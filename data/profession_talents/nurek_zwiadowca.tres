@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "nurek_zwiadowca"
+profession_id = "nurek"
+display_name = "Zwiadowca"
+description = "Po 1,5 sekundy ciągłego bezruchu, przy wyłączonej latarni i bez wykonywania akcji, pokazuje wyłącznie jeden z 8 kierunków oraz kategorię najbliższego niepokonanego zagrożenia albo silnego prądu (co najmniej 60) w promieniu 640, bez dystansu, nazwy i pozycji."
+parameters = {"detection_radius": 640.0, "stationary_seconds": 1.5, "strong_current_threshold": 60.0}
+sort_order = 10

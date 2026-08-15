@@ -1,0 +1,147 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/MainMenuController.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/SettingsMenu.tscn" id="2_settings"]
+[ext_resource type="Texture2D" path="res://assets/ui/main_menu_key_art_v1.png" id="3_key_art"]
+[ext_resource type="Theme" path="res://assets/ui/main_menu_theme.tres" id="4_theme"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_menu"]
+bg_color = Color(0.012, 0.034, 0.041, 0.955)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.33, 0.49, 0.49, 0.9)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+shadow_color = Color(0, 0, 0, 0.78)
+shadow_size = 24
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("4_theme")
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.035, 0.045, 1)
+
+[node name="KeyArt" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 2
+texture = ExtResource("3_key_art")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = 24.0
+offset_right = 624.0
+offset_bottom = -24.0
+grow_vertical = 2
+
+[node name="MenuPanel" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(560, 590)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_menu")
+
+[node name="Margin" type="MarginContainer" parent="Center/MenuPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 42
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 42
+theme_override_constants/margin_bottom = 26
+
+[node name="Content" type="VBoxContainer" parent="Center/MenuPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Center/MenuPanel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.8, 0.48, 1)
+theme_override_font_sizes/font_size = 34
+text = "OSTATNI POMOST"
+horizontal_alignment = 0
+
+[node name="Subtitle" type="Label" parent="Center/MenuPanel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66, 0.76, 0.76, 1)
+text = "Survival city-builder nad wodą i wyprawy pod nią"
+horizontal_alignment = 0
+
+[node name="Separator" type="HSeparator" parent="Center/MenuPanel/Margin/Content"]
+layout_mode = 2
+
+[node name="DifficultyLabel" type="Label" parent="Center/MenuPanel/Margin/Content"]
+layout_mode = 2
+text = "Poziom trudności nowej kampanii"
+
+[node name="DifficultyPicker" type="OptionButton" parent="Center/MenuPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+
+[node name="DifficultySummaryLabel" type="Label" parent="Center/MenuPanel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.7, 0.69, 1)
+theme_override_font_sizes/font_size = 12
+text = "Profil Standard"
+horizontal_alignment = 0
+autowrap_mode = 2
+
+[node name="CustomDifficultyButton" type="Button" parent="Center/MenuPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+text = "KONFIGURUJ TRUDNOŚĆ"
+visible = false
+
+[node name="NewGameButton" type="Button" parent="Center/MenuPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "NOWA GRA"
+
+[node name="ContinueButton" type="Button" parent="Center/MenuPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "KONTYNUUJ"
+
+[node name="SettingsButton" type="Button" parent="Center/MenuPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "USTAWIENIA"
+
+[node name="QuitButton" type="Button" parent="Center/MenuPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_type_variation = &"DangerButton"
+text = "WYJDŹ"
+
+[node name="StatusLabel" type="Label" parent="Center/MenuPanel/Margin/Content"]
+layout_mode = 1
+theme_override_colors/font_color = Color(0.55, 0.66, 0.67, 1)
+theme_override_font_sizes/font_size = 12
+text = "Sprawdzanie zapisu..."
+horizontal_alignment = 0
+autowrap_mode = 2
+
+[node name="SettingsOverlay" parent="." instance=ExtResource("2_settings")]

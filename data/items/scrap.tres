@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ItemDefinition.gd" id="1_item"]
+[ext_resource type="Texture2D" path="res://assets/diving/pickups/scrap_pickup.png" id="2_pickup"]
+
+[resource]
+script = ExtResource("1_item")
+id = "scrap"
+display_name = "Zlom"
+description = "Metal, podpory, elementy wzmocnien i napraw."
+stack_limit = 999
+weight = 1.5
+world_pickup_texture = ExtResource("2_pickup")

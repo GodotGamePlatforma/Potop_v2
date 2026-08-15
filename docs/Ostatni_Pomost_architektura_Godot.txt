@@ -1,0 +1,1171 @@
+OSTATNI POMOST — ARCHITEKTURA GODOT
+Wersja dokumentu: 2.0
+Godot 4.7 / zweryfikowane 4.7.1
+
+0. ROLA I KONTRAKT REDAKCYJNY
+================================================================================
+
+Ten dokument jest jedynym właścicielem technicznego mapowania zatwierdzonego produktu i ARD na Godot: własności stanu i zachowania, granic danych, kolejności, transakcji, persistence, kompatybilności, walidacji i mapy testów. Pełna macierz odpowiedzialności dokumentów znajduje się w `AGENTS.md`.
+
+Nie powtarzaj tutaj wizji i narracji, roadmapy produktu, pełnych tabel balansu, uzasadnienia decyzji, datowanego stanu wdrożenia ani ostatniego wyniku testów. Regułę widoczną dla gracza wskaż w `docs/OgolnyZarys.txt`; powód trwałego wyboru w `.ai/DECISIONS.md`; aktualny skrót i luki w `.ai/PROJECT_CONTEXT.md`. Dokładna aktywna wartość strojalna pochodzi z walidowanego zasobu, a ten dokument wskazuje jej pole, właściciela i konsumenta zamiast tworzyć drugą tabelę.
+
+Nowa lub całkowicie redagowana sekcja systemu odpowiada, o ile dotyczy, na następujące pytania:
+
+1. Odpowiedzialność — czego system jest jedynym właścicielem?
+2. Właściciel stanu — jaki stan przechowuje dane i czy jest trwały?
+3. Wejścia -> wyjścia — jaki jest publiczny kontrakt danych?
+4. Kolejność i transakcja — kiedy wolno mutować i zatwierdzić wynik?
+5. Konsumenci/UI — kto tylko prezentuje albo deleguje?
+6. Persistence i zgodność — jaki jest wpływ na wspólną rewizję, czystą granicę i starsze dane?
+7. Walidacja i testy — jakie ryzyko oraz kontrakt pokrycia istnieją, bez wyniku ostatniego przebiegu?
+8. Powiązania — właściwa sekcja produktu i aktywne ARD, bez kopiowania ich treści.
+
+Dla `[DOCELOWE]` opisuj wymagane granice i integracje, ale nie wymyślaj przedwcześnie nazw klas, pól ani plików. `[AKTYWNE]` wymaga konsumenta runtime potwierdzonego w `.ai/PROJECT_CONTEXT.md`. Znaczenie statusów i luki implementacyjnej określają aktywne ARD dokumentacyjne.
+
+Pełny zestaw eksportowanych pól zawsze definiuje wskazany skrypt. Lista w tym dokumencie jest kontraktem technicznym tylko wtedy, gdy sekcja jawnie ogłasza się pełnym inwentarzem. Przy edycji zastanej sekcji usuń powtórzony szczegół produktu do jego właściciela i pozostaw odwołanie; nie dopisuj równoległej wersji przepływu.
+
+1. ZASADY ARCHITEKTONICZNE
+================================================================================
+
+[AKTYWNE]
+
+1. `GameState` jest jedynym stanem kampanii.
+2. `GameRoot` orkiestruje aplikację i fazy, nie implementuje mechanik domenowych.
+3. Baza i nurkowanie są osobnymi modułami.
+4. Publiczna granica modułu nurkowania to `ExpeditionSetup -> DiveResult`; `DiveSessionState` jest stanem lokalnym wewnątrz modułu.
+5. `EndOfDayResolver` jest jedynym orkiestratorem końca dnia.
+6. Definicje i jawnie wyprowadzone dane balansowe są zasobami `Resource`; stałe algorytmiczne pozostają w systemie wskazanym przez ARD, a UI nie przechowuje drugiej kopii liczb.
+7. Plan dnia staje się niemutowalną migawką przed wyprawą albo rozliczeniem.
+8. Zmiany świata nurkowania trafiają do kampanii dopiero przez zakończony wynik.
+9. Save jest atomowy i wersjonowany.
+10. Mechanika opisana jako aktywna musi mieć rzeczywistego konsumenta, widoczny skutek i test proporcjonalny do ryzyka.
+11. Sceny i kontrolki są warstwą kompozycji/prezentacji, nie równoległym modelem domenowym.
+
+2. STRUKTURA PROJEKTU
+================================================================================
+
+[AKTYWNE]
+
+    project.godot
+    README.md
+    AGENTS.md
+    .agents/
+        skills/
+            ostatni-pomost-art/
+                SKILL.md
+                agents/
+                    openai.yaml
+                references/
+                    technical-art.md
+                    visual-direction.md
+                    visual-qa.md
+    .ai/
+        PROJECT_CONTEXT.md
+        DECISIONS.md
+    assets/
+        audio/
+        base/
+            building_blueprints/
+            environment_3d/
+        base_3d/
+            source/
+        diving/
+            world/map_v2/
+                source/
+                visuals/
+        intro/
+        ui/
+    data/
+        balance/
+        buildings/
+        diseases/
+        difficulty/
+        diving_gear/
+        events/
+        items/
+        missions/
+        professions/
+        survivor_templates/
+        survivors/
+        threats/
+        workshop_recipes/
+    docs/
+        OgolnyZarys.txt
+        Ostatni_Pomost_architektura_Godot.txt
+    scenes/
+        base/
+        diving/
+        main/
+        ui/
+    scripts/
+        base/
+        core/
+        data/
+        definitions/
+        diving/
+        ui/
+    tests/
+    tools/
+
+`.agents/skills` zawiera repozytoryjne przewodniki wykonawcze dla wyspecjalizowanych zadań Codex. Nie jest częścią runtime Godot ani źródłem mechaniki, architektury, stanu wdrożenia lub balansu. `ostatni-pomost-art` prowadzi proces grafiki, animacji i VFX, natomiast aktywne mapowanie zasobów oraz ich konsumentów nadal należy do właściwych sekcji tego dokumentu. Routing i granicę tych przewodników określają główny `AGENTS.md` oraz ARD-0086.
+
+Znaczenie warstw kodu:
+
+- `scripts/core` — orkiestracja aplikacji, fazy, sceny, zapis, baza definicji, deterministyczne próbki i tutorial;
+- `scripts/base` — planowanie Przystani, gospodarka, wydarzenia, kariera, misje i resolver;
+- `scripts/diving` — lokalna sesja czasu rzeczywistego, świat, ryzyko, interakcje i wynik;
+- `scripts/ui` — współdzielone kontrolki powłoki, podpowiedzi wejścia i panel ustawień;
+- `scripts/data` — zapisywalny stan i obiekty kontraktowe;
+- `scripts/definitions` oraz `data` — niemutowalne definicje i wartości strojalne;
+- `scenes` — kompozycja węzłów i UI;
+- `tests` — testy domenowe, sceniczne, integracyjne, e2e i snapshoty.
+- `tools` — samodzielne, deterministyczne raporty diagnostyczne poza domyślnym runnerem.
+
+Główna scena: `res://scenes/main/GameRoot.tscn`.
+
+Autoloady:
+
+- `SaveManager` — atomowy zapis, odczyt i walidacja jednego namespace kampanii;
+- `GameDatabase` — wczytanie oraz walidacja definicji.
+
+Nie ma autoloadu audio. `GameRoot` posiada zwykłą instancję `UserSettings`, a sceny i trwałe kontrolki powłoki mogą mieć lokalne odtwarzacze, jak ambient intro, muzyka Bazy i one-shot panelu narracji. Zwykłych systemów gameplayowych również nie dodaje się jako singletonów.
+
+3. GAMESTATE I FAZY
+================================================================================
+
+3.1. `GameState`
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+Aktualne eksportowane pola `scripts/data/GameState.gd`:
+
+- metadane: `format_revision`, `campaign_id`, `created_at`, `last_saved_at`, `day`, `seed`, `current_phase`;
+- konfiguracja: `difficulty_profile`;
+- gospodarka i ludzie: `resources`, `survivors`, `buildings`, `platform`, `active_policies`, `current_day_plan` oraz typowany `disease_campaign`;
+- nurkowanie: `underwater_world`, `last_dive_result`, `current_expedition_setup`, `diving_equipment`;
+- fabuła i prowadzenie: `story_flags`, `tutorial`, `mission_progress`;
+- poranek i presja: `pending_settlement_event`, `settlement_event_history`, `settlement_event_roll_day`, `weather`, `pressure_state`;
+- raporty: `last_morning_report`, `last_end_day_report`, `end_day_report_history`.
+
+`GameState` jest właścicielem stanu, lecz zachowanie należy do małych systemów. Panel nie zapisuje własnego rosteru, progresji, kontenera, misji ani wydarzenia.
+
+3.2. Fazy
+--------------------------------------------------------------------------------
+
+`GamePhase.Phase`:
+
+- `MAIN_MENU` — menu;
+- `DAY_START_REPORT` — blokująca decyzja poranka;
+- `BASE_PLANNING` — zwykłe planowanie;
+- `EXPEDITION_SETUP` — przygotowanie i walidacja wyprawy;
+- `DIVING` — lokalna sesja;
+- `DIVE_RESULT` — przyjęty wynik;
+- `DAY_RESOLUTION` — atomowe rozliczenie kandydata;
+- `END_DAY_REPORT` — obowiązkowe podsumowanie zapisanego dnia;
+- `CRISIS` — planowanie podczas kryzysu przywództwa;
+- `GAME_OVER` — porażka;
+- `ENDING` — scena zakończenia.
+
+Typowe ścieżki:
+
+    BASE_PLANNING / CRISIS
+        -> EXPEDITION_SETUP
+        -> DIVING
+        -> DIVE_RESULT
+        -> DAY_RESOLUTION
+        -> END_DAY_REPORT
+
+    BASE_PLANNING / CRISIS
+        -> end_day_without_dive
+        -> DAY_RESOLUTION
+        -> END_DAY_REPORT
+
+    END_DAY_REPORT
+        -> DAY_START_REPORT, jeżeli istnieje pending event
+        -> BASE_PLANNING albo CRISIS, jeżeli poranek jest spokojny
+
+Faza `CRISIS` nie jest pasmem presji wydarzeń. To planowanie aktywnego kryzysu przywództwa.
+
+`IntroScene` nie jest fazą kampanii. Menu zapisuje nowy stan w `BASE_PLANNING` przed pokazaniem intro; pominięcie lub naturalne zakończenie zmienia wyłącznie scenę. Kontynuacja istniejącego zapisu nie odtwarza intro.
+
+3.3. `DayPlanState`
+--------------------------------------------------------------------------------
+
+Pola planu: `day`, `locked`, `ration_policy`, `building_work_paces`, `worker_assignments`, `building_orders`, `selected_diver_id`, `expedition_entry_point`, `expedition_setup`, `medical_priority_survivor_ids` oraz `isolated_survivor_ids`. `selected_diver_id` jest jedynym edytowalnym wyborem nurka i wskazuje wolną, zdolną osobę; nie jest stanowiskiem budynku. Pierwsza z list priorytetowych zamraża preferowaną kolejność wspólnej opieki, a druga decyzje izolacji awaryjnej lub formalnej; puste priorytety oznaczają stabilny automatyczny triage, nie brak opieki. `[LEGACY] work_pace` oraz kompatybilnościowy widok `building_orders` opisuje sekcja 11.3.
+
+Plan jest edytowalny podczas planowania. `WorkerAssignmentSystem` synchronizuje go z trwałymi rosterami po każdej udanej zmianie. Start wyprawy albo dnia bez wyprawy blokuje migawkę. Nowy dzień tworzy nowy plan z aktualnego, zrekonsyliowanego rosteru. Gameplay czyta stan budynków i kolejkę produkcji bezpośrednio.
+
+4. MODUŁ BAZY
+================================================================================
+
+[AKTYWNE]
+
+Główne odpowiedzialności:
+
+- `BaseController` — wiązanie UI z systemami i intencjami gracza;
+- `BuildingSystem` — atomowa, natychmiastowa budowa lub rozbudowa wraz z ich kosztami;
+- `WorkerAssignmentSystem` — atomowy roster oraz odwrotny indeks;
+- `RationAllocationSystem` — czysta, bezstanowa projekcja polityki, odbiorców i jednego kosztu;
+- `BuildingEffectSystem` — bezstanowy prezenter poziomów i prognoz delegujący obliczenia do właścicieli domeny;
+- `BuildingWorkSystem` — czyste projekcje połowu, automatycznej naprawy i pracy Domu, z jednym adapterem obsady dla podglądu i resolvera;
+- `WorkPaceSystem` — ID, mnożniki, zmęczenie, lokalne przejścia Napięcia i progi agregacji Nadziei;
+- `ProductionSystem` — kolejka i wytwarzanie sprzętu;
+- `InjuryRecoverySystem` — wspólna projekcja i mutujący krok gojenia;
+- `MedicalCareSystem` — jedna projekcja kwalifikacji, triage, pojemności, kosztu i efektu aktywnej opieki nad zdrowiem, urazami oraz chorobami;
+- `DiseaseSystem` — ekspozycja, transmisja, progresja, rekonwalescencja, odporność i stan epidemii;
+- `CareerProgressionSystem` — rangi, naliczanie, kanoniczna bramka wydawania punktów wymagająca aktywnego Domu Wspólnoty I, druga specjalizacja i trwały wybór talentu wymagające poziomu II;
+- `ProfessionTalentSystem` — walidowany katalog dwóch talentów dla każdej wykonywalnej profesji oraz wspólne zapytania o zamrożony wybór;
+- `SettlementEventSystem` — poranny wybór i atomowy skutek;
+- `DifficultyDirector` — migawka `PressureState`;
+- `MissionSystem` — prowadzenie i rekonsyliacja misji;
+- `CampaignProgressionSystem` — jedyny pion Wspólnej Linii, kryzys, game over, trzy zakończenia energii i Kronika;
+- `WeatherSystem` / `StormSystem` — dzienna migawka i uszkodzenie platformy;
+- `EndOfDayResolver` — kolejność oraz raport.
+
+Kontroler sceny nie może implementować drugiego wzoru racji, tlenu, leczenia, kosztu ani prognozy budynku.
+
+4.1. Roster i praca
+--------------------------------------------------------------------------------
+
+`BuildingState.assigned_survivor_ids` jest trwałą, uporządkowaną i zwartą listą. `SurvivorState.current_assignment` jest indeksem odwrotnym. Rekonsyliacja usuwa `DEAD`, `DEPARTED`, nieistniejące ID i duplikaty.
+
+Zwarty model ma konsekwencję: usunięcie osoby z wcześniejszego stanowiska przesuwa role późniejszych osób w lewo. Jest to część formatu kampanii rewizji 1; model pozycyjny z pustymi miejscami wymagałby jawnej zmiany znaczenia trwałego stanu.
+
+Niezdolna osoba zachowuje stanowisko, ale `SurvivorState.can_work()` daje brak wkładu. `can_work()`, `can_dive()` i `work_efficiency()` są aktywnymi bramkami sprawności mieszkańca; docelowy `RosterRotationSystem` dodaje do nich kanoniczną fasadę obecności, aby osoba poza bazą nie mogła pracować ani nurkować. Widoczne progi i skutki należą do `docs/OgolnyZarys.txt`, sekcja 4. Zamrożona migawka zdolnej obsady jest źródłem jednej dziennej nagrody ogólnych PD, natomiast dziennik rzeczywistej pracy pozostaje jedynym źródłem praktyki zawodowej.
+
+`RESTING` nie ma producenta gameplayowego ani komendy odpoczynku, chociaż bieżąca bramka pracy toleruje tę wartość. UI nie przedstawia go jako działającego trybu mieszkańca; aktywne choroby są typowanymi rekordami `disease_cases`, nie wartością statusu.
+
+Każdy `BuildingState` przechowuje lokalne `work_pace` i `work_tension`, a `DayPlanState.building_work_paces` zamraża tempo po ID budynku. `WorkPaceSystem` jest jedynym właścicielem mapowania tempa na wykonany efekt, zmęczenie, przejście Napięcia i wspólną deltę Nadziei. Realną pracę potwierdza wpis dziennika z budynkiem, tempem i wykonawcami; resolver, raport oraz `BuildingEffectSystem` konsumują ten sam wynik. Pełne wartości i znaczenie graczowe są w `docs/OgolnyZarys.txt`, sekcja 4; kontrakt decyzji: ARD-0068.
+
+`BuildingWorkSystem.workforce_from_capable_ids()` jest wspólnym adapterem danych obsady. Wywołujący przekazuje ID zaakceptowane już przez centralną bramkę mieszkańca; podgląd czyta bieżącą sprawność, natomiast resolver przekazuje migawkę zamrożoną przed zastosowaniem wyniku wyprawy. Brak ID w przekazanej migawce daje zerowy wkład i nie może bocznie odczytać później zmienionego stanu osoby.
+
+4.2. Platforma i sloty
+--------------------------------------------------------------------------------
+
+`PlatformState.slot_states` zawiera sześć wpisów:
+
+- `top_left` -> `fishing_hut`;
+- `top_center` -> `kitchen`;
+- `top_right` -> `community_house`;
+- `bottom_left` -> `workshop`;
+- `center` -> `infirmary`;
+- `bottom_right` -> `diving_station`.
+
+Każdy wpis ma aktywne `is_edge`, `definition_id` i `building_id`. `PlatformState` zapisuje aktywne `fishing_pressure` oraz `repair_scrap_rounding_carry`; pola kompatybilnościowe opisuje sekcja 11.3. Wykonywane poziomy wsparcia Stacji należą do `ExpeditionSetup.base_support_level` oraz `DiveExitLine.support_level`.
+
+`BuildingSlot.gd` jest kontrolką `Button`/prezentacją. Nie jest zapisywalnym modelem slotu.
+
+Wizualna baza jest od ARD-0066 hybrydą 2,5D/3D: `BaseWorld3D` pokazuje model, ocean i efekty, natomiast powyższe wpisy `PlatformState.slot_states` nadal są jedynym źródłem typów, budowy i przypisań slotów. Nody `Ruin_<slot>`, `SlotAnchor_<slot>` oraz `Built_<slot>_L1..L4` w modelu są prezentacją i kotwicami UI, nie nowym stanem kampanii.
+
+Nie ma aktywnego przenoszenia, sąsiedztwa, dzielnic, segmentów ani uszkodzeń pojedynczego budynku. Sztorm zmienia globalną integralność. Pola bez konsumenta są opisane w sekcji legacy.
+
+`BuildingState.condition` jest przypadkiem granicznym: `is_active()` i UI odczytują wartość oraz blokują budynek przy `<= 0`, ale jedyny producent runtime ustawia 100 podczas budowy i żadna mechanika jej później nie obniża. Jest to defensywny stan kompatybilnościowy/placeholder, nie osiągalny obieg zużycia. Dopóki osobny pion nie doda producenta, skutku, naprawy i testów, UI nie powinno eksponować stałego „stanu technicznego” jako zmiennej mechaniki.
+
+4.3. Definicje budynków
+--------------------------------------------------------------------------------
+
+`BuildingDefinition` przechowuje tożsamość, opis, poziomy, wymaganie krawędzi i premię specjalisty. Rzeczywiste przypisanie typu wymusza `PlatformState.slot_states[slot_id].definition_id`, a krawędź `requires_edge`. `BuildingLevelDefinition` jest właścicielem `worker_slots`, `capabilities`, `build_cost` i `upgrade_cost`.
+
+Jedynymi źródłami aktywnych, strojalnych tabel sześciu budynków są walidowane zasoby:
+
+- `data/buildings/diving_station.tres`;
+- `data/buildings/fishing_hut.tres`;
+- `data/buildings/kitchen.tres`;
+- `data/buildings/workshop.tres`;
+- `data/buildings/infirmary.tres`;
+- `data/buildings/community_house.tres`.
+
+`GameDatabase` wymaga dokładnie zamkniętego katalogu tych sześciu definicji. Waliduje właściwy typ i ID zasobu, niepuste oraz wzajemnie unikalne nazwy i opisy, dokładnie cztery poziomy 1–4, dodatnią liczbę stanowisk, obecność wymaganych capabilities od poziomu odblokowania do IV wraz z typem i logicznym zakresem oraz komplet premii specjalisty. Walidacja kosztów i zgodności zawodu pozostaje częścią istniejących granic bazy definicji. Widoczne dla gracza znaczenie oraz bieżące tabele poziomów należą do `docs/OgolnyZarys.txt`, sekcja 5; ten dokument nie utrzymuje ich drugiej kopii.
+
+Wyjątkiem od danych strojalnych są jawne stałe algorytmiczne wskazane przez ARD. Dla Stacji `ExpeditionPreparationSystem` wyprowadza i zamraża `ExpeditionSetup.suit_quality`, zasięg Operatora i `suit_repair_amount`; właścicielami redukcji uszkodzeń/naprawy oraz izolacji są odpowiednio `SuitSystem` i `TemperatureSystem`. Szczegół wartości pozostaje w tych systemach, nie w równoległej tabeli dokumentu.
+
+Mapowanie lokalnego tempa jest zamknięte: Stacja skaluje wsparcie Operatora i naprawę kombinezonu, Chata wynik połowu, Kuchnia sumę oszczędności, Warsztat punkty produkcji i automatyczną naprawę, Lecznica ilość leczenia przed mnożnikiem trudności, a Dom koryguje poziomowy wkład pracownika. `BuildingEffectSystem` i panel konsumują ten sam wynik domenowy. Ciężki odzysk wymusza procedurę Normalną; bierne capabilities nie są skalowane. Kontrakt: ARD-0068; produkt: `docs/OgolnyZarys.txt`, sekcje 4-5.
+
+`BuildingWorkSystem` jest aktywnym właścicielem projekcji połowu, automatycznej naprawy oraz zwykłej pracy Domu. Adapter obsady przenosi stabilny zbiór talentów zdolnych uczestników, aby podgląd i resolver składały te same modyfikatory. Dla Chaty czyta z `BuildingDefinition` poziomowe `food_per_worker` i `fishing_pressure_per_food`, a odnowę presji łowiska utrzymuje jako jedną stałą algorytmiczną dla dnia pracy i drugą dla dnia bez obsady; talenty Rybaka modyfikują wyłącznie wynik tej projekcji. Projekcja, resolver oraz panel muszą konsumować ten sam wynik; regresja długiego horyzontu obejmuje co najmniej 15 kolejnych dni pełnej obsady i zakresy poziomów z `docs/OgolnyZarys.txt`, sekcja 5.2. `MedicalCareSystem` osobno posiada wspólną projekcję Lecznicy dla zdrowia, urazów i chorób, wraz z atomowo walidowanym skutkiem Rehabilitanta; `BuildingEffectSystem` prezentuje te wyniki, a `EndOfDayResolver` stosuje zwrócone delty oraz zobowiązania terapii bez ponownego liczenia wzoru. Racje nadal należą do `RationAllocationSystem`, produkcja do `ProductionSystem`, przejścia urazów do `InjuryRecoverySystem`, typowane przypadki i izolacja do `DiseaseSystem`, a mnożniki tempa do `WorkPaceSystem`.
+
+4.4. Racje i głód
+--------------------------------------------------------------------------------
+
+`PolicyState.RationPolicy` przechowuje wybór `FULL`, `HALF`, `NONE` albo `DIVER_PRIORITY`. Jedynym właścicielem wyliczenia kosztu, fallbacku, faktycznej polityki i odbiorców jest `RationAllocationSystem`; dokładna reguła oraz wartości widoczne dla gracza należą do `docs/OgolnyZarys.txt`, sekcje 3.1-3.2.
+
+`EndOfDayResolver` przekazuje do systemu zamrożoną politykę, żyjący roster, poprawnego nurka, dostępne jedzenie oraz wyprowadzoną efektywność Kuchni, a następnie pobiera koszt dokładnie raz i zapisuje zwrócony wynik w raporcie. Nie interpretuje fallbacku ponownie.
+
+`BuildingEffectSystem.ration_forecast()` jest prezenterem planu, nie drugim algorytmem. Czyta wyłącznie bieżący albo zamrożony `DayPlanState`, dodaje pewny połów rozliczany przed racjami, nie zgaduje nieznanego `DiveResult` i deleguje do tej samej metody `RationAllocationSystem.project()`. Wspólny wynik zasila koszt, odbiorców, fallback i kartę pracy Kuchni; brak faktycznego wydania oznacza wkład Kuchni 0.
+
+Po alokacji `EndOfDayResolver` stosuje zwrócone porcje w krokach głodu i morale. Zamrożony zestaw talentów zdolnej obsady Kuchni może zmienić wyłącznie osobistą konsekwencję połowy racji albo dodać warunkowe morale pełnej racji; globalny skutek Nadziei pozostaje osobnym składnikiem. Stałe progów oraz delt należą do walidowanych definicji talentów i odpowiednich systemów domenowych wskazanych przez ARD-0044, ARD-0068 i ARD-0089; architektura nie utrzymuje ich drugiej tabeli.
+
+`_resolve_conflicts()` jest obecnie hookiem ostrzegawczym. Nie losuje kradzieży, sabotażu ani dezercji. Choroby mają odrębny, pełny krok opisany w sekcji 4.6 i ARD-0073; nie korzystają z hooka konfliktów.
+
+4.5. Warsztat i modele kosztu
+--------------------------------------------------------------------------------
+
+Kolejność aktywnej pracy Warsztatu po zamrożeniu planu:
+
+1. dodatni postęp produkcji FIFO;
+2. najwyżej jeden ciężki odzysk;
+3. automatyczna naprawa platformy.
+
+Warsztat realizuje wyłącznie aktywne receptury wyposażenia, zlecenia Wspólnej Linii, ciężki odzysk i naprawę.
+
+Kod używa `if/elif`: niższy poziom jest blokowany tylko po realnym wykonaniu wyższego. W produkcji oznacza to dodatnio zastosowane punkty; systemowy zwrot lub anulowanie ani samo sprawdzenie zablokowanego zlecenia bez dodatniego postępu nie są pracą. Resolver i podgląd używają tego samego rozstrzygnięcia, więc wskazują wtedy ciężki odzysk albo naprawę. Budowa lub rozbudowa aktywuje poziom atomowo już podczas edytowalnego planowania; dzienny resolver korzysta z zamrożonej obsady i planu utworzonych po tej decyzji.
+
+Trzy przestrzenie materiałowych kosztów aktywnej gospodarki:
+
+- budowa/upgrade: `build_cost_multiplier`, zaokrąglenie do najbliższej liczby, minimum 1;
+- automatyczna naprawa: bazowy koszt jednego udanego dziennego uruchomienia, `repair_cost_multiplier`, error diffusion i trwałe carry; liczba uzyskanych punktów nie mnoży kosztu;
+- receptury Warsztatu i zlecenia kampanijne Wspólnej Linii: stałe, nieskalowane koszty autorskie.
+
+`ProductionSystem.get_craft_cost()` zwraca surowy koszt receptury. Nie wolno przedstawiać `build_cost_multiplier` jako mnożnika produkcji.
+
+`ProductionSystem.queue_recipe()` pobiera koszt natychmiast i dodaje do `BuildingState.queued_production_orders` typowany `WorkshopOrderState` formatu 1. Order zamraża tożsamość receptury i celu, prezentację, `reserved_cost`, dzień oraz częściowy postęp, a trwały licznik nadaje stabilne `instance_id`. System przeprowadza dzienną moc po FIFO, kończy pełne ordery i zachowuje resztę; każdy dodatni postęp jest realną pracą i blokuje ciężki odzysk oraz naprawę. Przy kwalifikującym pierwszym ukończeniu wynik projekcji może zawierać dokładnie jeden zwrot talentu Odzysk materiału; czysty podgląd i resolver konsumują ten sam rekord, a postęp, anulowanie, ciężki odzysk i automatyczna naprawa nie kwalifikują się. Konserwator należy z kolei do czystej projekcji automatycznej naprawy `BuildingWorkSystem`, przed limitem integralności. Pojemność, moc i koszt widoczne dla gracza należą do `docs/OgolnyZarys.txt`, sekcja 5.4, oraz walidowanych definicji.
+
+Resolver pracuje na snapshotcie orderu bez ponownego ładowania live receptury. Po sukcesie usuwa pierwszy wpis dopiero po dodaniu sprzętu; gdy sprzęt jest już posiadany, zwraca dokładnie `reserved_cost` raz, a błąd celu pozostawia order i rezerwację bez zmian. Panel pokazuje pozycję FIFO, dokładny koszt, postęp i rzeczywisty bloker. Jedyną aktywną kolejką jest `BuildingState.queued_production_orders`; czysty format nie przyjmuje alternatywnej listy receptur.
+
+4.6. Choroby, opieka i epidemia
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+`DiseaseDefinition` i zagnieżdżone `DiseaseStageDefinition` są walidowanymi zasobami pod `data/diseases`. Definicja przechowuje stabilne ID i wersję, prezentację, próg i modyfikatory presji, przebieg etapów, koszty terapii, czas naturalnego zdrowienia i odporności oraz podpis konfiguracji. `GameDatabase` ładuje zamknięty katalog i odrzuca puste albo powielone ID, nieznane etapy, niewykonalny przebieg, niepoprawne zakresy, brak podpisu i brak produkcyjnej Gorączki Zalewowej.
+
+`SurvivorState.disease_cases` zawiera typowane `DiseaseCaseState`. Przypadek zamraża wersję, podpis i głęboką definicję potrzebną do dokończenia przebiegu, etap, daty, presję, źródło i liczniki zdrowienia. Jest równoległy do urazu, przydziału i statusu; nie istnieje druga kolekcja ani osobny status choroby. `SurvivorState.work_efficiency()` składa najniższy aktywny mnożnik choroby z dotychczasową sprawnością, a centralne blockery pracy i nurkowania konsumują typowane etapy.
+
+`DiseaseExposureState` jest typowaną granicą narażenia: zachowuje chorobę, cel, rodzaj i ID źródła, opcjonalną osobę źródłową, presję i dzień. Ekspozycje wyprawy najpierw należą do lokalnego `DiveSessionState`, przechodzą przez zakończony `DiveResult`, a `_apply_dive_result()` dołącza je do `DiseaseCampaignState.pending_exposures`; sesja nigdy nie mutuje kampanii bez wyniku.
+
+`DiseaseCampaignState` przechowuje wyłącznie niederywowalne fakty: ostatni rozliczony dzień, pending ekspozycje, aktywność i tożsamość epizodu epidemii, dzień początku i opanowania oraz historyczny szczyt. Aktualne liczby przypadków są wyprowadzane z żywych i obecnych mieszkańców, nie zapisywane jako druga prawda.
+
+`DiseaseSystem.project_day()` jest czysty. Przyjmuje kandydata kampanii, katalog definicji, faktyczne porcje `RationAllocationSystem`, dziennik rzeczywistej pracy, listę izolowanych i zobowiązania terapii `MedicalCareSystem`. Sortuje definicje, źródła i osoby po stabilnych ID, buduje całą transmisję na snapshotcie sprzed nowych przypadków, ogranicza źródło, cel i całą osadę, a następnie projektuje etapy, delty zdrowia, odporność, przejście epidemii, jedną dokładną deltę Nadziei poza ogólnym mnożnikiem profilu i uporządkowane wpisy raportu. Profilaktyk jest parametrem tej samej projekcji i modyfikuje wyłącznie nową presję źródeł kontaktowych, bez reinterpretacji pending narażeń albo istniejących przypadków. `apply_day()` przyjmuje wyłącznie kompletną projekcję, stosuje ją raz i ustawia `last_resolved_day`; nie wykonuje drugiej analizy.
+
+`MedicalCareSystem.project()` jest jedynym właścicielem listy kandydatów, stabilnego automatycznego triage, jawnych priorytetów planu, pojemności budynku, dostępnego leku, wspólnego kosztu, leczenia zdrowia i urazów oraz zobowiązania terapii choroby. Jedna osoba występuje raz, zajmuje jeden slot i zużywa najwyżej jedną dawkę. `EndOfDayResolver` stosuje projekcję, `BuildingEffectSystem` i UI tylko ją prezentują, a `InjuryRecoverySystem` pozostaje właścicielem przejść urazów.
+
+Izolacja jest decyzją `DayPlanState`. `DiseaseSystem.isolation_change_blocker()` i `set_isolation_intent()` są jedyną granicą mutacji; sprawdzają fazę, blokadę planu, obecność osoby i etap przypadku wymagający izolacji. Brak aktywnej Lecznicy ani wyczerpana pojemność formalna nie blokują decyzji awaryjnej. `isolation_assignments()` stabilnie przypisuje pierwsze ID z planu do pojemności capability poziomu III/IV, a pozostałe do izolacji awaryjnej; tylko formalna lista całkowicie usuwa transmisję.
+
+Pierwsza definicja `flood_fever` i wszystkie aktywne liczby widoczne dla gracza należą do `data/diseases` oraz `docs/OgolnyZarys.txt`, sekcja 4. Ta sekcja utrzymuje tylko właścicieli, przepływ i transakcję. Kontrakt decyzji: ARD-0073.
+
+4.7. Docelowa rotacja załogi i ekspedycje łodzią
+--------------------------------------------------------------------------------
+
+[DOCELOWE]
+
+Rotacja załogi jest jednym pionem domenowym obejmującym dobrowolne odejście mieszkańca, wielodniową ekspedycję łodzią i decyzję o kandydaturach z powrotu. `RosterRotationSystem` jest właścicielem stałych inwariantów: czasy 2/3/4 dni, Chata Rybacka II jako bramka, jedna aktywna ekspedycja, jedna trwała decyzja o odejściu dziennie, pełny prowiant pobierany przy wypłynięciu, rezerwacja miejsca dowódcy oraz blokada pozostawienia pustej Przystani. UI Domu, Chaty i Załogi ma delegować do tej samej granicy.
+
+Istniejący szkielet kodu definiuje pięć wersjonowanych kontraktów `Resource` formatu 1:
+
+- `BoatExpeditionState` — aktywne zobowiązanie z trwałym ID, trasą i priorytetem, dowódcą, dniem wypłynięcia, czasem, dokładnym dniem powrotu, poziomem Chaty, kosztem FOOD na osobę, zdrowiem przy starcie, wersją i podpisem balansu, ziarnem oraz niezmiennym wynikiem;
+- `BoatExpeditionOutcomeSnapshot` — zamrożony poziom rezultatu, tekst raportu, nieujemne delty zwykłych zasobów, konsekwencje dowódcy i najwyżej dwie głębokie migawki kandydatów z wykonywalnych profesji, typowanych kompetencji, urazów i chorób; druga kandydatura jest poprawna wyłącznie dla czterodniowej ekspedycji z Chaty Rybackiej IV;
+- `BoatExpeditionCandidateDecision` — jawna decyzja `REJECT`, `ACCEPT_FREE_PLACE` albo `ACCEPT_REPLACING`, opcjonalnie ze wskazaniem zastępowanego mieszkańca i wariantu jego odejścia;
+- `BoatExpeditionReturnState` — stan powrotu powstający dopiero po jednorazowym zastosowaniu zasobów, zawierający pełny zestaw typowanych decyzji o wszystkich kandydaturach;
+- `CrewDepartureRecord` — niezmienna migawka tożsamości, rozwoju, kompetencji, zdrowia, urazów, głębokich przypadków chorób, wariantu odejścia, bazowej i faktycznej delty Nadziei oraz kosztu prowiantu w chwili trwałego odejścia.
+
+Szkielet nie jest jeszcze częścią `GameState`, nie ma producenta runtime, UI, definicji balansu ani kroku resolvera i nie czyni mechaniki aktywną. Pełna integracja wymaga jawnej zmiany wspólnego formatu oraz pól agregatu dla najwyżej jednej aktywnej ekspedycji, oczekującego powrotu, historii powrotów i odejść, stabilnej sekwencji ID oraz ostatniego dnia wykorzystania limitu odejścia. Te pola nie mogą trafić do bieżącego grafu przed preflightem, postflightem, roundtripem i testami odrzucenia.
+
+Aktywna ekspedycja ma być właścicielem nieobecności dowódcy; obecny enum mieszkańca nie ma wartości `MISSING` i nie wolno dodawać jej jako równoległego właściciela. `RosterRotationSystem` jest docelową kanoniczną fasadą pytań o roster żyjący, obecny, nieobecny i miejsca zarezerwowane oraz blockerów pracy i nurkowania. Jeżeli pełny pion doda prezentacyjny status osoby poza bazą, musi on być pochodny i walidacyjnie równoważny aktywnemu rekordowi ekspedycji.
+
+Pełna integracja rozdziela trzy zapytania rosteru:
+
+- żyjący roster — warunek przetrwania kampanii i trwała pojemność; dowódca nadal zajmuje swoje miejsce podczas wyprawy;
+- osoby obecne w Przystani — racje, głód, zmęczenie bazy, morale, schronienie danej nocy, praca, leczenie i transmisja chorób;
+- osoby nieobecne na ekspedycji — osobna projekcja wyniku, bez bocznego udziału w systemach bazy.
+
+Wypłynięcie i odejście są komendami atomowymi na edytowalnym planie. Najpierw walidują pełny koszt, status osoby, tutorial, pojemność, limit, aktywne zobowiązania i wszystkie referencje planu; dopiero potem pobierają zasoby, czyszczą obsadę i zapisują stan. Odrzucenie zachowuje plan, zasoby, roster, historię i licznik. Dowódca łodzi nie może mieć aktywnej choroby poza odpornością, nie może wypłynąć w dniu, którego odcinek 2/3/4 dni dosięga albo przekracza Czarny Front, a jego zamrożony wynik musi pozostawić co najmniej 1 zdrowia. Prowiant to dokładnie `FOOD_PER_ADULT * duration_days`; Kuchnia go nie skaluje. Osoby odchodzącej nie usuwa się z `GameState.survivors`: otrzymuje terminalne `DEPARTED`, a ogólny rejestr odejść zastępuje powiązanie tego statusu wyłącznie z historycznym następstwem Kroniki.
+
+Dobrowolne przyjęcie kandydata respektuje trwałą pojemność schronienia, która liczy także dowódcę poza bazą. Jedynym wyjątkiem pozostaje już aktywny ratunek nurkowy: ocalały przeniesiony przez zakończony `DiveResult` może wywołać awaryjne przeludnienie, ale nie otwiera bocznej drogi do dobrowolnego przyjęcia kandydatury.
+
+Generator wyniku musi używać stabilnego ID ekspedycji, seeda kampanii i wersjonowanej definicji balansu. Cały niejawny wynik oraz kandydaci są głęboko zamrażani przy wypłynięciu, więc zapis, zmiana danych i ponowne uruchomienie nie zmieniają przedstawionej później decyzji. Kandydat otrzymuje stabilne ID zależne od ekspedycji, korzysta wyłącznie z wykonywalnych profesji i przed przyjęciem pozostaje migawką oferty, a nie drugim wpisem aktywnego rosteru.
+
+Poranny powrót ma pierwszeństwo przed wydarzeniem osady i stanami nieterminalnymi. Najpierw wynik stosuje zasoby i konsekwencje dowódcy dokładnie raz, następnie UI zbiera kompletny zestaw `BoatExpeditionCandidateDecision`, a domena waliduje cały pakiet na odłączonym kandydacie. Wszystkie przyjęcia, najwyżej jedno zastąpienie, wspólny dzienny limit odejścia, pojemność i zakaz pozostawienia zera osób obecnych są zatwierdzane jednym commitem; błąd dowolnej decyzji nie zmienia żadnej kandydatury, rosteru, historii, Nadziei ani limitu. Ostatnią obecną osobę wolno zastąpić wyłącznie w tej samej atomowej transakcji. Jeżeli wszyscy żyjący są poza bazą, kampania nie przegrywa od samego braku obecnych: planowanie pracy i nurkowanie są zablokowane, a poranek przechodzi w stan oczekiwania na najbliższy powrót.
+
+Kontrakt graczowy: `docs/OgolnyZarys.txt`, sekcje 4, 5.2 i 5.6. Decyzje: ARD-0081 i ARD-0082.
+
+5. MODUŁ NURKOWANIA
+================================================================================
+
+[AKTYWNE]
+
+Główne odpowiedzialności:
+
+- `DiveController` — orkiestracja sesji i interakcji;
+- `DiverController` — ruch `CharacterBody2D` przez `InputMap`;
+- `OxygenSystem` — zużycie tlenu, sprint, obciążenie i wsparcie;
+- `SuitSystem` — uszkodzenie, przecieki i naprawa;
+- `TemperatureSystem` — zimno zależne od głębokości;
+- `NoiseSystem` — poziom i zdarzenia hałasu;
+- `ThreatSystem` / `DiveThreat` — pierwszy pion `noise_eel`;
+- `DiveCombatSystem` — wybór narzędzia, cooldown, amunicja, trafienie i lokalne obrażenia przeciwnika;
+- `LightSystem` — krzywa światła otoczenia zależna od głębokości oraz prezentacja rzeczywiście włączonej, wyposażonej latarni;
+- `LootSystem` — sloty, waga, selektywny transfer i plecak;
+- `RescueSystem` / `DiveRescueSurvivor` — Leon i holowanie;
+- `SectorPersistenceSystem` — mapowanie sesji i wyniku na `WorldDelta`;
+- `ContinuousDiveWorld` — widok, warstwy, collider i chunk index;
+- `DiveMovementSystem` — wspólny, czysty krok kinetyki używany przez sesję i certyfikacyjny replay;
+- `DiveRecoveryScenarioFactory` / `DiveRecoveryAnalyzer` — odłączony scenariusz, planner i certyfikat normalnego odzysku;
+- `DiveRiskRuntime` — składanie małych systemów ryzyka bez zapisu kampanii.
+
+Sterowanie z `project.godot`: `WASD` lub strzałki, `E`/`SPACE`, `SHIFT`, `R`, `SHIFT+R`, `F`, `I`, wybór narzędzia `1`/`2` oraz atak `LPM` w kierunku kursora. Wszystkie akcje klawiaturowe, w tym cicha naprawa, przechodzą przez `UserSettings` i zachowują modyfikatory przy remapie.
+
+5.1. Kontrakt wejściowy `ExpeditionSetup`
+--------------------------------------------------------------------------------
+
+Aktywne pola:
+
+- nurek: `diver_id`, `diver_display_name`, `diver_profession`, `diver_secondary_profession`, `diver_portrait_id`, `diver_level`, `diver_experience`, `diver_experience_to_next_level`, `diver_health`, `diver_health_capacity`, obserwacyjne składniki buildera `diver_personal_oxygen_capacity` i `diver_specialist_oxygen_multiplier`, `diver_carry_capacity`;
+- przedmioty i sprzęt: `item_weights`, `selected_gear`, `equipped_gear`, zamrożona amunicja wyposażonej broni `weapon_ammunition`, obserwacyjny składnik buildera `oxygen_tank_capacity`;
+- wynikowe parametry: `backpack_capacity`, `oxygen_capacity`, `suit_quality`;
+- rozwój zamrożony: `competency_levels` oraz `profession_talent_ids`, gdzie druga mapa ma kontrakt `{profession_id: talent_id}`;
+- wejście i prowadzenie: `start_entry_point`, `objective_title`, `objective_guidance`, `objective_target_landmark_id`, `objective_target_label`;
+- Stacja i wsparcie: `base_support_level`, `station_staffed_carry_multiplier`, `operator_assigned`, `technician_assigned`, `operator_survivor_id`, `technician_survivor_id`, `can_place_buoys`, `can_mark_heavy_objects`, `buoy_charges`, `station_work_pace_multiplier`, `suit_repair_amount`; finalny `operator_rescue_max_distance` jest zamrożony w `difficulty_modifiers`;
+- kontekst: `difficulty_modifiers`, `day`, `tutorial_mode`, `tutorial_baseline_step`.
+
+`DayPlanState.selected_diver_id` jest niezależną decyzją planu i nie wskazuje stanowiska Stacji. `ExpeditionPreparationSystem` jest jedynym builderem: waliduje wybranego, wolnego nurka, opcjonalnie odczytuje osobną Obsługę Stacji i zamraża jej mnożnik udźwigu 1,05 albo 1,0 bez obsady. Zamraża również lokalne tempo Stacji, finalny zasięg Operatora i ilość naprawy, więc późniejsza zmiana budynku nie reinterpretowuje wyprawy. Guidance misji jest wskazówką HUD-u, nie blokadą ruchu, wejścia ani ukończenia. Sesja konsumuje wynikowe wartości; składniki buildera nie działają później jako niezależne modyfikatory.
+
+5.2. Lokalny `DiveSessionState`
+--------------------------------------------------------------------------------
+
+Stan sesji przechowuje setup, rzeczywisty lokalny stan włączenia wyposażonej latarni, tlen, zdrowie, kombinezon, zimno, hałas, ładunki napraw, liczniki uszkodzeń, urazy, plecak i kolejność slotów, wagi, stan kontenerów, pickupy, holowaną osobę, boje, skróty, ciężkie oznaczenia, odzyskiwane plecaki i sprzęt, pakunki, czas oraz tryb tutoriala. Pozycja i ruch należą do `DiverController`/`CharacterBody2D`, nie do `DiveSessionState`. Dla tutoriala sesja zamraża `tutorial_baseline_step`, utrzymuje odłączony bieżący kursor, uporządkowany dziennik zdarzeń i fakty obowiązkowych skrzyń. `DiveController` kieruje zdarzenia do lokalnego `TutorialDirector`; wcześniejsza interakcja nie ginie, ale nie omija poprzednich instrukcji. Retry odtwarza baseline i czyści lokalny dziennik oraz fakty bez mutacji kampanii. Pierwsze zejście zalicza łup po zebraniu minimum celu określonego przez `TutorialDirector`, niezależnie od opróżnienia kontenerów; częściowa zawartość nadal przechodzi przez `remaining_container_contents` do `DiveResult`.
+
+`light_enabled` rozpoczyna każdą próbę jako włączone wyłącznie wtedy, gdy zamrożony `ExpeditionSetup.equipped_gear` zawiera światło rozwiązane do poprawnego `DivingGearDefinition`. Remapowalna akcja `dive_light_toggle` zmienia ten stan tylko w aktywnej sesji bez modala. Brak lub błędne ID wymusza `false`, wyłącza `PointLight2D` i daje komunikat bez tworzenia awaryjnej Latarni I w kontrolerze. Reset próby odtwarza stan początkowy; przełączenie nie przechodzi do `DiveResult`, `GameState` ani zapisu.
+
+Żadna z tych zmian nie modyfikuje `GameState` podczas trwającej próby. Każde wyzerowanie tlenu przy `tutorial_mode = true` pokazuje retry i odtwarza stan sprzed sesji bez `DiveResult` oraz bez końca dnia. Po tutorialu wyzerowanie przechodzi do śmierci albo automatycznej ekstrakcji Operatora.
+
+5.3. Kontrakt wyjściowy `DiveResult`
+--------------------------------------------------------------------------------
+
+Aktywne pola:
+
+- tożsamość i wynik: `diver_id`, `returned_alive`, `diver_dead`, `emergency_extraction`;
+- konsekwencje nurka: `diver_injuries`, `lost_gear`, `lost_items`, `body_location_if_dead`, `backpack_location_if_lost`, `death_world_position`, `oxygen_remaining`, `health_remaining`, `suit_condition_remaining`, `cold_exposure`, `repair_kit_uses`, `experience_gained`, `dive_duration`, `noise_events`, `risk_events`, `tutorial_completed`;
+- konsekwencje chorobowe: `disease_exposures`, zawierające wyłącznie typowane i głęboko odłączone rekordy z lokalnej sesji;
+- łup i ratunek: `collected_items`, `rescued_survivors`, `rescue_outcomes`;
+- trwałość świata: `placed_buoys`, `opened_shortcuts`, `opened_containers`, `collected_world_item_ids`, `remaining_container_contents`, `marked_heavy_objects`, `recovered_backpacks`, `recovered_gear_ids`, `dropped_loot_updates`;
+- przejściowa granica tutoriala: `tutorial_outcome` z baseline, końcowym krokiem i uporządkowanymi zdarzeniami bieżącej próby.
+
+Lokalna lista odkryć aktywnie zwiększa PD bieżącej wyprawy, po czym jest zapisywana do `WorldDelta.discovered_landmarks`. `body_location_if_dead` zasila telemetrię zgonu jako ID landmarku; odzyskiwalny obiekt to `lost_backpacks`, a runtime nie renderuje ciała. Raport używa prezentacyjnej nazwy landmarku albo neutralnego „rejonu”. Zachowane aliasy i pola kompatybilnościowe opisuje sekcja 11.3.
+
+`DiveTutorialOutcome` nie jest częścią trwałego formatu kampanii. Przy starcie `GameRoot` wymaga równoważności aktywnego tutoriala kampanii z `ExpeditionSetup.tutorial_mode`, zgodnego baseline i jednego z dozwolonych kroków rozpoczęcia nurkowania. Po powrocie waliduje outcome względem bieżącej kampanii, stosuje go na odłączonym kandydacie przed autosave i dopiero po sukcesie podmienia `GameState`; zapisane `last_dive_result` nie zawiera przejściowego outcome. Odrzucenie albo błąd zapisu zachowuje aktywny kursor, plan, fazę i kampanię.
+
+5.4. Powrót i awaryjna ekstrakcja
+--------------------------------------------------------------------------------
+
+Normalny powrót wymaga aktywnej liny przy wejściu głównym albo boi. Nie ma ręcznego wynurzenia z dowolnego miejsca.
+
+Operator:
+
+- wymaga capability Stacji II-IV oraz zdolnej do pracy osoby innej niż nurek, przypisanej do drugiego stanowiska Stacji i zamrożonej w setupie;
+- działa tylko przy starcie głównym;
+- korzysta z zamrożonego w `ExpeditionSetup` maksymalnego zasięgu oraz deterministycznej szansy profilu trudności;
+- sukces zwraca `DiveResult` oznaczony jako awaryjna ekstrakcja, z krytycznym zdrowiem, urazem i wyzerowanym tlenem;
+- zwykły niesiony łup trafia do raportowego `lost_items`, nie do odzyskiwalnego plecaka.
+
+Wartości widoczne dla gracza należą do `docs/OgolnyZarys.txt`, sekcje 5.1 i 6.1. Ich technicznymi właścicielami są `ExpeditionPreparationSystem`, właściwy `DifficultyProfile` i system ratunku; ta sekcja opisuje przepływ, nie utrzymuje drugiej tabeli balansu.
+
+`story_artifact` nie należy do bieżącego formatu ani aktywnego pionu Wspólnej Linii. Czysty odczyt nie ma dla niego wejścia ani reinterpretacji.
+
+`Dzwon głębinowy` jest nazwą poziomu Stacji. `[DOCELOWE]` Balon i ręczna komenda awaryjnego wynurzenia nie są obecnymi mechanikami.
+
+`OxygenSystem` jest jedynym właścicielem bazowych stawek bezczynności, zwykłego ruchu i sprintu. `DiveController` składa zwróconą stawkę z zamrożonym mnożnikiem trudności, obciążeniem, prądem i holowaniem, po czym konsumuje lokalny `DiveSessionState`; pojemności nadal pochodzą wyłącznie z `ExpeditionSetup`. Pokrycie graniczne wymaga co najmniej 300 sekund ciągłego zwykłego ruchu dla startowego Igora z Butlą I na najwyższym publicznym mnożniku zużycia oraz ściśle rosnącego czasu dla Butli II i III.
+
+5.5. Sprzęt, narzędzia, walka i waga
+--------------------------------------------------------------------------------
+
+Nóż po odblokowaniu, łom i jeden ładunek naprawczy są stałym zestawem wyprawy. Technik daje drugi ładunek. Holowanie blokuje naprawę i atak. Poza nim `R` zużywa dokładnie jeden ładunek i emituje hałas wyłącznie po udanej naprawie uszkodzonego kombinezonu; próba przy stanie 100%, bez zestawu albo bez ładunków nie zmienia sesji. Talent Technik głębinowy odblokowuje odrębną, remapowalną akcję `dive_quiet_repair`: `DiveController` utrzymuje wyłącznie anulowalny czas przytrzymania, natomiast `DiveRiskRuntime.try_repair_suit(mode)` atomowo waliduje talent z setupu, koszt, wielkość naprawy i emisję hałasu. Zwykłe `R` zachowuje dokładne dopasowanie bez modyfikatora, dlatego `SHIFT+R` nie uruchamia obu trybów. Stałe narzędzia nie zajmują slotów cargo, a nóż zachowuje kontekstowe przecinanie przez zwykły kontrakt interakcji.
+
+Talent Zwiadowca korzysta z publicznego `ContinuousDiveWorld.scout_signal_at()` oraz równoważnego helpera `DiveNavigationSnapshot`; UI nie czyta prywatnego blueprintu. `DiveScoutRuntime` posiada czas ciągłego bezruchu i resetuje go po ruchu, świetle, holowaniu lub akcji. Zapytanie wybiera po odległości najbliższe niepokonane zagrożenie albo krawędź silnej strefy prądu, rozstrzyga remis rodzajem i stabilnym ID, a HUD prezentuje wyłącznie ośmiokierunkowy symbol oraz kategorię.
+
+`DiveCombatSystem` jest bezstanowym właścicielem parametrów noża i wykonania ataku oraz konsumentem parametrów broni z `DivingGearDefinition`. `ExpeditionPreparationSystem` zamraża pojemność amunicji wyposażonej broni w `ExpeditionSetup`; `DiveController` rozwiązuje intencję wejścia i kierunek kursora, ale nie liczy obrażeń. `DiveSessionState` przechowuje wyłącznie lokalny wybór narzędzia, cooldown i odnawiane na początku próby harpuny. `DiveThreat` przechowuje lokalne zdrowie oraz stan pokonania; `DiveRiskRuntime` ignoruje pokonane zagrożenia. Reset próby odtwarza zdrowie i amunicję, a `DiveResult` nie utrwala zabitych przeciwników ani zużytych harpunów.
+
+Pistolet harpunowy używa istniejącego slotu wyposażenia `weapon`, przechodzi przez zwykłą recepturę Warsztatu II i istniejący kontrakt własności, wyposażenia, utraty oraz odzyskania. Nie dodaje zasobu amunicji, pola `GameState` ani wpisu `WorldDelta`. HUD czyta lokalną sesję i pokazuje wybrane narzędzie, pozostałe harpuny oraz aktualne podpowiedzi.
+
+Wybieralny sprzęt kampanii i jego parametry definiują walidowane `DivingGearDefinition` oraz receptury Warsztatu. Latarnia I pozostaje słabszym, nieutracalnym wyposażeniem startowym; receptura Latarni II pozostaje dostępna od Warsztatu I i tworzy wyraźnie mocniejsze światło. Warianty podstawowe są nieutracalne, a wytworzone ulepszenie nie ma `owner_survivor_id`: jest wyposażeniem kampanii zabieranym przez bieżącego nurka i może zostać utracone oraz odzyskane. Pełna oferta i wartości należą do `docs/OgolnyZarys.txt`, sekcje 5.1 i 6.
+
+Limit plecaka składa liczbę typów oraz osobisty udźwig. Waga sztuki pochodzi z `ItemDefinition`, a `DifficultyProfile.backpack_weight_multiplier` zmienia jej efektywną migawkę w setupie zamiast trwałego udźwigu postaci. `OxygenSystem` jest jedynym konsumentem wpływu obciążenia na tlen; ruch nie ma osobnego spowolnienia od samej wagi. Kompatybilnościowe znaczenie `stack_limit` opisuje sekcja 11.3.
+
+5.6. Certyfikacja odzyskiwalności i narzędzie projektanta
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+Jedynym właścicielem odpowiedzi „czy i czym można dostarczyć wskazany ładunek” jest domenowy analizator odzyskiwalności modułu nurkowania. UI, skrypt raportowy i testy są konsumentami jednego raportu; nie liczą osobno tlenu, wag, prądów ani skutków zagrożeń.
+
+`DiveRecoveryScenarioFactory` buduje legalny, niezapisywany scenariusz przez produkcyjny `ExpeditionPreparationSystem`. Odrzuca błędny typ profilu lub trudności, nieznane ID świata, wejście bez wcześniej utrwalonej boi, niemożliwy dzień oraz niespójny łańcuch urządzeń; po J-7 materializuje także właściwy dla presetu licznik Czarnego Frontu. `DiveRecoveryAnalyzer` konsumuje `DiveRecoveryQuery`, `DiveRecoverySafetyPolicy` i rzeczywisty `DiveNavigationSnapshot`, a wynik zapisuje w `DiveRecoveryCertificate` oraz `DiveRecoveryReport`. `tools/dive_recovery_report.gd` udostępnia ten sam kontrakt projektantowi, również dla enumeracji wszystkich statycznych celów. Live oraz replay współdzielą kinetykę w `DiveMovementSystem`; tryb analityczny może pominąć nieużywane segmenty renderowo-fizyczne i współdzielić bazową erozję rastra, ale zawsze maskuje stan bram na odłączonej kopii.
+
+Wejścia:
+
+- gotowy `ExpeditionSetup` zbudowany wyłącznie przez `ExpeditionPreparationSystem`;
+- wykonany `ContinuousDiveWorld` oraz niemutowalny `DiveNavigationSnapshot` zawierający kanoniczną siatkę kolizji, rzeczywiste pozycje wejścia, liny, celów i zagrożeń, strefy prądów oraz aktywne blokady skrótów;
+- nietrwały profil progresji opisujący wejścia do buildera setupu, a nie wynikowe statystyki;
+- nietrwałe ilościowe zapytanie zasobów oraz walidowana polityka bezpieczeństwa;
+- bieżący `WorldDelta` tylko do odczytu, aby respektować kontenery, pickupy, plecaki, pakunki, boje i skróty.
+
+Wyjściem jest raport per profil, preset, źródło i ilość. Rozdziela co najmniej łączność fizyczną, możliwość wejścia w zasięg interakcji, wymagania narzędzia/slotów/masy, `FEASIBLE`, `SAFE`, normalny powrót, przeżycie zagrożeń i konkretny kod porażki. Dla kontenera zwraca `max_safe_amount`; dla zapytania wielozasobowego nie myli sumy osobnych wypraw z jedną trasą zbierającą cały manifest.
+
+Kolejność certyfikacji:
+
+1. fabryka tworzy odseparowany `GameState` scenariusza, przeprowadza profil przez legalny ekwipunek, poziomy budynków i `ExpeditionPreparationSystem.build_setup()` oraz nigdy go nie zapisuje;
+2. świat buduje rzeczywiste węzły i skorygowane pozycje, po czym publikuje snapshot bez odsłaniania mutowalnej prywatnej siatki;
+3. planner eroduje wodę o konserwatywny gabaryt obracanej kapsuły, nakłada zamknięte bramy i szuka kierunkowej trasy, której koszt zależy od prądu oraz aktualnego ładunku; segment przecinający strefę prądu musi dodatkowo przejść odłączony raster bezpieczeństwa z marginesem polityki, podczas gdy wąskie przejścia poza prądem zachowują bazową geometrię;
+4. replay o stałym kroku odtwarza kandydata przez wspólne systemy ruchu, tlenu, temperatury, kombinezonu, hałasu i zagrożeń, pełne czasy interakcji oraz rzeczywistą linię; podczas przytrzymanej interakcji nadal kontruje prąd, przesuwa nurka, nalicza koszt i pilnuje rzeczywistego zasięgu celu;
+5. dopiero udany replay z dodatnim tlenem nadaje `FEASIBLE`, a spełnienie rezerwy polityki nadaje `SAFE`;
+6. raport zachowuje wejście, pozycje celów, pełne świadectwo trasy, wymagany i pozostały tlen, rezerwę, masę, sloty, ekspozycję na zagrożenia, bezpieczną ilość, liczbę wypraw i kod przyczyny; nie mutuje świata, sesji kampanii ani persistence.
+
+Pozycje z blueprintu nie są wystarczającym wejściem: certyfikacja używa pozycji po `_nearest_open_world_position()`. Celem planera jest bezpieczna komórka w aktywnym promieniu interakcji, a nie koniecznie środek obiektu. Zamknięte skróty są fizycznymi, obróconymi prostokątami poza PNG i muszą wejść do snapshotu. `collapsed_paths` pozostaje nieaktywnym polem danych i nie jest symulowaną przeszkodą.
+
+Profile etapów oraz zapytania są walidowanymi `Resource` pod `data/diving_validation`, ale nie są częścią `GameState`. Początkowe checkpointy rozdzielają Stację od Warsztatu: bazowy Tank I, legalny Tank II z Warsztatu II, legalny Tank III z Warsztatu III oraz Stację IV z wcześniej certyfikowanymi bojami. Publiczne presety są twardą macierzą, a `custom` trybem raportowym. Polityka przechowuje strojalną rezerwę, wymaganie normalnej liny i zakres akceptowanych skutków zagrożeń.
+
+Persistence: brak nowego pola kampanii i brak zmiany wspólnej rewizji. Dynamiczny plecak albo zwykły stos utraconego łupu może być analizowany bieżącym setupem, lecz automatyczna relokacja utrwalonego obiektu byłaby osobną zmianą znaczenia zapisu i nie należy do tego systemu.
+
+Kontrakt produktu: `docs/OgolnyZarys.txt`, sekcja 6.3. Decyzja: ARD-0072.
+
+6. KANONICZNA KOLEJNOŚĆ KOŃCA DNIA
+================================================================================
+
+[AKTYWNE]
+
+`GameRoot` duplikuje kampanię głęboko, ustawia `DAY_RESOLUTION` i przekazuje kandydata do resolvera z `persist = false`. Po zakończeniu domenowej kolejności zapisuje całego kandydata przez `SaveManager`; aktywny stan jest podmieniany dopiero po udanym autosave. Budowa i rozbudowa nie należą do tej transakcji: `BuildingSystem` pobiera koszt i aktywuje poziom atomowo podczas edytowalnego planowania.
+
+Dokładna kolejność `EndOfDayResolver.resolve()`:
+
+1. `WorkerAssignmentSystem.reconcile_assignments()`;
+2. blokada jeszcze niezablokowanego planu;
+3. utworzenie `ReportState` i migawki zdolnej obsady;
+4. `_apply_dive_result()` — wraz z natychmiastową terminalizacją zmarłego nurka, usunięciem go z obu rosterów i zamrożonej migawki obsady;
+5. `_resolve_fishing()`;
+6. `_resolve_kitchen_processing()`;
+7. `_resolve_workshop_and_repairs()` — produkcja FIFO, heavy i naprawa;
+8. `_resolve_medical_care()`;
+9. `_resolve_community_work()`;
+10. `_resolve_rations()`;
+11. `_resolve_hunger()`;
+12. `_resolve_fatigue()`;
+13. `_resolve_diseases()` — czysta projekcja oraz jednorazowa aplikacja równoczesnej transmisji, progresji, odporności, delty zdrowia i przejścia epidemii;
+14. `_resolve_work_tension()`;
+15. `_resolve_hope()` — zwykły bilans zawiera jedną nominalną deltę tempa przed mnożnikiem trudności, po czym dokładna epidemiczna delta -6/+4 jest stosowana osobno bez tego mnożnika;
+16. `_resolve_career_progression()` — najpierw deduplikuje ogólne PD ze zdolnej obsady, potem nalicza praktykę z dziennika realnej pracy;
+17. `_resolve_morale()`;
+18. `_resolve_conflicts()` — tylko ostrzeżenie ryzyka;
+19. `_resolve_storm_damage()`;
+20. `_resolve_deaths()`;
+21. `CampaignProgressionSystem.resolve_day_outcome()`;
+22. `MissionSystem.reconcile()`;
+23. przypisanie `last_end_day_report`;
+24. `_advance_day()` — numer, plan, pogoda;
+25. `prepare_pressure_for_day()`;
+26. `SettlementEventSystem.prepare_event_for_day()`;
+27. `_generate_morning_report()`;
+28. archiwizacja raportu;
+29. ustawienie `END_DAY_REPORT`, jeżeli stan nie jest terminalny;
+30. opcjonalne `_save_game()` tylko wtedy, gdy bezpośredni wywołujący podał `persist = true`.
+
+Punkt 30 nie jest produkcyjnym commitem dnia. W normalnym przepływie `GameRoot` używa `persist = false`, a następnie wykonuje transakcję `SaveManager.save_game(candidate) -> game_state = candidate`. Dzięki temu błąd zapisu nie pozostawia częściowo rozliczonego aktywnego stanu.
+
+Skutki ważne dla projektowania:
+
+- ratunek i łup są zastosowane przed racjami;
+- śmierć wyprawowa jest terminalna przed każdym systemem osady i nie może skorzystać z pracy, Lecznicy, racji, schronienia ani późniejszych delt mieszkańców;
+- Lecznica działa przed posiłkiem;
+- budynek utworzony podczas planowania jest aktywny przed blokadą planu i może wejść do migawki obsady tego samego dnia;
+- raport na podstawie dziennika pokazuje realnie pracujące budynki, ich lokalne Napięcie i zawsze dokładnie jedną nominalną deltę tempa do wspólnego bilansu Nadziei, także 0;
+- choroby korzystają z pełnego typowanego systemu, natomiast konflikty pozostają hookiem ostrzegawczym;
+- sztorm i śmierci mogą doprowadzić do porażki mimo wcześniejszego spełnienia warunku fabularnego tej samej nocy;
+- dzień bez nurkowania korzysta z tej samej ścieżki i ma `includes_dive = false`.
+
+Aktywna integracja ARD-0073 zachowuje zewnętrzną granicę transakcji: krok 4 dołącza typowane narażenia wyprawy, krok 8 stosuje jedną projekcję `MedicalCareSystem` i zwraca zobowiązania terapii, kroki 10–12 dostarczają faktyczne racje, głód i zmęczenie, krok 13 projektuje oraz stosuje jednoczesną transmisję i progresję, krok 15 konsumuje dokładną, niemnożoną deltę epidemii, a krok 20 pozostaje jedyną terminalizacją od zdrowia równego zero. Po zmianie dnia `PressureState` otrzymuje aktualne metryki chorobowe przed selekcją wydarzenia.
+
+`_resolve_deaths()` obsługuje wyłącznie późniejsze śmierci od głodu i zdrowia. Nie raportuje ponownie śmierci wyprawowej; jej telemetria, plecak, lokalizacja ciała oraz kara Nadziei pozostają częścią wcześniejszego zastosowania `DiveResult`.
+
+[DOCELOWE] Po pełnym włączeniu ARD-0081/0082 krok wielodniowych ekspedycji działa dopiero po `_advance_day()`. Terminalna porażka Czarnego Frontu ma pierwszeństwo przed powrotem. W pozostałych przypadkach krok dokładnie raz stosuje zamrożone zasoby i konsekwencje dowódcy oraz tworzy `BoatExpeditionReturnState`; następnie zatrzymuje przygotowanie zwykłego wydarzenia, jeżeli istnieją kandydatury. Po zapisanym `END_DAY_REPORT` gracz rozstrzyga wszystkie kandydatury, a domena waliduje i stosuje komplet typowanych decyzji jednym commitem na odłączonym kandydacie kampanii. Dopiero udany commit buduje `PressureState`, losuje zwykłe wydarzenie osady dla ostatecznego rosteru i otwiera planowanie. Poranek bez kandydatur może przejść od razu do dotychczasowego przygotowania presji i wydarzenia. Brak osób obecnych przy żyjących osobach poza bazą przechodzi w oczekiwanie na najbliższy powrót zamiast w `GAME_OVER`.
+
+7. TRUDNOŚĆ, PRESJA I WYDARZENIA
+================================================================================
+
+7.1. `DifficultyProfile`
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+Preset `easy`, `standard`, `hard` albo `custom` jest kopiowany głęboko do kampanii. Migawka przechowuje `profile_id`, prezentacyjne `profile_name`, `balance_version`, wartości ekonomii, społeczeństwa, nurkowania, pogody, wydarzeń i wybaczania błędów, `snapshot_sealed` oraz `configuration_signature`.
+
+Osiem ID `custom`:
+
+- `starting_resources`;
+- `food_consumption`;
+- `economy`;
+- `society`;
+- `diving`;
+- `weather`;
+- `events`;
+- `forgiveness`.
+
+UI przekazuje osiem osi. Builder niskopoziomowy przyjmuje brak osi jako wartość standardową. Podpis jest stabilnym SHA payloadu zwracanego przez `compute_configuration_signature()`; obecna funkcja obejmuje również `profile_name`. Dokumentacja nie kopiuje kolejności pól podpisu.
+
+`threat_aggression_multiplier` jest aktywnym składnikiem osi nurkowania: `ThreatSystem` używa go do tempa narastania alertu i obrażeń zagrożenia. Nie jest inertnym polem profilu i musi pozostawać w walidacji oraz testach skutków trudności.
+
+`disease_pressure_modifier` jest zamrożonym składnikiem osi `society`, objętym wersją balansu i podpisem konfiguracji. Modyfikuje dzienną presję choroby dokładnie raz; podgląd i resolver konsumują tę samą wartość.
+
+Pokrycie progresji sprawdza materialną wystarczalność autorskiej puli dla publicznych presetów, ale nie jest symulacją tras, transportu, racji, strat, wydarzeń ani pełnego przeżycia A–Z. Konfiguracja `custom` jest walidowana zakresowo bez obietnicy ukończenia każdej kombinacji. Dokładny zakres gwarancji dla gracza należy do `docs/OgolnyZarys.txt`, sekcja 8.
+
+7.2. `PressureState` kontra kryzys przywództwa
+--------------------------------------------------------------------------------
+
+`DifficultyDirector` tworzy `PressureState` raz na granicy dnia. Migawka przechowuje pasmo, budżet, limity wyboru wydarzeń, tagi maszynowe, zamrożone metryki, historię i cooldown. System jest jedynym właścicielem progów krytycznych, a selektor wydarzeń konsumuje gotowe tagi zamiast odtwarzać bramki.
+
+Migawka przechowuje liczbę osób z aktywnym przypadkiem, liczbę osób zakaźnych oraz flagę epidemii. Aktywna epidemia dodaje maszynowy tag medyczny, blokuje dołożenie kolejnego ciężkiego hardshipu i preferuje role pomocy medycznej; `reason_codes` pozostają wyłącznie diagnostyką.
+
+`PressureState.Band.CRISIS` jest pasmem selekcji wydarzeń, nie fazą kampanii. `CampaignProgressionSystem` osobno jest właścicielem `GamePhase.CRISIS`, licznika odzyskania stabilności i precedencji stanów terminalnych. Pełne warunki, wartości i skutek graczowy należą do `docs/OgolnyZarys.txt`, sekcje 3.2, 8 i 10; techniczna kolejność rozstrzygnięcia pozostaje w sekcjach 6 i 10.
+
+7.3. `SettlementEventSystem`
+--------------------------------------------------------------------------------
+
+Wydarzenie powstaje po `AdvanceDay`, a przed raportem i autosave. Dwa niezależne deterministyczne rzuty wybierają najpierw wydarzenie/spokój, potem kartę. Definicje i wybory są `Resource`; progi, krzywe i bezpieczniki należą do `data/balance/settlement_events.tres`.
+
+Selektor zużywa gotowe `active_pressure_tags`, `recovery_roles`, preferencje i blokady. `reason_codes` są diagnostyczne i nie są interpretowane jako logika.
+
+Gwarancję odbudowy załogi `SettlementEventSystem` ocenia atomowo dla całej kandydującej grupy na zamrożonym stanie rosteru, pojemności i zasobów. Wynik może wpłynąć wyłącznie na dobór oferty, nigdy na decyzję gracza. Dokładny warunek dostępności, próg bezpieczeństwa i jednorazowość postaci należą do `docs/OgolnyZarys.txt`, sekcja 2.
+
+Wybór jest oceniany w całości, stosowany do głębokiej kopii, zapisywany, a dopiero potem aktywowany.
+
+`SettlementEventState` przechowuje typowany `SettlementEventOfferSnapshot` formatu 1 i dziedziczące jego wersję `SettlementEventChoiceSnapshot`. Oferta zapisuje `event_id`, stabilny `history_key`, prezentację, zamrożone metadane selekcji/cooldownu, jeden wspólny `expected_resource_baseline`, przeskalowane delty, dostępność z powodem oraz głębokie stany tworzonych osób. Nieznana wersja jest odrzucana, a pending UI i resolver nie czytają live definicji. Każda karta ma walidowany `fallback_choice_id` bez ujemnego kosztu magazynowego i bez dodawania osoby; analiza tagów, selekcja i oferta używają jednej pełnej ewaluacji, więc zatwierdzony snapshot zawsze zawiera dostępne wyjście.
+
+Po resolve historia zwalnia ciężką migawkę wyborów, ale zachowuje wynik, `history_key` oraz zamrożone metadane potrzebne cooldownowi i jednorazowości. Czysty format wymaga od początku kompletnego `offer_snapshot`; nie buduje go z dawnych kart ani bieżących `.tres` podczas odczytu.
+
+[DOCELOWE] Oczekujący `BoatExpeditionReturnState` ma pierwszeństwo przed `SettlementEventSystem`. Selekcja wydarzenia dla nowego dnia następuje dopiero po atomowym przyjęciu albo odrzuceniu wszystkich kandydatur, aby `free_shelter`, populacja, zdrowi pracownicy i gwarancja odbudowy załogi korzystały z jednego ostatecznego stanu poranka. Oba przepływy mogą korzystać z fazy `DAY_START_REPORT`, lecz muszą mieć jawny typ oczekującej decyzji i nie mogą renderować dwóch obowiązkowych modali równocześnie.
+
+8. MIESZKAŃCY I KARIERA
+================================================================================
+
+8.1. `SurvivorState`
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+Pola tożsamości: `id`, `display_name`, `age_group`, `biography`, `portrait_id`.
+
+Kariera: `profession`, `secondary_profession`, `experience_by_job`, `level`, `experience`, `unspent_skill_points`.
+
+Statystyki: bazowe i premiowe zdrowie, tlen i udźwig, bieżące `health`, `hunger`, `fatigue`, `morale`.
+
+Narracja i stan: `positive_trait`, `negative_trait`, `relationship_links`, `current_assignment`, `injury_states`, `status` oraz kanoniczne `disease_cases`.
+
+Aktywne przejścia nadają `AVAILABLE`, `WORKING`, `DIVING`, `INJURED`, `DEAD` i `DEPARTED`. Nie ma osobnej komendy ani gameplayowego statusu odpoczynku; `WorkPaceSystem` rozlicza zmęczenie z dziennika realnej pracy, a nie z samego przydziału. Typowane choroby działają równolegle do statusu, natomiast mechanika zaginięcia pozostaje poza aktywnym zakresem. Wartości i skutek graczowy: `docs/OgolnyZarys.txt`, sekcja 4.
+
+[DOCELOWE] ARD-0081/0082 nie używa `MISSING` jako zamiennika ekspedycji łodzią. Obecność wynika z aktywnego zobowiązania ekspedycji, a `RosterRotationSystem` jest jedyną fasadą rozróżniającą roster żyjący, osoby obecne, osobę nieobecną i zarezerwowaną pojemność. Trwała pojemność nadal liczy żyjącego dowódcę; praca, nurkowanie, racje, schronienie, leczenie, choroby i presja korzystają z obecności. Ogólne odejście pozostawia `SurvivorState` w rosterze ze statusem `DEPARTED` i osobnym `CrewDepartureRecord`; historia Kroniki nie jest już jedynym legalnym producentem tego statusu.
+
+Pełne relacje i konflikty są `[DOCELOWE]`. Aktywne choroby mapuje sekcja 4.6, a przekrojowe kontrakty trwałych pól sekcja 11.3.
+
+[AKTYWNE]
+
+8.2. Specjalizacje
+--------------------------------------------------------------------------------
+
+Wykonywalne ID: `rybak`, `kucharz`, `mechanik`, `medyk`, `organizator`, `nurek`. Nie istnieje siódma ścieżka ani tożsamość postaci „Radiowiec”; `Radiostacja` jest nazwą poziomu Domu. Zofia ma narracyjne `profession = "ogrodniczka"`, a Paweł `profession = "cieśla"`; żadne z tych ID nie ma `ProfessionDefinition`, więc nie daje wykonywalnej premii.
+
+`ProfessionDefinition` jest jedynym źródłem wartości PD obsady, praktyki i progów kariery. `CareerProgressionSystem` interpretuje definicję, ogranicza praktykę i przeprowadza awans. `EndOfDayResolver` deduplikuje ogólne PD per osoba na podstawie `_capable_worker_snapshot`, a praktykę per osoba i dziedzina na podstawie `_committed_work_events`. Znaczenie oraz bieżące wartości dla gracza należą do `docs/OgolnyZarys.txt`, sekcja 4.
+
+Wydanie punktu rozwoju jest jedną komendą `CareerProgressionSystem`: sprawdza istnienie osoby i ścieżki, edytowalność planu, niewydany punkt oraz aktywny Dom Wspólnoty co najmniej I. Zarówno akcja w panelu budynku, jak i globalna karta Załogi delegują do tej granicy, więc żadna ścieżka HUD-u nie omija roli Domu. Bramka drugiej specjalizacji pozostaje osobnym kontraktem aktywnego Domu II.
+
+`SurvivorState.competency_levels` jest typowanym słownikiem piętnastu ID i poziomów 1–3. `CompetencySystem` jest jedynym katalogiem ID oraz przelicznikiem efektów; `CareerProgressionSystem` pozostaje granicą komendy wydania punktu. Nurkowanie kopiuje poziomy do `ExpeditionSetup`, dzięki czemu sesja nie czyta późniejszych zmian kampanii. Konsumentami kompetencji nurkowych są kontroler ruchu i tlenu, `DiveRiskRuntime` i `ThreatSystem`; kompetencje bazowe składają się w `ProductionSystem`, `SurvivorState.work_efficiency()`, `EndOfDayResolver` i kontaktowej gałęzi `DiseaseSystem`. UI wyświetla poziomy i wywołuje tę samą komendę, bez własnego stanu.
+
+`ProfessionTalentDefinition` pod `data/profession_talents` przechowuje ID, wykonywalną profesję, prezentację oraz strojalne parametry efektu. `ProfessionTalentSystem` wymaga dokładnie dwóch definicji dla każdej z sześciu profesji, czyli dwunastu łącznie. `SurvivorState.profession_talent_ids` ma postać `{profession_id: talent_id}` i najwyżej dwa wpisy dla formalnych `profession` oraz `secondary_profession`. `CareerProgressionSystem.select_profession_talent()` jest jedyną mutującą komendą wyboru: sprawdza obecność, edytowalny plan, aktywny Dom II, formalną profesję, jej próg praktyki i brak wcześniejszego wyboru, bez pobrania punktu, zasobu albo dnia. Podgląd oraz resolver otrzymują talenty przez tę samą migawkę zdolnej obsady, a nurkowanie dodatkowo przez odłączoną mapę w `ExpeditionSetup`.
+
+`profession` oraz najwyżej jedno `secondary_profession` dają pełny efekt przez `has_profession()`. Uczeń nie daje częściowej premii. Po formalnym awansie inne niezdobyte ścieżki pozostają zablokowane dla kolejnej specjalizacji, ale zachowują i zwiększają praktykę potwierdzonej pracy jako widoczną historię kompetencji.
+
+Ogólne PD obsady pochodzą z zamrożonej listy zdolnych pracowników aktywnego budynku. Praca jest osobno potwierdzana zdarzeniem resolvera. Pusty Warsztat, Lecznica bez pacjenta, Kuchnia bez wydanej racji lub zerowa naprawa dają ogólne PD obsady, lecz nie dają praktyki. Nurek zachowuje wyłącznie PD z wyprawy; Operator i Technik dostają PD obsady oraz rozwijają `nurek` po rzeczywistej wyprawie. Instruktor jest częścią tego samego rozliczenia zdarzeń: każdy uczestniczący mentor może raz dziennie dodać praktykę jednemu innemu uczestnikowi bez talentu Instruktor według stabilnego wyboru, bez ogólnego PD i bez drugiego dziennika pracy. Mediator konsumuje rzeczywistą pracę Domu przed skalowaniem ujemnej delty Napięcia profilem trudności.
+
+9. ŚWIAT POD WODĄ
+================================================================================
+
+9.1. Blueprint i warstwy
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+`UnderwaterWorldState` składa się z `WorldBlueprint` oraz `WorldDelta`. Statyczny świat ma dokładnie jedno źródło autorskie: `res://scenes/diving/UnderwaterMap.tscn`. `WorldBlueprint` jest deterministyczną migawką kompilowaną ze sceny dla runtime i zapisu, a nie drugim formatem edycji. `WorldDelta` przechowuje wyłącznie skutki działań gracza pod stabilnymi ID.
+
+Bieżąca scena produkcyjna opisuje świat 11 520 × 6 480, cztery regiony, 28 landmarków, 39 zwykłych połączeń i osiem skrótów, 32 stałe kontenery, 12 pickupów, sześć stałych urządzeń, prądy, jedno zagrożenie, jeden cel ratunkowy, trzy boje oraz trzy ciężkie obiekty. Bezkolizyjne dekoracje prowadzą magistralę od platformy przez tutorialowe skrzynie i SC-01 do J-7, a następnie przez Archiwum oraz R-3 do C-4; nie są celem gameplayowym ani częścią podpisu mapy. `campaign_seed` nie zmienia topologii, pozycji ani tras; pozostaje wejściem wyłącznie dla jawnie seedowanych albo skalowanych reguł, między innymi deterministycznego zaokrąglenia zwykłego łupu.
+
+Scena utrzymuje wymagane grupy: `VisualLayers`, `Terrain`, `DepthRegions`, `Landmarks`, `Entries`, `Routes`, `CurrentZones`, `Gameplay`, `StaticObstacles`, `Decorations` i `RuntimeDynamic`. Pod `Gameplay` wymagane są katalogi `Containers`, `Pickups`, `Threats`, `HeavyObjects`, `RescueEncounters`, `BuoyAnchors` i `ShortcutGates`. Kompilator dopuszcza podkatalogi organizacyjne, ale każdy prefab musi pozostać pod gałęzią przypisaną do swojego typu; trasa należy do `Routes`, przeszkoda do `StaticObstacles`, a dekoracja do `Decorations`. Nazwa noda i jego ścieżka służą organizacji edytora; trwałą tożsamością jest `Object ID` albo `Connection ID`. Przestrzeń ID obiektów jest rozdzielona od przestrzeni ID połączeń, dzięki czemu brama może legalnie wskazywać połączenie o tym samym czytelnym oznaczeniu.
+
+Autorska warstwa pełnej mapy w `assets/diving/world/map_v2/visuals` zachowuje wyłącznie unikalną dekorację środowiska `duzaMapaEnvironmentDecorationLayer-v3.png` jako master authoringowy. Produkcyjna scena wskazuje `visual_chunks/map_visual_chunks_v1.json`, a `DiveVisualChunkStreamer` asynchronicznie ładuje rzadkie cropy z pierścieniem prefetch, histerezą i ograniczoną liczbą podpięć na klatkę; pełny master nie jest preloadowany przez runtime. Dawne tło biomów z sylwetkami architektury nie ma już autora ani konsumenta runtime. Manifest i cropy są deterministycznie generowaną prezentacją, wyłączoną z `map_gameplay_signature`. Jednolite tło oceanu i wspólną powierzchnię skał tworzy renderer opisany w sekcji 9.1.2.
+
+Bazową makronawigację dostarcza `assets/diving/world/map_v2/world_collision_grid.png`, skalowany do rozmiaru świata. Lokalnie edytowalne instancje `MapObstacle` dodają transformowane wielokąty blokujące. `MapObstacle` bez `Visual Scene` oznacza jawnie niewidoczną korektę kolizji elementu już narysowanego na bazowej warstwie; nowa widoczna przeszkoda otrzymuje prefab. `MapNavigationRaster` jest wspólnym właścicielem rasteryzacji obrazu i przeszkód scenowych dla `UnderwaterMapSceneCompiler` oraz `ContinuousDiveWorld`, więc walidacja i runtime nie interpretują obrotu ani skali przeszkody inaczej. Raster, wyprowadzone z niego segmenty graniczne oraz ich przypisanie do chunków są niemutowalnym cache'em procesu kluczowanym podpisem gameplayowym; kompilator przechowuje analogicznie pochodny blueprint według ziarna i czasu modyfikacji sceny. Zmiana źródła unieważnia cache, a konsumenci otrzymują defensywne kopie danych. Widoczny prefab nie jest źródłem fizyki. Jedna edycja bazowej maski zmienia kontur renderowanego terenu i fizyczną granicę; pojedyncze korekty oraz nowe przeszkody należy wykonywać przez `MapObstacle`. Techniczny indeks chunków jest niewidoczny i nie jest modelem sektorów.
+
+9.1.1. Authoring bezpośrednio w edytorze Godot
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+Projektant otwiera `res://scenes/diving/UnderwaterMap.tscn` i pracuje w zwykłym widoku 2D. Katalog `res://scenes/diving/map_objects/` zawiera sceny `MapRegion`, `MapLandmark`, `MapEntryPoint`, `MapExitLine`, `MapConnection`, `MapCurrentZone`, `MapLootContainer`, `MapPickup`, `MapThreat`, `MapHeavyObject`, `MapRescue`, `MapBuoy`, `MapShortcutGate`, `MapObstacle` i `MapDecoration`. Są to instancje z tool-scriptami, dlatego zapisane markery, obrysy, etykiety, kierunki prądów i trasy są widoczne bez uruchamiania gry. `DiveMapConnection` rysuje i kompiluje wypieczony przebieg własnej krzywej `Curve2D`, a gdy jej brak — czytelny odcinek pomiędzy wskazanymi landmarkami. Końce ręcznej krzywej muszą pozostać przy wskazanych landmarkach.
+
+`DiveMapObject` pokazuje w Inspectorze wyłącznie pola właściwe dla wybranego typu. Projektant może przesuwać instancje, a dla typów o znaczeniu powierzchniowym także obracać i skalować ich transformację. Dane takie jak definicja itemu, zawartość, narzędzie, czas interakcji, powiązany landmark albo połączenie pozostają jawnie typowane i walidowane; grafika nie zastępuje ich semantyki. Dodanie lub usunięcie noda jest zmianą produkcyjnej mapy, nie lokalnym draftem.
+
+Każdy obiekt może opcjonalnie wskazać `Visual Scene: PackedScene` z rootem `Node2D` oraz lokalny offset, obrót, skalę i `z_index`; `MapDecoration` wymaga takiej sceny, ponieważ nie ma domyślnej prezentacji runtime. Tool-script tworzy nietrwały podgląd prefabu w edytorze. Kompilator odrzuca prefab zawierający `DiveMapObject`, `DiveMapConnection`, `CollisionObject2D`, `CollisionShape2D` albo `CollisionPolygon2D`; runtime dodatkowo zeruje warstwy i maski oraz wyłącza monitoring/kształty obcego prefabu. Transformacja runtime zachowuje tę samą kolejność co podgląd: pełna transformacja obiektu mapy, łącznie z obrotem, skalą i `Skew`, następnie lokalna transformacja wizualna. Prefab może zastąpić domyślny wygląd kontenera, pickupu, zagrożenia, boi, bramy, ciężkiego obiektu, ratunku, wejścia/wyjścia albo elementu statycznego, lecz stan interakcji nadal należy do właściwego skryptu domenowego. Typy kompilowane do osiowego `Rect2` — region, landmark i strefa prądu — odrzucają `Skew` oraz obrót inny niż wielokrotność 90 stopni; `MapObstacle` przekazuje dokładny przetransformowany wielokąt.
+
+`UnderwaterMapSceneCompiler`:
+
+- publikuje `MAP_SOURCE_VERSION = 4`; tylko source-v4 jest bieżącym kontraktem sceny, rastra, SDF, chunków i podpisu mapy;
+- ładuje wyłącznie `UnderwaterMap.tscn`, sortuje rekordy deterministycznie i buduje `WorldBlueprint`;
+- wymaga wszystkich grup sceny, dodatniego rozmiaru świata i bazowej tekstury nawigacji;
+- wymaga stabilnych, unikalnych ID z ograniczonego alfabetu, dokładnie jednego wejścia i wyjścia oraz poprawnych referencji regionów, landmarków i połączeń;
+- odrzuca prefab poza przypisaną gałęzią drzewa, obiekty i punkty tras poza mapą, nieprawidłowe dane typu, nieprawidłowy prefab i cel na zablokowanej albo nieosiągalnej komórce;
+- kompiluje transformowane obrysy przeszkód oraz odbudowuje lookupy i indeks chunków;
+- tworzy SHA-256 `map_gameplay_signature` z topologii, pozycji, tras, zawartości, interakcji, przeszkód, rozmiaru świata, rozmiaru chunków i zawartości bazowej maski nawigacji.
+
+Pola prezentacyjne — między innymi nazwa wyświetlana, kolor, ścieżka prefabu i jego lokalna transformacja — są usuwane z wejścia podpisu, a dekoracje nie wchodzą do podpisu. Zmiana wyłącznie prezentacyjna może więc odświeżyć pochodny blueprint zgodnego zapisu bez modyfikacji `WorldDelta`. Zmiana gameplayowa daje inny podpis i jest traktowana jako inny statyczny świat.
+
+Root `UnderwaterMapScene` udostępnia w Inspectorze przyciski `Waliduj mapę` oraz `Odśwież podglądy prefabów`. Walidacja edytorowa jest szybką bramką struktury i podstawowej przechodniości; zmieniony cel objęty obietnicą odzysku nadal wymaga certyfikacji ARD-0072 na publicznych profilach oraz odpowiednich testów wyprawy. Nie istnieje etap `Zapisz szkic`, `Opublikuj` ani produkcyjny katalog layoutu. Zapis sceny jest zmianą źródła, a commit powinien obejmować scenę, użyte prefaby/assety, testy i właściwe dokumenty.
+
+`ContinuousDiveWorld` klonuje `VisualLayers` z tej samej sceny, buduje kolizję ze wspólnego rastra i instancjonuje statyczne oraz interaktywne rekordy migawki. Szablon warstw i tekstura nawigacji są współdzielonym cache'em wyłącznie na czas życia procesu; autoload zwalnia je przy zamykaniu drzewa. Cache nie jest źródłem authoringu ani częścią zapisu. Wszystkie elementy tworzone podczas sesji trafiają pod `RuntimeDynamic`; przebudowa czyści tylko ten kontener, nie usuwa autorskich dzieci sceny i nigdy nie zapisuje runtime z powrotem do `UnderwaterMap.tscn`.
+
+9.1.2. Pochodny teren i atmosfera
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+`world_collision_grid.png` wskazany przez produkcyjną scenę pozostaje jedynym semantycznym źródłem bazowego konturu, przechodniości, fizyki i podpisu statycznego świata. Deterministycznie generowany `world_collision_render_sdf_v1.png` jest wyłącznie prezentacyjnym polem odległości: `UnderwaterTerrainRenderer` używa go w jednym globalnym `Sprite2D`, aby wygładzić widoczny kontur i antyaliasing bez zmiany progu fizyki. Jeden globalny `Polygon2D` tworzy wodę. Pochodny SDF, detal materiału i ich manifesty nie wchodzą do `map_gameplay_signature`.
+
+Kolizje terenu pozostają grupowane według indeksu chunków. Segment należy deterministycznie do chunka komórki, która go wytworzyła, więc granica nie jest dublowana. `ContinuousDiveWorld.update_streaming()` synchronizuje aktywne `StaticBody2D` oraz `DiveTerrainOcclusion`, który z tych samych segmentów buduje `LightOccluder2D` dla aktywnego pierścienia; cień latarni zatrzymuje się zatem na kanonicznym terenie bez drugiego, ręcznie edytowanego obrysu. `MapObstacle` nadal trafia do wspólnego rastra przed podziałem. Wygenerowane nody są cache'em `RuntimeDynamic`, nie zapisują się do sceny i nie tworzą formatu mapy.
+
+Tło wody jest proceduralną powierzchnią świata. Cztery walidowane profile prezentacyjne określają paletę wody, przejrzystość, caustics, zawiesinę, ruch prądu oraz barwy, skalę detalu i krawędź skał; są mieszane ciągle według pozycji świata, a ten sam wynik otrzymują środowisko, teren i obiekty interaktywne. Materiał skał używa globalnie zakotwiczonego, mipmapowanego detalu autorskiego oraz wielodomenowego fBm jako bezszwowego fallbacku, bez osiowych pól tonalnych. Profile nie definiują mechanik i są usuwane z wejścia `map_gameplay_signature`. Budżet ziarna, refrakcji i lokalnej winiety należy do wspólnego profilu jakości postprocessu. Unikalne landmarki, urządzenia i dekoracje pozostają prefabami authoringowymi. Edycja maski nadal jest zmianą statycznego świata; regeneracja pochodnych assetów prezentacyjnych nie jest zmianą zapisu.
+
+`UnderwaterEnvironment2D` składa jeden postprocess `CanvasItem` pod HUD-em, światowe caustics oraz dwa budżetowane emitery `GPUParticles2D`. Postprocess rozdziela daleką mgłę, drobne światło objętościowe i lokalną strefę czytelności wokół środka stabilnej kamery; materiał wody i terenu zachowują drobniejszy, przerywany rytm caustics zamiast pełnoekranowej siatki o równym kontraście. Wszystkie shadery otrzymują jawny `anim_time`; pauza i snapshot nie zależą od globalnego `TIME`. `low/medium/high` zmieniają liczbę cząstek, refrakcję i liczbę próbek, a `reduced_motion` usuwa refrakcję i zamraża albo silnie ogranicza dryf bez zmiany kontrastu sygnałów gameplayowych. `DiveController` jest warstwą wiążącą: pobiera od `ContinuousDiveWorld` głębokość, region, profil prezentacyjny i prąd, po czym przekazuje wyłącznie kontekst prezentacyjny. Szczegóły wartości należą do walidowanych zasobów oraz shaderów, nie do tego dokumentu.
+
+`ContinuousDiveWorld` przekazuje ten sam, globalnie mieszany kontekst prezentacyjny także aktywnym kontenerom, wolnostojącym znajdźkom, trwałym interakcjom, ratunkom i linii powrotu. Jawna tożsamość regionu wynikająca ze stabilnego ID albo powiązanego landmarku pozostaje źródłem sygnałów semantycznych, ponieważ prostokąty regionów mogą nakładać się na przejściach. Wspólny `DiveInteractableVisualStyle` odpowiada wyłącznie za patynę, osad, profil jakości, zatrzymanie wtórnego ruchu i regionalne sygnały czytelności; nie zmienia transformacji korzenia, fizyki, zawartości ani stanu. Unikalne urządzenia Wspólnej Linii zachowują odrębne, bezkolizyjne `Visual Scene`, natomiast właściwy skrypt interakcji pozostaje właścicielem znaczenia i prezentuje stan również nad prefabem.
+
+`LightSystem` włącza cienie głównego światła nurka na warstwie okluderów terenu. Geometria okluzji jest zawsze pochodna tej samej maski i tego samego aktywnego pierścienia co fizyka; nie jest drugim formatem authoringu.
+
+Kontrakt decyzji: ARD-0085.
+
+9.2. `WorldDelta`
+--------------------------------------------------------------------------------
+
+Pola trwałości z aktywnym późniejszym konsumentem: `opened_containers`, `collected_items`, `remaining_container_contents`, `lost_backpacks`, `dropped_loot_piles`, `rescued_or_dead_survivors`, `placed_buoys`, `marked_heavy_objects`, `recovered_heavy_objects`, `opened_shortcuts`, `activated_fixed_devices`.
+
+`fixed_device_spawns` jest typowaną kategorią `WorldBlueprint`. Scena przechowuje stabilne ID, rolę urządzenia, dzień dostępności oraz kontrakt interakcji. `DiveSessionState.activated_fixed_devices` jest lokalny dla próby, `DiveResult.activated_fixed_devices` przekracza granicę wyprawy, a `SectorPersistenceSystem` dopisuje ID do `WorldDelta` idempotentnie. Pierwszym aktywnym rekordem jest `junction_j7`, dostępny od dnia 3; `CampaignProgressionSystem` mapuje jego pierwsze utrwalenie na typowany stan J-7 i dzień aktywacji.
+
+`discovered_landmarks` i `dead_divers` są zapisywane, ale nie odtwarzają odkryć ani renderowanych ciał. Pierwsze utrwala ID odkryte lokalnie podczas wyprawy — sama lokalna lista aktywnie daje PD — i ma tylko kompatybilnościowy odczyt zapewniający sentinel landmarku wejścia. Drugie mapuje nurka na ID landmarku zgonu bez późniejszego konsumenta. Nie stanowią aktywnego fog-of-war ani renderowanych ciał; odzyskiwalnym obiektem śmierci jest osobny rekord `lost_backpacks` z `world_position`.
+
+`[LEGACY] active_landmark_id` oraz `[LEGACY] discovered_chunks` są inicjalizowane dla wejścia i zachowane w zapisie, lecz runtime nie aktualizuje ich podczas eksploracji. Nie stanowią aktywnego śledzenia lokacji ani odkrywania chunków.
+
+`collapsed_paths` i `depleted_biological_nodes` są obecne w danych, ale nie mają pełnego aktywnego obiegu odradzania/zawaleń; pozostają przejściowym miejscem dla przyszłego pionu, nie obietnicą UI.
+
+9.3. Biomy i dostęp
+--------------------------------------------------------------------------------
+
+Regiony: Dachy Umarłego Miasta, Zielone Osiedla, Rdzawy Pas, Czarne Serce.
+
+Nie istnieje obecnie osobny `BiomeDefinition` ani katalog zasobów biomów. Nazwy, położenie i aktywne różnice regionów wynikają z `WorldBlueprint`, generatora oraz danych landmarków, prądów, łupu i zagrożenia. Wymaganie ARD-0003 dotyczące biomów jako `Resource` pozostaje docelowe dla pełnego pionu tożsamości, nie jest stanem bieżącym.
+
+Nie ma `safe_access_biome_3`, hard gate, aktywnego sonaru, ciśnienia, funkcjonalnego dzwonu ani balonu. Mapa jest dostępna fizycznie; miękkie bariery to czas, tlen, światło, głębokość/zimno, kombinezon, prądy, kolizje, zagrożenie i wejścia.
+
+Mapa nie tworzy drugiego Dzwonu, dodatkowego wyjścia ani interakcji. Aktywny „Dzwon głębinowy” pozostaje nazwą Stacji IV; zachowane metadane zgodności opisuje sekcja 11.3.
+
+`DiveLightingDefinition` pod `data/balance` jest walidowanym właścicielem punktu końca pełnej widoczności płytkiej, punktu osiągnięcia głębokiej ciemności, obu kolorów ambientu i kształtu przejścia. `LightSystem` jest jedynym właścicielem interpolacji według `ContinuousDiveWorld.depth_at()` oraz konfiguracji `CanvasModulate` i `PointLight2D`. `DiveController` przekazuje aktualną głębokość do ambientu i rzeczywiste `DiveSessionState.light_enabled` do `DiveRiskRuntime`; grafika, HUD i reakcja zagrożenia konsumują dzięki temu ten sam stan włączenia zamiast sprawdzać samo istnienie definicji sprzętu. Krzywa jest niezależna od `WorldDelta`, wyposażenia i stanu kampanii i nie zmienia topologii ani podpisu gameplayowego mapy.
+
+[DOCELOWE] Pełne mechaniczne różnice biomów, ciśnienie, dodatkowe zagrożenia, odradzanie biologii i lokalnie zmienna roślinność wymagają osobnego pionu. Nie mogą naruszyć gwarantowanej osiągalności obowiązkowego celu ani jedynej drogi powrotnej.
+
+9.4. Heavy i Leon
+--------------------------------------------------------------------------------
+
+Trzy heavy objects są aktywnymi rekordami oznaczanymi workiem i odzyskiwanymi przez Warsztat. Wspólna Linia nie używa przenoszonych artefaktów fabularnych. Znaczenie dla gracza należy do `docs/OgolnyZarys.txt`, sekcja 9.
+
+Leon w R1-03 nie ma timera. Brak interakcji nie zmienia spotkania między dniami. `WorldDelta` utrwala wynik dopiero po zakończonej wyprawie.
+
+10. FABUŁA I STANY TERMINALNE
+================================================================================
+
+[AKTYWNE]
+
+Jedynym aktywnym przebiegiem kampanii jest Wspólna Linia. Ma konsumentów J-7, terminala Archiwum, diagnostyki i uruchomienia R-3, Rozdzielni C-4, montażu Rozdzielacza oraz trzech finałowych konfiguracji energii. `CampaignProgressionSystem` jest właścicielem typowanego postępu, warunków dostępności i deterministycznego mapowania konfiguracji na wynik, a `WorldDelta` utrwala wykonane interakcje stałych urządzeń. Zamrożony `ExpeditionSetup` udostępnia kolejne dostępy dopiero po spełnieniu poprzedniego stanu. Receptury `r3_regulator` i `common_line_splitter` tworzą zwykłe zlecenia FIFO z wynikiem kampanijnym, zamrożonym kosztem i `required_work_points`; `ProductionSystem` wykonuje pracę, lecz nie dodaje fikcyjnego wyposażenia nurkowego. Po ukończeniu odpowiedni wynik kampanii trafia wyłącznie do zamrożonego `ExpeditionSetup` jako wymagane narzędzie instalacji. Aktywacje C-4 i gniazda Rozdzielacza w R4-06 przechodzą przez `DiveResult`, są przyjmowane niezależnie od śmierci nurka w drodze powrotnej i pozostają trwałymi wpisami `WorldDelta`.
+
+Po nadejściu Czarnego Frontu `resolve_day_outcome()` rozstrzyga najpierw terminalną porażkę. Dokładnie 100% integralności ustawia `energy_choice_pending` i fazę `ENDING`. Przed odsłonięciem wyboru `EndingController` zleca `GameRoot` prezentację osiągalnego kamienia R-3, C-4 albo montażu Rozdzielacza ukończonego w tym samym rozliczonym dniu; katalog rozpoznaje go po istniejącej fladze i polu `*_day`, a deduplikacja klucza pozostaje wyłącznie prezentacyjna. Na ostatnim poranku `story_conversations()` zwraca bieżący kamień przed sceną ostatniego dnia, dzięki czemu żadna z nich nie przykrywa drugiej. Dopiero potem gracz korzysta z trzech opcji i blockerów pochodzących z domeny; `GameRoot.choose_energy_configuration()` wykonuje wybór na odłączonym kandydacie, zapisuje go i po sukcesie podmienia aktywny agregat. `choose_energy_configuration()` jest jednorazowe i mapuje `harbor -> quiet_after_storm`, `north -> debt_repaid`, `common_line -> last_bridge`. Wspólna Linia wymaga dodatkowo Domu Wspólnoty III oraz co najmniej jednego zdolnego przypisanego pracownika. Ten sam commit tworzy `chronicle_summary` z faktycznego agregatu. Po wyrenderowaniu wyniku `EndingController` przekazuje jego prezentacyjną scenę z `NarrativeContent` do trwałego panelu `GameRoot`; żadna rozmowa nie uczestniczy w wyborze ani zapisie. Każdy udany wariant zachowuje 100% integralności przed i po sztormie; finał nie produkuje ukrytych urazów.
+
+`continue_chronicle()` pracuje na odłączonym kandydacie, ustawia jednorazowe `final_chronicle_continued`, przechodzi do Epilogu i nowego planu dnia, uzgadnia agregat, zapisuje go i dopiero po sukcesie publikuje. Nie mutuje rosteru, nie tworzy geografii i nie symuluje późniejszych zdarzeń radiowych, które pozostają zakresem docelowym bez zatwierdzonych definicji wydarzeń.
+
+`CampaignProgressionSystem` jest aktywnym właścicielem:
+
+- Aktu I oraz Epilogu Wspólnej Linii;
+- stanów J-7, Archiwum, R-3, C-4, Rozdzielacza i wyboru energii;
+- kryzysu przywództwa i powodów game over;
+- trzech zakończeń oraz przejścia do Kroniki.
+
+`StoryProgressState` przechowuje wyłącznie stan Wspólnej Linii, kryzysu, Czarnego Frontu, trzech wyników energii i Kroniki. Nie zawiera pól Projektu Świt, jego artefaktów ani Odejścia.
+
+`continue_chronicle()` wykonuje najwyżej raz idempotentną transakcję następstwa, uzgadnia stan kampanii i plan dnia, a następnie utrwala ten sam zapis. Nie usuwa mieszkańca. Kontrakt graczowy należy do `docs/OgolnyZarys.txt`, sekcja 10.
+
+[DOCELOWE] `Miasto nad głębią` i `Sygnał` nie mają aktywnych scen ani efektów.
+
+[AKTYWNE] Akt I, terminal Archiwum, R-3, C-4, opcjonalny Rozdzielacz, wybór energii, Kronika wyniku oraz kontynuacja tego samego zapisu tworzą cały bieżący przebieg rewizji 1. Starsza semantyka kampanii nie ma wejścia odczytu; dawnych plików gra nie usuwa ani nie przekształca.
+
+11. ZAPIS I RAPORTY
+================================================================================
+
+11.1. Save
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+`GameFormat.CAMPAIGN_FORMAT_REVISION = 1` jest jedynym numerem formatu całego grafu `GameState`; korzeń zapisuje go w `GameState.format_revision`. Nie ma niezależnych wersji podstanów ani wykonywalnego łańcucha migracji.
+
+`SaveManager` posiada dokładnie jeden namespace bieżącej kampanii:
+
+- primary: `user://ostatni_pomost_campaign.tres`;
+- pending: `user://ostatni_pomost_campaign.pending.tres`;
+- backup: `user://ostatni_pomost_campaign.backup.tres`.
+
+Nie istnieje aktywny `SaveSlot`, `slot_id`, selektor kampanii ani numerowana przestrzeń plików. `configure_paths()` służy wyłącznie testom w izolowanym katalogu i nadal wskazuje jeden zestaw primary/pending/backup.
+
+Odczyt przebiega `primary -> pending -> backup`. Każdy kandydat musi być dokładnym `GameState` rewizji 1 i przejść tę samą granicę: strukturalny preflight, `load_validation_errors()` wraz z kompilacją source-v4 mapy i kontrolą podpisu oraz pełny postflight persistence. Samo istnienie pliku nie włącza `KONTYNUUJ`. Kandydat o innej rewizji, dawny plik Wspólnej Linii albo plik poprzedniego systemu slotów jest ignorowany bez importu, migracji, usuwania i nadpisywania.
+
+Zapis wykonuje kolejno:
+
+1. potwierdzenie dokładnego typu `GameState` oraz strukturalny preflight;
+2. `load_validation_errors()` i pełny `persistence_validation_errors()` na bieżącej rewizji;
+3. głębokie odłączenie kandydata i ustawienie jego `last_saved_at`;
+4. zapis do pending, ponowny odczyt i przeprowadzenie tej samej granicy;
+5. rotację wyłącznie poprawnego poprzedniego primary do backupu;
+6. atomową promocję pending do primary i dopiero wtedy aktualizację czasu w aktywnym stanie.
+
+Niepoprawny istniejący primary nie jest cicho zastępowany. `NOWA GRA` po potwierdzeniu wywołuje `delete_campaign_storage()` dla całego bieżącego namespace, tworzy nowy `GameState` i zapisuje jego stan startowy. Powrót do menu odrzuca runtime bez autosave, ale nie usuwa kampanii. `UserSettings` pozostaje osobnym plikiem urządzenia.
+
+`GameStatePersistenceValidator` jest jedynym właścicielem preflightu i postflightu. Oprócz pełnego grafu kampanii waliduje typy `WorldBlueprint` i `WorldDelta`, source-v4, seed, stabilne ID oraz referencje stanu gracza. Dla zgodności sceny porównuje `campaign_seed`, `map_source_version`, `map_id`, `map_gameplay_signature`, rozmiar świata, wejście, wyjście i rozmiar chunków z nowo skompilowaną migawką. Nie porównuje całych tablic rekordów, ponieważ zawierają także dozwolone metadane prezentacyjne.
+
+`UnderwaterMapSceneCompiler.ensure_world_is_current()` po zgodnym podpisie zastępuje zapisany blueprint świeżą migawką sceny i pozostawia `WorldDelta` bez zmian. Pozwala to odświeżyć grafiki, etykiety, kolory i lokalne transformacje prefabów. Inny podpis gameplayowy blokuje odczyt kampanii; kod nie przesuwa plecaków, porzuconych pakunków ani trwałych rekordów do nowej topologii.
+
+Zmiana znaczenia trwałego pola wymaga podniesienia wspólnej rewizji i domyślnie ustanawia czystą granicę. Import poprzedniego formatu wymaga osobnego ARD, uwierzytelnialnego mapowania, odłączonej transformacji, pełnej walidacji oraz testów braku mutacji źródła. Bez takiej decyzji nowa rewizja nie ma wejścia migracyjnego.
+
+[DOCELOWE] Szkielet ARD-0081/0082 nie jest osiągalny z `GameState`. Jego przyszła pełna aktywacja musi wejść bezpośrednio do jednego bieżącego formatu, dodać pola agregatu oraz przejść preflight, postflight, roundtrip i testy odrzucenia; nie może przywrócić poprzedniego modelu fabuły ani pobocznego numeru schematu.
+
+[AKTYWNE]
+
+11.2. Raporty
+--------------------------------------------------------------------------------
+
+`ReportState`: `title`, `day`, `includes_dive`, `entries`, `warnings`.
+
+`ReportState.day` jest numerem zakończonego dnia. Poranny raport i pending event dotyczą dnia `day + 1`. Resolver archiwizuje głęboką migawkę po przygotowaniu poranka, deduplikuje po dniu i zachowuje siedem najnowszych. Po pierwszym kontakcie J-7 kolejne poranki projektują z tego samego `StoryProgressState` jawny licznik Frontu, dokładny próg integralności oraz krótki etapowy komunikat radia Północnej; pierwszy raport po aktywacji J-7 nie może uprzedzić sceny kontaktu.
+
+Nieterminalny autosave zatrzymuje się w `END_DAY_REPORT`. Potwierdzenie zmienia fazę na wydarzenie albo planowanie i zapisuje ją; błąd zapisu przywraca `END_DAY_REPORT`.
+
+Archiwum jest tylko do odczytu. Nie odtwarza `DiveResult`, nie rekonstruuje stanu i nie uruchamia efektów.
+
+11.3. Aktualny kontrakt trwałego stanu
+--------------------------------------------------------------------------------
+
+Rewizja 1 opisuje wyłącznie bieżący graf. Nie zawiera pól `save_schema_version`, aktywnego slotu, `unlocked_skill_ids`, `disease_states`, `current_events`, `Status.SICK` ani `Status.MISSING`; kod nie utrzymuje aliasów tych dawnych reprezentacji.
+
+Kluczowe przekrojowe kontrakty trwałego stanu:
+
+- `GameState.format_revision` musi być równe `GameFormat.CAMPAIGN_FORMAT_REVISION` dla każdego zapisywanego i wczytywanego kandydata;
+- `SurvivorState.competency_levels` zawiera wyłącznie ID z katalogu piętnastu kompetencji i poziomy 1-3, a `profession_talent_ids` najwyżej jeden poprawny talent dla każdej formalnej profesji osoby; katalog talentów ma dwanaście definicji;
+- `DayPlanState.selected_diver_id` wskazuje wolną, obecną i zdolną osobę; wybór jest niezależny od obsady budynków i zostaje wyczyszczony po przypisaniu tej osoby do stanowiska albo izolacji;
+- `ExpeditionSetup` zamraża `diver_id`, kompetencje, talenty, osobisty udźwig oraz `station_staffed_carry_multiplier`; aktywna Obsługa Stacji daje mnożnik 1,05, a brak obsady 1,0. Sesja nie odczytuje ponownie rosteru Stacji;
+- `WorldBlueprint` pochodzi wyłącznie z source-v4 `UnderwaterMap.tscn`; trwała zgodność obejmuje `map_source_version`, `map_id`, `map_gameplay_signature`, seed, rozmiar świata, wejście, wyjście i rozmiar chunków;
+- `WorldDelta` zachowuje zmiany dynamiczne pod stabilnymi ID, a odświeżenie zgodnego blueprintu nie przesuwa utrwalonych plecaków, pakunków ani rozliczonych urządzeń;
+- finał Wspólnej Linii korzysta z jednego zestawu `energy_configuration`, `final_outcome_id`, `final_summary`, `chronicle_summary` i `final_chronicle_continued`;
+- `UserSettings` nie jest częścią `GameState` ani rewizji kampanii.
+
+Normalizacja może wyłącznie kanonizować poprawny stan rewizji 1 bez zmiany jego rozstrzyganego znaczenia. Pole bez producenta i konsumenta nie staje się automatycznie funkcją; nowe UI nie może prezentować go jako aktywnej korzyści.
+
+12. UI I PREZENTACJA
+================================================================================
+
+[AKTYWNE]
+
+12.1. Powłoka, intro i ustawienia
+--------------------------------------------------------------------------------
+
+`MainMenu` udostępnia nową kampanię, profile trudności, konfigurator `custom`, bezpośrednią kontynuację oraz `SettingsOverlay`. `KONTYNUUJ` jest aktywne tylko wtedy, gdy `SaveManager.has_save()` znajduje poprawnego kandydata bieżącej rewizji, i prowadzi bez selektora do jego zapisanej fazy. `NOWA GRA` wymaga potwierdzenia, jeżeli istnieje dowolny plik bieżącego namespace, a po zatwierdzeniu usuwa primary/pending/backup przed utworzeniem nowej kampanii.
+
+Start wywołany przez menu tworzy i zapisuje poprawny `GameState` przed `IntroScene`; nie archiwizuje poprzedniej kampanii ani nie nadaje jej numeru. Intro ma deterministyczną oś prezentacji, lokalny ambient, jawny skip i nie jest zapisywalną fazą. Kontynuacja ładuje jeden namespace i routuje bezpośrednio z fazy odczytanej z zapisu.
+
+Warstwę prezentacyjną `MainMenu` tworzą pełnoekranowy, statyczny `assets/ui/main_menu_key_art_v1.png` w `TextureRect` z `KEEP_ASPECT_COVERED`, zachowany pod nim jednolity fallback oraz asymetryczny lewy panel. Panel zachowuje ścieżkę `Center/MenuPanel/Margin/Content`, więc kontroler i semantyka akcji nie zależą od kompozycji tła; `SettingsOverlay` pozostaje pełnoekranowym rodzeństwem, a nie dzieckiem lewego pasa.
+
+`assets/ui/main_menu_theme.tres` jest motywem korzenia menu. Dostarcza jawne stany zwykłych, głównych i niebezpiecznych przycisków oraz wspólne style kontrolek ustawień. Tworzone w runtime okna potwierdzenia i konfigurator trudności otrzymują ten sam motyw jawnie, a po związaniu menu początkowy fokus trafia do `NOWA GRA`. Statyczny key art nie ma osobnego wariantu `low/medium/high`, nie wymaga zegara ani gałęzi `reduced_motion`, nie odczytuje pogody ani `GameState` i nie wchodzi do persistence. Snapshoty ustawień przechwytują powłokę i cztery kategorie; zapisane PNG wymagają ręcznej oceny wzrokowej.
+
+[AKTYWNE] `PauseMenu` jest trwałą kontrolką powłoki pod osobnym, najwyższym `CanvasLayer`, jako rodzeństwo `SceneMount`; wymiana sceny nie usuwa go. `GameRoot` jest jedynym właścicielem dostępności menu, ręcznego zapisu, własności `SceneTree.paused` i żądania zamknięcia aplikacji. Kontrolka ma `PROCESS_MODE_ALWAYS`, pełnoekranowo przechwytuje mysz, utrzymuje fokus wśród dostępnych akcji i po zamknięciu oddaje go wcześniejszej kontrolce. Zdejmuje wyłącznie pauzę założoną przez ten przepływ, dzięki czemu nie wznawia drzewa zatrzymanego wcześniej przez utratę fokusu.
+
+W niepauzowanym `BaseScene` i `DiveScene` `GameRoot` rozpatruje `ui_cancel` przed otwarciem menu, ale pozostawia zdarzenie istniejącemu konsumentowi, gdy bieżąca scena zgłasza widoczną opcjonalną nakładkę. Baza obejmuje popover planu, panel załogi, Tryb Zarządzania Bazą lub rozwój mieszkańca oraz oba dzienniki; nurkowanie obejmuje plecak i panel łupu. Obowiązkowe `DaySummaryPanel`, `SettlementEventPanel`, decyzja ratunku i ekran ponowienia nie są lokalnie anulowane. `IntroScene`, `MainMenu`, `GameOverScene` i `EndingScene` nie udostępniają menu pauzy.
+
+`PauseMenu` emituje wyłącznie intencje kontynuacji, zapisu, ustawień, powrotu do menu i wyjścia. Ręczny zapis deleguje do `GameRoot`, który ponownie sprawdza trwałą fazę `DAY_START_REPORT`, `BASE_PLANNING`, `END_DAY_REPORT` albo `CRISIS`, brak zablokowanego planu i brak przejściowego `current_expedition_setup`, a następnie wywołuje `SaveManager.save_game()` dla bieżącej kampanii bez dodatkowej mutacji domeny. W `DIVING` i pozostałych fazach przejściowych UI pokazuje blocker i nie dotyka persistence. Sukces albo błąd pozostawia menu otwarte i drzewo zatrzymane.
+
+`SettingsMenu` jest trwałym rodzeństwem pauzy na wyższej warstwie powłoki. Otwiera tę samą instancję `UserSettings`, ma `PROCESS_MODE_ALWAYS`, przechwytuje wejście przed pauzą i po zamknięciu oddaje fokus przyciskowi `USTAWIENIA`; `SceneTree.paused` pozostaje bez zmian. `PauseMenu` nie interpretuje kopii ustawień.
+
+`main_menu_theme.tres` jest motywem powłoki i okien systemowych. Każda instancja `SettingsMenu` oraz inne kontrolki współdzielone między `MainMenu` i trwałymi warstwami `GameRoot` przypinają go na własnym korzeniu, zamiast polegać na dziedziczeniu z konkretnej sceny. Dzięki temu ten sam komponent zachowuje typografię, pola, przyciski, fokus i semantyczne akcenty niezależnie od miejsca montażu; motyw nie jest narzucany całemu światu Bazy ani nurkowania.
+
+Geometria okien zaczyna się od kontraktu 1280 × 720. Nagłówek i stopka akcji są stałe, a typowy zestaw danych potrzebny do podstawowej decyzji ma mieścić się bez widocznego suwaka. `ScrollContainer` pozostaje dozwolonym fallbackiem dla faktycznie zmiennych list, archiwów i długich lokalizacji; kontrolka dostosowuje wysokość części przewijanej do liczby elementów albo grupuje stały, zamknięty zbiór w kolumny. Zmiana układu nie zmienia właściciela stanu, treści blokera ani kolejności komend.
+
+`POWRÓT DO MENU GŁÓWNEGO` otwiera `ConfirmationDialog` przetwarzany podczas pauzy. Tekst rozróżnia bazę od niezakończonej wyprawy. Dopiero potwierdzenie wywołuje w `GameRoot` przejście bez zapisu: zamyka nakładki, zdejmuje wyłącznie pauzę należącą do menu, odrzuca `game_state` i montuje `MainMenu`, pozostawiając namespace kampanii nietknięty. Anulowanie wraca fokusem do akcji pauzy. Żądanie `WYJDŹ Z GRY` nadal prowadzi bezpośrednio do `SceneTree.quit(0)` — bez dialogu, autosave, zmiany fazy i przejścia przez menu główne. Kontrakt graczowy: `docs/OgolnyZarys.txt`, sekcja 2.2; zapis: sekcja 11.1; decyzja: ARD-0092.
+
+`IntroController` używa `AnimationPlayer` jako autorytatywnego zegara 45-sekundowej prezentacji i wyprowadza z jego pozycji crossfade, subtelny ruch plansz, napisy, deszcz, przejście linii wody, winietę oraz tytuł. Cztery pełnoekranowe `TextureRect` — `drowned_city.png`, `platform_discovery.png`, `platform_prerender.png` i `last_bridge.png` — mają `KEEP_ASPECT_COVERED`, krytyczne obiekty w środkowej strefie kadru i nie zawierają tekstu ani UI. `IntroScene` nie instancjuje `BaseEnvironment`, `BaseWorld3D`, `SubViewport` ani żadnego `Node3D` i nie odczytuje `GameState.weather`.
+
+[AKTYWNE] `NarrativeDialoguePanel` jest trwałą kontrolką powłoki pod osobnym `NarrativeLayer`, jako rodzeństwo `SceneMount` i warstwa niższa od `PauseLayer`. Prezentuje wspólny tytuł i `scene_context`, indeks bieżącego przejścia, treść, przycisk `DALEJ` oraz — dla `dialogue` — podpis mówiącego i dwa stabilne miejsca portretów oparte na współdzielonym `SurvivorPortrait`. Każda linia ma prezentacyjny `line_type`: `dialogue`, `stage_direction` albo `world_event`. Tylko dialog wskazuje stronę `left` lub `right`; dwa pozostałe typy otrzymują własną etykietę, nie pokazują mówcy ani portretów i nie przechowują żadnego stanu kampanii. Prawa instancja portretu włącza prezentacyjne odbicie poziome wewnątrz `SurvivorPortrait`, obejmujące teksturę i fallback proceduralny, lecz nie ramkę, tekst ani geometrię kontrolki; pozostali konsumenci zachowują domyślną orientację. Wspólna akcja `ui_accept` albo przycisk przechodzi do następnego przejścia, a dopiero ostatnie emituje zamknięcie całego klucza rozmowy.
+
+`GameRoot` automatycznie otwiera rozmowy kampanii tylko nad `BaseScene` w `BASE_PLANNING` albo `CRISIS`. `END_DAY_REPORT` i oczekujące `DAY_START_REPORT` są twardą bramką prezentacji, dlatego po potwierdzeniu raportu i ewentualnym rozstrzygnięciu wydarzenia kontroler ponawia synchronizację dopiero dla bezpiecznej fazy planowania. Osobne publiczne wejście przyjmuje wyłącznie rozmowę wyniku nad `EndingScene` w fazie `ENDING`. `DiveScene` nigdy nie jest konsumentem rozmowy fabularnej. Odkrycie dokonane podczas wyprawy pozostaje kanonicznym faktem wyniku lub `StoryProgressState`, a jego rozmowa jest rekonstruowana po powrocie do Bazy.
+
+Otwarte okno nie zmienia `process_mode` Bazy. Ocean, pogoda, światło, geometria platformy, muzyka i pozostała prezentacja nadal są przetwarzane. Pełnoekranowy backdrop zatrzymuje zdarzenia myszy, a panel w `_input` konsumuje klawiaturę; jedyną akcją rozmowy jest przejście `DALEJ`. Jest to modal wejścia, nie pauza drzewa ani sceny. Przy zamknięciu przywracany jest poprzedni fokus, bez wywołania zdarzenia domenowego, przesunięcia tutoriala, potwierdzenia misji lub mutacji `GameState`.
+
+`NarrativeContent` pozostaje jednym katalogiem prezentacji. Rekord kroku tutoriala zawiera dokładne `compact_title` i `body` dla kapsuły celu, a tylko wybrane ważne przejścia udostępniają powiązaną rozmowę z `scene_context` i uporządkowaną tablicą typowanych linii. Katalog projektuje również jedną ciągłą scenę odzyskania zasilania i pierwszego kontaktu po J-7, pełne sceny zmieniające wiedzę albo relację z Północną, krótkie interludia potwierdzające techniczne wykonanie oraz trzy wyniki finału. Karty `world_event` nazywają wyłącznie obserwowalny, zatwierdzony skutek i nie powtarzają następnego celu, wymagań receptury ani tekstu trackera. Opcjonalne `cue_id` linii jest wyłącznie prezentacyjnym wskazaniem krótkiego dźwięku; jego brak oznacza zamierzoną ciszę tej warstwy. Dzięki temu instrukcja mechaniczna nie powstaje w drugiej mapie, drobne kroki i wszystkie kroki nurkowania nie muszą generować okna, a `TutorialDirector` pozostaje jedynym właścicielem kroku i nadal przechodzi dalej wyłącznie po zdarzeniu domenowym.
+
+Rozmowy późniejszej fabuły są uporządkowanymi projekcjami już zatwierdzonego `StoryProgressState`, a nie nową kolejką kampanii. Tylko linie `dialogue` przechodzą przez `NarrativeSpeakerResolver`: jawne tożsamości tutoriala i zewnętrzny głos Klary zachowują podpis oraz portret lub deterministyczny fallback, natomiast Głos Przystani i Głos techniczny wybierają żyjącą, obecną i zdolną osobę z właściwego kontekstu, preferując odpowiednio Mirę i Ankę. Rola może dostarczyć osobny `fallback_body` przeznaczony dla neutralnego raportu, aby brak wiarygodnego rozmówcy nie przypisywał bezosobowemu komunikatowi osobistej reakcji. Sceny obowiązkowe nie opierają dramaturgii na wymianie dwóch ról, które w skrajnym rosterze mogłyby zostać rozwiązane do tej samej osoby. `stage_direction` i `world_event` omijają resolver jako bezportretowe projekcje istniejącego stanu i nie mogą mutować kampanii. `GameRoot` deduplikuje obejrzane klucze wyłącznie w pamięci bieżącej sesji; ponowne uruchomienie może przypomnieć aktualny kamień milowy, ale nie powtarza nagrody ani zdarzenia, nie tworzy pola zapisu i nie zmienia rewizji kampanii.
+
+`NarrativeAudioCatalog` mapuje zamknięty zestaw stabilnych `cue_id` na niepozycyjne, niezapętlone streamy 48 kHz. `NarrativeDialoguePanel` posiada jeden lokalny `NarrativeCuePlayer` na istniejącej magistrali `Master`, z `max_polyphony = 1` i jawnym `PROCESS_MODE_PAUSABLE`, mimo że sam panel przetwarza wejście zawsze. Wejście w pierwszą albo kolejną linię najpierw zatrzymuje poprzedni stream, renderuje kartę i najwyżej raz uruchamia poprawny cue dla tokenu `message_key + line_index`; resize, ponowne ułożenie kontrolek i zastosowanie ustawień nie wyzwalają audio. Brak lub nieznane ID tylko zatrzymuje poprzedni cue. `dismiss()` i bezsygnałowe `clear()` wykonują ten sam bezwarunkowy cleanup, dlatego wymiana sceny, reset sesji, szybkie przejście i łańcuch rozmów nie przenoszą dźwięku do innego kontekstu. Sygnał aktywności pozwala bieżącej `BaseScene` lokalnie i odwracalnie ściszyć własną muzykę; nie zmienia `Master`, intro ani ustawień użytkownika. Audio nie emituje intencji domenowej, nie przesuwa linii i nie należy do `GameState` ani persistence. Kontrakt decyzji: ARD-0087.
+
+`BaseController` prezentuje dokładny cel `CampaignProgressionSystem` i licznik Frontu równolegle do aktywnej karty `MissionSystem`, zamiast zastępować je śledzoną misją. Podczas przygotowania wyprawy wymagany, nieukończony etap Wspólnej Linii ma pierwszeństwo nawigacyjne przed zwykłą misją i przekazuje istniejący cel, opis oraz stabilny landmark do `ExpeditionSetup`; dziennik oraz wybór śledzonej misji pozostają niezmienione.
+
+`assets/intro/platform_prerender.png` jest nieprzezroczystym kadrem 1672×941 generowanym przez `tools/PlatformPrerenderCapture.tscn` i `tools/render_platform_prerender.gd` z rzeczywistego przepływu `GameRoot -> BaseScene`. Harness odtwarza kanoniczny `start_platform_ruins.glb`, sześć ruin, bieżący materiał pokładu, wspólne słońce, mokrość i ocean dla standardowego dnia pierwszego, seeda 808, jakości high oraz chwili 25,0 s, a wynik skaluje filtrem Lanczosa do rozmiaru docelowego. Widoczne cząstki deszczu i `RainFarVeil` są wyłączone podczas renderu, ponieważ ruchomy deszcz należy do zewnętrznego `RainOverlay` oraz `assets/intro/intro_rain_overlay.gdshader`. Proceduralne `ArrivalDetails` pozostają nieobecne; dokładnie troje założycieli pokazuje poprzednia plansza odkrycia. Harness domyślnie zapisuje kandydata poza assetem docelowym; zmiana modelu, materiałów, kamery albo światła bazy nie aktualizuje prerenderu automatycznie i wymaga jawnego renderu, kontroli wyniku oraz snapshotów intro przed promocją.
+
+`GameRoot` przekazuje wspólnym hookiem jakość grafiki oraz `reduced_motion`, lecz intro świadomie konsumuje tylko drugą wartość. Statyczne plansze wyglądają identycznie na `low/medium/high`. Ograniczenie ruchu zachowuje narrację, crossfade, animowany deszcz 2D i statyczną informację, ale wyłącza panoramowanie oraz zoom plansz i zastępuje pionowy przejazd linii wody nieruchomym błyskiem.
+
+Narracja intro jest siedmioma podpisanymi kwestiami Miry synchronizowanymi wyłącznie z autorytatywną osią prezentacji. Każdy rekord `CAPTIONS` przechowuje tekst oraz początek i koniec okna napisu; nie zawiera streamu, `voice_start` ani innego kontraktu mowy. Scena nie instancjonuje `VoicePlayer`, a podpis `MIRA` wskazuje autora tekstu bez etykiety syntezy. Wymuszone czasy snapshotów zatrzymują ambient i pozostają deterministyczne, ale nadal pokazują pełny kanoniczny tekst i portret.
+
+Lokalny `AmbientPlayer` odtwarza oryginalny, 45-sekundowy Ogg Vorbis `assets/audio/intro/intro_ambient.ogg` ze stałą lokalną głośnością. Korzysta z istniejącej magistrali `Master`; nie powstaje autoload ani pusta magistrala Dialog, a intro nie wykonuje duckingu pod nieistniejący voice-over. Brak albo koniec ambientu nie może stworzyć softlocka. `IntroSkipButton`, `ui_cancel` i naturalny koniec wywołują tę samą zabezpieczoną metodę `GameRoot.finish_intro()`. Kontrakt decyzji: ARD-0087.
+
+`UserSettings` jest własnością `GameRoot`, nie autoloadem ani częścią kampanii. Osobny `ConfigFile` formatu 1 korzysta z:
+
+- `user://ostatni_pomost_settings.cfg`;
+- `user://ostatni_pomost_settings.pending.cfg`;
+- `user://ostatni_pomost_settings.backup.cfg`.
+
+Kolejność odzysku to primary -> pending -> backup, a brak poprawnego kandydata przywraca defaulty projektu. Migawka obejmuje tryb/rozdzielczość okna, VSync i FPS, jakość/MSAA 2D, głośność i wyciszenie `Master`, ograniczenie ruchu, pauzę po utracie fokusu oraz do dwóch klawiszy dla trzynastu zarządzanych akcji `InputMap`, w tym przełączania latarni oraz wyboru noża i harpunu. Atak kierowany kursorem pozostaje stałą akcją myszy poza edytorem klawiszy.
+
+Pending jest kandydatem transakcyjnym, nie potwierdzonym zapisem. Po nieudanej końcowej promocji zostaje usunięty, a obrócony wcześniej poprawny primary jest odtwarzany z backupu. Dzięki temu następny `load_current()` nie może przyjąć ustawień, o których UI poinformowało, że nie zostały zapisane.
+
+`SettingsMenu` pracuje na kopii roboczej. Anulowanie przywraca poprzedni runtime, a zmiana trybu lub rozdzielczości wymaga potwierdzenia w ciągu 15 sekund; brak potwierdzenia wykonuje rollback. Ustawienia nie zmieniają `GameState` ani rewizji kampanii.
+
+Geometria okna ma jawny kontrakt możliwości. `UserSettings.display_geometry_capability()` odrzuca backend headless, brak głównego okna oraz uruchomienie zwracające `Engine.is_embedded_in_editor()`. W takim środowisku menu wyłącza tylko tryb i rozdzielczość, pokazuje powód oraz instrukcję wyłączenia `Embed Game on Next Play`, a VSync, limit FPS, jakość, audio, dostępność i sterowanie pozostają aktywne. `PRZYWRÓĆ DOMYŚLNE` zachowuje wtedy nieedytowalny tryb i rozdzielczość, aby nie blokować resetu pozostałych opcji.
+
+W uruchomieniu natywnym sama zmiana logicznej migawki nie jest dowodem sukcesu. `display_output_state()` czyta bezpośrednio z `DisplayServer` tryb, flagę i rozmiar obszaru klienta. `SettingsMenu` czeka przez ograniczoną liczbę klatek na zgodny wynik po zastosowaniu, mierzy go ponownie bezpośrednio przed zapisem i po rollbacku. Dopiero zgodność otwiera 15-sekundowe potwierdzenie albo pozwala zapisać kandydata; mismatch, błąd aplikacji lub brak potwierdzonego rollbacku pozostawia menu otwarte z komunikatem błędu. Pełny ekran bez ramek oznacza dokładnie `Window.MODE_FULLSCREEN`, nie `MODE_EXCLUSIVE_FULLSCREEN`.
+
+`tests/native_window_settings_test.gd`, uruchamiany bez `--headless` i poza Game Embedding, mierzy dwa różne rozmiary klienta, fullscreen bez ramek i oba powroty. `SettingsUIFlowTest.tscn` ma osobne gałęzie dla środowiska obsługiwanego i niewspieranego; w natywnym oknie sprawdza także zmianę fizycznego outputu pomiędzy pokazaniem dialogu a zatwierdzeniem oraz zapis dokładnie zweryfikowanego kandydata.
+
+Profile jakości `low/medium/high` nie są etykietami bez skutku: ustawiają antyaliasing viewportu bazy 3D, gęstość oceanu, liczbę geometrycznych makrofal i oktaw mikrostruktury, LOD modelu, rzeczywistą liczbę cząstek obu warstw deszczu, pule skorelowanych impaktów, rozdzielczość rain heightfieldu i rozbryzgi, SSAO/SSIL oraz zasięg i miękkość cienia, a także docierają przez `GameRoot` do `BaseEnvironment` i `DiverVisualEffects`. `SceneFlow` pozwala `GameRoot` wywołać przed dodaniem nowej instancji do drzewa wąski hook `seed_user_settings_before_ready`. `BaseController` zapamiętuje jakość i `reduced_motion`, po czym przekazuje je przed `BaseEnvironment.build()`; `BaseEnvironment` ustawia jakość `BaseWorld3D` przed budową zasobów GPU, więc zapisany profil low/medium nie alokuje przejściowego wariantu high w bazie. `IntroController` przez ten sam hook zapamiętuje wyłącznie `reduced_motion` i nie ma settera jakości, ponieważ jego plansze są statyczne. Pozostałe sceny nadal otrzymują zwykłe ustawienia dopiero po `_ready()`. Medium używa SMAA zamiast rozmywającego FXAA. Low renderuje świat 3D w połowie rozdzielczości z jawnym liniowym filtrowaniem, wyłącza PCSS, SSIL, spray i dodatkowe shaderowe mikrokregi oceanu, lecz zachowuje odbicie nieba, rzadszy rzeczywisty kontakt kropli z powierzchniami oraz pełnorozdzielczą daleką warstwę deszczu. Medium zachowuje pełną rozdzielczość, SMAA, SSAO i oszczędny spray, a high dokłada SSIL, gęstszą geometrię, mikrostrukturę, cząstki i cztery splity cienia. SSR jest wyłączone na wszystkich profilach po porównaniu A/B opisanym w sekcji 12.2. Profile zmieniają wyłącznie reprezentację i budżet prezentacji; nie zmieniają `WeatherState`, fizyki, zagrożeń ani wyniku kampanii.
+
+Audio udostępnia wyłącznie realną magistralę `Master`. Suwak i wyciszenie mają natychmiastowy, odwracalny podgląd, a `SettingsMenu` generuje krótki ton testowy lokalnie w pamięci. Muzyka, ambient i niewerbalne cue narracji korzystają z tego samego rzeczywistego busa; nie istnieją puste suwaki Muzyka/SFX bez odpowiadających im magistral i odtwarzaczy.
+
+Sterowanie obejmuje jedenaście akcji nurkowania oraz dziennik misji i raporty bazy. Każda akcja ma najwyżej dwa klawisze, konflikty są rozpatrywane oddzielnie w kontekście bazy i wyprawy, `F10` jest zarezerwowane, a widoczne podpowiedzi pochodzą z aktualnego `InputMap` przez `InputPrompt`. Ruch nie czyta bocznie wbudowanych `ui_*`; strzałki są zwykłymi alternatywnymi przypisaniami tych samych akcji co WASD.
+
+`DiveRiskRuntime` składa ostrzeżenie przecieku z aktualnej etykiety `dive_repair` przez `InputPrompt`, tak samo jak pozostałe widoczne podpowiedzi.
+
+Selektor języka pozostaje `[DOCELOWE]`. Nie wolno pokazać częściowego przełącznika, dopóki UI, tutorial, wydarzenia, raporty, teksty zapisane w migawkach oraz zakończenie nie przejdą wspólnie na klucze tłumaczeń i nie otrzymają kompletnych lokalizacji.
+
+12.2. Baza
+--------------------------------------------------------------------------------
+
+`BaseEnvironment` jest hybrydą 2,5D/3D. Wypełnia ekran liniowo filtrowanym `SubViewportContainer`, tworzy izolowany `BaseWorldViewport` i dodaje do niego `BaseWorld3D`. Ten świat 3D składa model platformy, ocean, warstwy deszczu near/mid, kolizje GPU i skorelowane impakty oceanu, pokładu oraz budynków, pianę, rozbryzgi, mokrość materiałów, światło i ruch platformy z tej samej migawki `WeatherState`. Pełnoekranowy `RainFarVeil` jest proceduralnym `ColorRect` nad teksturą świata 3D, ale pod `PlatformBoard`, hitboxami, tutorialem i HUD-em; nie przechwytuje wejścia i nie tworzy drugiego stanu pogody. Ponieważ nie ma dostępu do głębi izolowanego viewportu, `BaseEnvironment` projektuje konserwatywną bryłę poruszającej się platformy i przekazuje shaderowi miękko wygaszany prostokąt okluzji. Daleka warstwa zachowuje sygnał nad otwartym morzem, lecz nie maluje smug na dachach i pokładzie; tam pozostają prawdziwie okludowane warstwy 3D. Nad nią znajduje się przezroczysty 2D `PlatformBoard` z `BuildingSlots`, który utrzymuje stabilne hitboxy, kontrakt HUD-u oraz cel powrotu fokusu z Trybu Zarządzania. Jego animacja nie jest równoległym zestawem amplitud w pikselach: `BaseEnvironment` projektuje przez aktywną kamerę środek oraz osie aktualnego `PlatformRig3D` i wyprowadza z nich przesunięcie, obrót oraz skalę całej planszy 2D. Tutorial, hitboxy i prezentacje budynków dziedziczą przez to ten sam widoczny ruch co model 3D.
+
+[AKTYWNE] `BaseScene` posiada jeden lokalny `AudioStreamPlayer` odtwarzający historyczny `res://assets/audio/base/oddech_przystani.ogg` przez istniejącą magistralę `Master`. Import Ogg ma `loop = true`, `loop_offset = 0`, tempo 64 BPM, 240 uderzeń, cztery uderzenia w takcie i wynikowy czas pętli 225 s. Repozytorium nie utrzymuje generatora ani drugiego źródłowego miksu tego utworu; aktywnym źródłem jest finalny Ogg. Player korzysta z `autoplay`, dziedziczy pauzę drzewa i nie ma `PROCESS_MODE_ALWAYS`. Jest niszczony razem z `BaseScene` przy każdej wymianie `SceneMount`, dlatego opuszczenie Bazy kończy muzykę, a ponowne utworzenie sceny rozpoczyna ją od początku. Nie istnieje autoload audio, trwała pozycja odtwarzania, osobna magistrala Muzyka, adaptacja do `WeatherState`, stan kampanii ani wpływ na zapis. Kontrakt decyzji: ARD-0093.
+
+Pokrycie muzyki Bazy sprawdza produkcyjny przepływ `GameRoot -> BaseScene`, dokładnie jeden player, stream `oddech_przystani.ogg`, `Master`, autoplay, importową pętlę 225 s / 64 BPM / 240 uderzeń z offsetem 0, pauzę/wznowienie oraz usunięcie przy wymianie sceny. Test sceny nie zastępuje odsłuchu szwu ani pełnego miksu z efektami UI i cue narracji.
+
+Near i mid są dwoma emiterami `GPUParticles3D` w przestrzeni świata. Startują już w pasmach prędkości terminalnej, mają zerowe dalsze przyspieszenie, niewielki rozrzut i deterministyczny podmuch wyprowadzony ze wspólnego wiatru oraz zegara prezentacji. Pasma narodzin, minimalna prędkość, lifetime i krok symulacji gwarantują, że nawet najwolniejsza kropla z górnej krawędzi osiąga ocean przed wygaśnięciem. Kanoniczne footprinty kontaktu obejmują widoczne morze oraz odbiorniki platformy; przy każdej zmianie podmuchu `BaseWorld3D` projektuje bieżący kierunek wstecz od tych footprintów do pozycji narodzin. `local_coords = false` pozostawia już lecące krople w świecie, a camera-fit dopasowuje szerokość i głębokość nowej emisji dla wspieranego zakresu 16:9–5:4, dzięki czemu deszcz wchodzi z górnej części obrazu i nie wygasa masowo za dolną krawędzią. Smuga jest krótkim, ustawionym do prędkości quadem opisującym ekspozycję optyczną; proceduralna zwężana alfa, rampy narodzin/zaniku i proximity fade zastępują długie jednolite prostokąty. Orientację `TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY` stosuje wyłącznie system cząstek, a materiał smugi ma billboard wyłączony: drugi billboard materiału nadpisywałby bazę prędkości, odrzucał skalę transformu i interpretował `CUSTOM.x` jako kąt, ponownie spłaszczając deszcz do warstwy ekranowej. `BaseWorld3D` projektuje aktualną trajektorię mid przez rzeczywistą kamerę i przekazuje wynik do `RainFarVeil`, dlatego warstwa daleka ma ten sam znak dryfu i podmuch co 3D. Shader daleki różnicuje długość, jasność i gęstość smug, ma ograniczoną alfę i pozostaje pełnorozdzielczy także na low.
+
+Kontakt deszczu korzysta z natywnej ścieżki `GPUParticlesCollisionHeightField3D` w Forward+ oraz własnego particle shadera `rain_collision_carrier.gdshader`. Shader czyta `COLLIDED`, `COLLISION_NORMAL` i `COLLISION_DEPTH`, usuwa pionowy promień nośnika użyty przez nieobrócony heightfield, dodaje wyłącznie mały bias przeciw z-fightingowi i buduje bazę styczną z osią Y zgodną z normalną oraz osią Z skierowaną do kamery. Każda smuga kończy się na pierwszym receiverze, natomiast stabilny hash wybiera reprezentatywną część dużych kropel, dla których shader emituje dokładnie jedną krótką koronę z kręgiem; statystyczny drobny kontakt oceanu pozostaje w jego mikrostrukturze. Warstwa near zachowuje większy udział efektów hero niż mid, więc dachy i pokład są czytelne bez dywanu identycznych znaków. Standardowe `SUB_EMITTER_AT_COLLISION` nie jest tu kontraktem: jego ścieżka hide-on-contact nie koryguje pozycji o depth ani nie orientuje efektu do receivera. Mid i near mają osobne, stale nieemitujące autonomicznie pule child-particles; współdzielenie jednego celu przez dwa parenty jest zabronione, ponieważ renderer zeruje bufor emisji targetu przed każdym dispatch'em rodzica. Pojemność pul, liczba parent-particles i rozdzielczość heightfieldu zależą od jakości, ale każdy profil zachowuje semantykę kontaktu.
+
+World-fixed, nieobrócony heightfield aktualizuje się co klatkę, ponieważ ocean jest deformowany w vertex shaderze, a `PlatformRig3D` zmienia heave, roll i pitch. Założenie o nieobróconym colliderze jest częścią korekty punktu kontaktu; dodanie SDF, Box albo obróconego heightfieldu wymaga osobnej rekonstrukcji pozycji. Osobna warstwa renderowa kolizji obejmuje shaderowo zdeformowany ocean, aktywne lekkie siatki `Ruin_*`/`Built_*` oraz authored receiver pokładu, wspólnych dachów i ukośnego żurawia. Kamera tej warstwy nie widzi. Receiver ma tylko 20 trójkątów i zastępuje szeroki płaski prostokąt; milionowa wspólna siatka `MeshyPlatform_Geometry` nigdy nie jest drugi raz renderowana co klatkę do heightfieldu. Dzięki temu dach aktywnego wariantu przejmuje kroplę przed pokładem, deck przejmuje ją przed oceanem, a fala używa tej samej deformacji co obraz.
+
+`ocean_surface_3d.gdshader` zachowuje dodatkowe deterministyczne mikrokregi w world XZ bezpośrednio na zdeformowanej siatce i subtelnie zmienia nimi normalną PBR. Są warstwą statystycznego drobnego deszczu, nie zastępstwem zdarzenia kropla-kolizja; low może je pominąć, podczas gdy skorelowane korony i kręgi z subemiterów nadal działają. System nie używa trails ani turbulencji i nie tworzy physics bodies w głównym świecie gry.
+
+Ocean i ruch platformy korzystają z jednego analitycznego pola fal oraz jednego mnożnika czasu pogody. `BaseWorld3D` posiada trzy kanoniczne komponenty Gerstnera i wiąże je jako uniformy shadera; `BaseEnvironment` przekazuje surowy czas, a `WeatherState.wave_speed_multiplier` wchodzi dokładnie raz jako finalne `wave_speed_scale`. Dwie najdłuższe fale są próbkowane w środku oraz na czterech stronach obrysu platformy: ważona średnia wysokości daje heave, różnice boków roll/pitch, a ruch orbitalny subtelne przesunięcie XZ. Znaki uwzględniają osie Godot: dodatni obrót Z podnosi prawą stronę `+X`, natomiast dodatni obrót X opuszcza przód `+Z`; asymptotyczna saturacja zachowuje mały ruch liniowo i usuwa wieloklatkowe plateau twardego clampu. Prędkość kadłuba jest odejmowana od lokalnej pionowej prędkości wody, dlatego kontakt opisuje zamykanie szczeliny woda-kadłub, nie sam ruch fali. Cztery strony i osiem istniejących kotwic pontonów otrzymują osobne energie, przekazywane do shadera w trzech `Vector4`; energia globalna pozostaje wyłącznie sygnałem zbiorczym. `BaseEnvironment` wykrywa lokalne szczyty względnego sygnału uderzenia, stosuje zależny od `splash_intensity` próg i cooldown, a następnie przekazuje dominującą stronę oraz deterministycznie zmienny seed do kotwic sprayu. Dzięki temu częstotliwość rośnie od calm do storm, a intensywność cząstek nie blokuje ponownego wyzwolenia. Uśrednienie przestrzenne i analityczna odpowiedź masy są deterministyczne dla dowolnego czasu snapshotu i nie zależą od FPS ani historii integratora; detektor zdarzeń jest stabilny w testowanym zakresie 24–240 Hz.
+
+Shader nakłada na dwie dominujące składowe bezstanowe, kierunkowe rozpraszanie wokół obrysu platformy. Każda składowa wyprowadza własny kierunek propagacji z aktualnego `WeatherState.wind_direction` i swojego kąta: po stronie napływu `-d` powstaje słabe, zgodne fazowo odbicie, po zawietrznej `+d` pozostaje niezerowa transmisja z miękkim, zwężającym się i odzyskującym cieniem, a dwa punkty sylwetki wypełniają jego brzegi subtelną dyfrakcją. Krótsza fala traci więcej amplitudy niż dominująca fala długa, lecz trzecia składowa, chop, opad i dyfrakcja nadal przechodzą przez cień, dlatego woda nie zamiera. Odpowiedź modyfikuje razem wysokość i analityczny gradient powierzchni; w cieniu osłabia chop, glint oraz narodziny piany Stage A/B. Przy union-SDF kadłuba i ośmiu pontonów dominująca faza fali tworzy poszarpaną, lokalną pianę uderzeniową tylko na zwróconej ku napływowi części wodnicy, a gradient odbicia zasila krótkie, zanikające grzbiety clapotis przed sylwetką. Oba sygnały są łączone z pianą jako nieemisyjne PBR, mają rzeczywiste obszary zera i znikają wraz z energią fali, więc nie tworzą białej ramki, stałego prostokąta ani martwej tafli. Całość jest wyłącznie prezentacją shadera: nie wraca do `sample_platform_wave_motion()`, nie zmienia ruchu platformy, `WeatherState`, `GameState` ani zapisu. Publiczny przełącznik `set_ocean_scattering_enabled()` służy jedynie deterministycznemu porównaniu A/B, a profile jakości zachowują kierunkowe znaczenie efektu przy różnym budżecie krótszej dyfrakcji.
+
+Powierzchnia oceanu jest nieprzezroczystym materiałem PBR z zapisem głębi. Dwie lub trzy dobrze próbkowane fale deformują geometrię zależnie od jakości, a fragment zachowuje wynikającą z pełnego Jacobianu normalną Gerstnera i dopiero do niej dodaje krótszy proceduralny detal. Albedo ma neutralną, stalowo-granatową paletę i nie maluje ręcznie Fresnela ani stałego koloru horyzontu; odbicie kątowe pochodzi z GGX i radiancji proceduralnego nieba. Jasny glint moduluje roughness, nie albedo; ridge'y mają wspólny czas pogody i `reduced_motion`, fizycznie spójne prędkości fazowe oraz wygaszanie subpikselowego szczegółu przez `fwidth`.
+
+Piana grzbietowa ma dwie warstwy. Stage A jest krótkim aktywnym załamaniem: determinant poziomego Jacobianu Gerstnera daje artystyczny sygnał kompresji, ograniczony do górnej i napierającej strony grzbietu, a filtrowana przez `fwidth`, odkształcana domenowo maska komórek rozrywa go na krótkie fragmenty osiągające rzeczywiste zero. Stage B jest szerszą, ciemniejszą i bardziej szorstką pozostałością. Shader analitycznie odtwarza źródło w wcześniejszych chwilach, przesuwa je z wiatrem, rozciąga poprzecznie, wygasza oraz łączy probabilistyczną unią; `low/medium/high` używają odpowiednio jednego, dwóch i trzech tapów. Nie istnieje mutowalny bufor historii GPU, więc wymuszony czas snapshotu, cofnięcie osi i wejście do Bazy pozostają deterministyczne bez warm-startu. Sygnał Jacobianu jest proxy prezentacyjnym, nie deklaracją dokładnego kryterium fizycznego początku łamania.
+
+Shader nie czyta `ocean_detail.png`, `hint_depth_texture`, nie zapisuje `ALPHA` i nie używa emisji. Piana kontaktowa korzysta z unii pomniejszonego obrysu głównego kadłuba oraz ośmiu okręgów odpowiadających rzeczywistym kotwicom pontonów. Gradient SDF daje lokalną normalną zewnętrzną, a osobne energie boków i pontonów ograniczają świeżą pianę oraz ciemniejszą pozostałość do miejsca napierania; zawietrzna strona nie otrzymuje już stałej jasnej ramki. Kosztowny szum i gradient kontaktu są liczone tylko w wąskim pasie wokół platformy. Kotwice jednorazowych bryzgów są dziećmi `PlatformRig3D`, wybierają stronę o największej lokalnej energii, łączą normalną burty z wiatrem, używają miękkiej proceduralnej tekstury alfa zamiast prostokątnych quadów i zmieniają układ kropli przez seed zdarzenia.
+
+Każdy profil jakości korzysta z odbicia proceduralnego nieba, zachowuje zapis głębi i PBR, a SSR pozostaje wyłączone. `BaseWorld3D` jest jedynym właścicielem jednego `SunDirectionalLight3D`, jego kierunku, wspólnej maski i cienia obejmującego wszystkie siatki platformy. `BaseEnvironment` mapuje `WeatherState` na udział światła bezpośredniego, ambient pochmurnego nieba i charakter wspólnego cienia bez tworzenia drugiego `Light3D` ani lokalnego fill light. Profile jakości mogą zmieniać wyłącznie koszt wykonania cienia, nie pogodowe znaczenie energii, barwy, ambientu i opacity. Kontrakt decyzji: ARD-0071.
+
+Aktywne parametry kalibracji należą do `BaseWorld3D`, `BaseEnvironment` i testów czytających rzeczywiste właściwości nodów; ten dokument nie utrzymuje ich równoległej tabeli ani historycznego benchmarku. Mapa pokrycia w sekcji 13 wymaga jednego światła, wspólnego pokrycia modelu, zachowania znaczenia profili i czytelności platformy w sztormie.
+
+Mokrość platformy zachowuje importowane albedo, normal, ORM, emisję i pozostałe właściwości PBR. Jednorazowy skan grupuje powierzchnie na gałąź wspólną, ruiny i konkretne `Built_<slot>_L<level>`, ale nie instaluje override'ów ukrytych wariantów. Płytki `duplicate(false)` powstaje leniwie przy pierwszym pokazaniu gałęzi i jest współdzielony przez wszystkie powierzchnie tego samego materiału źródłowego. Profile rozróżniają mieszaną platformę PBR, rdzę, metal malowany i surowy, szkło, liny/tkaniny oraz drewno; wykluczone są wyłącznie `M_AmberLamp` i `M_RedNavigationLamp`. Zmiana pogody aktualizuje tylko unikalne, już zainstalowane materiały i kończy pracę bez zapisu, jeżeli wartość mokrości się nie zmieniła.
+
+Pokład ma jeden dedykowany materiał `M_MeshyPlatformPBR`, używany wyłącznie przez `Root/Deck/MeshyPlatform_Geometry`. Jego korekta albedo i wyłączona emisja pozostają własnością aktywnego materiału; jasność pochodzi ze wspólnego oświetlenia `BaseWorld3D`. Korekta nie obejmuje materiałów ruin ani wariantów `Built_<slot>_L1..L4`.
+
+Aktywne assety:
+
+- model bazy: `assets/base_3d/start_platform_ruins.glb`;
+- ustawienie importu `gltf/embedded_image_handling=3` zachowuje 40 używanych obrazów bezstratnie wewnątrz samodzielnego zasobu GLB;
+- edytowalne źródło: `assets/base_3d/source/start_platform_ruins.blend` oraz dokładny zestaw jego zależności pod `assets/base_3d/source/textures`, wyłączone z importu przez `.gdignore`;
+- odtwarzalny authoring ruin i walidacja eksportu: `assets/base_3d/source/rebuild_start_ruins.py`;
+- świat 3D: `scripts/base/BaseWorld3D.gd`;
+- shader oceanu: `assets/base/environment_3d/ocean_surface_3d.gdshader`;
+- shader nośnika i kontaktu deszczu: `assets/base/environment_3d/rain_collision_carrier.gdshader`;
+- shader dalekiego deszczu: `assets/base/environment_3d/rain_far_veil.gdshader`;
+- poziomy przebieg rozmycia maski budynku: `assets/base/environment_3d/building_highlight_blur_horizontal.gdshader`;
+- pionowy przebieg i kompozyt miękkiej poświaty budynku: `assets/base/environment_3d/building_highlight_outline.gdshader`;
+- historyczne assety sylwetek budowy i rozbudowy, bez aktywnego stanu oczekiwania: `assets/base/building_blueprints`;
+- interakcja 2D: `PlatformBoard`, `BuildingSlots`, `BuildingPanel` i HUD bazy.
+
+Model `start_platform_ruins.glb` musi zachować kontrakt nazw: `Ruin_<slot>`, `Ruin_<slot>_Geometry`, `SlotAnchor_<slot>` oraz `Built_<slot>_L1..L4` dla sześciu slotów `top_left`, `top_center`, `top_right`, `bottom_left`, `center`, `bottom_right`. Każda początkowa ruina jest jednym triangulowanym meshem PBR złożonym z celowo uszkodzonego podzbioru odpowiadającego wariantu L1 oraz kilku prostych elementów identyfikujących funkcję; nie korzysta z projekcji kamery, przezroczystego szkła ani współpłaszczyznowej płyty pokładu. Skrypt authoringu zachowuje nody, anchory i 24 warianty `Built_*`, kontroluje UV, materiały, obrys, dodatnią wysokość oraz wspólny budżet do 7000 trójkątów. `BaseWorld3D` indeksuje nody po nazwie, ukrywa ruiny po wybudowaniu budynku i pokazuje wyłącznie wariant odpowiadający aktywnemu poziomowi. Gdy GLB nie zostanie załadowany, istnieje prosty fallback proceduralny, ale nie jest docelową prezentacją produktu.
+
+`BuildingSlot` pozostaje właścicielem stabilnego hitboxu 2D i emituje tryb `focus`, `hover`, `pressed`, `tutorial` albo `none` bez rysowania prostokątnego feedbacku tych stanów. Cel tutorialu także nie rysuje dawnego pomarańczowego prostokąta; jego właścicielem nadal jest `TutorialDirector`, a slot tylko publikuje tryb prezentacji. `BaseController` rozstrzyga globalny priorytet `tutorial > pressed > hover > focus`, dzięki czemu prowadzenie pozostaje na wskazanej ruinie lub Stacji do zakończenia kroku, po czym natychmiast odsłania zapamiętany stan bezpośredniej interakcji. Efekt jest dozwolony wyłącznie w fazie planowania lub kryzysu i znika pod modalem budynku. `BaseWorld3D` rozwiązuje z kanonicznego `_slot_states` aktualny `Ruin_<slot>` albo `Built_<slot>_L<level>`, po czym tymczasowo dopisuje jego siatkom bit warstwy 20; przejście ruina -> budynek, zmiana poziomu, bezpośredni transfer i clear najpierw przywracają pełną wcześniejszą wartość `layers`. Warstwy obrazu gracza i receivera deszczu pozostają zachowane, główna kamera oraz heightfield nie widzą warstwy 20, a efekt nie instaluje materiałów, nie zmienia mokrości, stanu domenowego ani zapisu. Wieloslotowy sygnał zakolejkowania pozostaje osobnym feedbackiem 2D i nie uczestniczy w arbitrażu pojedynczej maski.
+
+`BaseEnvironment` tworzy raz przezroczysty `BuildingHighlightViewport`, współdzieli z głównym viewportem dokładnie ten sam `World3D`, utrzymuje kamerę o tej samej projekcji, transformie i logicznym rozmiarze, lecz z maską wyłącznie warstwy 20. Drugi, przezroczysty i pozbawiony bufora 3D `BuildingHighlightBlurViewport` jest wielokrotnie używanym celem poziomego przebiegu; pełnoekranowy pass z wyłączonym blendingiem nadpisuje każdy piksel, więc target nie wykonuje osobnego clearu. Pierwszy shader `CanvasItem` rozmywa scaloną alfę ważonym kernelem binomialnym, a końcowy shader wykonuje przebieg pionowy, usuwa wnętrze źródłowej sylwetki i nakłada premultiplikowaną, miękką poświatę nad światem, ale pod blueprintami, hitboxami, panelem tutorialu oraz HUD-em. Profile jakości zmieniają budżet próbek, rozpiętość i AA maski bez zmiany semantyki wskazania. Oba dodatkowe viewporty działają w `UPDATE_ALWAYS` tylko przy aktywnym wskazaniu poruszającej się platformy i wracają do `UPDATE_DISABLED` wraz z ukryciem kompozytu po clear. Render maski jest unshaded, nietemporalny i nie kopiuje SMAA ani najwyższego MSAA głównego świata. Puls bursztynowego tutorialu pochodzi z deterministycznego zegara prezentacji `BaseEnvironment`, nie z shaderowego `TIME`, a `reduced_motion` zamraża go na stałej czytelnej sile. Dzięki temu wynik nie zależy od split normals i liczby surfaces GLTF. Jest to kompozyt screen-space bez bufora głębi głównego `BaseWorldViewport`: może zachować fragment poświaty przykryty geometrią pierwszego planu; wprowadzenie funkcjonalnych okluderów wymagających ścisłego visible-only oznacza osobny depth-aware pass, nie zmianę logiki slotu.
+
+`BuildingPresentation`, `BuildingSlot`, przejścia i feedback czytają stan po zatwierdzonej komendzie. Nie zapisują postępu. Po sukcesie natychmiast pokazują aktywny wariant docelowego poziomu; nie istnieje sylwetka planu ani procent pracy w zatrzymanym czasie.
+
+`BuildingOccupancyBadge` jest bezstanową prezentacją budowaną przez `BaseController` z bieżącego `BuildingState.assigned_survivor_ids`, liczby stanowisk aktywnego poziomu oraz rekordów `SurvivorState`. Sześć instancji znajduje się w osobnej warstwie `BuildingInfo` pod `PlatformBoard`, nad obrazem budynków i pod hitboxami `BuildingSlots`, dlatego dziedziczy projekcję ruchu platformy i całkowicie ignoruje wejście. `BaseController` przekazuje jej istniejący, wyłącznie myszowy sygnał wejścia i wyjścia z hitboxu `BuildingSlot`: kontrolka pozostaje ukryta w spoczynku i przy samym fokusie klawiatury, a jest widoczna tylko podczas najechania na odpowiadający wybudowany obiekt; otwarcie modalu czyści ten stan prezentacji. Pokazuje nazwę poziomu, zajętość, najwyżej trzy współdzielone `SurvivorPortrait`, wolne ramki i imiona; dla pustego rosteru pokazuje `NIEOBSADZONE`. Bieżąca osoba niezdolna dla własnej roli pozostaje przypisana i otrzymuje tekstowe ostrzeżenie; wszystkie stanowiska, w tym Obsługa Stacji, korzystają ze wspólnego `work_blocker()`. Ruina pozostaje bez tabliczki także po najechaniu. Badge nie mutuje obsady, nie interpretuje efektu pracy i nie dodaje pola zapisu.
+
+HUD zachowuje planszę jako kontekst także po jawnym otwarciu Trybu Zarządzania Bazą. `ResourceBar` łączy dzień, zasoby, pogodę i skrót racji; `DayPlanPopover` jest właścicielem kontrolek planu, `BuildingPanel` tempa oraz Napięcia wybranego budynku, `SurvivorsPanel` rosteru, a `CampaignPanel` bieżącego celu. Przezroczysty, pełnoekranowy `BuildingModal` pozostaje nad światem jako `MOUSE_FILTER_STOP`, więc widoczne hitboxy platformy nie otrzymują wejścia. Mniejszy `BuildingManagementWorkspace` jest jego dzieckiem, natomiast `ResourceBar`, jego popovery i `EndDayButton` mają wyższy priorytet warstwy i pozostają interaktywne zgodnie z ARD-0091. Aktualny stan potwierdzonej luki należy wyłącznie do `.ai/PROJECT_CONTEXT.md`.
+
+`TutorialPanel` jest bezstanową projekcją bieżącego `TutorialState` i treści `NarrativeContent`. Gdy prowadzenie jest aktywne, `BaseController` utrzymuje kapsułę ponad `BuildingModal`, `BuildingManagementWorkspace` oraz otwieranymi nad nim flyoutami, zachowuje kontekstową pozycję calloutu i nie ukrywa jej po wybraniu budynku. Panel i jego potomkowie mają `MOUSE_FILTER_IGNORE`, nie przejmują fokusu i nie tworzą własnego stanu, dlatego widoczne pod nimi menu oraz aktywny HUD nadal otrzymują wejście.
+
+W kroku `TutorialState.SET_RATIONS` `NarrativeContent` wskazuje prawą górną pozycję kapsuły, a `BaseController` wyprowadza z aktywnego kroku bursztynowy styl rzeczywistego przycisku `DayPlanButton`. Widoczny `DayPlanPopover` przenosi kapsułę na lewą stronę, zamknięcie przywraca ją na prawą, a przejście do kolejnego kroku usuwa wyróżnienie. Jest to wyłącznie prezentacja bieżącego `TutorialState` i widoczności panelu; nie powstaje dodatkowy stan domenowy, sesyjny ani zapisowy.
+
+`SurvivorsPanel` wyprowadza zawartość i wysokość wiersza z bieżącego `SurvivorState`. Dodatnie `unspent_skill_points` tworzy osobną etykietę komunikatu, która musi mieścić się w granicach przycisku, a zielony kolor słowa `dostępny` jest dozwolony wyłącznie dla osoby bez `current_assignment` i z kanonicznym `Status.AVAILABLE`. Kolor i układ nie tworzą drugiego statusu ani kopii punktów.
+
+`BaseController` montuje mniejszy od viewportu workspace z trzech części i układa go poniżej `ResourceBar` oraz powyżej `EndDayButton`. `BuildingNavigationRail` po lewej buduje dokładnie sześć kafelków w stabilnej kolejności z `PlatformState.slot_states` i `GameDatabase.buildings`; przechowuje wyłącznie lokalny fokus, a wybór deleguje do tej samej ścieżki selekcji slotu co kliknięcie platformy. `BuildingPanel` wybranego slotu wypełnia środek, a jego zewnętrzny host `BuildingRightSidebar` jest niezależną prawą szyną. Zaznaczony kafelek pokazuje tożsamość, poziom albo ruinę oraz stan tekstem, symbolem i obrysem, nie wyłącznie kolorem.
+
+Stały nagłówek `BuildingPanel` otacza wyłącznie szeroką przewijaną część `DZIAŁANIE` albo `WYPRAWA`; środek otrzymuje całą szerokość pomiędzy dwiema zewnętrznymi szynami. Jego host `BuildingRightSidebar`, montowany przez `BaseController` jako sąsiad panelu, zawiera dwa niezależne przewijane obszary: `OBSADA` przedstawia zwarty, uporządkowany roster i deleguje przyciski `OBSADŹ`/`ZMIEŃ` do istniejącego `WorkerCandidatePickerPanel`, a `BUDOWA`/`ROZBUDOWA` prezentuje poziom docelowy, koszty i blocker oraz deleguje atomową komendę do `BuildingSystem`. Nie ma równoległych zakładek ani dolnej stopki budowy/rozbudowy; `NURKUJ` pozostaje główną akcją wewnątrz części wyprawy Stacji. Plan zablokowany pozwala na inspekcję, lecz wyłącza mutacje z prawdziwym powodem. Workspace reaguje na zmianę viewportu, zachowuje obie szyny i główną akcję oraz jest zamykany przez `Esc` albo jawny przycisk. Przezroczyste obrzeże nie ma semantyki click-outside. `BuildingPanel` zapętla fokus pomiędzy szynami, panelem, dostępnymi kontrolkami `ResourceBar` i `EndDayButton`, ale odzyskuje go po próbie przejścia do slotu platformy. Gdy otwarty jest `DayPlanPopover` albo `SurvivorsPanel`, jego lokalna pułapka ma pierwszeństwo; pierwsze `Esc` zamyka flyout, a kolejne może zamknąć workspace. Zamknięcie oddaje fokus ostatnio wybranemu slotowi; warstwa potomna wraca do jego panelu bez opuszczenia workspace'u. Dokładna geometria i wizualne tokeny są własnością sceny i kodu kontrolek, nie drugą tabelą dokumentu.
+
+`WorkerAssignmentRail` prezentuje zwarte, uporządkowane stanowiska z `BuildingState.assigned_survivor_ids`: portret bieżącej osoby, rolę, dzisiejszy wkład oraz akcję `WYBIERZ`/`ZMIEŃ`. Akcja otwiera centralny `WorkerCandidatePickerPanel`, który wyprowadza kafelki wyłącznie z osób żyjących i obecnych, pomija kandydatów zajmujących inne stanowisko tego samego budynku, a blokady pobiera 1:1 z `WorkerAssignmentSystem.assignment_candidate_blocker(state, survivor_id, building_id, slot_index)`. Wszystkie stanowiska, w tym pierwsze stanowisko Stacji `Obsługa Stacji`, używają wspólnej bramki pracy; izolacja i obecność pozostają wspólnymi bramkami. Ta sama ocena chroni atomową komendę, tekst selektora, stan raila i wyliczenie wkładu; UI nie może dopuścić nowego przydziału, który od razu wnosiłby 0. Bieżący mieszkaniec pozostaje możliwy do inspekcji mimo czasowej niezdolności, zachowuje roster i pokazuje dokładny blocker oraz wkład 0; szczegóły ryzyka kontaktu są projekcją `DiseaseSystem.case_presentation()`. Panel przechowuje tylko lokalne ID fokusowanego kandydata i reaguje na szerokość viewportu. Wybór albo zwolnienie emituje żądanie do `BaseController`, który jako warstwa wiążąca wywołuje istniejącą atomową komendę `WorkerAssignmentSystem.assign_worker_to_slot()`, odświeża stan i przywraca fokus właściwej karcie. `Wróć`, `Esc` i click-outside zamykają wyłącznie selektor. Nie powstaje drugi roster ani luka między slotami; kompaktowa kolejność i synchronizacja odblokowanego planu pozostają własnością systemu domenowego.
+
+`DivingStationHud` utrzymuje w części `WYPRAWA` stałą, pionowo przewijaną kolumnę wszystkich obecnych mieszkańców. Kliknięcie kafelka deleguje wybór do `ExpeditionPreparationSystem`; system odrzuca osobę zajmującą stanowisko, niezdolną, odizolowaną albo zmianę po blokadzie planu. Główna część pokazuje pełny profil i wyposażenie wybranego nurka, a `NURKUJ` buduje jedyną migawkę `ExpeditionSetup`. Stacja może być bez obsady; zdolna Obsługa Stacji na slocie 0 uruchamia strojoną premię udźwigu dla wybranego nurka, którą builder zamraża razem z pozostałymi statystykami.
+
+`SurvivorInfoPresenter` jest bezstanowym katalogiem objaśnień bieżących stanów i narracyjnych cech. Progi pobiera z kanonicznych stałych `SurvivorState`, a nie z kopii w kontrolkach. `CompetencySystem` pozostaje jedynym katalogiem nazw, pełnych opisów oraz aktualnego efektu piętnastu kompetencji, a `ProfessionTalentSystem` analogicznie prezentuje talenty. Selektor obsady, karta mieszkańca, rozwój w Domu Wspólnoty i profil Nurka montują te teksty jako tooltipy konkretnych nazw lub wartości; nie tworzą drugiego stanu ani reguł gameplayowych.
+
+W prowadzonym kroku Noża `BuildingPanel` wyprowadza prezentację z bieżącego `TutorialState`: wymusza zakładkę DZIAŁANIE i kieruje fokus na `Craft_tutorial_rescue_knife`. Dotyczy to zarówno bezpośredniego przejścia po wyborze pracownika w otwartym workspace'ie, jak i pierwszego otwarcia Warsztatu po wcześniejszej rekonsyliacji obsady. Panel nie zapisuje drugiego kroku ani nie wykonuje własnej rekonsyliacji domenowej.
+
+Poza specjalnym krokiem Noża `BuildingPanel` buduje kafelkowy katalog bezpośrednio z `GameDatabase.workshop_recipes`. Filtruje jedynie nieodblokowane warunkiem fabularnym receptury, sortuje pozostałe stabilnie według wymaganego poziomu i nazwy, a lokalnie przechowuje wyłącznie ID zaznaczonego kafelka jako stan prezentacji. Kafelek nie wykonuje komendy: wybrane szczegóły i pojedynczy przycisk produkcji nadal pobierają koszt, status oraz dokładny bloker z `ProductionSystem`. Receptury wyższego poziomu, posiadane, wykonane i zakolejkowane pozostają w katalogu z pochodnym statusem; dodanie definicji nie wymaga nowej gałęzi UI ani pola zapisu.
+
+Dla aktywnego Domu Wspólnoty `BuildingPanel` buduje z bieżącego rosteru dwukolumnową siatkę kafelków osób obecnych. Kafelek korzysta ze współdzielonego `SurvivorPortrait`, pokazuje wyłącznie pochodne dane `SurvivorState` i zmienia lokalne, prezentacyjne ID zaznaczenia; nie mutuje obsady ani nie przechowuje kopii rozwoju. Szczegóły wybranej osoby, trzy statystyki, piętnaście kompetencji, awans zawodowy i dwie karty talentów każdej formalnej profesji delegują do jednej bramki `CareerProgressionSystem`. Trwały wybór talentu wymaga osobnego potwierdzenia; anulowanie nie mutuje stanu, a odbudowa po wyborze lub wydaniu punktu zachowuje fokus i logiczną kotwicę przewinięcia. Globalna Załoga i selektor pracowników pokazują talenty wyłącznie do odczytu.
+
+Nagłówek panelu zawsze pokazuje dokładny `BuildingDefinition.description`: przed budową, natychmiast po atomowej aktywacji budowy lub rozbudowy i niezależnie od przewinięcia części działania albo prawego paska. Bez rozwijania widoczna jest także karta `WYNIK DZISIAJ` z prognozą bieżącej obsady i planu; pełny opis efektu poziomu pozostaje w domyślnie zwiniętej sekcji. Stan kompatybilnościowy `condition <= 0` jest prezentowany neutralnie jako nieaktywność, bez procentowego „stanu technicznego” i bez obietnicy mechaniki zużycia pojedynczego budynku.
+
+`DayPlanPopover` i `SurvivorsPanel` zachowują trzy drogi zamknięcia także nad otwartym budynkiem. Workspace budynków zgodnie z ARD-0090 i ARD-0091 używa `Esc` oraz jawnego przycisku, bez click-outside. Wszystkie trzy warstwy zachowują powrót fokusu, poprawną geometrię po resize i jawny prezenter faktycznej przyczyny blokady. `EndDayButton` deleguje bez wyjątku do kanonicznego `GameRoot.end_day()`; obowiązkowy raport fazowy zamyka workspace w zwykłej ścieżce renderowania i przejmuje fokus. Sekcja 13 mapuje wymagane pokrycie; bieżące różnice między komponentami i data ich potwierdzenia należą do `.ai/PROJECT_CONTEXT.md`.
+
+Panel rozwoju zachowuje zakładkę, fokus i logiczną kotwicę pionowego przewinięcia po wydaniu punktu lub zatwierdzeniu specjalizacji; trwały komunikat aktywnej specjalizacji stabilizuje również wysokość wyniku. `DaySummaryPanel` i `SettlementEventPanel` pozostają obowiązkowymi, centralnymi modalami z własną pułapką fokusu. Skrócony raport stawia najważniejsze zmiany przed szczegółowym przebiegiem, a karta wydarzenia pokazuje dokładny skutek i powód niedostępności bez opuszczania decyzji.
+
+Podpowiedzi nie obiecują nieistniejących wypadków ani ogólnego mnożnika całej osady.
+
+`BuildingPanel` prezentuje lokalne tempo i Napięcie z projekcji `WorkPaceSystem`, odróżnia realną pracę od bezczynności oraz wskazuje stałą procedurę zadań, których tempo nie skaluje. Raport konsumuje ten sam dziennik i wynik agregacji Nadziei. Widoczne wartości i wyjątki należą do `docs/OgolnyZarys.txt`, sekcja 4.
+
+Prognoza Chaty pokazuje kolejno presję bieżącą, wartość po regeneracji i wartość po prognozowanym połowie z tej samej projekcji co resolver. Opisy bieżącego poziomu i rozbudowy jawnie oddzielają nazwy autorskie od mechanik: między innymi Sonar, Dzwon, magazyn przynęt, Akwakultura, Wędzarnia, Spiżarnia, Suszarnia i Radiostacja nie uruchamiają nieistniejącego osobnego pionu.
+
+`SurvivorsPanel` i karta osoby prezentują typowane przypadki, etap, zakaźność, wpływ na pracę/nurkowanie oraz prognozę. `WorkerCandidatePickerPanel` konsumuje `DiseaseSystem.case_presentation()` i przy nieizolowanym zakaźnym kandydacie pokazuje nazwę choroby oraz kanoniczną presję kontaktu; nie rekonstruuje etapu ani liczb w UI. `BuildingPanel` Lecznicy pokazuje wspólną kolejkę, pojemność, formalną izolację, koszt i wynik z `MedicalCareSystem`; komendy priorytetu i izolacji delegują do domeny planu. `ResourceBar` pokazuje kompaktowe Zdrowie osady tylko przy narażeniu, przypadku albo epidemii. `DivingStationHud` nie kapitalizuje legacy stringów i konsumuje centralny blocker typowanego przypadku. Raporty pozostają prezentacją wyników, nie drugim stanem epidemii.
+
+Popover planu pokazuje wyliczony koszt, faktyczny fallback i odbiorców wspólnej prognozy racji. Dla `DIVER_PRIORITY` opisuje rzeczywistą pełną lub połowę nurka, grupowy fallback bez poprawnego nurka albo brak wydania, bez obietnicy nieistniejącego priorytetu.
+
+Copy misji, przedmiotów i raportu zachowuje aktywną granicę Wspólnej Linii: Stary sygnał prowadzi do stałego terminala Archiwum, przesłana mapa nie trafia do plecaka, heavy pozostają osobnym systemem, łom jest stałym narzędziem, lek do Leona znajduje się pod wodą, a `meds_chemicals` służy Lecznicy i stabilizacji. Raport używa współczesnych nazw rejonów, licznik Czarnego Frontu pokazuje pozostałe dni, a kryzys nie obiecuje zatrzymania zwykłej gospodarki.
+
+12.3. HUD nurkowania
+--------------------------------------------------------------------------------
+
+`Camera2D` jest dzieckiem nurka, utrzymuje stabilny kadr i limity mapy, a podczas sprintu nie zmienia zoomu ani nie stosuje look-ahead. HUD działa na osobnym `CanvasLayer`, dlatego nie skaluje się razem ze światem.
+
+Aktywny obraz postaci biegnie przez `Diver.tscn -> diver_sprite_frames.tres -> animated_16f_v1`. Zasób `SpriteFrames` jest właścicielem trzech zapętlonych klipów `idle`, `swim` i `sprint`, ich tempa oraz normalizacji komórek. `DiverController` zachowuje znormalizowaną fazę przy jednowarstwowej zmianie klipu i nakłada na aktywny sprite wygładzony, ciągły transform bezwładności. Brak nakładającej się drugiej sylwetki zapobiega temporalnemu podwójnemu obrazowi na granicy `idle/swim/sprint`. Transform dotyczy wyłącznie gałęzi wizualnej sprite'a i jej prezentacyjnych socketów: nie przesuwa korzenia `CharacterBody2D`, collidera ani `InteractionRange`. `reduced_motion` zachowuje klatki lokomocji, lecz ogranicza wtórną bezwładność i impulsy kontekstowe.
+
+`DiverSocketProfile` jest walidowanym zasobem prezentacyjnym dla spłaszczonego rastra. Przechowuje po 16 dyskretnych próbek `breath`, `fin_upper`, `fin_lower`, `tool_hand`, `lamp` i `leak_valve` dla każdego klipu. Markery są dziećmi `AnimatedSprite2D`, dziedziczą jego pozę oraz skalę, a `DiverController` jawnie odbija wyłącznie współrzędną X przy `flip_h`; pozycji nie interpoluje pomiędzy nieruchomymi jeszcze klatkami bitmapy. `DiveLight` śledzi socket lampy, lecz jego model, energia, stan włączenia i wpływ na zagrożenia nadal pochodzą z dotychczasowego sprzętu oraz `DiveSessionState`.
+
+`DiverVisualEffects` jest prezentacyjnym dzieckiem nurka i utrzymuje sześć budżetowanych emiterów w przestrzeni świata: rytmiczny oddech, dwa ślady płetw, przeciek, pracę narzędzia oraz krótkie cue wyniku. Ślady płetw używają prędkości względem wody `velocity - current_velocity`, dlatego bierny dryf nie tworzy fałszywego napędu. `DiveController` wyprowadza przeciek, interakcję i holowanie z kanonicznej sesji, a jednorazowe cue zleca dopiero po potwierdzonym wyniku ataku, naprawy, zebrania, ratunku albo trafienia; markery i VFX nie zapisują stanu, nie emitują zdarzeń hałasu i nie wpływają na ruch, tlen, kolizję, czas, obrażenia ani zagrożenia. Profil `low/medium/high` i `reduced_motion` trafiają do VFX jeszcze przed `_ready()`, aby pierwszy przydział nie tworzył przejściowego budżetu `high`; reset czyści kontekst i aktywne bufory cząstek. Materiał sprite'a pozostaje niezależną od światła świata warstwą czytelności i krótkich akcentów działania/trafienia bez tworzenia dodatkowego `Light2D`.
+
+`DiveHudDock` składa trzy grupy prezentacyjne: stan nurka, przewijany hotbar oraz sprzęt z kontekstowym ryzykiem. Tutorial i nawigacja są osobnymi kapsułami, a cel misji pozostaje wskazówką bez blokowania eksploracji. Kapsuła tutoriala pokazuje tytuł i pełną bieżącą instrukcję bez wymagania tooltipa. `DiveHudDock` jest właścicielem priorytetu alarmów i toastów, ale wartości progów oraz widoczne znaczenie interfejsu należą do `docs/OgolnyZarys.txt`, sekcja 6; scena i kod kontrolki są właścicielami dokładnej geometrii.
+
+`DiveController` wyprowadza całą prezentację finału dnia 3 z kroku `TutorialDirector`, bez nowego stanu sesji lub kampanii. Dla `ACTIVATE_JUNCTION_J7` kompaktowy cel używa pozycji rzeczywistego `DivePersistentInteractable` o ID `junction_j7`, szczegół objaśnia bramkę, a prompt aktywnej `DiveExitLine` pokazuje blocker zamiast obietnicy powrotu i ukrywa pasek postępu. Dla `FINAL_RETURN_TO_LINE` cel natychmiast wraca do liny. Krytyczny alarm tlenu zachowuje pierwszeństwo w kapsule ostrzeżeń, lecz nie usuwa osobnej trwałej instrukcji tutoriala.
+
+`TutorialDirectionIndicator` jest bezstanową prezentacją na `CanvasLayer`, zakotwiczoną w środku stabilnej kamery nurka. `DiveController` rozwiązuje dla aktywnego kroku rzeczywistą pozycję obowiązkowego kontenera, miejsca blokady przy linii, J-7 albo liny i przekazuje wyłącznie wektor celu w przestrzeni świata. Kontrolka rysuje bursztynową strzałkę na stałym okręgu wokół nurka, zachowuje kierunek 360 stopni, nie odczytuje transformacji viewportu ani powierzchni okna, nie przechwytuje myszy i znika przy celu lub poza tutorialem. Nie przechowuje kroku, nie rozwiązuje obiektu świata i nie mutuje `DiveSessionState`, `GameState` ani zapisu.
+
+Zakończenie wyprawy może synchronicznie wymienić scenę wewnątrz obsługi interakcji tej samej klatki. Po `_update_interaction()` kontroler przerywa dalszą prezentację, gdy sesja ma `_ending` albo scena opuściła drzewo; sam wskaźnik dodatkowo nie odczytuje transformacji nieistniejącego viewportu. Te zabezpieczenia należą do teardownu UI i nie zmieniają wyniku `DiveResult`.
+
+Przezroczyste korzenie ignorują mysz. Stan pochodzi z `ExpeditionSetup` i `DiveSessionState`; HUD nie przelicza sprzętu ani statystyk.
+
+Wiersz sprzętu pokazuje model latarni, rzeczywisty stan `WŁ.`/`WYŁ.` oraz klawisz `dive_light_toggle` rozwiązany przez `InputPrompt`. Brak poprawnie wyposażonego światła jest osobnym czerwonym stanem, a nie ukrytym fallbackiem. Zmiana `light_enabled` natychmiast odświeża lokalne światło i HUD; ambient głębokości pozostaje niezależny.
+
+12.4. Portrety mieszkańców
+--------------------------------------------------------------------------------
+
+[AKTYWNE]
+
+`PortraitCatalog` rozwiązuje stabilne `portrait_id` do autorskiej tekstury, a współdzielony `SurvivorPortrait` renderuje ją u wszystkich konsumentów. Jawny katalog obejmuje wszystkich obecnie definiowanych mieszkańców oraz zewnętrzny głos Klary używany w rozmowie z Północną, a nieznany albo niezaładowany identyfikator zachowuje deterministyczny portret proceduralny zamiast pustego pola. Katalog i kontrolka nie przechowują stanu kampanii, nie wybierają nurka i nie interpretują statusu postaci.
+
+Konsumenci czytają wyłącznie istniejące granice danych:
+
+- intro przekazuje stałą tożsamość Miry i pokazuje portret w warstwie napisów niezależnie od powodzenia ambientu;
+- `SurvivorsPanel` wiąże każdy wiersz z `SurvivorState.portrait_id` oraz nazwą osoby;
+- przygotowanie wyprawy wiąże profil z bieżącym wyborem, ale nie zamraża w UI drugiej kopii;
+- `ExpeditionPreparationSystem` nadal jest jedynym builderem `ExpeditionSetup` i zamraża `diver_portrait_id` razem z tożsamością nurka;
+- `DiveHudDock` prezentuje zamrożone `ExpeditionSetup.diver_portrait_id`, z dotychczasowym fallbackiem do rekordu mieszkańca i `diver_id`.
+
+Jest to wyłącznie nowa reprezentacja istniejącego pola. Nie zmienia rewizji kampanii, walidacji ani kontraktu `ExpeditionSetup -> DiveResult`. Pokrycie sceniczne sprawdza obecność Miry w intro, komplet autorskiego katalogu bieżących postaci, poprawne powiązanie w Załodze i przygotowaniu wyprawy, zamrożony wybór w HUD-zie nurkowania oraz czytelny fallback nieznanego ID.
+
+Powiązania: `docs/OgolnyZarys.txt`, sekcje 1 i 4; ARD-0001, ARD-0040, ARD-0047, ARD-0087.
+
+13. WALIDACJA I TESTY
+================================================================================
+
+[AKTYWNE]
+
+`GameDatabase` waliduje ID, typy skryptów i zależności statycznych definicji, ale nie cały graf wczytanego `GameState`. Pokrycie mapy rozdziela kanoniczną maskę i fizykę od pochodnego SDF, globalnego renderu oraz streamingu rzadkich warstw autorskich. Testy chronią hashe masterów, manifestów i każdego cropu, brak runtime preloadu pełnych rastrów, deterministyczne generatory, niezmieniony podpis oraz kompletny streaming; jakość krawędzi, materiału, okluzji i atmosfery wymaga dodatkowo wzrokowej kontroli reprezentatywnych kadrów. Aktualny wynik należy do `.ai/PROJECT_CONTEXT.md`.
+
+`dive_recovery_certification_test.gd` w zwykłym uruchomieniu sprawdza szybki kontrakt runtime: kompletność i unikalność 65 statycznych celów, unii 103 par źródło + zasób oraz 35 pełnych interakcji, legalność DAG 14 profili, margines planera, prądy, odłączone skróty i brak mutacji wejść. Wyczerpujący frontier jest jawnym trybem narzędziowym `DIVE_CERT_EXHAUSTIVE=1`: dla każdego z 138 `query_id` statycznie odrzuca niemożliwe checkpointy, a każde potencjalne minimum odtwarza na `easy`, `standard` i `hard`, dopuszczając kilka nieporównywalnych minimów. Discovery może dzielić posortowaną unię przez `DIVE_CERT_EARLIEST_ONLY` oraz `DIVE_CERT_EARLIEST_SHARD_COUNT/INDEX`, ale każdy shard musi pracować w osobnej pełnej kopii projektu. Frontier chroni także legalność sprzętu względem Warsztatu, wcześniejsze boje i wejścia, narastającą sekwencję J-7 -> Archiwum -> R-3 -> C-4 -> Rozdzielacz, licznik Czarnego Frontu, odmaskowanie skrótu na odłączonej kopii oraz brak mutacji `GameState`, `WorldDelta` i snapshotu wejściowego. `tools/dive_recovery_report.gd --all-targets` uruchamia pełną enumerację projektową. Diagnostyczny `FAIL` lub timeout nie jest wynikiem akceptującym; sama dokumentacja ani szybki kontrakt nie potwierdzają przejścia frontieru.
+
+`underwater_map_scene_test.gd` chroni istnienie pełnego katalogu prefabów, kompilację produkcyjnej sceny, wymagane grupy, stabilne ID w rozdzielonych przestrzeniach, jedno wejście i wyjście, rekord prezentacyjny linii powrotu, wspólną rasteryzację obróconej i pochylonej przeszkody, deterministyczny podział segmentów maski na chunki, zmianę podpisu po edycji gameplayowej, zawartości łupu lub rozmiaru chunków oraz zachowanie podpisu po zmianie lokalnej prezentacji prefabu, profilu regionu i pochodnych assetów renderu. Test chroni też dokładnie 58 jednostek standardowej żywności, sześć jednostek obowiązkowego celu tutorialowego oraz rozłożenie pozostałych źródeł między cztery regiony. `dive_visual_chunk_streaming_test.gd` porównuje rzeczywiste SHA-256 obu masterów i każdego cropu z manifestem oraz blokuje preload pełnej warstwy. `underwater_environment_test.gd` chroni ciągłe mieszanie czterech profili w przestrzeni świata, budżety `low/medium/high`, zamrożenie smug prądu i wyłączenie refrakcji przez `reduced_motion`, jawny czas shadera, SDF, mipmapowany detal oraz bezosiowy fallback tonalny.
+
+`continuous_map_collision_test.gd`, `map_reachability_probe.gd` i istniejące testy wyprawy pozostają bramką fizyki oraz osiągalności na pełnych assetach; pierwszy sprawdza jeden globalny render wody i terenu, aktywny pierścień colliderów i okluderów, pusty chunk bez landmarku, odłączenie i ponowne wczytanie fizyki oraz rozszerzenie bufora dla szerokiego kadru. `dive_system_test.gd` i wąski `DiverPresentationTest.tscn` chronią komplet klipów nurka, liczbę klatek, czasy pętli, filtrowanie importu, komplet 288 dyskretnych próbek socketów, odbicie, pierwszy budżet `low/reduced`, ruch względem wody, reset emiterów, jednowarstwowe przełączenie, zachowanie fazy oraz niezmienność korzenia, collidera i `InteractionRange` podczas cue; testy ryzyka i nawigacji obejmują cichą naprawę, remap, czas Zwiadowcy, zasięg i remisy sygnałów. Test fabuły chroni aktywację Archiwum i poprawność stanu przy pierwszym wynurzeniu. Test granicy zapisu chroni dokładną rewizję 1, odrzucenie innych rewizji bez mutacji, pojedynczy namespace, roundtrip talentów, wybór nurka i zamrożone wsparcie Stacji. `PngWorldSnapshot.tscn` zamraża czas rendererów i zapisuje reprezentatywne kadry czterech regionów, profili jakości, latarki oraz ruchu, w tym okluzję światła na terenie. Osobny natywny `DiverPresentationCapture.tscn` przy stałych 24 FPS zapisuje pełny przebieg `idle/swim/sprint`, atak, naprawę, przeciek, trafienie i holowanie w pełnym oraz ograniczonym ruchu, macierz jakości, overlay socketów i surowy koszt renderowania; kadry wymagają kontroli wzrokowej, a raport bez zatwierdzonego progu nie stanowi samodzielnej bramki wydajności.
+
+Katalog `tests` rozdziela testy domenowe, sceny przepływu, walidację persistence i snapshoty. Komendy uruchomienia należą do `README.md`, a zasady sekwencyjności, interpretacji logów i izolacji zapisu wyłącznie do `AGENTS.md`; ta sekcja mapuje ryzyka na rodzaje pokrycia.
+
+`tests/run_all_tests.ps1` domyślnie tworzy pełną, jednorazową kopię projektu poza repozytorium w lokalnym workspace użytkownika. Kopia ma własne `.godot`, logi i wynik testu, a następnie jest usuwana; dlatego uruchomiona gra albo Edytor w źródłowym checkoutcie nie współdzielą cache z testem. Wewnętrzny przebieg pozostaje sekwencyjny, `-KeepWorkspace` zachowuje nieudaną kopię do diagnozy, a `-InPlace` jest wyłącznie świadomym trybem lokalnym po zamknięciu wszystkich procesów Godota tej kopii. `-Target` uruchamia pojedynczy cel headless, natomiast `-NativeTarget` pojedynczy test wymagający prawdziwego okna i bez flagi `--headless`; lane'y nie mogą być zamieniane. Kontrakt: ARD-0048. Komendy i lokalizacja workspace należą do `README.md`.
+
+Pokrycie obsady rozdziela domenowy kontrakt trwałego, kompaktowego rosteru od prezentacji selektora. Test systemu chroni atomowe przeniesienie między budynkami, blokadę po zamrożeniu planu, synchronizację migawki i rekonsyliację stanów terminalnych. Osobny przypadek graniczny 85% zmęczenia wymaga odrzucenia kandydata z bezpośredniej listy nurków z dokładnym `dive_blocker()`, przy równoczesnym dopuszczeniu tej samej osoby do wspólnej Obsługi Stacji i zwykłego stanowiska pracy. Dedykowany flow selektora chroni jawne stany „po przydziale będzie pracować” i „po przydziale wkład 0”, widoczność bieżącej osoby, dokładny blocker niedostępnego kafelka, komendę wyboru i zwolnienia, semantyczne tooltipy stanu, cechy i kompetencji oraz przejście układu szerokiego w jednokolumnowy. Sceny Bazy dodatkowo przechodzą rzeczywiste otwarcie stałej listy nurków, wybór portretu, tutorialowe przejście do następnej akcji, ryzyko chorobowe i drugie stanowisko Stacji. Osobne asercje badge’y chronią brak tabliczki nad ruiną, ukrycie w spoczynku i przy samym fokusie klawiatury, pokazanie dokładnie jednego wybudowanego budynku podczas najechania, ponowne ukrycie po wyjściu kursora, stany pusty/częściowy/pełny, wiązanie `portrait_id`, tekstowe ostrzeżenie osoby niezdolnej, brak przechwytywania wejścia oraz natychmiastowe odświeżenie po zmianie obsady; snapshot na aktywnym najechaniu przy 16:9 i 5:4 pozostaje bramką czytelności oraz niekolizyjnego układu tabliczki z istniejącym feedbackiem slotu.
+
+`TutorialPartialLootFlowTest.tscn` przechodzi produkcyjny przepływ do dnia 3 i chroni oba warianty Warsztatu: stale widoczną prawą `OBSADĘ` przed przydziałem oraz widoczną akcję Noża w szerokim `DZIAŁANIU` po rekonsyliacji lub ponownym otwarciu workspace'u. Pierwszą skrzynię otwiera jeszcze podczas instrukcji ruchu, zabiera żywność i potwierdza, że wcześniejsze kroki nie są pomijane, natomiast po instrukcji tlenu spełniony krok skrzyni zostaje natychmiast uzgodniony. Powrót przy linie pozostaje zablokowany do osiągnięcia jawnego kroku powrotu także wtedy, gdy plecak zawiera już całe wymagane minimum; domenowe testy chronią lokalny baseline, dziennik zdarzeń, reset retry, symetryczną bramkę startu, brak mutacji kampanii podczas nurkowania oraz atomowe zastosowanie `DiveTutorialOutcome` dopiero na kandydacie zatwierdzonego powrotu. Ten sam flow sprawdza stałą instrukcję J-7, pozycjonowany cel, jawny blocker przy linii, brak zakończenia przed aktywacją, kolizję z alarmem krytycznego tlenu, odtworzenie celu po resecie próby, natychmiastową zmianę celu po aktywacji oraz utrwalenie J-7 dopiero po bezpiecznym powrocie. `dive_ui_snapshot.gd` chroni dodatkowo obecność pełnej widocznej instrukcji w kompaktowej kapsule.
+
+`NarrativeDialogueFlowTest.tscn` chroni produkcyjny przepływ `GameRoot -> NarrativeDialoguePanel`: kontekst sceny, `dialogue`, `stage_direction` i `world_event`, dokładnie jedno przejście na `ui_accept`, stabilne strony i portrety rozmówców, brak mówcy dla beatów bezosobowych, responsywną geometrię każdej prezentowanej linii katalogu w 720×540 i 1280×720, fokus `DALEJ`, brak mutacji tutoriala oraz dalszy ruch deterministycznego zegara środowiska. Osobne przypadki blokują rozmowę dnia 2 i połączoną scenę J-7 w `END_DAY_REPORT`, rozmowę dnia 3 w `DAY_START_REPORT`, wymagają otwarcia dopiero po przejściu do planowania i potwierdzają całkowity brak okna w `DiveScene` przy zachowaniu pełnej kapsuły celu. Test sprawdza też scenę odzyskania zasilania i pierwszego kontaktu, rozwiązane role i portrety, techniczne `world_event`, trzy zakończenia, rzeczywiste wejście `EndingScene -> GameRoot`, tekstowy nośnik wszystkich kwestii oraz bieżącą rewizję 1. Pokrycie cue wymaga poprawnego streamu i startu dokładnie raz przy przypisanym przejściu, zamierzonej ciszy przy braku lub nieznanym `cue_id`, natychmiastowego przerwania przy szybkim przejściu, `dismiss`, wymuszonym `clear` i wymianie sceny oraz braku ponownego startu po resize lub ustawieniach. Test intro osobno blokuje obecność voice-overu i assetów mowy.
+
+`campaign_story_system_test.gd` chroni brak radiowego uprzedzenia pierwszego kontaktu i kolejne poranne komunikaty Północnej z licznikiem Frontu. `mission_journal_flow_test.gd` oraz `BaseOptionalPanelsFlowTest.tscn` chronią równoległą widoczność celu kampanii i śledzonej misji, nieruchomą stopkę akcji oraz brak kolizji trackera z budynkami. `building_system_test.gd` sprawdza pierwszeństwo celów wypraw Wspólnej Linii, brak prowadzenia pod wodę podczas etapów produkcyjnych i aktywny opis wymagania Radiostacji.
+
+Ten przepływ chroni także strzałkę na okręgu wokół nurka: obecność od początku pierwszego zejścia, przełączenie zasoby -> blokada -> lina, pełny kierunek do J-7 oraz natychmiastową zmianę J-7 -> lina. Po pierwszym wynurzeniu celowo wykonuje również ostatnią aktualizację odpiętego HUD-u; wskaźnik ma ją bezpiecznie przerwać bez odczytu viewportu lub powierzchni renderującej. Kontrolka jest testowana jako prezentacja pochodna, bez drugiego stanu tutoriala.
+
+Manifest runnera ma jawne, niepowielone zbiory: szybka bramka uruchamia 13 testów skryptowych i 2 sceniczne przepływy, pełna regresja 40 testów skryptowych i 16 przepływów, a opcja snapshotów 9 celów wizualnych. Quick obejmuje bieżący format rewizji 1 bez migracji, podstawową pętlę dnia, tutorial, narrację, kompetencje, talenty, produkcję, niezależny wybór nurka, opcjonalne +5% Obsługi Stacji, source-v4 mapy oraz izolowany test nieaktywnego szkieletu ARD-0081/0082. Full rozszerza ten zakres między innymi o szybki kontrakt certyfikacji odzysku, streaming, pozostałe domeny, sceniczne przepływy i lane natywnego okna; nie uruchamia wyczerpującego frontieru bez jawnej zmiennej narzędziowej. Test szkieletu potwierdza wyłącznie formaty oraz inwarianty przyszłej integracji; nie jest dowodem działającej rotacji załogi ani pełnej pętli A-Z. Liczby opisują manifest, nie wynik ostatniego uruchomienia.
+
+Snapshoty bazy przechwytują prawdziwy przepływ `GameRoot -> BaseScene`, pełny HUD i reprezentatywne stany pogody, jakości oraz poziomów budynków przy deterministycznej osi prezentacji. Tryb startowy `BaseWeatherSnapshot` wymusza realny stan dnia pierwszego z sześcioma pustymi slotami i sprawdza import GLB, dokładnie sześć widocznych ruin, brak widocznych wariantów zbudowanych oraz żądany profil w macierzy `low/medium/high` × `1280×720/1280×1024`; zapisane kadry nadal wymagają kontroli wzrokowej, nie są automatycznym golden diffem. Zamknięty tryb ma chronić czytelność planszy, zgodność wariantów 3D, wspólny model światła z ARD-0071 i czytelność niepodświetlonych części platformy w sztormie. Osobny stan otwartego Trybu Zarządzania Bazą chroni pełne przykrycie świata, dokładnie sześć kafelków szyny, szybkie przełączanie kontekstu, stałą widoczność nagłówka i głównej akcji, grafitowo-morską hierarchię powierzchni oraz fokus przy 1280×720 i 1280×1024. `base_environment_test.gd` chroni ponadto inwarianty opadu: przestrzeń świata near/mid, ruch w dół i zakres terminalny, konserwatywny zasięg życia z uwzględnieniem spreadu i najniższej doliny fali, odwrócenie dryfu z wiatrem, synchronizację i okluzję projekcji far, footprint kontaktu kamery dla 16:9 i 5:4, wejście emitterów z górnej części kadru, pełne wyłączenie dla zera, liniową gęstość i monotoniczny budżet jakości, co najmniej 25% zapasu dwóch niezależnych pul, kontrakt custom shadera punktu/normalnej oraz maski i koszt geometrii heightfieldu, udział wszystkich wariantów budynków i shaderowe mikrokregi na deformowanym oceanie. Dokładne fixture, progi obrazu i synchronizacja renderera należą do harnessów oraz wykonywalnych testów, nie do dokumentacji.
+
+Osobny harness ruchu oceanu porównuje deterministyczne profile pogody i jakości w prawdziwym przepływie bazy. Udostępnia zwykły widok gry, wariant diagnostyczny bez deszczu, HUD-u oraz warstwy hitboxów, a także pełny zestaw zbudowanych wariantów do inspekcji kontaktu na dachach. Opcje `--wind=x,z`, `--scattering=on/off` i `--camera=production/topdown` pozwalają przy tej samej fazie potwierdzić stronę napływu, transmisję po zawietrznej, obrót efektu po zmianie wiatru oraz brak wpływu warstwy prezentacyjnej na ruch platformy. Test bazy dodatkowo chroni zakresy niezerowej transmisji, odbicia i retencji, integrację fazowej piany wyłącznie z nieemisyjną warstwą świeżą oraz identyczny wynik pełnego próbkowania ruchu w macierzy jakości, przeciwnych wiatrów i faz. Po natywnym rozgrzaniu harness odczytuje testowo `capture_aabb()` obu dormant impact-pools i kończy się błędem, jeżeli którakolwiek nie otrzymała rzeczywistych kolizji; odczyt bufora GPU pozostaje wyłącznie bramką harnessu, nie metryką runtime. Movie Maker przy stałych 60 FPS służy ocenie rytmu ruchu i porównaniu zsynchronizowanych klipów. Wydajność mierzy wyłącznie oddzielny natywny przebieg: harness włącza `RenderingServer.viewport_set_measure_render_time()` dla głównego viewportu i izolowanego świata Bazy, sumuje ich czasy GPU/CPU oraz raportuje percentyle wraz z draw callami, prymitywami i VRAM. Tych dwóch rodzajów dowodu nie wolno utożsamiać.
+
+Test przepływu intro chroni zapis kampanii przed prezentacją, pominięcie, kontynuację, niezależność sceny 2D od runtime bazy, oś siedmiu napisów, portret Miry, lokalny ambient oraz całkowity brak `VoicePlayer`, streamów i assetów mowy oraz duckingu zależnego od kwestii. Brak ambientu nie może blokować pominięcia ani naturalnego końca. Snapshoty intro sprawdzają kompozycję reprezentatywnych chwil. Szybki test fabuły chroni kontrakty do Kroniki, ale nie jest dowodem przejścia zwykłym UI ani pełnej gospodarki na każdym profilu.
+
+Testy persistence chronią rewizję 1, dokładny typ korzenia, brak importu innych rewizji i dawnych przestrzeni, pojedynczy namespace, atomowy pending/primary/backup, kontrolowane odrzucenie bez mutacji, zamrożenie talentów i parametrów wyprawy oraz roundtrip aktywnego stanu. Przepływ menu chroni bezpośrednie `KONTYNUUJ`, potwierdzone usunięcie całego namespace przez `NOWA GRA` i zapis stanu startowego przed intro. Testy domenowe Warsztatu, budynków, raportu i przygotowania wyprawy chronią zgodność wykonania z podglądem oraz zamrożone wejścia. Pozostałe grupy mapują świat, wydarzenia, roster i kampanię; pełne nazwy oraz asercje należą do katalogu `tests`.
+
+`PauseMenuFlowTest.tscn` chroni ponadto otwarcie wspólnego `SettingsMenu` nad zatrzymaną bazą i wyprawą, priorytet `ESC`, powrót fokusu oraz brak mutacji kampanii. Powrót do menu jest testowany osobno dla bazy i nurkowania: anulowanie zachowuje scenę i sesję, potwierdzenie nie zapisuje, odrzuca runtime bez usuwania namespace, zdejmuje własną pauzę i montuje prawdziwy `MainMenu`. Bezpośredni quit nadal nie tworzy potwierdzenia ani autosave.
+
+Pokrycie panelu Warsztatu sprawdza co najmniej równoczesną obecność kafelków Latarni i Butli, widoczność receptury wyższego poziomu, zmianę zaznaczenia oraz zgodność pojedynczej akcji z dokładnym blockerem `ProductionSystem`. Tutorial zachowuje osobną regresję stabilnego przycisku Noża w szerokiej części działania przy stale widocznym prawym pasku obsady.
+
+Pokrycie rozwoju w Domu Wspólnoty i globalnym panelu Załogi sprawdza komplet kafelków obecnej załogi, brak osoby nieobecnej, wiązanie portretów, zmianę wybranej osoby z powrotem fokusu, brak zmiany obsady, wspólną bramkę wydawania punktów statystyk, kompetencji i formalnego awansu, pełne zmieszczenie komunikatu o niewydanym punkcie w wierszu oraz zielony status osoby kanonicznie dostępnej.
+
+Pokrycie oświetlenia nurkowania sprawdza walidację definicji ambientu, pełną widoczność przed płytką granicą, dokładne oba punkty krzywej, monotoniczne ciemnienie po skoku w dół i z powrotem, różnicę Latarni I/II, start i reset lokalnego `light_enabled`, przełączenie w obie strony, brak światła bez wyposażenia, remapowany prompt HUD-u oraz przekazanie rzeczywistego stanu do reakcji zagrożenia. Test przepływu potwierdza, że `F` zmienia `PointLight2D`, stan sesji i bodziec zagrożenia bez mutacji kampanii.
+
+Pokrycie budynków sprawdza zamknięty kontrakt sześciu definicji i wartości graniczne capabilities, zgodność wspólnych projekcji z resolverem, dokładną trajektorię presji Chaty oraz piętnastodniowy horyzont pełnej obsady na każdym poziomie, brak obejścia bramki Domu I z dowolnej karty rozwoju oraz obecność jednego własnego opisu i zawsze widocznego wyniku dnia we wszystkich stanach panelu. `BaseManagementWorkspaceSnapshot.tscn` chroni przezroczystą warstwę i mniejszą geometrię 1280×720, brak przecięcia z `ResourceBar` oraz `EndDayButton`, dokładnie sześć kafelków w kanonicznej kolejności, ich miniaturę i tekstowy stan, przełączenie kontekstu bez zamykania, brak click-outside, powrót do ostatniego slotu, grafitowo-morską paletę z jasnym tekstem, turkusową strukturą i bursztynem zarezerwowanym dla głównej decyzji oraz osobny kadr aktywnego tutoriala nad menu. `BaseOptionalPanelsFlowTest.tscn` chroni fizyczne wejście do górnego HUD-u i `ZAKOŃCZ DZIEŃ` nad workspace'em, priorytet flyoutów, widoczność pełnego celu tutoriala ponad workspace'em i flyoutami, jego `MOUSE_FILTER_IGNORE`, blokadę kliknięć do slotów, rozszerzony zakres fokusu oraz resize. Snapshot bazy chroni neutralną prezentację nieaktywnego rekordu zamiast nieistniejącego obiegu uszkodzeń budynku.
+
+Pokrycie poświaty sprawdza osobno niewidoczny prostokątny styl hitboxu i celu tutorialu oraz produkcyjny przepływ `BuildingSlot -> BaseController -> BaseEnvironment -> BaseWorld3D`: priorytet tutorialu nad focus/hover/pressed, powrót jawnej interakcji po zmianie kroku, modal, powrót fokusu, fazę niedozwoloną i dokładnie jeden aktywny slot. Test środowiska chroni wspólny `World3D`, synchronizację kamery i rozmiaru, oba nieaktywne viewporty w `UPDATE_DISABLED`, łańcuch maska -> rozmycie poziome -> kompozyt pionowy, wyizolowaną warstwę 20, zachowanie warstw obrazu i heightfieldu, aktualny wariant podczas pendingu oraz atomowe przejścia ruina -> L3 -> L4 -> inny slot -> clear. Macierz jakości sprawdza osobny budżet maski i rozmycia low/medium/high, deterministyczny puls tutorialu oraz jego zamrożenie przez `reduced_motion`; natywne snapshoty dnia pierwszego, zbudowanej Stacji, 16:9 i 5:4 chronią miękką sylwetkę bez dawnego prostokąta, także w pełnym HUD-zie i deszczu.
+
+Pokrycie chorób rozdziela walidację definicji, czystą projekcję i jednorazową aplikację, progi i limity transmisji, pełną macierz etapów, zgodność podglądu Lecznicy z wykonaniem, publiczną kolejność resolvera, granice epidemii, centralny zgon i roundtrip aktywnego epizodu rewizji 1. Dedykowany flow chroni drogę R1-06 -> lokalne narażenie -> `DiveResult` -> resolver, UI planu, izolację awaryjną bez Lecznicy oraz ostrzeżenia raila obsady dla presji Objawów +2 i Stanu ciężkiego +3. `underwater_map_scene_test.gd` oraz testy świata chronią stałą nagrodę +5 na easy/standard/hard, scenową migawkę mapy i stabilne ID, a zwykły kontener zachowuje osobną regresję skalowania profilem. Testy domeny i persistence chronią terapię, opanowanie, zapis oraz wczytanie: dalsza noc aktywnego epizodu nie powtarza -6, noc po opanowaniu nie powtarza +4, kolejny epizod dostaje nowe stabilne ID, a wczytany aktywny epizod nie odtwarza kary. Dokładne +4 jest sprawdzane obok zwykłego dodatniego bilansu skalowanego profilem, pojemności izolacji obejmują 0/2/4 wraz ze stabilnym overflow do trybu awaryjnego, a pełny `EndOfDayResolver.resolve()` obejmuje wspólną opiekę, chorobę i centralny zgon. Ogólny test transakcji `DiveFlow` chroni brak mutacji kandydata przy błędzie autosave; nie zastępuje disease-specific fixture awarii zapisu.
+
+`tools/disease_balance_report.gd` jest oddzielnym, bezstanowym narzędziem strojenia Gorączki Zalewowej. Korzysta kolejno z produkcyjnych projekcji i aplikacji `MedicalCareSystem`, `DiseaseSystem` oraz centralnego kroku zgonów; nie kopiuje progów ani przejść choroby i nigdy nie zapisuje kampanii. Domyślna macierz porównuje trzy profile, populacje 3/5/7 i strategie przygotowania, naturalnej reakcji, późnej odpowiedzi oraz braku odpowiedzi, obok pełnej macierzy kontrolnej presji i porównania pojemności izolacji. Raport mierzy między innymi transmisje, etapy, epidemię, leki, zdrowie, zgony, izolację oraz utratę zdolności pracy, a powtórzenie porównuje znormalizowany odcisk wyniku. Narzędzie pozostaje poza domyślnym runnerem: niekorzystny rezultat wymaga oceny balansu, natomiast błąd wejścia, niespójna projekcja albo niedeterministyczny wynik są błędem wykonania. Świadomie nie zastępuje pełnej gospodarki jedzenia, losowej pogody, wydarzeń, UI ani ręcznego playtestu.
+
+Wymagane kontrakty pokrycia o wysokim ryzyku:
+
+- wspólne źródło wizualnego konturu i kolizji w `world_collision_grid.png`, w tym pusty chunk bez landmarku;
+- pełna droga `wejście -> wymagany ładunek -> aktywna lina` dla każdego celu i publicznego presetu przypisanego profilu, z kanoniczną kolizją, rezerwą, zimnem i zagrożeniami;
+- brak kołowej zależności pomiędzy materiałem ulepszenia a najwcześniejszym profilem zdolnym go odzyskać;
+- zamykanie workspace'u `BuildingPanel` przez `Esc` i przycisk bez click-outside, dostępność górnego HUD-u i `ZAKOŃCZ DZIEŃ` nad otwartym budynkiem oraz `DayPlanPopover` i `SurvivorsPanel` osobno przez trzy drogi, zawsze z powrotem fokusu do właściwej kontrolki i pełną pułapką/obiegiem fokusu;
+- nieprzecinanie klikalnych slotów przez rozwinięty `CampaignPanel` przy obsługiwanych rozdzielczościach, blokowanie slotów przez przezroczysty `BuildingModal`, widoczny powód każdej blokady kontrolek ARD-0062, dokładnie sześć kafelków nawigacji ARD-0090/ARD-0091 oraz przeliczenie otwartego workspace'u po resize;
+- dla kroku racji dnia 1: prawa pozycja kapsuły przy zamkniętym planie na wszystkich obsługiwanych rozdzielczościach, bursztynowe wyróżnienie `DayPlanButton`, przeniesienie kapsuły na lewo bez przecięcia z otwartym `DayPlanPopover`, fokus polityki racji oraz usunięcie wyróżnienia po jawnym wyborze.
+
+Aktualny stan luk pokrycia należy do `.ai/PROJECT_CONTEXT.md`. Reguły izolacji autosave i wykonywania testów należą do `AGENTS.md`.
+
+14. GRANICA ROZWOJU
+================================================================================
+
+[DOCELOWE]
+
+Lista zatwierdzonych, niezrealizowanych pionów należy wyłącznie do `docs/OgolnyZarys.txt`. Gdy użytkownik wybierze pion do wdrożenia, właściwa sekcja tego dokumentu opisuje jego techniczne mapowanie: właściciela stanu i zachowania, granicę danych, integrację, persistence oraz wymagane pokrycie. Proces kwalifikowania i aktualizacji dokumentów należy do `AGENTS.md`.
+
+15. PODSUMOWANIE
+================================================================================
+
+Aktywna architektura to `GameRoot + GameState`, rozdzielone moduły bazy i nurkowania, wejście `ExpeditionSetup`, lokalny `DiveSessionState`, atomowy `DiveResult`, jeden `EndOfDayResolver`, walidowane definicje i wersjonowany zapis.
+
+Granice techniczne aktywnego i docelowego zakresu pozostają rozdzielone: ten dokument mapuje wyłącznie systemy potwierdzone w `.ai/PROJECT_CONTEXT.md` albo jawnie oznaczone jako docelowe i nie ustanawia samodzielnie stanu wdrożenia.

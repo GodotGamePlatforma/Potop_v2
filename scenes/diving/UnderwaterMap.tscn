@@ -1,0 +1,1503 @@
+[gd_scene format=3 uid="uid://cqd575g6qq1hp"]
+
+[ext_resource type="Script" uid="uid://bc4mnpnh3fx5h" path="res://scripts/diving/UnderwaterMapScene.gd" id="1_map_scene"]
+[ext_resource type="Texture2D" uid="uid://cmdyglryagewt" path="res://assets/diving/world/map_v2/world_collision_grid.png" id="7_navigation_grid"]
+[ext_resource type="Texture2D" uid="uid://iu2jsfsho862" path="res://assets/diving/world/map_v2/world_collision_render_sdf_v1.png" id="7_render_sdf"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapRegion.tscn" id="8_region"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapLandmark.tscn" id="9_landmark"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapEntryPoint.tscn" id="10_entry"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapExitLine.tscn" id="11_exit"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapConnection.tscn" id="12_connection"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapCurrentZone.tscn" id="13_current"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapLootContainer.tscn" id="14_container"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapPickup.tscn" id="15_pickup"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapThreat.tscn" id="16_threat"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapHeavyObject.tscn" id="17_heavy"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapRescue.tscn" id="18_rescue"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapBuoy.tscn" id="19_buoy"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapShortcutGate.tscn" id="20_shortcut"]
+[ext_resource type="Resource" path="res://data/items/food.tres" id="21_food"]
+[ext_resource type="Resource" path="res://data/items/planks.tres" id="22_planks"]
+[ext_resource type="Resource" path="res://data/items/scrap.tres" id="23_scrap"]
+[ext_resource type="Resource" path="res://data/threats/noise_eel.tres" id="24_noise_eel"]
+[ext_resource type="Resource" path="res://data/survivors/leon_wrona.tres" id="25_leon_wrona"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapFixedDevice.tscn" id="26_fixed_device"]
+[ext_resource type="Texture2D" uid="uid://dbptpe2ytsvi0" path="res://assets/diving/world/materials/underwater_rock_detail_tile_v1.png" id="27_rock_detail"]
+[ext_resource type="Resource" path="res://data/diving_visuals/r1_rooftops.tres" id="28_visual_r1"]
+[ext_resource type="Resource" path="res://data/diving_visuals/r2_green_estates.tres" id="29_visual_r2"]
+[ext_resource type="Resource" path="res://data/diving_visuals/r3_rust_belt.tres" id="30_visual_r3"]
+[ext_resource type="Resource" path="res://data/diving_visuals/r4_black_heart.tres" id="31_visual_r4"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/JunctionJ7Visual.tscn" id="32_visual_j7"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/ArchiveTerminalVisual.tscn" id="33_visual_archive"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/R3DiagnosticPanelVisual.tscn" id="34_visual_r3_diagnostic"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/R3GeneratorVisual.tscn" id="35_visual_r3_generator"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/C4SwitchboardVisual.tscn" id="36_visual_c4_switchboard"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/C4SplitterMountVisual.tscn" id="37_visual_c4_splitter"]
+[ext_resource type="Script" path="res://scripts/diving/DiveVisualChunkStreamer.gd" id="38_visual_streamer"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_objects/MapDecoration.tscn" id="39_decoration"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineCableVisual.tscn" id="40_visual_common_line_cable"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/TutorialCableBlockageVisual.tscn" id="41_visual_cable_blockage"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineArchiveCableVisual.tscn" id="42_visual_common_line_archive"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineR3CableVisual.tscn" id="43_visual_common_line_r3"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineC4CableVisual.tscn" id="44_visual_common_line_c4"]
+
+[node name="UnderwaterMap" type="Node2D" unique_id=1534845512]
+editor_description = "Jedno źródło prawdy świata podwodnego. Dodawaj i przesuwaj instancje z res://scenes/diving/map_objects/, przypisuj Visual Scene i uruchamiaj Waliduj mapę w Inspectorze."
+script = ExtResource("1_map_scene")
+navigation_grid_texture = ExtResource("7_navigation_grid")
+terrain_render_sdf_texture = ExtResource("7_render_sdf")
+terrain_detail_texture = ExtResource("27_rock_detail")
+terrain_visual_profiles = Array[Resource]([ExtResource("28_visual_r1"), ExtResource("29_visual_r2"), ExtResource("30_visual_r3"), ExtResource("31_visual_r4")])
+
+[node name="VisualLayers" type="Node2D" parent="." unique_id=1485954516]
+
+[node name="EnvironmentDecoration" type="Node2D" parent="VisualLayers" unique_id=2144235696]
+z_index = -90
+
+[node name="VisualChunkStreamer" type="Node2D" parent="VisualLayers"]
+script = ExtResource("38_visual_streamer")
+
+[node name="TopOverlay" type="Node2D" parent="VisualLayers" unique_id=1798141132]
+z_index = 100
+
+[node name="Terrain" type="Node2D" parent="." unique_id=763603734]
+
+[node name="TerrainNavigation" type="Node2D" parent="Terrain" unique_id=1354252848]
+
+[node name="DepthRegions" type="Node2D" parent="." unique_id=789190580]
+
+[node name="R1_DachyUmarlegoMiasta" parent="DepthRegions" unique_id=1589448087 instance=ExtResource("8_region")]
+position = Vector2(5760, 767.1402)
+object_id = "R1"
+display_name = "Dachy Umarłego Miasta"
+bounds_size = Vector2(11520, 1534.2804)
+accent_color = Color(0.243137, 0.776471, 0.839216, 1)
+water_color = Color(0.027451, 0.356863, 0.494118, 1)
+
+[node name="R2_ZieloneOsiedla" parent="DepthRegions" unique_id=983909681 instance=ExtResource("8_region")]
+position = Vector2(5760, 1984.5583)
+object_id = "R2"
+display_name = "Zielone Osiedla"
+bounds_size = Vector2(11520, 1234.0951)
+depth_range = Vector2(30, 70)
+accent_color = Color(0.466667, 0.827451, 0.435294, 1)
+water_color = Color(0.027451, 0.356863, 0.494118, 1)
+
+[node name="R3_RdzawyPas" parent="DepthRegions" unique_id=644249266 instance=ExtResource("8_region")]
+position = Vector2(5760, 3168.6226)
+object_id = "R3"
+display_name = "Rdzawy Pas"
+bounds_size = Vector2(11520, 1534.2804)
+depth_range = Vector2(65, 115)
+accent_color = Color(0.87451, 0.529412, 0.239216, 1)
+water_color = Color(0.027451, 0.356863, 0.494118, 1)
+
+[node name="R4_CzarneSerce" parent="DepthRegions" unique_id=343942308 instance=ExtResource("8_region")]
+position = Vector2(5760, 5107.82)
+object_id = "R4"
+display_name = "Czarne Serce"
+bounds_size = Vector2(11520, 2744.3606)
+depth_range = Vector2(105, 160)
+accent_color = Color(0.352941, 0.568627, 0.901961, 1)
+water_color = Color(0.027451, 0.356863, 0.494118, 1)
+
+[node name="Landmarks" type="Node2D" parent="." unique_id=976886050]
+
+[node name="R1_00_StacjaNurkowa" parent="Landmarks" unique_id=1825890131 instance=ExtResource("9_landmark")]
+position = Vector2(5813.388, 372.22977)
+object_id = "R1-00"
+display_name = "Stacja Nurkowa"
+region_id = "R1"
+bounds_size = Vector2(1779.6086, 346.8808)
+landmark_role = "entry"
+visual_kind = "dive_station"
+aliases = PackedStringArray("dead_city_rooftops_001")
+
+[node name="R1_01_Apteka" parent="Landmarks" unique_id=1985716454 instance=ExtResource("9_landmark")]
+position = Vector2(1720.2883, 224.13835)
+object_id = "R1-01"
+display_name = "Apteka"
+region_id = "R1"
+bounds_size = Vector2(1502.7806, 313.52686)
+landmark_role = "medicine"
+visual_kind = "pharmacy"
+aliases = PackedStringArray()
+
+[node name="R1_02_ZalanaKamienica" parent="Landmarks" unique_id=944804887 instance=ExtResource("9_landmark")]
+position = Vector2(2479.5881, 748.46204)
+object_id = "R1-02"
+display_name = "Zalana Kamienica"
+region_id = "R1"
+bounds_size = Vector2(1621.4213, 333.5392)
+landmark_role = "tutorial_salvage"
+visual_kind = "tenement"
+aliases = PackedStringArray()
+
+[node name="R1_03_ZatopionyHotel" parent="Landmarks" unique_id=1998667635 instance=ExtResource("9_landmark")]
+position = Vector2(8411.617, 720.4447)
+object_id = "R1-03"
+display_name = "Zatopiony Hotel"
+region_id = "R1"
+bounds_size = Vector2(1660.968, 333.5392)
+landmark_role = "survivor"
+visual_kind = "hotel"
+aliases = PackedStringArray()
+
+[node name="R1_04_Parking" parent="Landmarks" unique_id=747599769 instance=ExtResource("9_landmark")]
+position = Vector2(2135.5303, 1176.7263)
+object_id = "R1-04"
+display_name = "Parking"
+region_id = "R1"
+bounds_size = Vector2(1542.3275, 320.19766)
+landmark_role = "current_risk"
+visual_kind = "parking"
+aliases = PackedStringArray()
+
+[node name="R1_05_SklepSpozywczy" parent="Landmarks" unique_id=26453563 instance=ExtResource("9_landmark")]
+position = Vector2(5742.204, 844.5213)
+object_id = "R1-05"
+display_name = "Sklep Spożywczy"
+region_id = "R1"
+bounds_size = Vector2(1621.4213, 333.5392)
+landmark_role = "tutorial_food"
+visual_kind = "grocery"
+aliases = PackedStringArray()
+
+[node name="R1_06_Szpital" parent="Landmarks" unique_id=1086926392 instance=ExtResource("9_landmark")]
+position = Vector2(10072.585, 1268.7832)
+object_id = "R1-06"
+display_name = "Szpital"
+region_id = "R1"
+bounds_size = Vector2(1502.7806, 320.19766)
+landmark_role = "medicine"
+visual_kind = "hospital"
+aliases = PackedStringArray()
+
+[node name="R1_07_StatekWUlicy" parent="Landmarks" unique_id=1741748997 instance=ExtResource("9_landmark")]
+position = Vector2(9135.324, 360.22235)
+object_id = "R1-07"
+display_name = "Statek w Ulicy"
+region_id = "R1"
+bounds_size = Vector2(1779.6086, 346.8808)
+landmark_role = "heavy_salvage"
+visual_kind = "ship"
+aliases = PackedStringArray()
+
+[node name="R1_08_Muzeum" parent="Landmarks" unique_id=185796746 instance=ExtResource("9_landmark")]
+position = Vector2(3808.3625, 1192.7362)
+object_id = "R1-08"
+display_name = "Muzeum"
+region_id = "R1"
+bounds_size = Vector2(1542.3275, 333.5392)
+landmark_role = "landmark"
+visual_kind = "museum"
+aliases = PackedStringArray()
+
+[node name="R1_09_ZalaneArchiwum" parent="Landmarks" unique_id=2124990181 instance=ExtResource("9_landmark")]
+position = Vector2(7818.414, 1164.719)
+object_id = "R1-09"
+display_name = "Zalane Archiwum"
+region_id = "R1"
+bounds_size = Vector2(1621.4213, 333.5392)
+landmark_role = "story"
+visual_kind = "archive"
+aliases = PackedStringArray()
+
+[node name="R2_01_Szklarnia" parent="Landmarks" unique_id=66229333 instance=ExtResource("9_landmark")]
+position = Vector2(1305.0464, 1560.9635)
+object_id = "R2-01"
+display_name = "Szklarnia"
+region_id = "R2"
+bounds_size = Vector2(1502.7806, 333.5392)
+landmark_role = "landmark"
+visual_kind = "greenhouse"
+aliases = PackedStringArray()
+
+[node name="R2_02_Park" parent="Landmarks" unique_id=1442311396 instance=ExtResource("9_landmark")]
+position = Vector2(3321.936, 1641.013)
+object_id = "R2-02"
+display_name = "Park"
+region_id = "R2"
+bounds_size = Vector2(1621.4213, 346.8808)
+landmark_role = "buoy"
+visual_kind = "park"
+aliases = PackedStringArray()
+anchor_id = "B-01"
+
+[node name="R2_03_CentrumOgrodnicze" parent="Landmarks" unique_id=1371098947 instance=ExtResource("9_landmark")]
+position = Vector2(6169.31, 1681.0377)
+object_id = "R2-03"
+display_name = "Centrum Ogrodnicze"
+region_id = "R2"
+bounds_size = Vector2(1660.968, 346.8808)
+landmark_role = "salvage"
+visual_kind = "garden_center"
+aliases = PackedStringArray()
+
+[node name="R2_04_BankNasion" parent="Landmarks" unique_id=810474644 instance=ExtResource("9_landmark")]
+position = Vector2(8423.48, 1641.013)
+object_id = "R2-04"
+display_name = "Bank Nasion"
+region_id = "R2"
+bounds_size = Vector2(1542.3275, 333.5392)
+landmark_role = "critical_food"
+visual_kind = "seed_bank"
+aliases = PackedStringArray()
+
+[node name="R2_05_Przedmiescia" parent="Landmarks" unique_id=1459417021 instance=ExtResource("9_landmark")]
+position = Vector2(9847.168, 2113.3044)
+object_id = "R2-05"
+display_name = "Przedmieścia"
+region_id = "R2"
+bounds_size = Vector2(1502.7806, 333.5392)
+landmark_role = "survivor"
+visual_kind = "suburbs"
+aliases = PackedStringArray()
+
+[node name="R2_06_SplataneKorytarze" parent="Landmarks" unique_id=2075612842 instance=ExtResource("9_landmark")]
+position = Vector2(2009, 2383)
+object_id = "R2-06"
+display_name = "Splątane Korytarze"
+region_id = "R2"
+bounds_size = Vector2(1621.4213, 346.8808)
+landmark_role = "hazard"
+visual_kind = "tangled"
+aliases = PackedStringArray()
+
+[node name="R3_01_MagazynyPortowe" parent="Landmarks" unique_id=301238099 instance=ExtResource("9_landmark")]
+position = Vector2(1992, 2607)
+object_id = "R3-01"
+display_name = "Magazyny Portowe"
+region_id = "R3"
+bounds_size = Vector2(1660.968, 346.8808)
+landmark_role = "buoy"
+visual_kind = "port"
+aliases = PackedStringArray()
+anchor_id = "B-02"
+
+[node name="R3_02_StaraStocznia" parent="Landmarks" unique_id=2105279017 instance=ExtResource("9_landmark")]
+position = Vector2(4081.2358, 2345.4478)
+object_id = "R3-02"
+display_name = "Stara Stocznia"
+region_id = "R3"
+bounds_size = Vector2(1779.6086, 360.22235)
+landmark_role = "heavy_salvage"
+visual_kind = "shipyard"
+aliases = PackedStringArray()
+
+[node name="R3_03_Fabryka" parent="Landmarks" unique_id=1694979165 instance=ExtResource("9_landmark")]
+position = Vector2(6976.066, 2569.5862)
+object_id = "R3-03"
+display_name = "Fabryka"
+region_id = "R3"
+bounds_size = Vector2(1779.6086, 360.22235)
+landmark_role = "tech"
+visual_kind = "factory"
+aliases = PackedStringArray()
+
+[node name="R3_04_Elektrownia" parent="Landmarks" unique_id=751326783 instance=ExtResource("9_landmark")]
+position = Vector2(10250.546, 2745.6948)
+object_id = "R3-04"
+display_name = "Elektrownia"
+region_id = "R3"
+bounds_size = Vector2(1621.4213, 346.8808)
+landmark_role = "hazard"
+visual_kind = "power_plant"
+aliases = PackedStringArray()
+
+[node name="R3_05_SkladChemikaliow" parent="Landmarks" unique_id=332628244 instance=ExtResource("9_landmark")]
+position = Vector2(7937.0547, 3366.078)
+object_id = "R3-05"
+display_name = "Skład Chemikaliów"
+region_id = "R3"
+bounds_size = Vector2(1700.5149, 346.8808)
+landmark_role = "medicine"
+visual_kind = "chemical_storage"
+aliases = PackedStringArray()
+
+[node name="R3_06_Zlomowisko" parent="Landmarks" unique_id=259631245 instance=ExtResource("9_landmark")]
+position = Vector2(3155.8394, 3314.0457)
+object_id = "R3-06"
+display_name = "Złomowisko"
+region_id = "R3"
+bounds_size = Vector2(1779.6086, 360.22235)
+landmark_role = "heavy_salvage"
+visual_kind = "scrapyard"
+aliases = PackedStringArray()
+
+[node name="R4_01_DworzecMetra" parent="Landmarks" unique_id=1913967542 instance=ExtResource("9_landmark")]
+position = Vector2(2016.8898, 4382.7056)
+object_id = "R4-01"
+display_name = "Dworzec Metra"
+region_id = "R4"
+bounds_size = Vector2(1779.6086, 360.22235)
+landmark_role = "buoy"
+visual_kind = "metro"
+aliases = PackedStringArray()
+anchor_id = "B-03"
+
+[node name="R4_02_Bunkier" parent="Landmarks" unique_id=1917851482 instance=ExtResource("9_landmark")]
+position = Vector2(5054.0884, 4158.567)
+object_id = "R4-02"
+display_name = "Bunkier"
+region_id = "R4"
+bounds_size = Vector2(1621.4213, 333.5392)
+landmark_role = "safe_room"
+visual_kind = "bunker"
+aliases = PackedStringArray()
+
+[node name="R4_03_Laboratoria" parent="Landmarks" unique_id=284959866 instance=ExtResource("9_landmark")]
+position = Vector2(8186.1997, 4362.693)
+object_id = "R4-03"
+display_name = "Laboratoria"
+region_id = "R4"
+bounds_size = Vector2(1779.6086, 360.22235)
+landmark_role = "tech"
+visual_kind = "laboratory"
+aliases = PackedStringArray()
+
+[node name="R4_04_ZamknieteGrodzie" parent="Landmarks" unique_id=2115273016 instance=ExtResource("9_landmark")]
+position = Vector2(10392.914, 4614.8486)
+object_id = "R4-04"
+display_name = "Zamknięte Grodzie"
+region_id = "R4"
+bounds_size = Vector2(1542.3275, 333.5392)
+landmark_role = "story_gate"
+visual_kind = "sealed_gate"
+aliases = PackedStringArray()
+
+[node name="R4_05_CentrumMiasta" parent="Landmarks" unique_id=1168386999 instance=ExtResource("9_landmark")]
+position = Vector2(5943.893, 5107.1523)
+object_id = "R4-05"
+display_name = "Centrum Miasta"
+region_id = "R4"
+bounds_size = Vector2(1898.2493, 386.9055)
+landmark_role = "deep_bell"
+visual_kind = "city_center"
+aliases = PackedStringArray()
+anchor_id = "DZWON"
+
+[node name="R4_06_Serce" parent="Landmarks" unique_id=959054754 instance=ExtResource("9_landmark")]
+position = Vector2(5932.029, 5963.681)
+object_id = "R4-06"
+display_name = "Serce"
+region_id = "R4"
+bounds_size = Vector2(2175.0771, 453.61334)
+landmark_role = "finale"
+visual_kind = "heart"
+aliases = PackedStringArray()
+
+[node name="Entries" type="Node2D" parent="." unique_id=2040611700]
+
+[node name="EntryStation" parent="Entries" unique_id=1983695955 instance=ExtResource("10_entry")]
+position = Vector2(5861.388, 384.22977)
+object_id = "entry_station"
+display_name = "Stacja Nurkowa — wejście"
+linked_object_id = "R1-00"
+
+[node name="ExitStation" parent="Entries" unique_id=1574428220 instance=ExtResource("11_exit")]
+position = Vector2(5713.388, 388.22977)
+object_id = "exit_station"
+display_name = "Stacja Nurkowa — powrót"
+
+[node name="Routes" type="Node2D" parent="." unique_id=1276020473]
+
+[node name="C001_StacjaSklep" parent="Routes" unique_id=1258220828 instance=ExtResource("12_connection")]
+connection_id = "C001"
+from_landmark_id = "R1-00"
+to_landmark_id = "R1-05"
+width = 182.4
+
+[node name="C002_AptekaKamienica" parent="Routes" unique_id=2056930679 instance=ExtResource("12_connection")]
+connection_id = "C002"
+from_landmark_id = "R1-01"
+to_landmark_id = "R1-02"
+width = 148.8
+
+[node name="C003_AptekaParking" parent="Routes" unique_id=1936715207 instance=ExtResource("12_connection")]
+connection_id = "C003"
+from_landmark_id = "R1-01"
+to_landmark_id = "R1-04"
+width = 134.4
+
+[node name="C004_KamienicaHotel" parent="Routes" unique_id=924207162 instance=ExtResource("12_connection")]
+connection_id = "C004"
+from_landmark_id = "R1-02"
+to_landmark_id = "R1-03"
+kind = 1
+width = 129.6
+
+[node name="C005_KamienicaSklep" parent="Routes" unique_id=1582812330 instance=ExtResource("12_connection")]
+connection_id = "C005"
+from_landmark_id = "R1-02"
+to_landmark_id = "R1-05"
+width = 168.0
+
+[node name="C006_HotelSklep" parent="Routes" unique_id=98162606 instance=ExtResource("12_connection")]
+connection_id = "C006"
+from_landmark_id = "R1-03"
+to_landmark_id = "R1-05"
+width = 163.2
+
+[node name="C007_HotelSzpital" parent="Routes" unique_id=686527208 instance=ExtResource("12_connection")]
+connection_id = "C007"
+from_landmark_id = "R1-03"
+to_landmark_id = "R1-06"
+width = 148.8
+
+[node name="C008_ParkingSklep" parent="Routes" unique_id=77163801 instance=ExtResource("12_connection")]
+connection_id = "C008"
+from_landmark_id = "R1-04"
+to_landmark_id = "R1-05"
+width = 148.8
+
+[node name="C009_ParkingMuzeum" parent="Routes" unique_id=42586505 instance=ExtResource("12_connection")]
+connection_id = "C009"
+from_landmark_id = "R1-04"
+to_landmark_id = "R1-08"
+width = 139.2
+
+[node name="C010_SklepArchiwum" parent="Routes" unique_id=1804262414 instance=ExtResource("12_connection")]
+connection_id = "C010"
+from_landmark_id = "R1-05"
+to_landmark_id = "R1-09"
+width = 168.0
+
+[node name="C011_SzpitalStatek" parent="Routes" unique_id=1613420694 instance=ExtResource("12_connection")]
+connection_id = "C011"
+from_landmark_id = "R1-06"
+to_landmark_id = "R1-07"
+kind = 1
+width = 124.8
+
+[node name="C012_SzpitalArchiwum" parent="Routes" unique_id=1192557529 instance=ExtResource("12_connection")]
+connection_id = "C012"
+from_landmark_id = "R1-06"
+to_landmark_id = "R1-09"
+width = 148.8
+
+[node name="C013_MuzeumArchiwum" parent="Routes" unique_id=653234089 instance=ExtResource("12_connection")]
+connection_id = "C013"
+from_landmark_id = "R1-08"
+to_landmark_id = "R1-09"
+width = 144.0
+
+[node name="C014_ArchiwumCentrumOgrodnicze" parent="Routes" unique_id=611132184 instance=ExtResource("12_connection")]
+connection_id = "C014"
+from_landmark_id = "R1-09"
+to_landmark_id = "R2-03"
+width = 158.4
+
+[node name="C015_SzklarniaPark" parent="Routes" unique_id=2098815605 instance=ExtResource("12_connection")]
+connection_id = "C015"
+from_landmark_id = "R2-01"
+to_landmark_id = "R2-02"
+width = 163.2
+
+[node name="C016_SzklarniaKorytarze" parent="Routes" unique_id=395285960 instance=ExtResource("12_connection")]
+connection_id = "C016"
+from_landmark_id = "R2-01"
+to_landmark_id = "R2-06"
+width = 139.2
+
+[node name="C017_ParkCentrumOgrodnicze" parent="Routes" unique_id=807713655 instance=ExtResource("12_connection")]
+connection_id = "C017"
+from_landmark_id = "R2-02"
+to_landmark_id = "R2-03"
+width = 168.0
+
+[node name="C018_ParkPrzedmiescia" parent="Routes" unique_id=817385520 instance=ExtResource("12_connection")]
+connection_id = "C018"
+from_landmark_id = "R2-02"
+to_landmark_id = "R2-05"
+kind = 1
+width = 148.8
+
+[node name="C019_CentrumOgrodniczeBankNasion" parent="Routes" unique_id=1422708360 instance=ExtResource("12_connection")]
+connection_id = "C019"
+from_landmark_id = "R2-03"
+to_landmark_id = "R2-04"
+width = 148.8
+
+[node name="C020_BankNasionPrzedmiescia" parent="Routes" unique_id=653696845 instance=ExtResource("12_connection")]
+connection_id = "C020"
+from_landmark_id = "R2-04"
+to_landmark_id = "R2-05"
+width = 156.0
+
+[node name="C021_BankNasionFabryka" parent="Routes" unique_id=149500455 instance=ExtResource("12_connection")]
+connection_id = "C021"
+from_landmark_id = "R2-04"
+to_landmark_id = "R3-03"
+width = 148.8
+
+[node name="C022_PrzedmiesciaKorytarze" parent="Routes" unique_id=1187896717 instance=ExtResource("12_connection")]
+connection_id = "C022"
+from_landmark_id = "R2-05"
+to_landmark_id = "R2-06"
+width = 156.0
+
+[node name="C023_PrzedmiesciaStocznia" parent="Routes" unique_id=1068381725 instance=ExtResource("12_connection")]
+connection_id = "C023"
+from_landmark_id = "R2-05"
+to_landmark_id = "R3-02"
+width = 153.6
+
+[node name="C024_KorytarzePort" parent="Routes" unique_id=1431017788 instance=ExtResource("12_connection")]
+connection_id = "C024"
+from_landmark_id = "R2-06"
+to_landmark_id = "R3-01"
+width = 134.4
+
+[node name="C025_PortStocznia" parent="Routes" unique_id=14091567 instance=ExtResource("12_connection")]
+connection_id = "C025"
+from_landmark_id = "R3-01"
+to_landmark_id = "R3-02"
+width = 163.2
+
+[node name="C026_PortZlomowisko" parent="Routes" unique_id=583681941 instance=ExtResource("12_connection")]
+connection_id = "C026"
+from_landmark_id = "R3-01"
+to_landmark_id = "R3-06"
+width = 148.8
+
+[node name="C027_StoczniaFabryka" parent="Routes" unique_id=1135526830 instance=ExtResource("12_connection")]
+connection_id = "C027"
+from_landmark_id = "R3-02"
+to_landmark_id = "R3-03"
+width = 168.0
+
+[node name="C028_FabrykaElektrownia" parent="Routes" unique_id=227392087 instance=ExtResource("12_connection")]
+connection_id = "C028"
+from_landmark_id = "R3-03"
+to_landmark_id = "R3-04"
+width = 148.8
+
+[node name="C029_FabrykaChemikalia" parent="Routes" unique_id=1255397223 instance=ExtResource("12_connection")]
+connection_id = "C029"
+from_landmark_id = "R3-03"
+to_landmark_id = "R3-05"
+kind = 1
+width = 134.4
+
+[node name="C030_ElektrowniaChemikalia" parent="Routes" unique_id=1976685040 instance=ExtResource("12_connection")]
+connection_id = "C030"
+from_landmark_id = "R3-04"
+to_landmark_id = "R3-05"
+width = 148.8
+
+[node name="C031_ChemikaliaZlomowisko" parent="Routes" unique_id=1374110442 instance=ExtResource("12_connection")]
+connection_id = "C031"
+from_landmark_id = "R3-05"
+to_landmark_id = "R3-06"
+width = 158.4
+
+[node name="C032_ChemikaliaLaboratoria" parent="Routes" unique_id=838668257 instance=ExtResource("12_connection")]
+connection_id = "C032"
+from_landmark_id = "R3-05"
+to_landmark_id = "R4-03"
+width = 144.0
+
+[node name="C033_ZlomowiskoMetro" parent="Routes" unique_id=69515251 instance=ExtResource("12_connection")]
+connection_id = "C033"
+from_landmark_id = "R3-06"
+to_landmark_id = "R4-01"
+width = 148.8
+
+[node name="C034_MetroBunkier" parent="Routes" unique_id=1004541168 instance=ExtResource("12_connection")]
+connection_id = "C034"
+from_landmark_id = "R4-01"
+to_landmark_id = "R4-02"
+width = 148.8
+
+[node name="C035_MetroCentrumMiasta" parent="Routes" unique_id=411734478 instance=ExtResource("12_connection")]
+connection_id = "C035"
+from_landmark_id = "R4-01"
+to_landmark_id = "R4-05"
+kind = 1
+width = 129.6
+
+[node name="C036_BunkierCentrumMiasta" parent="Routes" unique_id=1503724100 instance=ExtResource("12_connection")]
+connection_id = "C036"
+from_landmark_id = "R4-02"
+to_landmark_id = "R4-05"
+width = 144.0
+
+[node name="C037_LaboratoriaGrodzie" parent="Routes" unique_id=784645525 instance=ExtResource("12_connection")]
+connection_id = "C037"
+from_landmark_id = "R4-03"
+to_landmark_id = "R4-04"
+width = 134.4
+
+[node name="C038_LaboratoriaCentrumMiasta" parent="Routes" unique_id=908376734 instance=ExtResource("12_connection")]
+connection_id = "C038"
+from_landmark_id = "R4-03"
+to_landmark_id = "R4-05"
+width = 144.0
+
+[node name="C039_CentrumMiastaSerce" parent="Routes" unique_id=127861434 instance=ExtResource("12_connection")]
+connection_id = "C039"
+from_landmark_id = "R4-05"
+to_landmark_id = "R4-06"
+width = 168.0
+
+[node name="SC01_ParkingStacja" parent="Routes" unique_id=1924761437 instance=ExtResource("12_connection")]
+connection_id = "SC-01"
+from_landmark_id = "R1-04"
+to_landmark_id = "R1-00"
+kind = 2
+width = 124.8
+
+[node name="SC02_BankNasionArchiwum" parent="Routes" unique_id=1818797472 instance=ExtResource("12_connection")]
+connection_id = "SC-02"
+from_landmark_id = "R2-04"
+to_landmark_id = "R1-09"
+kind = 2
+width = 120.0
+
+[node name="SC03_SzklarniaMuzeum" parent="Routes" unique_id=1003623006 instance=ExtResource("12_connection")]
+connection_id = "SC-03"
+from_landmark_id = "R2-01"
+to_landmark_id = "R1-08"
+kind = 2
+width = 120.0
+
+[node name="SC04_ZlomowiskoStocznia" parent="Routes" unique_id=1025924409 instance=ExtResource("12_connection")]
+connection_id = "SC-04"
+from_landmark_id = "R3-06"
+to_landmark_id = "R3-02"
+kind = 2
+width = 124.8
+
+[node name="SC05_MetroElektrownia" parent="Routes" unique_id=1100154788 instance=ExtResource("12_connection")]
+connection_id = "SC-05"
+from_landmark_id = "R4-01"
+to_landmark_id = "R3-04"
+kind = 2
+width = 115.2
+
+[node name="SC06_LaboratoriaFabryka" parent="Routes" unique_id=373961144 instance=ExtResource("12_connection")]
+connection_id = "SC-06"
+from_landmark_id = "R4-03"
+to_landmark_id = "R3-03"
+kind = 2
+width = 120.0
+
+[node name="SC07_GrodzieMetro" parent="Routes" unique_id=1136630360 instance=ExtResource("12_connection")]
+connection_id = "SC-07"
+from_landmark_id = "R4-04"
+to_landmark_id = "R4-01"
+kind = 2
+width = 115.2
+
+[node name="SC08_SerceGrodzie" parent="Routes" unique_id=1328550071 instance=ExtResource("12_connection")]
+connection_id = "SC-08"
+from_landmark_id = "R4-06"
+to_landmark_id = "R4-04"
+kind = 2
+width = 124.8
+
+[node name="CurrentZones" type="Node2D" parent="." unique_id=334817869]
+
+[node name="ParkingCrossflow" parent="CurrentZones" unique_id=1485180462 instance=ExtResource("13_current")]
+position = Vector2(2175.0771, 1174.0581)
+object_id = "parking_crossflow"
+display_name = "PRĄD ULICZNY"
+bounds_size = Vector2(1779.6086, 373.56393)
+current_velocity = Vector2(-70, 16)
+
+[node name="TangledUndertow" parent="CurrentZones" unique_id=366464962 instance=ExtResource("13_current")]
+position = Vector2(2076.2102, 2258.0605)
+object_id = "tangled_undertow"
+display_name = "PODWODNY CIĄG"
+bounds_size = Vector2(1779.6086, 433.60098)
+current_velocity = Vector2(24, 68)
+
+[node name="PowerDischarge" parent="CurrentZones" unique_id=889604494 instance=ExtResource("13_current")]
+position = Vector2(10321.73, 2768.3755)
+object_id = "power_discharge"
+display_name = "ZRZUT ELEKTROWNI"
+bounds_size = Vector2(1898.2493, 466.9549)
+current_velocity = Vector2(-86, 0)
+
+[node name="Gameplay" type="Node2D" parent="." unique_id=1781060364]
+
+[node name="FixedDevices" type="Node2D" parent="Gameplay" unique_id=1484278595]
+
+[node name="JunctionJ7" parent="Gameplay/FixedDevices" unique_id=812158720 instance=ExtResource("26_fixed_device")]
+position = Vector2(2244, 1220)
+object_id = "junction_j7"
+display_name = "Węzeł J-7"
+device_role = "common_line_junction"
+available_from_day = 3
+visual_scene = ExtResource("32_visual_j7")
+
+[node name="ArchiveTerminal" parent="Gameplay/FixedDevices" unique_id=1977298314 instance=ExtResource("26_fixed_device")]
+position = Vector2(7980, 1100)
+object_id = "archive_terminal"
+display_name = "Terminal Zalanego Archiwum"
+linked_object_id = "R1-09"
+required_tool = "crowbar"
+device_role = "common_line_archive_terminal"
+available_from_day = 4
+visual_scene = ExtResource("33_visual_archive")
+
+[node name="R3DiagnosticPanel" parent="Gameplay/FixedDevices" unique_id=1006683028 instance=ExtResource("26_fixed_device")]
+position = Vector2(9760, 2700)
+object_id = "r3_diagnostic_panel"
+display_name = "Panel diagnostyczny R-3"
+linked_object_id = "R3-04"
+required_tool = "r3_diagnostic_access"
+device_role = "common_line_r3_diagnostic"
+available_from_day = 4
+visual_scene = ExtResource("34_visual_r3_diagnostic")
+
+[node name="R3Generator" parent="Gameplay/FixedDevices" unique_id=1033317832 instance=ExtResource("26_fixed_device")]
+position = Vector2(10300, 3040)
+object_id = "r3_generator"
+display_name = "Generator R-3"
+linked_object_id = "R3-04"
+required_tool = "r3_regulator"
+device_role = "common_line_r3_generator"
+available_from_day = 4
+visual_scene = ExtResource("35_visual_r3_generator")
+
+[node name="C4Switchboard" parent="Gameplay/FixedDevices" unique_id=1791523460 instance=ExtResource("26_fixed_device")]
+position = Vector2(5700, 5800)
+object_id = "c4_switchboard"
+display_name = "Rozdzielnia C-4"
+linked_object_id = "R4-06"
+required_tool = "c4_control_access"
+device_role = "common_line_c4_switchboard"
+available_from_day = 4
+visual_scene = ExtResource("36_visual_c4_switchboard")
+
+[node name="C4SplitterMount" parent="Gameplay/FixedDevices" unique_id=1119516161 instance=ExtResource("26_fixed_device")]
+position = Vector2(6100, 5800)
+object_id = "c4_splitter_mount"
+display_name = "Gniazdo Rozdzielacza C-4"
+linked_object_id = "R4-06"
+required_tool = "common_line_splitter"
+device_role = "common_line_splitter_mount"
+available_from_day = 4
+visual_scene = ExtResource("37_visual_c4_splitter")
+visual_z_index = 1
+
+[node name="Containers" type="Node2D" parent="Gameplay" unique_id=1749430349]
+
+[node name="TutorialMarketCrate" parent="Gameplay/Containers" unique_id=566554887 instance=ExtResource("14_container")]
+position = Vector2(5204, 700)
+object_id = "tutorial_market_crate"
+linked_object_id = "R1-05"
+display_name = "Skrzynia z żywnością"
+contents = {
+"food": 6
+}
+mandatory_order = 0
+
+[node name="TutorialWorkshopCase" parent="Gameplay/Containers" unique_id=1617699709 instance=ExtResource("14_container")]
+position = Vector2(2804, 804)
+object_id = "tutorial_workshop_case"
+linked_object_id = "R1-02"
+display_name = "Skrzynia warsztatowa"
+contents = {
+"fabric_rubber": 2,
+"planks": 4,
+"scrap": 3
+}
+mandatory_order = 1
+
+[node name="TutorialServiceLocker" parent="Gameplay/Containers" unique_id=94690 instance=ExtResource("14_container")]
+position = Vector2(2642, 474)
+object_id = "tutorial_service_locker"
+linked_object_id = "R1-02"
+display_name = "Ryzykowna skrytka"
+contents = {
+"fabric_rubber": 2,
+"scrap": 3
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 1.8
+
+[node name="PharmacyMedicineCase" parent="Gameplay/Containers" unique_id=1383803833 instance=ExtResource("14_container")]
+position = Vector2(1812, 244)
+object_id = "pharmacy_medicine_case"
+linked_object_id = "R1-01"
+display_name = "Szafka apteczna"
+contents = {
+"food": 4,
+"meds_chemicals": 3
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 1.7
+
+[node name="HotelLinenCache" parent="Gameplay/Containers" unique_id=1155668393 instance=ExtResource("14_container")]
+position = Vector2(8292.977, 740.4571)
+object_id = "hotel_linen_cache"
+linked_object_id = "R1-03"
+display_name = "Magazyn hotelowy"
+contents = {
+"fabric_rubber": 4,
+"food": 6
+}
+required_tool = "knife"
+interaction_action = "cut"
+interaction_seconds = 1.45
+
+[node name="HospitalEmergencyStore" parent="Gameplay/Containers" unique_id=1365843272 instance=ExtResource("14_container")]
+position = Vector2(9900, 1600)
+object_id = "hospital_emergency_store"
+linked_object_id = "R1-06"
+display_name = "Magazyn ratunkowy"
+contents = {
+"meds_chemicals": 5
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 1.9
+difficulty_scaled_contents = false
+disease_id = "flood_fever"
+disease_exposure_pressure = 3
+
+[node name="GreenhouseSupplyBox" parent="Gameplay/Containers" unique_id=1774434626 instance=ExtResource("14_container")]
+position = Vector2(1423.6869, 1584.9784)
+object_id = "greenhouse_supply_box"
+linked_object_id = "R2-01"
+display_name = "Skrzynia ogrodnika"
+contents = {
+"fabric_rubber": 2,
+"food": 8
+}
+required_tool = "knife"
+interaction_action = "cut"
+interaction_seconds = 1.55
+
+[node name="SeedBankVault" parent="Gameplay/Containers" unique_id=294164668 instance=ExtResource("14_container")]
+position = Vector2(8636, 1428)
+object_id = "seed_bank_vault"
+linked_object_id = "R2-04"
+display_name = "Kapsuła nasion"
+contents = {
+"food": 11,
+"tech_parts": 1
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.1
+
+[node name="PortToolCrate" parent="Gameplay/Containers" unique_id=1987832941 instance=ExtResource("14_container")]
+position = Vector2(2000, 2800)
+object_id = "port_tool_crate"
+linked_object_id = "R3-01"
+display_name = "Skrzynia portowa"
+contents = {
+"food": 3,
+"planks": 4,
+"scrap": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 1.9
+
+[node name="FactoryControlParts" parent="Gameplay/Containers" unique_id=689105745 instance=ExtResource("14_container")]
+position = Vector2(7070.9785, 2569.5862)
+object_id = "factory_control_parts"
+linked_object_id = "R3-03"
+display_name = "Panel sterowania"
+contents = {
+"scrap": 3,
+"tech_parts": 5
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.2
+
+[node name="ChemicalCabinet" parent="Gameplay/Containers" unique_id=1062028705 instance=ExtResource("14_container")]
+position = Vector2(8120, 3280)
+object_id = "chemical_cabinet"
+linked_object_id = "R3-05"
+display_name = "Szafa chemiczna"
+contents = {
+"meds_chemicals": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.0
+
+[node name="LaboratoryPrototype" parent="Gameplay/Containers" unique_id=1669774484 instance=ExtResource("14_container")]
+position = Vector2(7700, 4600)
+object_id = "laboratory_prototype"
+linked_object_id = "R4-03"
+display_name = "Kaseta prototypu"
+contents = {
+"meds_chemicals": 3,
+"tech_parts": 7
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.4
+
+[node name="ShipCarpentryStore" parent="Gameplay/Containers" unique_id=559489454 instance=ExtResource("14_container")]
+position = Vector2(8973.183, 396.2446)
+object_id = "ship_carpentry_store"
+linked_object_id = "R1-07"
+display_name = "Skład ciesielski statku"
+contents = {
+"fabric_rubber": 3,
+"planks": 18,
+"scrap": 8,
+"tech_parts": 1
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.0
+
+[node name="MuseumReinforcementCache" parent="Gameplay/Containers" unique_id=1312801588 instance=ExtResource("14_container")]
+position = Vector2(3958.6406, 1218.0852)
+object_id = "museum_reinforcement_cache"
+linked_object_id = "R1-08"
+display_name = "Belki z magazynu muzeum"
+contents = {
+"fabric_rubber": 4,
+"planks": 15,
+"scrap": 4
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 1.8
+
+[node name="ArchiveMaintenanceStore" parent="Gameplay/Containers" unique_id=240966109 instance=ExtResource("14_container")]
+position = Vector2(7652.3174, 1152.7115)
+object_id = "archive_maintenance_store"
+linked_object_id = "R1-09"
+display_name = "Zaplecze konserwatorów"
+contents = {
+"fabric_rubber": 2,
+"planks": 14,
+"scrap": 6,
+"tech_parts": 2
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.0
+
+[node name="ParkServiceShed" parent="Gameplay/Containers" unique_id=1091882226 instance=ExtResource("14_container")]
+position = Vector2(3632, 1504)
+object_id = "park_service_shed"
+linked_object_id = "R2-02"
+display_name = "Zalany domek techniczny"
+contents = {
+"fabric_rubber": 5,
+"food": 2,
+"planks": 16,
+"scrap": 4
+}
+required_tool = "knife"
+interaction_action = "cut"
+interaction_seconds = 1.7
+
+[node name="GardenCenterLumber" parent="Gameplay/Containers" unique_id=1333798612 instance=ExtResource("14_container")]
+position = Vector2(6012, 1812)
+object_id = "garden_center_lumber"
+linked_object_id = "R2-03"
+display_name = "Skład konstrukcji szklarni"
+contents = {
+"fabric_rubber": 6,
+"planks": 18,
+"scrap": 5,
+"tech_parts": 1
+}
+required_tool = "knife"
+interaction_action = "cut"
+interaction_seconds = 1.8
+
+[node name="SuburbRenovationStore" parent="Gameplay/Containers" unique_id=308300835 instance=ExtResource("14_container")]
+position = Vector2(9685.025, 2147.9927)
+object_id = "suburb_renovation_store"
+linked_object_id = "R2-05"
+display_name = "Materiały remontowe"
+contents = {
+"fabric_rubber": 5,
+"planks": 20,
+"scrap": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.0
+
+[node name="TangledSupportCache" parent="Gameplay/Containers" unique_id=925937733 instance=ExtResource("14_container")]
+position = Vector2(2650, 2036)
+object_id = "tangled_support_cache"
+linked_object_id = "R2-06"
+display_name = "Skrzynia podpór technicznych"
+contents = {
+"fabric_rubber": 3,
+"planks": 12,
+"scrap": 8,
+"tech_parts": 2
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.1
+
+[node name="ShipyardMaterialRack" parent="Gameplay/Containers" unique_id=256728223 instance=ExtResource("14_container")]
+position = Vector2(4100, 2140)
+object_id = "shipyard_material_rack"
+linked_object_id = "R3-02"
+display_name = "Regał materiałowy stoczni"
+contents = {
+"fabric_rubber": 3,
+"planks": 18,
+"scrap": 15,
+"tech_parts": 4
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.2
+
+[node name="PowerPlantServiceStore" parent="Gameplay/Containers" unique_id=1551925164 instance=ExtResource("14_container")]
+position = Vector2(10100, 2760)
+object_id = "power_plant_service_store"
+linked_object_id = "R3-04"
+display_name = "Magazyn serwisowy elektrowni"
+contents = {
+"fabric_rubber": 4,
+"food": 3,
+"planks": 10,
+"scrap": 16,
+"tech_parts": 5
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.3
+
+[node name="ScrapyardSortingCache" parent="Gameplay/Containers" unique_id=2142515344 instance=ExtResource("14_container")]
+position = Vector2(2800, 3000)
+object_id = "scrapyard_sorting_cache"
+linked_object_id = "R3-06"
+display_name = "Posortowany odzysk"
+contents = {
+"fabric_rubber": 3,
+"food": 3,
+"planks": 12,
+"scrap": 20,
+"tech_parts": 4
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.2
+
+[node name="MetroMaintenanceStore" parent="Gameplay/Containers" unique_id=377721784 instance=ExtResource("14_container")]
+position = Vector2(2200, 4660)
+object_id = "metro_maintenance_store"
+linked_object_id = "R4-01"
+display_name = "Magazyn utrzymania metra"
+contents = {
+"fabric_rubber": 5,
+"food": 2,
+"planks": 10,
+"scrap": 12,
+"tech_parts": 3
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.3
+
+[node name="BunkerConstructionReserve" parent="Gameplay/Containers" unique_id=2111119805 instance=ExtResource("14_container")]
+position = Vector2(4895.9014, 4190.587)
+object_id = "bunker_construction_reserve"
+linked_object_id = "R4-02"
+display_name = "Rezerwa konstrukcyjna bunkra"
+contents = {
+"fabric_rubber": 5,
+"food": 2,
+"meds_chemicals": 2,
+"planks": 18,
+"scrap": 10,
+"tech_parts": 4
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.4
+
+[node name="SealedGateParts" parent="Gameplay/Containers" unique_id=1991668329 instance=ExtResource("14_container")]
+position = Vector2(10300, 4800)
+object_id = "sealed_gate_parts"
+linked_object_id = "R4-04"
+display_name = "Części zamkniętych grodzi"
+contents = {
+"fabric_rubber": 3,
+"planks": 10,
+"scrap": 15,
+"tech_parts": 5
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.5
+
+[node name="CityCenterReliefStore" parent="Gameplay/Containers" unique_id=623336572 instance=ExtResource("14_container")]
+position = Vector2(5772, 5196)
+object_id = "city_center_relief_store"
+linked_object_id = "R4-05"
+display_name = "Miejski magazyn ratunkowy"
+contents = {
+"fabric_rubber": 5,
+"food": 4,
+"planks": 15,
+"scrap": 10,
+"tech_parts": 4
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.5
+
+[node name="HeartStructuralCache" parent="Gameplay/Containers" unique_id=1002515818 instance=ExtResource("14_container")]
+position = Vector2(6500, 5800)
+object_id = "heart_structural_cache"
+linked_object_id = "R4-06"
+display_name = "Rdzeń konstrukcyjny"
+contents = {
+"fabric_rubber": 4,
+"planks": 18,
+"scrap": 10,
+"tech_parts": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.6
+
+[node name="HospitalStructuralStore" parent="Gameplay/Containers" unique_id=522056725 instance=ExtResource("14_container")]
+position = Vector2(9600, 1500)
+object_id = "hospital_structural_store"
+linked_object_id = "R1-06"
+display_name = "Zaplecze techniczne szpitala"
+contents = {
+"fabric_rubber": 4,
+"planks": 12,
+"scrap": 8,
+"tech_parts": 1
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.0
+
+[node name="MetroReconstructionReserve" parent="Gameplay/Containers" unique_id=1533519861 instance=ExtResource("14_container")]
+position = Vector2(1600, 4660)
+object_id = "metro_reconstruction_reserve"
+linked_object_id = "R4-01"
+display_name = "Rezerwa odbudowy metra"
+contents = {
+"fabric_rubber": 10,
+"planks": 30,
+"scrap": 15,
+"tech_parts": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.7
+
+[node name="BunkerReconstructionReserve" parent="Gameplay/Containers" unique_id=787086189 instance=ExtResource("14_container")]
+position = Vector2(5100, 3850)
+object_id = "bunker_reconstruction_reserve"
+linked_object_id = "R4-02"
+display_name = "Rezerwa odbudowy schronu"
+contents = {
+"fabric_rubber": 10,
+"planks": 30,
+"scrap": 15,
+"tech_parts": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.7
+
+[node name="CityReconstructionReserve" parent="Gameplay/Containers" unique_id=1220646321 instance=ExtResource("14_container")]
+position = Vector2(6140, 5108)
+object_id = "city_reconstruction_reserve"
+linked_object_id = "R4-05"
+display_name = "Miejska rezerwa odbudowy"
+contents = {
+"fabric_rubber": 10,
+"planks": 30,
+"scrap": 15,
+"tech_parts": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.8
+
+[node name="HeartReconstructionReserve" parent="Gameplay/Containers" unique_id=1768675006 instance=ExtResource("14_container")]
+position = Vector2(6900, 5800)
+object_id = "heart_reconstruction_reserve"
+linked_object_id = "R4-06"
+display_name = "Głębinowa rezerwa odbudowy"
+contents = {
+"fabric_rubber": 10,
+"planks": 30,
+"scrap": 15,
+"tech_parts": 6
+}
+required_tool = "crowbar"
+interaction_action = "pry"
+interaction_seconds = 2.8
+
+[node name="Pickups" type="Node2D" parent="Gameplay" unique_id=142765797]
+
+[node name="PickupR1Food01" parent="Gameplay/Pickups" unique_id=1738032060 instance=ExtResource("15_pickup")]
+position = Vector2(5508.8774, 809.83325)
+object_id = "pickup_r1_food_01"
+linked_object_id = "R1-05"
+display_name = "Jedzenie"
+pickup_item = ExtResource("21_food")
+
+[node name="PickupR1Planks01" parent="Gameplay/Pickups" unique_id=1620475140 instance=ExtResource("15_pickup")]
+position = Vector2(2380, 650)
+object_id = "pickup_r1_planks_01"
+linked_object_id = "R1-02"
+display_name = "Deska"
+pickup_item = ExtResource("22_planks")
+
+[node name="PickupR1Scrap01" parent="Gameplay/Pickups" unique_id=784937654 instance=ExtResource("15_pickup")]
+position = Vector2(3605, 593)
+object_id = "pickup_r1_scrap_01"
+linked_object_id = "R1-08"
+display_name = "Złom"
+pickup_item = ExtResource("23_scrap")
+
+[node name="PickupR2Food01" parent="Gameplay/Pickups" unique_id=580715516 instance=ExtResource("15_pickup")]
+position = Vector2(1087.5386, 1527.6096)
+object_id = "pickup_r2_food_01"
+linked_object_id = "R2-01"
+display_name = "Jedzenie"
+pickup_item = ExtResource("21_food")
+
+[node name="PickupR2Planks01" parent="Gameplay/Pickups" unique_id=1300154555 instance=ExtResource("15_pickup")]
+position = Vector2(6532, 1820)
+object_id = "pickup_r2_planks_01"
+linked_object_id = "R2-03"
+display_name = "Deska"
+pickup_item = ExtResource("22_planks")
+
+[node name="PickupR2Scrap01" parent="Gameplay/Pickups" unique_id=2092119922 instance=ExtResource("15_pickup")]
+position = Vector2(10060, 2100)
+object_id = "pickup_r2_scrap_01"
+linked_object_id = "R2-05"
+display_name = "Złom"
+pickup_item = ExtResource("23_scrap")
+
+[node name="PickupR3Food01" parent="Gameplay/Pickups" unique_id=1086910184 instance=ExtResource("15_pickup")]
+position = Vector2(2204, 2576)
+object_id = "pickup_r3_food_01"
+linked_object_id = "R3-01"
+display_name = "Jedzenie"
+pickup_item = ExtResource("21_food")
+
+[node name="PickupR3Planks01" parent="Gameplay/Pickups" unique_id=626926329 instance=ExtResource("15_pickup")]
+position = Vector2(3700, 2100)
+object_id = "pickup_r3_planks_01"
+linked_object_id = "R3-02"
+display_name = "Deska"
+pickup_item = ExtResource("22_planks")
+
+[node name="PickupR3Scrap01" parent="Gameplay/Pickups" unique_id=2134749647 instance=ExtResource("15_pickup")]
+position = Vector2(3500, 3300)
+object_id = "pickup_r3_scrap_01"
+linked_object_id = "R3-06"
+display_name = "Złom"
+pickup_item = ExtResource("23_scrap")
+
+[node name="PickupR4Food01" parent="Gameplay/Pickups" unique_id=954183736 instance=ExtResource("15_pickup")]
+position = Vector2(5500, 4050)
+object_id = "pickup_r4_food_01"
+linked_object_id = "R4-02"
+display_name = "Jedzenie"
+pickup_item = ExtResource("21_food")
+
+[node name="PickupR4Planks01" parent="Gameplay/Pickups" unique_id=114519293 instance=ExtResource("15_pickup")]
+position = Vector2(1600, 4100)
+object_id = "pickup_r4_planks_01"
+linked_object_id = "R4-01"
+display_name = "Deska"
+pickup_item = ExtResource("22_planks")
+
+[node name="PickupR4Scrap01" parent="Gameplay/Pickups" unique_id=921224804 instance=ExtResource("15_pickup")]
+position = Vector2(8200, 4100)
+object_id = "pickup_r4_scrap_01"
+linked_object_id = "R4-03"
+display_name = "Złom"
+pickup_item = ExtResource("23_scrap")
+
+[node name="Threats" type="Node2D" parent="Gameplay" unique_id=478169605]
+
+[node name="ParkingNoiseEel" parent="Gameplay/Threats" unique_id=939466517 instance=ExtResource("16_threat")]
+position = Vector2(2639, 421)
+object_id = "parking_noise_eel"
+display_name = "Węgorz hałasowy"
+threat_definition = ExtResource("24_noise_eel")
+
+[node name="HeavyObjects" type="Node2D" parent="Gameplay" unique_id=1495761015]
+
+[node name="ShipEngineR1" parent="Gameplay/HeavyObjects" unique_id=450429986 instance=ExtResource("17_heavy")]
+position = Vector2(9300, 520)
+object_id = "ship_engine_r1"
+display_name = "Silnik statku"
+contents = {
+"scrap": 10,
+"tech_parts": 2
+}
+
+[node name="ShipyardWinchR3" parent="Gameplay/HeavyObjects" unique_id=1237115683 instance=ExtResource("17_heavy")]
+position = Vector2(4100, 2700)
+object_id = "shipyard_winch_r3"
+display_name = "Wyciągarka stoczniowa"
+contents = {
+"scrap": 14,
+"tech_parts": 4
+}
+
+[node name="ScrapyardGeneratorR3" parent="Gameplay/HeavyObjects" unique_id=2075268124 instance=ExtResource("17_heavy")]
+position = Vector2(3200, 3100)
+object_id = "scrapyard_generator_r3"
+display_name = "Generator przemysłowy"
+contents = {
+"fabric_rubber": 8,
+"scrap": 31,
+"tech_parts": 11
+}
+
+[node name="RescueEncounters" type="Node2D" parent="Gameplay" unique_id=528819803]
+
+[node name="RescueHotelLeon" parent="Gameplay/RescueEncounters" unique_id=1372541350 instance=ExtResource("18_rescue")]
+position = Vector2(8604, 708)
+object_id = "rescue_hotel_leon"
+display_name = "Leon Wrona"
+rescue_definition = ExtResource("25_leon_wrona")
+
+[node name="BuoyAnchors" type="Node2D" parent="Gameplay" unique_id=1524200822]
+
+[node name="BuoyB01" parent="Gameplay/BuoyAnchors" unique_id=10833338 instance=ExtResource("19_buoy")]
+position = Vector2(3324, 1548)
+object_id = "B-01"
+display_name = "Park"
+linked_object_id = "R2-02"
+
+[node name="BuoyB02" parent="Gameplay/BuoyAnchors" unique_id=1150684721 instance=ExtResource("19_buoy")]
+position = Vector2(1778, 2485)
+object_id = "B-02"
+display_name = "Magazyny Portowe"
+linked_object_id = "R3-01"
+
+[node name="BuoyB03" parent="Gameplay/BuoyAnchors" unique_id=1375219574 instance=ExtResource("19_buoy")]
+position = Vector2(1980, 4332)
+object_id = "B-03"
+display_name = "Dworzec Metra"
+linked_object_id = "R4-01"
+
+[node name="ShortcutGates" type="Node2D" parent="Gameplay" unique_id=1851726663]
+
+[node name="ShortcutSC01" parent="Gameplay/ShortcutGates" unique_id=592276084 instance=ExtResource("20_shortcut")]
+position = Vector2(2464, 940)
+object_id = "SC-01"
+display_name = "Blokada kabla: sieci i roślinność"
+linked_object_id = "SC-01"
+required_tool = "knife"
+interaction_action = "cut"
+gate_width = 168.48
+visual_scene = ExtResource("41_visual_cable_blockage")
+visual_z_index = 2
+
+[node name="ShortcutSC02" parent="Gameplay/ShortcutGates" unique_id=2039098167 instance=ExtResource("20_shortcut")]
+position = Vector2(8180, 1340)
+rotation = -0.903924
+object_id = "SC-02"
+display_name = "Skrót: Bank Nasion — Archiwum"
+linked_object_id = "SC-02"
+gate_width = 162.0
+
+[node name="ShortcutSC03" parent="Gameplay/ShortcutGates" unique_id=1789240080 instance=ExtResource("20_shortcut")]
+position = Vector2(2580, 1412)
+rotation = 1.424748
+object_id = "SC-03"
+display_name = "Skrót: Szklarnia — Muzeum"
+linked_object_id = "SC-03"
+gate_width = 162.0
+
+[node name="ShortcutSC04" parent="Gameplay/ShortcutGates" unique_id=613422382 instance=ExtResource("20_shortcut")]
+position = Vector2(3476, 2868)
+rotation = 0.762592
+object_id = "SC-04"
+display_name = "Skrót: Złomowisko — Stocznia"
+linked_object_id = "SC-04"
+gate_width = 168.48
+
+[node name="ShortcutSC05" parent="Gameplay/ShortcutGates" unique_id=1102476123 instance=ExtResource("20_shortcut")]
+position = Vector2(6133.718, 3564.2002)
+rotation = 1.374536
+object_id = "SC-05"
+display_name = "Skrót: Metro — Elektrownia"
+linked_object_id = "SC-05"
+gate_width = 155.52
+
+[node name="ShortcutSC06" parent="Gameplay/ShortcutGates" unique_id=1704617804 instance=ExtResource("20_shortcut")]
+position = Vector2(7581.133, 3466.1396)
+rotation = -0.593668
+object_id = "SC-06"
+display_name = "Skrót: Laboratoria — Fabryka"
+linked_object_id = "SC-06"
+gate_width = 162.0
+
+[node name="ShortcutSC07" parent="Gameplay/ShortcutGates" unique_id=262633912 instance=ExtResource("20_shortcut")]
+position = Vector2(6172, 4532)
+rotation = -1.543088
+object_id = "SC-07"
+display_name = "Skrót: Grodzie — Metro"
+linked_object_id = "SC-07"
+gate_width = 155.52
+
+[node name="ShortcutSC08" parent="Gameplay/ShortcutGates" unique_id=789544281 instance=ExtResource("20_shortcut")]
+position = Vector2(8162.4717, 5289.265)
+rotation = 1.277168
+object_id = "SC-08"
+display_name = "Skrót: Serce — Grodzie"
+linked_object_id = "SC-08"
+gate_width = 168.48
+
+[node name="StaticObstacles" type="Node2D" parent="." unique_id=1319875072]
+
+[node name="Decorations" type="Node2D" parent="." unique_id=1468220591]
+
+[node name="CommonLineCableR1J7" parent="Decorations" instance=ExtResource("39_decoration")]
+position = Vector2(5713.388, 388.22977)
+object_id = "common_line_cable_r1_j7"
+display_name = "Kabel Wspólnej Linii: platforma — J-7"
+designer_notes = "Bezkolizyjna wskazówka środowiskowa prowadząca przez obie skrzynie tutoriala, blokadę SC-01 i Węzeł J-7."
+visual_scene = ExtResource("40_visual_common_line_cable")
+show_authoring_marker = false
+
+[node name="CommonLineCableJ7Archive" parent="Decorations" instance=ExtResource("39_decoration")]
+position = Vector2(2244, 1220)
+object_id = "common_line_cable_j7_archive"
+display_name = "Kabel Wspólnej Linii: J-7 — Archiwum"
+designer_notes = "Bezkolizyjna magistrala fabularna prowadząca od J-7 do terminala Zalanego Archiwum."
+visual_scene = ExtResource("42_visual_common_line_archive")
+show_authoring_marker = false
+
+[node name="CommonLineCableArchiveR3" parent="Decorations" instance=ExtResource("39_decoration")]
+position = Vector2(7980, 1100)
+object_id = "common_line_cable_archive_r3"
+display_name = "Kabel Wspólnej Linii: Archiwum — R-3"
+designer_notes = "Bezkolizyjna magistrala fabularna prowadząca od Archiwum do diagnostyki Elektrowni R-3."
+visual_scene = ExtResource("43_visual_common_line_r3")
+show_authoring_marker = false
+
+[node name="CommonLineCableR3C4" parent="Decorations" instance=ExtResource("39_decoration")]
+position = Vector2(10300, 3040)
+object_id = "common_line_cable_r3_c4"
+display_name = "Kabel Wspólnej Linii: R-3 — C-4"
+designer_notes = "Bezkolizyjna magistrala fabularna prowadząca od generatora R-3 do rozdzielni C-4 w Sercu."
+visual_scene = ExtResource("44_visual_common_line_c4")
+show_authoring_marker = false
+
+[node name="RuntimeDynamic" type="Node2D" parent="." unique_id=1587319164]

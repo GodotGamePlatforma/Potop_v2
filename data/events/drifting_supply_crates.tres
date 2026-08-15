@@ -1,0 +1,44 @@
+[gd_resource type="Resource" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/SettlementEventDefinition.gd" id="1_event"]
+[ext_resource type="Script" path="res://scripts/definitions/SettlementEventChoiceDefinition.gd" id="2_choice"]
+
+[sub_resource type="Resource" id="ChoiceFood"]
+script = ExtResource("2_choice")
+id = "recover_food"
+label = "WYŁÓW SKRZYNIE Z ŻYWNOŚCIĄ"
+preview = "Jedzenie +10"
+result_text = "Najcięższe skrzynie skrywają zaplombowane racje. Zapasy Przystani rosną."
+resource_deltas = {"food": 10}
+impact_tags = Array[String](["food_relief"])
+
+[sub_resource type="Resource" id="ChoiceMaterials"]
+script = ExtResource("2_choice")
+id = "dismantle_float"
+label = "ROZBIERZ PŁYWAJĄCY STELAŻ"
+preview = "Deski +5  •  Złom +4"
+result_text = "Załoga rozcina stelaż i wyciąga wszystko, co może wzmocnić zabudowania."
+resource_deltas = {"planks": 5, "scrap": 4}
+impact_tags = Array[String](["material_relief"])
+
+[resource]
+script = ExtResource("1_event")
+id = "drifting_supply_crates"
+history_key = "drifting_supply_crates"
+category = "supplies"
+title = "ŁADUNEK W DRYFIE"
+body = "Prąd przynosi resztki platformy transportowej. Zanim konstrukcja zatonie, zdążymy zabezpieczyć tylko jedną część ładunku."
+base_weight = 10.0
+tone = "relief"
+severity = 1
+pressure_cost = 0.0
+minimum_day = 3
+cooldown_days = 4
+cooldown_group = "supply_opportunity"
+allow_during_crisis = true
+trigger_tags = Array[String](["food_need", "material_need"])
+impact_tags = Array[String](["food_relief", "material_relief"])
+exclusive_tags = Array[String]([])
+recovery_role = "food"
+fallback_choice_id = "recover_food"
+choices = Array[Resource]([SubResource("ChoiceFood"), SubResource("ChoiceMaterials")])

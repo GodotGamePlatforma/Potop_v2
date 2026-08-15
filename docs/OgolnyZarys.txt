@@ -1,0 +1,1442 @@
+OSTATNI POMOST
+Survival city-builder nad wodą i niebezpieczne wyprawy pod nią
+Wersja dokumentu: 2.1
+
+ROLA I KONTRAKT REDAKCYJNY
+
+Ten plik jest jedynym właścicielem znaczenia produktu dla gracza: fantazji, doświadczenia, decyzji, widocznych zasad i skutków, balansu, narracji oraz granicy między zakresem aktywnym i docelowym. Pełna macierz odpowiedzialności dokumentów znajduje się w `AGENTS.md`.
+
+Nie opisuj tutaj klas, metod, pól, ścieżek assetów, schematów i algorytmów migracji, wewnętrznej kolejności wywołań, nazw testów ani ostatniego wyniku weryfikacji. Techniczny identyfikator może wystąpić wyłącznie w krótkim odwołaniu, jeżeli jest potrzebny do jednoznacznego powiązania z architekturą. Strojalna wartość może być objaśniona jako zasada balansu dla gracza, lecz aktywna wartość runtime nadal pochodzi z walidowanych danych albo właściwego systemu.
+
+Nowa lub całkowicie redagowana sekcja mechaniki ma postać:
+
+	[AKTYWNE | DOCELOWE | LEGACY | HISTORYCZNE] — NAZWA
+
+	Decyzja gracza / warunek:
+	Widoczny skutek i feedback:
+	Ograniczenia i wyjątki istotne dla gracza:
+	Odwołania: ARD-XXXX; architektura, sekcja X.Y.
+
+Czysta narracja może pozostać prozą, ale musi mieć jeden jawny status. `[AKTYWNE]` stosuj dopiero po potwierdzeniu runtime w `.ai/PROJECT_CONTEXT.md`; zatwierdzony pomysł bez kompletnego konsumenta jest `[DOCELOWE]`. Akapit bez własnego oznaczenia dziedziczy status najbliższego nagłówka. Znaczenie statusów i luki implementacyjnej określają aktywne ARD dokumentacyjne.
+
+Przy edycji zastanej sekcji zachowaj jej sens graczowy, usuń z niej techniczne przecieki do właściwej sekcji architektury i zostaw odwołanie. Nie dopisuj historii redakcji ani drugiej wersji tej samej reguły.
+
+1. PREMISA I FILARY
+
+[AKTYWNE] — PREMISA
+
+Deszcz pada nieustannie od pięciu lat. Najpierw zniknęły pola, potem drogi, partery i całe miasta. Dzisiaj świat kończy się kilka desek pod stopami ocalałych. Pod platformą zostało wszystko, czego potrzebują do życia.
+
+Ostatnią znaną osadą jest Przystań — stale naprawiana platforma z desek, beczek, blachy i fragmentów zatopionych budynków. Mieszkańcy nie wiedzą, czy są ostatnimi ludźmi. Inni mogą czekać na dachach, tratwach albo w kieszeniach powietrznych zatopionych konstrukcji.
+
+Mira Boruta, Anka Ryl i Igor Sowa znaleźli tę opuszczoną platformę serwisową na otwartym morzu. Nie zastali osady ani sprawnej infrastruktury — tylko pusty, zardzewiały pokład z sześcioma zniszczonymi zaczątkami przyszłych budynków. Nazwali go Przystanią i od pierwszego dnia przebudowują z odzyskanych materiałów.
+
+[AKTYWNE] — OŚ FABULARNA KAMPANII „WSPÓLNA LINIA”
+
+Pod platformą biegnie stara magistrala energetyczno-komunikacyjna. Jej ponowne załączenie przywraca Przystani podstawowe światło i łączność, lecz jednocześnie obciąża wspólny bank energii zasilający inną osadę — Platformę Północną.
+
+To ocaleni z Północnej Platformy ostrzegają mieszkańców Przystani przed Czarnym Frontem, pierwszym wielkim sztormem kampanii. Od końca Aktu I działa jawny licznik dni. Aby przetrwać uderzenie, Przystań musi mieć dokładnie 100% integralności. Późniejsza część kampanii stawia gracza przed wyborem, czy ostatnią energię zachować dla własnej platformy, przekazać Północnej, czy spróbować utrzymać obie osady na jednej linii.
+
+Postęp fabularny wynika z budowy sześciu obiektów, naprawy platformy, uruchamiania stałych urządzeń pod wodą, produkowania części w Warsztacie oraz decyzji dotyczących ludzi i energii.
+
+[AKTYWNE] — INTRO NOWEJ KAMPANII
+
+Pomijalne, około 45-sekundowe intro prowadzi Mira w pierwszej osobie. Cztery beztekstowe, prerenderowane ujęcia pokazują zatopione miasto, dokładnie troje ludzi zbliżających się do pustej platformy, ustalony kadr początkowej Przystani oraz linę prowadzącą ku ruinom. Intro jest oddzielnym bytem prezentacyjnym i nie uruchamia świata 3D ani pogody kampanii; żywa baza 2,5D/3D zaczyna się dopiero po przejściu do tutoriala. Ostatnia kwestia — „Jeśli chcemy zobaczyć jutro, musimy zbudować drogę w dół” — bezpośrednio uzasadnia budowę Stacji Nurkowej podczas pierwszego dnia tutoriala. Wszystkie siedem kwestii Miry jest przekazywanych jako podpisane napisy obok jej portretu; intro ani późniejsza kampania nie używają nagranego lub syntetycznego voice-overu. Oryginalny ambient deszczu, morza i pracującego metalu zachowuje własny rytm bez ściszania pod nieistniejący głos. Intro można pominąć przyciskiem albo `ESC`.
+
+[AKTYWNE] — PORTRET MIRY W INTRO
+
+Podczas narracji intro obok podpisu i napisów widoczny jest portret Miry. Wizerunek jednoznacznie łączy tekst z postacią, pozostaje czytelny na wspieranych proporcjach ekranu i nie zasłania kluczowych elementów czterech ujęć. Jego obecność wynika z osi prezentacji i nie zależy od poprawnego odtworzenia ambientu.
+
+Odwołania: ARD-0047, ARD-0069, ARD-0087; architektura, sekcja 12.1.
+
+Gracz zarządza Przystanią, przydziela ludzi do pracy, wybiera racje, rozwija sześć budynków i przygotowuje wyprawy pod wodę. Rybołówstwo zapewnia odnawialny rdzeń zapasów, lecz nie pełną samowystarczalność rozwijającej się osady; żywność z wypraw pozostaje regularnym uzupełnieniem gospodarki. Zasadniczy rozwój oraz przerwanie WYMAGA odzysku z głębin. Nurkowanie jest głównym źródłem progresji, ale nie jest obowiązkowe każdego dnia — gracz może świadomie zakończyć dzień bez wyprawy.
+
+Filary projektu:
+
+- baza i głębina tworzą jeden łańcuch przyczynowo-skutkowy;
+- każda wyprawa jest decyzją o czasie, tlenie, udźwigu, drodze powrotnej i człowieku;
+- świat pod wodą jest stały i pamięta działania;
+- mieszkańcy są konkretnymi postaciami, a nie wymienną liczbą pracowników;
+- porażka ma konsekwencje, ale pojedyncza śmierć nurka nie może bezwarunkowo zablokować kampanii;
+- systemy pokazują graczowi prawdziwe liczby i powody, zamiast ukrywać drugi model balansu.
+
+[AKTYWNE] — CZYTELNY I PRZYJAZNY INTERFEJS
+
+Interfejs zachowuje sztormowy charakter świata, lecz powierzchnie służące czytaniu są jaśniejsze, spokojniejsze i cieplejsze niż samo otoczenie. Grafit zastępuje jednolitą czerń, tekst ma wysoki kontrast, a bursztyn wskazuje bieżącą decyzję zamiast ozdabiać wszystkie elementy. Turkus oznacza informację lub bezpieczny stan, a koral i czerwień są zarezerwowane dla realnego zagrożenia.
+
+Najczęstszy stan okna pokazuje bez przewijania wszystkie informacje i akcje potrzebne do podjęcia podstawowej decyzji przy bazowym obrazie 1280 × 720. Długie archiwa, rozbudowane listy, katalogi i szczegóły mogą zachować przewijanie jako rezerwę, lecz nagłówek, kontekst, główna decyzja oraz stopka akcji pozostają od razu widoczne. Zwięzłe podsumowanie ma pierwszeństwo przed pełnym opisem, a powiązane dane są grupowane w zakładki, kolumny lub zwarte karty zamiast jednej długiej ściany tekstu.
+
+Stan interakcji nie opiera się wyłącznie na kolorze: zaznaczenie, fokus, blokada i ostrzeżenie zachowują także obrys, tekst albo symbol. Układ pozostawia miejsce na polskie napisy i nie zmniejsza liczby informacji potrzebnych do planowania. Główny świat pozostaje widoczny podczas zwykłego planowania oraz przez przezroczyste obrzeża świadomie otwartego Trybu Zarządzania Bazą. Mniejsza przestrzeń robocza daje pierwszeństwo czytelności decyzji i szybkiemu przełączaniu sześciu obiektów, ale nie zasłania górnego paska ani przycisku `ZAKOŃCZ DZIEŃ`.
+
+Odwołania: ARD-0040, ARD-0062, ARD-0090, ARD-0091; architektura, sekcje 12.1–12.3.
+
+2. GŁÓWNA PĘTLA DNIA
+
+[AKTYWNE]
+
+`NOWA GRA` tworzy jedną bieżącą kampanię, zapisuje jej bezpieczny stan startowy, pokazuje pomijalne intro z napisami Miry, a następnie przechodzi do tutoriala. `KONTYNUUJ` wraca bezpośrednio do poprawnej bieżącej kampanii i nie odtwarza intro ponownie.
+
+W bazie czas jest zatrzymany podczas planowania. Jeden dzień przebiega następująco:
+
+1. Gracz odbiera obowiązkowe podsumowanie poprzedniego dnia.
+2. Jeżeli poranek ma zapisaną kartę wydarzenia, rozstrzyga ją przed dostępem do planowania.
+3. Przydziela mieszkańców, ustawia racje i osobne tempo każdego budynku, natychmiast buduje albo ulepsza obiekty, kolejkuje sprzęt oraz przygotowuje wyprawę.
+4. Wybiera jedną z dwóch dróg: `NURKUJ` albo świadomie `ZAKOŃCZ DZIEŃ` bez wyprawy.
+5. Po zatwierdzeniu plan staje się niemutowalną migawką.
+6. W przypadku wyprawy gracz eksploruje świat w czasie rzeczywistym i kończy sesję fizycznym powrotem, trwałą śmiercią albo ratunkiem Operatora.
+7. Gra jednorazowo rozlicza wynik wyprawy, pracę bazy, jedzenie, stan ludzi, sztorm i postęp kampanii.
+8. Powstaje zapisany raport oraz poranek nowego dnia.
+
+Baza nie symuluje sekund pracy w tle podczas nurkowania. Przydziały są zamrożone, a ich skutki oblicza deterministycznie resolver po zakończeniu wyprawy lub dnia bez wyprawy.
+
+Nurek, który zginął podczas wyprawy, jest uznawany za zmarłego natychmiast po przyjęciu wyniku wyprawy. Jest usuwany z obsad, dlatego tej samej nocy nie korzysta z Lecznicy, racji ani schronienia i nie otrzymuje późniejszych zmian głodu, zmęczenia, Nadziei lub morale. Późne zgony dotyczą wyłącznie skutków powstałych podczas rozliczenia; śmierć wyprawowa zachowuje jeden raport, miejsce zgonu, plecak i właściwą karę Nadziei. Szczegół kolejności: architektura, sekcja 6.
+
+Poranne wydarzenia
+
+Po tutorialu poranek może przynieść najwyżej jedną kartę albo spokojny dzień. Najpierw gracz widzi raport dnia poprzedniego, potem kartę, a dopiero po decyzji wraca do planowania. Wynik jest zapisany, więc ponowne wczytanie nie losuje innej oferty.
+
+Jeżeli tego ranka wraca ekspedycja łodzią z kandydatami, jej obowiązkowa decyzja ma pierwszeństwo przed zwykłą kartą. Gracz rozstrzyga cały zamrożony zestaw kandydatur, a dopiero potem wydarzenie korzysta z ostatecznego składu, pojemności i stanu osady. Powrót bez kandydatów nie tworzy pustego modala.
+
+Treść, dostępność i skutki pokazanej karty zostają zamrożone razem z zapisem. Ponowne wczytanie nie może zmienić oferty ani reinterpretować decyzji według później zmienionych danych; każda karta ma też faktycznie dostępny wybór awaryjny. Szczegół techniczny: architektura, sekcje 7.3 i 11.3; ARD-0032 i ARD-0063.
+
+Pierwsza pula obejmuje:
+
+- Zofię Kruk i Pawła Mazura na tratwie;
+- ładunek w dryfie;
+- pęknięte cumowanie;
+- wspólny posiłek;
+- łódź handlarza.
+
+Gwarancja odbudowy załogi może wymusić tylko pojawienie się kwalifikującej karty — nigdy wybór gracza. Po hipotetycznym przyjęciu całej grupy muszą pozostać miejsca dla wszystkich oraz co najmniej 0,75 nominalnego dnia jedzenia. Karta Zofii i Pawła jest jednorazowa.
+
+Raporty
+
+Obowiązkowy raport pokazuje wynik wyprawy albo dzień bez wyprawy, łup, czas, skutki resolvera, ostrzeżenia oraz skrót nowego poranka. Po jego odebraniu klawisz `R` otwiera tylko do odczytu archiwum siedmiu ostatnich zakończonych dni. Oglądanie historii nie uruchamia ponownie żadnego skutku.
+
+[AKTYWNE] — ODLICZANIE CZARNEGO FRONTU
+
+Po zakończeniu Aktu I każdy poranny raport i stały HUD bazy pokazują liczbę pełnych dni pozostałych do Czarnego Frontu. Licznik zmniejsza się po każdym rozliczonym dniu, także bez wyprawy i podczas kryzysu przywództwa. Nie zatrzymuje go dialog, śmierć bohatera ani rozpoczęcie misji.
+
+Wartość „1 dzień” oznacza ostatni pełny dzień planowania i ostatnią możliwość nurkowania. Po jego rozliczeniu rozpoczyna się finał. Przed zatwierdzeniem planu interfejs pokazuje aktualną integralność, prognozowaną naprawę, przewidywane uszkodzenie zwykłej pogody oraz informację, czy Przystań może zakończyć dzień z wymaganymi 100%.
+
+2.1. TRWAŁOŚĆ KAMPANII
+
+[AKTYWNE]
+
+Gra prowadzi jedną bieżącą kampanię. Autosave, zapis ręczny, rozliczenia i finał trafiają do tego samego bezpiecznego zapisu; uszkodzony albo niepełny kandydat nie zastępuje ostatniej poprawnej kopii tej kampanii.
+
+`KONTYNUUJ` jest dostępne tylko dla poprawnej bieżącej kampanii. `NOWA GRA` wymaga jasnego potwierdzenia, że usuwa całą bieżącą kampanię i rozpoczyna nową od początku. Gra nie importuje, nie przekształca ani nie zachowuje poprzednich kampanii jako ukrytego archiwum.
+
+To jest obietnica produktu, nie specyfikacja formatu. Bezpieczny zapis i warunki odrzucenia należą do architektury, sekcja 11; normatywny kontrakt ustanawia ARD-0092.
+
+2.2. PAUZA, ZAPIS RĘCZNY I WYJŚCIE
+
+[AKTYWNE]
+
+W bazie i podczas wyprawy `ESC` otwiera menu pauzy z pięcioma decyzjami: `KONTYNUUJ`, `ZAPISZ GRĘ`, `USTAWIENIA`, `POWRÓT DO MENU GŁÓWNEGO` oraz `WYJDŹ Z GRY`. Kontynuacja wraca dokładnie do tej samej sceny i tej samej sesji, bez przeładowania, zmiany fazy ani utraty bieżącego kontekstu. Jeżeli jest otwarty opcjonalny panel lokalny, pierwszy `ESC` zamyka ten panel zgodnie z jego dotychczasowym zachowaniem, a dopiero kolejny otwiera pauzę. Obowiązkowy raport dnia albo karta wydarzenia nie są w ten sposób zamykane; menu może pojawić się nad nimi, a po kontynuacji nadal wymagają decyzji.
+
+Ręczny zapis korzysta z tego samego bezpiecznego zapisu bieżącej kampanii co pozostały przepływ. Jest dostępny tylko w trwałym punkcie bazy. Podczas nurkowania oraz przejściowego rozliczenia przycisk pozostaje wyłączony i pokazuje konkretny powód; gra nie zapisuje lokalnej sesji wyprawy ani nie tworzy zapisu przed nurkowaniem.
+
+`USTAWIENIA` otwierają tę samą nakładkę ustawień urządzenia co menu główne. Drzewo gry pozostaje zatrzymane, zamknięcie albo anulowanie wraca do menu pauzy, a ustawienia nadal nie należą do bieżącej kampanii.
+
+`POWRÓT DO MENU GŁÓWNEGO` zawsze wymaga potwierdzenia i nigdy nie wykonuje ukrytego autosave. W bazie ostrzega o utracie zmian od ostatniego bezpiecznego zapisu; podczas nurkowania ostrzega o utracie całej niezakończonej wyprawy. Po zatwierdzeniu bieżący stan runtime zostaje odrzucony, gra wraca do menu głównego, a ponowne wejście do kampanii wymaga `KONTYNUUJ`.
+
+`WYJDŹ Z GRY` natychmiast zamyka aplikację bez potwierdzenia i bez dodatkowego zapisu. Niezapisane zmiany od ostatniego bezpiecznego punktu — w tym cała niezakończona wyprawa — przepadają. `ESC` w intro nadal pomija intro; menu pauzy nie przejmuje menu głównego, ekranu porażki ani zakończenia kampanii.
+
+Odwołania: architektura, sekcje 11.1 i 12.1; ARD-0019, ARD-0046, ARD-0049 i ARD-0092.
+
+3. ZASOBY I GOSPODARKA
+
+[AKTYWNE]
+
+Zasoby magazynowe i ich obecne zastosowania:
+
+- Jedzenie — racje mieszkańców oraz koszty wybranych wydarzeń.
+- Deski — budowy i ulepszenia sześciu budynków.
+- Złom — budowy, ulepszenia, receptury oraz automatyczna naprawa platformy.
+- Tkaniny i guma — budowy, ulepszenia oraz receptury Warsztatu.
+- Części techniczne — wyższe poziomy budynków i receptury Warsztatu.
+- Chemikalia i leki — ulepszenia Lecznicy do poziomów II–IV, leczenie pacjentów oraz stabilizacja Leona. Budowa poziomu I nie wymaga leku. Wydarzenie handlarza może dodać dwie sztuki w zamian za jedzenie, ale nie zużywa leku.
+- Nadzieja — stan wspólnoty i wejście w kryzys przywództwa.
+- Integralność platformy — globalna odporność Przystani na pogodę i warunek porażki.
+
+[AKTYWNE] — ZASOBY KAMPANII „WSPÓLNA LINIA”
+
+Nowa kampania nie dodaje osobnego zasobu energii, paliwa ani części fabularnych przechowywanych w plecaku. Zasilanie jest czytelnym stanem sieci: awaryjne, ustabilizowane przez Generator R-3 albo rozdzielone w Centralnej Rozdzielni C-4.
+
+Nóż ratowniczy, Regulator R-3 i Rozdzielacz Wspólnej Linii są jednorazowymi zleceniami kampanii. Ich koszty są jawne, stałe i nieskalowane profilem trudności. Nóż kosztuje 3 złomu oraz 2 tkaniny i gumy; jego obowiązkowy materiał znajduje się w łupie pierwszego zejścia. Zwykłe naprawy platformy nadal zużywają złom według wspólnego systemu Warsztatu.
+
+Integralność 100% jest twardym warunkiem rozpoczęcia finału z wynikiem innym niż porażka. Osiągnięcie pełnej wartości wcześniej nie zamyka celu: zwykła pogoda może ją ponownie obniżyć, dlatego gracz musi utrzymać 100% do końca odliczania.
+
+[DOCELOWE] — POZA ZAKRESEM GOSPODARKI
+
+Czystość wody, psucie żywności, przepisy, odkażanie, rozbudowane uczty i osobne paliwo nie są zasobami ani funkcjami Kuchni w docelowej kampanii.
+
+3.1. Jedzenie i racje
+
+[AKTYWNE]
+
+Jednostką zapasu jest „jedzenie”, nie gotowa racja. Publiczne profile mają koszt bazowy 4 jednostek na osobę; konfiguracja niestandardowa może ustawić 3, 4 albo 5. Obsadzona Kuchnia obniża łączny koszt procentowo, a Kucharz dodaje punkty procentowe. Łączna oszczędność nie przekracza 75%, a pełna racja kosztuje co najmniej 1 jednostkę na żyjącą osobę.
+
+Gracz ma cztery polityki:
+
+- Pełne racje (`FULL`) — pełna porcja dla wszystkich; przy braku zapasu atomowa próba podania połowy wszystkim; jeżeli nie wystarcza nawet na połowę, nikt nie je, a niewydany zapas pozostaje w magazynie.
+- Połowa racji (`HALF`) — połowa dla wszystkich albo nic dla wszystkich; nieudana próba nie zużywa pozostałego jedzenia.
+- Brak racji (`NONE`) — brak wydania jedzenia.
+- Pierwszeństwo nurka (`DIVER_PRIORITY`) — najpierw pełna, a przy niedoborze połowa porcji dla poprawnego żyjącego nurka; następnie największy osiągalny prefiks połówek dla pozostałych mieszkańców w stabilnej kolejności. Dzień bez poprawnego nurka używa dokładnego grupowego fallbacku `HALF`. Jeżeli nie stać nawet na połowę nurka albo grupy, faktyczna polityka wynosi `NONE` i magazyn pozostaje bez zmian.
+
+Koszt połowy wynosi `max(ceil(koszt pełny / 2), ceil(populacja / 2))`. Mieszany przydział jest wyceniany raz, proporcjonalnie w jednostkach „pełna = 2, połowa = 1”, bez sumowania osobno zaokrąglonych cen mieszkańców.
+
+Prognoza planu i rzeczywiste rozliczenie korzystają z tych samych reguł. Prognoza dolicza pewny połów Chaty Rybackiej rozliczany przed racjami, ale nie zgaduje nieznanego jeszcze łupu wyprawy; pokazuje faktyczny fallback, koszt oraz odbiorców także bez działającej Kuchni. Szczegół wykonania: architektura, sekcja 4.4 i 6.
+
+Skutki otrzymanej porcji:
+
+- pełna: głód -18, składnik racji do morale +1;
+- połowa: głód +10, Nadzieja -2 za odbiorcę, składnik racji do morale -2;
+- brak: głód +25, Nadzieja -8 za osobę, składnik racji do morale -6.
+
+Wartości `+1/-2/-6` nie są całą zmianą morale. Po rozliczeniu Nadziei każda żywa osoba otrzymuje także przyciąganie `pull = clamp(Nadzieja_po_rozliczeniu - morale_przed, -5, 5)`, a finalnie `morale = clamp(morale_przed + pull + składnik_racji, 0, 100)`.
+
+3.2. Głód, zdrowie, morale i Nadzieja
+
+[AKTYWNE]
+
+Głód ma zakres 0–100:
+
+- od 20 wydajność spada do 90%;
+- od 40 do 75%;
+- od 65 do 45% i mieszkaniec nie może nurkować;
+- od 85 mieszkaniec nie może pracować;
+- przy 100 traci 20 zdrowia podczas końca dnia.
+
+Nie ma losowej śmierci głodowej przy 85–99. Śmierć następuje dopiero wtedy, gdy rzeczywista utrata zdrowia sprowadzi je do zera.
+
+Nadzieja ma zakres 0–100. Zmienia ją między innymi wynik wyprawy, zdobyty łup, ratunek, racje, Dom Wspólnoty i brak schronienia. Nadzieja 0 rozpoczyna podczas rozliczenia trzydniowy kryzys przywództwa; cel to co najmniej 15 przed wyczerpaniem trzech kolejnych pełnych rozliczeń.
+
+[DOCELOWE] — PEŁNE KONFLIKTY SPOŁECZNE
+
+Kradzieże, bójki, sabotaż, dezercje, wybór nowego lidera i pełny system konfliktów nie są obecnie skutkami progów Nadziei. Runtime emituje jedynie ostrzeżenie o ryzyku przy niskiej wartości.
+
+4. MIESZKAŃCY I SPECJALIZACJE
+
+[AKTYWNE]
+
+Każdy mieszkaniec ma tożsamość, portret, status, zdrowie, głód, zmęczenie, morale, poziom, PD, punkty rozwoju, osobisty tlen, udźwig, profesję główną, najwyżej jedną dodatkową oraz praktykę ścieżek pracy.
+
+Osoba może być dostępna, pracować, nurkować, być ranna, mieć równoległy przypadek choroby, umrzeć albo trwale odejść. Nie ma osobnej komendy ani mechanicznego statusu odpoczynku, a pełna mechanika zaginięcia nie jest aktywna. Osoba czasowo niezdolna pozostaje przypisana do budynku, lecz wnosi zero pracy; nieaktualne i zduplikowane przypisania są usuwane. Techniczne statusy, przypadki chorób i reguły rekonsyliacji: architektura, sekcje 4.1, 4.6, 8.1 i 11.3.
+
+Sześć wykonywalnych specjalizacji:
+
+- Nurek — osobisty tlen ×1,10 i płaski bonus +15 jednostek wyprawy.
+- Rybak — +1 jednostka do nominalnego połowu.
+- Kucharz — +2 punkty procentowe oszczędności racji.
+- Mechanik — +1 punkt naprawy platformy.
+- Medyk — +5 do bazowego leczenia pacjenta.
+- Organizator — +2 nominalnej Nadziei z pracy Domu Wspólnoty.
+
+Nie istnieje siódma wykonywalna specjalizacja ani postać o tożsamości „Radiowiec”. „Ogrodniczka” Zofii i „cieśla” Pawła są etykietami narracyjnymi, nie premiami specjalisty.
+
+Rozwój ma cztery aktywne tory:
+
+- ogólne PD podnoszą poziom i dają punkty na +10 maksymalnego zdrowia, +10 osobistego tlenu albo +4 kg udźwigu;
+- te same punkty można wydać w Domu Wspólnoty I na jeden z trzech poziomów pasywnej kompetencji;
+- ogólne PD za pracę rosną za zdolną obsadę aktywnego budynku, natomiast praktyka zawodowa wyłącznie za rzeczywiście wykonane działanie.
+- po opanowaniu formalnej profesji gracz wybiera jeden z dwóch nieodwracalnych talentów tej profesji.
+
+Piętnaście kompetencji pasywnych tworzy wybór między nurkowaniem a bazą. Dotychczasowe osiem zachowuje skutki: Pływanie daje +5/+10/+15% szybkości w wodzie, Gospodarka tlenem zmniejsza zużycie o 4/8/12%, Odporność na chłód zmniejsza narastanie wychłodzenia o 5/10/15%, Produkcja zwiększa osobisty wkład w Warsztat o 5/10/15%, Współpraca zwiększa osobistą wydajność pracy o 4/8/12%, Odporność organizmu odejmuje 1/2/3 punkty od jawnej presji choroby, Obsługa narzędzi skraca interakcje o 5/10/15%, a Czujność obniża próg wizualnego ostrzeżenia o zagrożeniu o 5/10/15 punktów.
+
+Nowe kompetencje mają również po trzy poziomy:
+
+- Trym ładunku zmniejsza wyłącznie tlenową dopłatę za ciężar o 20/35/50%; nie zwiększa udźwigu ani liczby slotów.
+- Cichy profil przyspiesza zanik pozostałego hałasu o 20/40/60%, kiedy nurek nie sprintuje; nie wycisza samej czynności.
+- Zimna krew przyspiesza opadanie alarmu zagrożenia bez aktywnego bodźca o 15/30/45%; nie zmienia wykrycia, narastania alarmu ani ataku.
+- Kontrola szczelności poniżej 50% stanu kombinezonu zmniejsza obrażenia zdrowia od przecieku o 15/30/45%; nie chroni kombinezonu, nie ogranicza zimna i przy dokładnie 50% pozostaje nieaktywna.
+- Ergonomia pracy odejmuje 1/2/3 punkty od jednego dziennego przyrostu zmęczenia za potwierdzoną pracę, również wyprawę nurkową; nie wzmacnia odpoczynku.
+- Hart ducha zmniejsza o 1/2/3 osobistą utratę morale powodowaną przyciąganiem niskiej Nadziei, ale pozostawia co najmniej -1; nie zmienia racji ani globalnej Nadziei.
+- Higiena pracy zmniejsza o 1/2/3 presję choroby przekazywaną przez zakaźną osobę współpracownikowi; nie chroni właściciela i nie zmienia kontaktów poza pracą.
+
+Wszystkie kompetencje są deterministyczne i nie zwiększają łupu podwodnego. Czujność nie daje niewrażliwości. Osobne aktywne umiejętności ogólne pozostają poza bieżącym zakresem; cicha naprawa opisana niżej jest wariantem narzędzia odblokowanym przez talent Nurka, a nie nową ścieżką punktową.
+
+Zdolny mieszkaniec obsadzający aktywny budynek otrzymuje raz na zakończony dzień 100 ogólnych PD, nawet jeżeli budynek nie miał tego dnia wykonalnego zadania. Osoba nieprzypisana, nieobecna albo niezdolna do pracy nie otrzymuje tej nagrody. Wybrany nurek korzysta wyłącznie z osobnych PD wyprawy; Obsługa Stacji, Operator i Technik otrzymują zwykłe PD za obsadę.
+
+Rzeczywiście wykonana praca przyznaje dodatkowo 20 praktyki właściwej dziedziny. Bezczynny Warsztat, Lecznica bez pacjenta i Kuchnia bez wydanych racji dają ogólne PD za obsadę, ale zero praktyki. Przy 40 praktyki pojawia się ranga Uczeń, przy 100 gotowość do awansu. Uczeń nie daje częściowej premii. Aktywny Dom Wspólnoty II pozwala świadomie i nieodwracalnie nadać jedną dodatkową specjalizację bez kosztu materiałów i bez zużycia dnia. Wszystkie ścieżki nadal zapisują praktykę rzeczywistej pracy, lecz tylko profesja główna i jedna wybrana dodatkowa zapewniają premię specjalisty.
+
+Po osiągnięciu 100 praktyki formalnej profesji głównej albo dodatkowej aktywny Dom Wspólnoty II pozwala bez kosztu i bez zużycia dnia wybrać dokładnie jeden z dwóch talentów tej profesji. Wybór jest trwały i zamyka drugi wariant; jedna osoba może więc mieć najwyżej dwa talenty, jeżeli posiada dwie formalne profesje. Samo zdobycie praktyki nieformalnej ścieżki nie pozwala wybrać jej talentu.
+
+Talenty zawodowe:
+
+- Nurek — Zwiadowca po 1,5 s bezruchu w ciemności pokazuje wyłącznie ośmiokierunkowy znak najbliższego zagrożenia albo silnego prądu w promieniu 640 px; Technik głębinowy odblokowuje osobną cichą naprawę trwającą 1,8 s, przywracającą 60% zwykłej wartości i wytwarzającą 25% zwykłego hałasu.
+- Rybak — Strażnik łowiska zmniejsza przyrost presji z rzeczywistego połowu o 30%; Połów forsowny dodaje +1 jedzenia po zwykłym obliczeniu i zwiększa przyrost presji o 50%. Efekty różnych rybaków mogą złożyć się raz każdy.
+- Kucharz — Porcjowanie kryzysowe zmienia osobisty składnik morale pół racji z -2 na -1, bez zmiany globalnej kary Nadziei; Pokrzepiający posiłek dodaje +1 morale odbiorcy pełnej racji, jeżeli przed rozliczeniem ma morale poniżej 40.
+- Mechanik — Konserwator dodaje +2 do rzeczywistej automatycznej naprawy platformy za ten sam koszt; Odzysk materiału zwraca 1 złomu po pierwszym ukończonym tego dnia zleceniu Warsztatu, którego zamrożony koszt obejmował co najmniej 2 złomu.
+- Medyk — Rehabilitant zmniejsza zmęczenie każdego faktycznie leczonego pacjenta o 4; Profilaktyk zmniejsza o 1, do minimum 1, nową presję kontaktowego zakażenia w Przystani, bez zużycia leku i bez usuwania istniejącego Narażenia.
+- Organizator — Mediator zmniejsza o 1 ujemną nominalną karę Nadziei z Napięcia pracy, jeżeli rzeczywiście pracował w Domu; Instruktor raz dziennie przyznaje +10 praktyki jednemu mniej doświadczonemu współpracownikowi bez tego talentu z tego samego wykonanego działania, wybierając najniższą praktykę i nie przekraczając 100.
+
+Nurek zachowuje PD wynikające z wyprawy i rozwija praktykę nurkowania; Operator i Technik także rozwijają tę ścieżkę za rzeczywiste wsparcie.
+
+Zdolność do pracy wymaga dostępności, zdrowia co najmniej 35% maksimum, głodu <85, zmęczenia <90 i morale >=10. Zdolność do nurkowania wymaga dostępności, zdrowia co najmniej 50%, głodu <65, zmęczenia <85 i morale >=20. Przy zmęczeniu 85–89 osoba nadal może pracować, lecz wnosi tylko 35% zwykłej wydajności.
+
+Każdy z sześciu budynków ma własne tempo Ostrożne/Normalne/Intensywne, zamrażane w planie dnia. Mnożnik 0,75/1,00/1,25 skaluje aktywny efekt danego budynku: wsparcie Stacji, połów, oszczędność Kuchni, produkcję i naprawę Warsztatu oraz leczenie; Dom zamiast mnożenia zmienia poziomowy wkład każdego pracownika o -1/0/+1. Bierne limity, stanowiska, koszty, schronienie, szansa i ładunki Stacji oraz ciężki odzysk nie są mnożone. Indywidualna sprawność pracownika wpływa tylko na połów i automatyczną naprawę.
+
+Każdy budynek ma trwałe Napięcie pracy 0–3. Brak realnej pracy lub Ostrożna praca obniża je o 2, Normalna o 1, a Intensywna podnosi o 1. Jeżeli wystąpiła Intensywna praca, jedna nominalna kara Nadziei wynosi `-min(5, najwyższe nowe Napięcie + próg unikalnych intensywnych pracowników)`, gdzie próg to 0/1/2 dla 1–3/4–6/7+ osób. W przeciwnym razie co najmniej jedno rzeczywiste Ostrożne obniżenie daje łącznie +1; pozostałe dni 0. Ten składnik wchodzi do zwykłej sumy Nadziei przed mnożnikiem trudności. Globalna Nadzieja przyciąga potem morale każdej żyjącej osoby, więc lokalna Intensywna praca może pośrednio osłabić przyszłą obsadę wszystkich budynków.
+
+Zmęczenie +4/+8/+14 otrzymują wyłącznie osoby z potwierdzonego dziennika realnej pracy; brak takiego wpisu zmniejsza zmęczenie o 12 mimo zapamiętanego przydziału. Nurek dostaje zamiast tego `round((16 + min(floor(czas wyprawy / 120), 14)) × tempo Stacji)`. Panel opisuje delty tempa tylko jako skutek realnej pracy, a przy jej braku pokazuje -12 zmęczenia i -2 Napięcia. Ciężki odzysk używa stałej procedury Normalnej. Raport zawsze zawiera dokładnie jeden nominalny wpis delty tempa, także 0. Nie istnieje mechanika wypadków ani ogólnego ryzyka pracy.
+
+Panel Załogi pokazuje przy mieszkańcu z niewydanym punktem osobny, w pełni widoczny komunikat `PUNKTY ROZWOJU DO ROZDANIA: N`. Status osoby rzeczywiście dostępnej i nieprzypisanej jest zapisany zielonym słowem `dostępny`; pozostałe przydziały i stany zachowują neutralny kolor. Karta mieszkańca pokazuje poziom, ogólne PD oraz osobne paski praktyki wszystkich sześciu dziedzin wraz z rangą i progiem. Panel rozwoju po wydaniu punktu albo zatwierdzeniu drugiej specjalizacji odbudowuje treść z zachowaniem aktywnej zakładki, fokusu i logicznej kotwicy przewinięcia. Awans specjalizacyjny pozostaje świadomy i nie zmienia obsady budynku.
+
+[DOCELOWE] — ROTACJA ZAŁOGI, ODEJŚCIA I KANDYDACI
+
+Decyzja gracza / warunek:
+
+Odejścia mieszkańców oraz ekspedycje łodzią są jednym systemem rotacji załogi. Ekspedycja tworzy szansę pozyskania zapasów i nowych osób, a dobrowolne odejście pozwala zwolnić miejsce. Żadna osoba nie odchodzi automatycznie na podstawie pozycji w rosterze, poziomu, choroby ani wyniku algorytmicznego porównania. Każde trwałe odejście wymaga jawnego wyboru gracza.
+
+Decyzje o odejściu odblokowują się dopiero po zakończeniu trzydniowego tutoriala i wymagają aktywnego Domu Wspólnoty I. Gracz może wybrać najwyżej jedną obecną osobę na dzień. Nie wolno odesłać ostatniej osoby obecnej w Przystani, nurka po zablokowaniu planu ani dowódcy trwającej ekspedycji łodzią. Wyjątkiem jest atomowe zastąpienie: ostatnia osoba może odejść wyłącznie wtedy, gdy przyjmowany kandydat w tej samej decyzji natychmiast pozostawia co najmniej jednego mieszkańca na miejscu. Zastąpienie zużywa ten sam dzienny limit co zwykłe odejście.
+
+Przed zatwierdzeniem gracz wybiera sposób rozstania:
+
+- `ODEŚLIJ Z PROWIANTEM` — koszt jednej pełnej dziennej racji według profilu kampanii i Nadzieja -6;
+- `ODEŚLIJ BEZ PROWIANTU` — bez kosztu jedzenia i Nadzieja -10.
+
+Jeżeli odchodząca osoba ma zakaźny przypadek choroby, uraz blokujący pracę i nurkowanie albo mniej niż 50% zdrowia, zwykła kara wybranego wariantu otrzymuje jeden dodatkowy składnik -4 Nadziei. Kilka takich powodów nie mnoży dodatkowej kary. Choroba nie blokuje decyzji: gracz może zwolnić miejsce zajmowane przez osobę wymagającą utrzymania, lecz osada rozpoznaje społeczny koszt takiego wyboru.
+
+Widoczny skutek i feedback:
+
+Odejście jest nieodwracalne, usuwa bieżące przydziały, leczenie, izolację i rację tej osoby, ale zachowuje jej tożsamość, rozwój, kompetencje, urazy, etap choroby, koszt prowiantu i okoliczności w Kronice. Przed zatwierdzeniem ekran pokazuje dokładny koszt, pełną deltę Nadziei i powód dodatkowej kary.
+
+Kandydat z ekspedycji jest pokazywany jako pełna postać: poziom, wykonywalna profesja, kompetencje, zdrowie, głód, zmęczenie, morale, urazy i przypadki chorób. Wyższy poziom nie gwarantuje przewagi. Odrzucenie kandydatury nie ma automatycznej kary Nadziei. Każda osoba otrzymuje jawny wybór: odrzuć, przyjmij na wolne miejsce albo przyjmij i zastąp konkretną obecną osobę.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+Pojemność ma dwa znaczenia. Obecne osoby korzystają danej nocy z racji, pracy, kontaktów chorobowych i schronienia. Wszystkie żyjące osoby należące do rosteru, także dowódca na ekspedycji łodzią, rezerwują miejsce na przyszły powrót. Przy pełnej pojemności jedna oferta może więc przyjąć najwyżej jednego kandydata przez zastąpienie; druga osoba wymaga osobnego wolnego miejsca albo zostaje odrzucona. Dobrowolne kandydatury z łodzi i wydarzeń podlegają temu twardemu limitowi. Ratunek wykonany podczas nurkowania może awaryjnie przeludnić osadę i ponosi zwykłą karę braku schronienia.
+
+Powrót ekspedycji jest obowiązkową decyzją poranka. Najpierw zasoby i stan dowódcy są stosowane dokładnie raz, potem cały zestaw kandydatur jest zatwierdzany jako jedna decyzja, a dopiero na końcu system przygotowuje zwykłe wydarzenie. Nieudana walidacja albo zapis zachowują cały stan wejściowy i nie zużywają dziennego limitu.
+
+Jeżeli śmierć pozostawiła Przystań bez osoby obecnej, lecz żyje dowódca z zaplanowanym powrotem, gra automatycznie przesuwa dni bez planowania, pracy, racji i wydarzeń. Pogoda oraz integralność nadal są rozliczane. Porażka z powodu braku ludzi następuje dopiero wtedy, gdy nikt nie jest obecny i nikt nie może wrócić; terminalny finał kampanii ma pierwszeństwo.
+
+Odwołania: ARD-0081, ARD-0082; architektura, sekcje 4.7, 6, 7.3, 8.1 i 11.
+
+[AKTYWNE] — ROLE FABULARNE ODPORNE NA ŚMIERĆ
+
+Mira, Anka i Igor są głównymi postaciami intro oraz trzydniowego tutoriala. Po jego zakończeniu każda z tych osób może umrzeć, a żadna konieczna informacja nie może zniknąć razem z nią.
+
+Dialogi kampanii korzystają z ról:
+
+- Głos Przystani — żyjąca, zdolna osoba obsługująca Dom Wspólnoty; domyślnie Mira;
+- Głos techniczny — żyjący Mechanik albo zdolny pracownik Warsztatu; domyślnie Anka;
+- raport systemu — neutralny komunikat terminala lub dziennika, gdy żadna osoba nie może wiarygodnie przekazać wymaganej informacji.
+
+Radiostacja nie tworzy osobnej profesji. Każda obowiązkowa wiadomość trafia także do dziennika misji, a osobiste warianty dialogów zmieniają ton i Kronikę, nie możliwość ukończenia kampanii.
+
+[AKTYWNE] — SPÓJNE PORTRETY MIESZKAŃCÓW
+
+Mira, Anka, Igor, Zofia, Paweł i Leon mają indywidualne, rozpoznawalne portrety zgodne z ich osobowością oraz wspólnym stylem gry. Panel Załogi pokazuje wizerunek przy danych każdej osoby, a przygotowanie wyprawy i HUD nurkowania zawsze pokazują portret aktualnie wybranego nurka. Ten sam mieszkaniec zachowuje ten sam wygląd we wszystkich tych miejscach; portret nie tworzy osobnego statusu ani nie zmienia zdolności postaci.
+
+Odwołania: architektura, sekcje 5.1, 8.1, 12.2 i 12.3; ARD-0001, ARD-0040.
+
+[DOCELOWE] — RELACJE I ŁAŃCUCHY OSOBISTE
+
+Cechy i więzi są obecnie danymi narracyjnymi. Nie realizują jeszcze pełnego systemu relacji, konfliktów, poczucia winy ani osobistych łańcuchów zdarzeń.
+
+[AKTYWNE] — CHOROBY I EPIDEMIE
+
+Decyzja gracza / warunek:
+
+Choroba zawsze ma jawne źródło. Pierwszym pełnym przypadkiem jest Gorączka Zalewowa, na którą nurek może narazić się przez opcjonalną, uprzednio opisaną interakcję z zalanym zapleczem medycznym w R1-06. Nagrodą jest dokładnie 5 jednostek chemikaliów i leków; ta jawna wymiana ryzyko/nagroda nie podlega mnożnikowi ilości łupu profilu trudności. Zła pogoda, brak racji albo słabe schronienie nie tworzą choroby samodzielnie; mogą tylko pogorszyć istniejące narażenie. Zagrożenie nie występuje podczas tutoriala.
+
+Standardowy próg zachorowania wynosi 4 punkty. Pierwsze narażenie w R1-06 daje 3, kontakt z osobą mającą objawy 2, a z osobą w stanie ciężkim 3. Faktycznie otrzymana pełna racja odejmuje 1, połowa nie zmienia wyniku, a brak racji dodaje 1. Niekorzystne połączenie pogody ze słabym schronieniem albo integralnością może dodać najwyżej 1. Oś trudności Społeczeństwo koryguje dzienną presję o -1/0/+1 na profilu Łagodnym/Standardowym/Surowym. Każdy składnik jest widoczny przed zablokowaniem planu albo w raporcie.
+
+Narażenie pozyskane w dniu N nie rozwija objawów tej samej nocy. Dzień N+1 jest pełnym oknem reakcji: gracz może przeznaczyć lek na profilaktykę, zapewnić pełną rację, odizolować osobę albo przyjąć ryzyko. Dopiero koniec tego dnia porównuje jawną presję z progiem. Wynik poniżej progu usuwa narażenie; wynik równy albo wyższy powoduje objawy od kolejnego planowania.
+
+Przebieg ma pięć etapów:
+
+- Narażenie — 100% pracy, nurkowanie dozwolone z ostrzeżeniem, brak zakaźności.
+- Objawy — 65% pracy, nurkowanie zablokowane, przypadek zakaźny.
+- Stan ciężki — brak pracy i nurkowania, zakaźność oraz 15 punktów utraty zdrowia za nierozliczony dzień.
+- Rekonwalescencja — jeden pełny dzień, 80% pracy, nurkowanie zablokowane i brak zakaźności.
+- Odporność — trzy dni pełnej sprawności i ochrony przed ponownym przypadkiem tej samej choroby.
+
+Znany przypadek w Objawach albo Stanie ciężkim leczony w Lecznicy przechodzi do Rekonwalescencji. Profilaktyka Narażenia usuwa je przed pojawieniem się objawów. Bez leku dwa kolejne dni izolacji, odpoczynku od pracy i faktycznie otrzymanych pełnych racji prowadzą naturalnie do Rekonwalescencji; w Stanie ciężkim utrata zdrowia nadal działa do dnia poprawy. Choroba nie ma osobnego rzutu śmierci — zgon następuje wyłącznie wtedy, gdy jawna utrata zdrowia sprowadzi zdrowie do zera.
+
+Widoczny skutek i feedback:
+
+Karta mieszkańca pokazuje nazwę, etap, presję, zakaźność, wpływ na pracę i nurkowanie, zaplanowaną izolację lub terapię oraz prognozę końca dnia. Przydział do pracy korzysta z rzeczywistego mnożnika etapu i wskazuje ryzyko kontaktu. Raport zachowuje kolejno źródło, ochronę, kontakt, zmianę etapu, leczenie, utratę zdrowia oraz początek albo koniec epidemii.
+
+Transmisja używa faktycznego dziennika pracy. Znana zakaźna osoba może narazić najwyżej jednego rzeczywistego współpracownika dziennie; osoba bez realnej pracy może utworzyć najwyżej jeden słabszy kontakt wspólnotowy. Jeden cel otrzymuje najwyżej jedno narażenie kontaktowe dziennie, a cała osada najwyżej `max(1, ceil(liczba żywych i obecnych / 4))`. Nowy przypadek nie zakaża dalej tej samej nocy. Kolejność wyboru jest stabilna i ponowne wczytanie nie zmienia wyniku.
+
+Izolacja awaryjna jest zawsze dostępna bez budynku i leku, lecz wyłącza pracę oraz nurkowanie. Usuwa kontakty zawodowe i ogranicza kontakt wspólnotowy. Poziom III Lecznicy naprawdę uruchamia formalną Izolatkę: formalnie odizolowana osoba nie jest źródłem ani celem nowej transmisji kontaktowej. Izolacja nie usuwa narażenia nabytego wcześniej ani oczekującego na nocne rozliczenie. Miejsca izolacji są pojemnością poziomu budynku, a nie skutkiem samej nazwy.
+
+Lecznica korzysta z jednej kolejki obejmującej obrażenia, Objawy, Stan ciężki i profilaktykę. Domyślny priorytet to bezpośrednie zagrożenie życia, najniższe zdrowie i ciężkie obrażenia, Objawy, a na końcu Narażenie; gracz może zmienić kolejność przed blokadą planu. Jedna osoba zajmuje jeden slot pacjenta i zużywa najwyżej jedną jednostkę chemikaliów i leków na dzień, nawet jeżeli jest jednocześnie ranna i chora. Medyk otrzymuje praktykę tylko za rzeczywiście zastosowaną opiekę.
+
+Epidemia rozpoczyna się, gdy liczba osób w Objawach albo Stanie ciężkim osiągnie `max(2, ceil(liczba żywych i obecnych / 3))`. Rozpoczęcie odejmuje jednorazowo dokładnie 6 Nadziei. Stan trwa do zakończonego dnia bez zakaźnego przypadku; pełne opanowanie dodaje jednorazowo dokładnie 4 Nadziei. Te dwie zmiany nie podlegają ogólnemu mnożnikowi Nadziei profilu trudności. Nie ma codziennej kary za ten sam epizod, a aktywna epidemia ogranicza dokładanie kolejnego ciężkiego zdarzenia i preferuje oferty pomocy medycznej.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+Choroba współistnieje z urazem i przydziałem, nie zastępuje ich pojedynczym statusem. Mieszkaniec zmarły albo trwale nieobecny nie jest źródłem, celem ani składnikiem progu epidemii. Praca już wykonana w zamrożonym dniu nie jest anulowana przez objawy wykryte podczas jego końcowego rozliczenia. Nowe narażenie z wyprawy nie jest leczone wstecz przez kolejkę ułożoną przed tą wyprawą.
+
+Odwołania: ARD-0073; architektura, sekcje 4.6, 5.3, 6, 7.2, 8.1 i 11.
+
+5. PLATFORMA I SZEŚĆ BUDYNKÓW
+
+[AKTYWNE]
+
+Platforma V3 ma sześć stałych, typowanych miejsc — po jednym dla każdego budynku. Aktywny widok bazy jest 2,5D/3D: zardzewiały model platformy, wzburzone morze, deszcz, światło i ruch tworzą scenę, a panele i klikane obszary pozostają stabilną warstwą 2D. Na starcie wszystkie sześć miejsc widać jako zniszczone, rozpoczęte konstrukcje, które gracz dopiero odbudowuje. Gracz nie przenosi obiektów, nie wybiera sąsiedztwa i nie rozbudowuje nowych dzielnic. Po tutorialu wszystkie niewybudowane obiekty poziomu I są dostępne bez drzewa technologicznego; ograniczają je materiały.
+
+Poprawne kliknięcie `Buduj` albo `Rozbuduj` atomowo pobiera pełny koszt i natychmiast aktywuje docelowy poziom wraz z jego wyglądem, stanowiskami oraz biernymi funkcjami. Nie istnieje oczekiwanie na koniec dnia ani procentowy postęp konstrukcji. Aktywacja nie wykonuje automatycznie pracy dziennej: produkcja, połów, leczenie i pozostałe skutki nadal wynikają z obsady oraz rozliczenia zamrożonego planu.
+
+[AKTYWNE] — TRYB ZARZĄDZANIA BAZĄ
+
+Kliknięcie dowolnego miejsca budynku otwiera dużą, lecz mniejszą od ekranu przestrzeń zarządzania. Jej otoczenie jest przezroczyste, dzięki czemu platforma pozostaje widoczna, ale miejsca budynków pod oknem i jego obrzeżami nie przyjmują przypadkowych kliknięć. Okno pozostawia osobny pas dla całego górnego HUD-u oraz wolną przestrzeń dla przycisku `ZAKOŃCZ DZIEŃ`; oba pozostają widoczne i możliwe do użycia bez zamykania budynku. Po lewej stronie okna pozostaje stale widoczna pionowa szyna dokładnie sześciu kafelków, po jednym dla każdego stałego miejsca. Kafelek pokazuje nazwę, poziom lub stan ruiny oraz rozróżnialne bez samego koloru zaznaczenie. Wybranie innego kafelka natychmiast przełącza kontekst bez zamykania okna, dzięki czemu gracz może kolejno porównać i obsłużyć wszystkie budynki.
+
+Panel wybranego budynku zajmuje środek okna: stały nagłówek oraz szeroką przewijaną część `DZIAŁANIE` albo `WYPRAWA`. Po jego prawej stronie, poza jego ramą i analogicznie do lewej szyny budynków, pozostaje osobna wąska szyna z dwoma rozdzielonymi kartami: `OBSADA` — zajętość, osoby na stanowiskach, ich bieżący wkład i przyciski `OBSADŹ`/`ZMIEŃ` — oraz `BUDOWA` lub `ROZBUDOWA` — poziom docelowy, wymagane składniki, aktualnie posiadane ilości, prawdziwy powód blokady i przycisk `ODBUDUJ`/`ROZBUDUJ`. Przy maksymalnym poziomie karta jawnie komunikuje ten stan bez przycisku. Powierzchnie tworzą grafitowo-morską hierarchię z jasnym, kontrastowym tekstem; turkus prowadzi informację i fokus, bursztyn jest zarezerwowany dla głównej decyzji, zieleń potwierdza gotowość, a koral oznacza zagrożenie lub blokadę. Piaskowo-brązowe tła nie stanowią drugiego systemu paneli. Typowa decyzja przy 1280 × 720 pokazuje nagłówek, kluczowe dane i główną akcję bez przewijania; długie katalogi i rozwój mieszkańców zachowują przewijanie wewnątrz treści.
+
+Aktywna kapsuła samouczka pozostaje widoczna ponad otwartym oknem zarządzania. Nadal pokazuje pełny bieżący cel i nie przechwytuje kliknięć ani fokusu, dlatego prowadzi gracza przez właściwy kafelek, zakładkę lub akcję bez blokowania menu, górnego HUD-u i `ZAKOŃCZ DZIEŃ`.
+
+`Esc` i jawny przycisk zamknięcia wracają do platformy oraz oddają fokus miejscu ostatnio wybranego budynku. Kliknięcie przez przezroczyste obrzeże nie zamyka trybu. Fokus klawiatury może przechodzić pomiędzy oknem zarządzania, kontrolkami górnego HUD-u i `ZAKOŃCZ DZIEŃ`; próba przejścia do zasłoniętego miejsca platformy wraca do aktywnego interfejsu. Szyna i panel odczytują istniejący stan sześciu slotów; nie tworzą drugiej listy budynków ani nowych reguł domenowych.
+
+[AKTYWNE] — KOLEJNOŚĆ BUDOWY W NOWEJ KAMPANII
+
+Pierwszego dnia tutorial wymaga Domu Wspólnoty I oraz Stacji Nurkowej I. Drugiego dnia gracz buduje Warsztat Odzysku I; zgodnie ze wspólną regułą obiekt aktywuje się natychmiast, lecz wykona pracę dopiero z obsady później zamrożonego planu. Od początku Aktu II gracz sam wybiera kolejność Chaty Rybackiej, Kuchni i Wędzarni oraz Lecznicy i Suszarni.
+
+Wszystkie sześć obiektów pozostaje na tych samych stałych miejscach. Nowa fabuła nie dodaje siódmego budynku, osobnej elektrowni na pokładzie ani nowej dzielnicy.
+
+[AKTYWNE] — MUZYKA BAZY
+
+Przystani towarzyszy historyczny instrumentalny utwór „Oddech Przystani”. Daje spokojne tło schronienia i pozostawia przestrzeń na czytanie, liczenie zasobów, komunikaty interfejsu oraz diegetyczne znaki dźwiękowe narracji; nie zawiera wokalu ani voice-overu.
+
+Utwór jest długą, bezszwową pętlą bez wyciszenia. Gra wyłącznie wtedy, gdy aktywna jest scena Bazy — także pod jej raportami i panelami — zatrzymuje się razem z grą pod menu pauzy, wznawia z tego samego miejsca po kontynuacji oraz milknie po przejściu do intro, menu, nurkowania albo sceny terminalnej. Ponowne utworzenie sceny Bazy rozpoczyna utwór od początku. Pętla nie interpretuje samodzielnie pogody, stanu budynków ani kampanii.
+
+Odwołania: ARD-0049, ARD-0062, ARD-0066, ARD-0090, ARD-0091, ARD-0093; architektura, sekcje 2, 12.1 i 12.2.
+
+Najechanie lub fokus klawiatury na miejsce budynku otacza miękką turkusową poświatą aktualnie widoczną sylwetkę ruiny albo bieżącego poziomu zamiast rysować niebieskawe prostokątne pole. Wciśnięcie wzmacnia tę samą poświatę ciepłym kolorem, a otwarcie Trybu Zarządzania Bazą usuwa ją na czas pracy w oknie i po zamknięciu przywraca wskazanie fokusowanego miejsca. Prowadzenie tutorialu używa tej samej poświaty rzeczywistej sylwetki w bursztynie zamiast pomarańczowego prostokąta miejsca i utrzymuje ją do wykonania bieżącego kroku. Po udanej komendzie nowy poziom natychmiast zastępuje ruinę albo poprzedni wariant; nie istnieje sylwetka oczekującej budowy ani komunikat zakolejkowania konstrukcji.
+
+Sztorm uszkadza globalną integralność platformy, nie pojedyncze budynki. Budynek aktywowany podczas planowania może zostać od razu obsadzony i wejść do później zamrożonej migawki tego samego dnia. Panel slotu pokazuje rzeczywisty efekt danych, prognozę obsady, premię specjalisty i powód efektu zero.
+
+Obsadę zmienia się z karty konkretnego stanowiska przez kafelkowy wybór mieszkańców. Każdy kafelek pokazuje portret, imię, poziom, profesję oraz gotowość ocenioną dla właśnie wybieranego stanowiska. Jeszcze przed kliknięciem gracz widzi jednoznacznie, czy po przydziale osoba będzie pracować; niezdolny kandydat ma wkład 0, wyłączony wybór i dokładny powód blokady. Wszystkie stanowiska budynków, w tym Obsługa Stacji, korzystają ze wspólnych wymagań pracy. Wymagania nurkowania dotyczą wyłącznie bezpośredniego wyboru osoby do wyprawy, dlatego mieszkaniec zdolny do zwykłej pracy może obsłużyć Stację, lecz nie może zostać wybrany na nurka. Osoba czasowo niezdolna, która już zajmuje stanowisko, zachowuje wyróżniony, możliwy do inspekcji kafelek, przydział oraz zerowy wkład. Kliknięcie zdolnego kafelka natychmiast obsadza stanowisko, w razie potrzeby przenosząc osobę z innego budynku. Osobna akcja zwalnia bieżące stanowisko, a `Wróć`, click-outside lub `Esc` wracają do panelu wybranego budynku bez zmiany.
+
+Po najechaniu myszą na wybudowany budynek pojawia się nad nim zwarta tabliczka obsady. Pokazuje nazwę aktywnego poziomu, liczbę zajętych stanowisk, portrety przypisanych osób, puste ramki wolnych stanowisk oraz imiona obsady; przy braku pracowników jednoznacznie informuje `NIEOBSADZONE`. Po opuszczeniu miejsca kursorem tabliczka znika. Osoba czasowo niezdolna nadal jest pokazywana jako przypisana, ale tabliczka dodaje tekstowe ostrzeżenie zamiast sugerować wolne stanowisko. Ruina i niewybudowane miejsce nie mają tabliczki także po najechaniu. Informacja porusza się razem z platformą, nie przechwytuje kliknięć miejsca budynku i nie zastępuje szczegółów ani komend w panelu zarządzania.
+
+Szczegóły mieszkańca rozdzielają stany, cechy i kompetencje. Najechanie myszą albo fokus klawiatury na nazwę stanu pokazuje jego znaczenie, bieżącą wartość i progi pracy oraz nurkowania; kompetencja pokazuje pełny zakres działania i aktualny efekt poziomu. Cechy osobowości są jawnie opisane jako narracyjne i w bieżącej wersji nie zmieniają statystyk ani wyniku pracy. Te same objaśnienia są dostępne w selektorze obsady, karcie mieszkańca, rozwoju w Domu Wspólnoty oraz profilu Nurka.
+
+[AKTYWNE] — INTEGRALNOŚĆ PODCZAS CZARNEGO FRONTU
+
+Czarny Front nadal sprawdza jedną globalną integralność. Nie wymaga naprawiania sześciu osobnych pasków budynków; warunek 100% i odliczanie opisuje sekcja 9.
+
+[AKTYWNE] — SCHRONIENIE
+
+Bez Domu Wspólnoty Przystań ma 3 miejsca schronienia. Aktywny Dom zastępuje tę wartość pojemnością swojego poziomu; nie dodaje jej do trzech bazowych miejsc. Każda osoba bez dachu odejmuje 4 Nadziei.
+
+5.1. Stacja Nurkowa
+
+Poziom I — Drabina i lina:
+
+- 1 stanowisko;
+- możliwość nurkowania po wybraniu wolnego, zdolnego mieszkańca w przygotowaniu wyprawy; Stacja nie wymaga stałej obsady, aby nurkować;
+- zdolna Obsługa Stacji daje wybranemu nurkowi +5% udźwigu łupu;
+- 6 slotów plecaka;
+- bazowy kombinezon, naprawa +30.
+
+Poziom II — Sprężarka i wyciągarka:
+
+- 2 stanowiska: Obsługa Stacji i Operator;
+- 10 slotów;
+- możliwość automatycznego ratunku przy głównej linie, ale tylko ze zdolną osobą przypisaną do drugiego stanowiska Operatora;
+- 10% redukcji bazowych uszkodzeń dzięki jakości kombinezonu;
+- 12% redukcji tempa zimna; naprawa +35.
+
+Poziom III — Sonar i komora ciśnieniowa:
+
+- nazwa poziomu nie oznacza aktywnego sonaru;
+- 2 stanowiska: Obsługa Stacji i Operator; 14 slotów;
+- możliwość ustawienia jednej boi na wyprawę;
+- 20% redukcji bazowych uszkodzeń, 24% redukcji tempa zimna; naprawa +40.
+
+Poziom IV — Dzwon głębinowy:
+
+- nazwa poziomu nie oznacza osobnego wyjścia;
+- 3 stanowiska: Obsługa Stacji, Operator, Technik;
+- 16 slotów;
+- start z ustawionej boi;
+- oznaczanie ciężkich obiektów;
+- 30% redukcji bazowych uszkodzeń, 36% redukcji tempa zimna; naprawa +45;
+- zdolny Technik daje dwa ładunki napraw zamiast jednego i mnoży obrażenia kombinezonu przez 0,9.
+
+Poziom Stacji nie dodaje tlenu. Pojemność wyprawy to:
+
+`osobisty tlen × mnożnik specjalizacji + (pojemność butli - 100) + płaski bonus specjalisty`.
+
+Igor z Butlą I ma 125 jednostek: `100 × 1,10 + 0 + 15`.
+
+Bazowy rytm tlenu zapewnia Igorowi z Butlą I co najmniej pięć minut ciągłego zwykłego pływania także na profilu Surowym; na Standardzie zapas wystarcza na około sześć minut takiego ruchu. Bezczynność zużywa tlen wolniej, natomiast sprint, obciążenie, prąd i holowanie skracają realny czas wyprawy. Butle II–III oraz rozwój osobistego tlenu wydłużają czas stopniowo zamiast otwierać osobny licznik sesji.
+
+Tempo Stacji skaluje zasięg Operatora `440 × tempo` oraz ilość naprawy kombinezonu; oba wyniki są zamrażane w przygotowaniu wyprawy. Szansa ratunku, ładunki naprawcze, pojemność plecaka i bierne parametry poziomu pozostają bez zmian.
+
+W przygotowaniu wyprawy lista wszystkich obecnych mieszkańców jest stale widoczna. Gracz wybiera z niej wolną osobę, sprawdza jej profil i wyposażenie, a potem naciska `NURKUJ`. Osoba już obsadzająca budynek nie może równocześnie nurkować. Obsada Stacji pozostaje wspólna z pozostałymi budynkami, lecz tylko tu jest opcjonalna: jej pierwszy, zdolny pracownik dodaje wybranemu nurkowi dokładnie +5% udźwigu, co jest widoczne przed startem i obowiązuje przez całą wyprawę.
+
+5.2. Chata Rybacka
+
+- Poziom I: 1 stanowisko, 5 jedzenia na pełną jednostkę pracy, presja 0,016 za uzyskaną jednostkę.
+- Poziom II: 2 stanowiska, 5 jedzenia, presja 0,010.
+- Poziom III: 2 stanowiska, 6 jedzenia, presja 0,008.
+- Poziom IV: 3 stanowiska, 6 jedzenia, presja 0,006.
+- Rybak dodaje +1 do nominalnego wyniku.
+
+Wynik składa wydajność osoby, lokalne tempo Chaty, integralność i presję łowiska. Obsadzona Chata regeneruje 0,10 presji przed połowem, a nieobsadzona 0,15. Przy pełnej sprawności, tempie Normalnym i dobrej integralności długoterminowy połów z jednym Rybakiem ma utrzymywać około 5–6 jedzenia na poziomie I, 8–10 na II, 11–13 na III oraz 15–18 na IV. Chata pokrywa dzięki temu znaczącą część racji, ale wcześniejsze poziomy nadal wymagają zapasów z wypraw albo oszczędności Kuchni.
+
+[DOCELOWE] — EKSPEDYCJE ŁODZIĄ
+
+Decyzja gracza / warunek:
+
+Chata Rybacka II odblokowuje jedną równoległą ekspedycję łodzią. Gracz wybiera dowódcę, trasę oraz czas 2, 3 albo 4 dni. Pełny prowiant równy `czas × food_per_adult` jest pobierany przy wypłynięciu bez zniżki Kuchni; później dowódca nie otrzymuje bazowej racji. Wypłynięcie jest możliwe tylko wtedy, gdy w Przystani pozostanie co najmniej jedna osoba. Dowódca wymaga co najmniej 50% zdrowia, głodu <65, zmęczenia <85, morale >=20 oraz braku aktywnego przypadku choroby; zakończona odporność jest dozwolona. Ekspedycja nie może kończyć się w dniu nadejścia znanego Czarnego Frontu ani później.
+
+Widoczny skutek i feedback:
+
+- 2 dni — najmniejszy koszt i ryzyko, głównie jedzenie oraz podstawowe materiały, 0–1 kandydatura;
+- 3 dni — wariant zbalansowany, szersza pula zapasów, 0–1 kandydatura;
+- 4 dni — najwyższy koszt i ryzyko, rzadsze materiały, 0–2 kandydatury.
+
+Poziom III Chaty ogranicza ryzyko słabego wyniku i zawęża prezentowany przed wypłynięciem zakres możliwych nagród. Poziom IV pozwala wskazać priorytet `ZAPASY` albo `OCALALI` oraz jako jedyny może utworzyć drugą kandydaturę. Nadal trwa najwyżej jedna ekspedycja łodzią, aby decyzja o utracie pracownika na kilka dni nie została rozmyta przez równoległą flotę.
+
+Przed wypłynięciem panel pokazuje dzień powrotu, pełny koszt, możliwy zakres łupu i nieobecność dowódcy. Rezultat oraz najwyżej dwie kandydatury są deterministycznie zamrażane przy starcie. Profesja, poziom, kompetencje, długość, priorytet i poziom Chaty wpływają na rozkład przez jedną wersjonowaną definicję balansu.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+W pierwszym wykonywalnym pionie dowódca zawsze wraca z co najmniej 1 zdrowia, o ile kampanii wcześniej nie zakończy Czarny Front albo inny stan terminalny. Porażka ekspedycji oznacza mały albo zerowy łup, zmęczenie, głód, spadek morale lub uraz, ale nie śmierć. Ekspedycja łodzią może trwać równolegle ze zwykłym nurkowaniem, lecz ta sama osoba nie może uczestniczyć w obu. Dowódca pozostaje żyjącym członkiem rosteru i rezerwuje miejsce, ale do powrotu nie pracuje, nie nurkuje, nie je, nie zajmuje nocnego schronienia, nie jest leczony i nie uczestniczy w transmisji chorób bazy.
+
+Odwołania: ARD-0081, ARD-0082; architektura, sekcje 4.7, 6, 8.1 i 11.
+
+[AKTYWNE]
+
+5.3. Kuchnia i Wędzarnia
+
+- Poziom I: 1 stanowisko, oszczędność 8%.
+- Poziom II: 1 stanowisko, 14%.
+- Poziom III: 2 stanowiska, 20%.
+- Poziom IV: 2 stanowiska, 26%.
+- Każdy zdolny Kucharz dodaje 2 punkty procentowe.
+
+Kuchnia nie tworzy jedzenia ani osobnego magazynu posiłków. Suma oszczędności poziomu i premii Kucharzy jest mnożona przez lokalne tempo Kuchni, ograniczana do 75% i zmniejsza koszt racji podczas tego samego rozliczenia.
+
+5.4. Warsztat Odzysku
+
+- Poziom I: 1 stanowisko, naprawa 3, kolejka 1, bazowa moc produkcji 100 punktów; Latarnia II.
+- Poziom II: 1 stanowisko, naprawa 5, kolejka 2, bazowa moc produkcji 100 punktów; Butla II.
+- Poziom III: 2 stanowiska, naprawa 7, kolejka 3, bazowa moc produkcji 200 punktów; jeden ciężki odzysk; odblokowanie Butli III po posiadaniu Butli II.
+- Poziom IV: 3 stanowiska, naprawa 10, kolejka 4, bazowa moc produkcji 300 punktów.
+- Mechanik dodaje +1 punkt naprawy.
+
+Dodatni postęp produkcji blokuje tego dnia ciężki odzysk i automatyczną naprawę. Jeżeli produkcja nie wykonała realnej pracy, Warsztat może przejść do jednego ciężkiego odzysku, a następnie do naprawy. Systemowy zwrot, anulowanie albo samo sprawdzenie zablokowanego zlecenia nie są pracą. Każde zlecenie wymaga liczby punktów zapisanej w swojej recepturze, a dzienna moc wynosi `stanowiska produkcyjne × 100 × lokalne tempo`; kolejka przechodzi po FIFO, a niewykorzystany postęp zostaje w zleceniu. Warsztat aktywowany podczas planowania może pracować tego samego dnia, jeżeli zostanie obsadzony przed zamrożeniem planu.
+
+Receptury mają stałe koszty i nie są skalowane profilem trudności. Łom i ładunek naprawczy pozostają częścią zestawu Stacji, a nie zwykłymi recepturami.
+
+Automatyczna naprawa pobiera bazowo 1 złom raz za całe udane dzienne uruchomienie naprawy, przed mnożnikiem trudności i error diffusion; koszt nie zależy od liczby pracowników ani punktów integralności.
+
+Materiały są pobierane natychmiast przy dodaniu zlecenia. Kolejka zachowuje kolejność, dokładny zarezerwowany koszt i częściowy postęp między dniami oraz zapisami. Brak zdolnej obsady albo nieaktywny Warsztat odracza zlecenie zamiast je usuwać; późniejsza zmiana receptury nie zmienia już przyjętego kosztu. Panel pokazuje pozycję, koszt, postęp i faktyczny bloker. Szczegół danych i migracji: architektura, sekcje 4.5, 6 i 11.3.
+
+Panel Warsztatu pokazuje odblokowany fabularnie katalog receptur jako osobne, kwadratowe kafelki. Widoczne są także przedmioty wymagające wyższego poziomu Warsztatu, aby gracz mógł wcześniej poznać kierunek rozwoju; wybór kafelka pokazuje opis, pełny koszt, wymagany poziom, punkty pracy i faktyczny powód blokady. Przedmiot posiadany, wykonany albo już zakolejkowany pozostaje widoczny z jednoznacznym statusem. Dodanie następnej poprawnej receptury automatycznie dodaje następny kafelek, bez ręcznego dopisywania akcji w panelu. Nieodblokowane zlecenia fabularne pozostają ukryte, aby nie zdradzać przyszłych celów.
+
+[AKTYWNE] — ZLECENIA FABULARNE WARSZTATU
+
+Nóż ratowniczy jest specjalnym krokiem trzeciego dnia tutoriala. Po przydzieleniu pracownika gracz przechodzi przez panel Warsztatu, zatwierdza koszt i natychmiast otrzymuje trwałe odblokowanie noża, aby móc zanurkować jeszcze tego samego dnia. To jedyny wyjątek od zwykłego rozliczania produkcji na końcu dnia.
+
+Regulator R-3 jest aktywnym jednorazowym zleceniem kampanii. Wymaga Warsztatu II, 6 złomu, 3 tkanin i gumy, 2 części technicznych oraz 200 punktów pracy. Koszt jest stały, jawny i nieskalowany profilem trudności. Korzysta ze zwykłej kolejki i realnej pracy Warsztatu; przy jednym slocie produkcyjnym oraz tempie Normalnym trwa dwa dni pracy. Każdy dzień dodatniego postępu jest dniem bez automatycznej naprawy platformy, co tworzy bezpośredni konflikt z odliczaniem Czarnego Frontu.
+
+Po aktywacji C-4 gracz może wykonać opcjonalny Rozdzielacz Wspólnej Linii. Wymaga Warsztatu III, 10 złomu, 5 tkanin i gumy, 4 części technicznych oraz 400 punktów pracy. Koszt jest stały, jawny i nieskalowany profilem trudności. Przy Warsztacie III oraz tempie Normalnym zlecenie trwa dwa dni pracy. Gotowy Rozdzielacz nie tworzy energii i nie działa automatycznie: trzeba zabrać go na wyprawę i zamontować przy C-4.
+
+5.5. Lecznica i Suszarnia
+
+[AKTYWNE]
+
+- Poziom I: 1 stanowisko, 1 pacjent, bazowo +12 zdrowia.
+- Poziom II: 1 stanowisko, 2 pacjentów, +18.
+- Poziom III: 2 stanowiska, 4 pacjentów, +24.
+- Poziom IV: 2 stanowiska, 6 pacjentów, +32.
+- Medyk dodaje +5 do leczenia każdego pacjenta.
+
+Lecznica korzysta ze wspólnej kolejki osób wymagających leczenia zdrowia, urazów, Objawów, Stanu ciężkiego albo profilaktyki Narażenia. Jedna osoba zajmuje jeden slot i zużywa najwyżej 1 jednostkę chemikaliów i leków, nawet gdy łączy uraz z chorobą. Lokalna procedura skaluje ilość odzyskanego zdrowia przed istniejącym mnożnikiem trudności; nie skaluje pojemności, kosztu leku ani przejść choroby.
+
+[AKTYWNE]
+
+Poziom III uruchamia formalną Izolatkę dla dwóch osób, a poziom IV dla czterech. Formalna izolacja nie pobiera leku za samo odseparowanie i całkowicie zatrzymuje transmisję od wybranej osoby. Leczenie oraz profilaktyka nadal zajmują zwykły slot pacjenta i zużywają jedną dawkę. Wspólna kolejka, priorytet i zasada jednego kosztu są opisane w sekcji 4.
+
+5.6. Dom Wspólnoty
+
+- Poziom I: 4 miejsca schronienia, 1 stanowisko, +1 Nadziei na zdolnego pracownika; wydawanie punktów rozwoju.
+- Poziom II: 7 miejsc, 1 stanowisko, +2; formalna druga specjalizacja.
+- Poziom III — Radiostacja: 11 miejsc, 2 stanowiska, +3.
+- Poziom IV: 16 miejsc, 3 stanowiska, +5.
+- Organizator dodaje +2 Nadziei.
+
+Schronienie działa bez obsady. Aktywna Nadzieja wymaga zdolnych pracowników, a lokalne tempo koryguje poziomowy wkład każdego z nich o -1/0/+1; premia Organizatora pozostaje bez zmian. Zdolna obsada wykonuje realną pracę także wtedy, gdy Ostrożny wkład na poziomie I wynosi 0.
+
+Panel aktywnego Domu pokazuje całą obecną załogę jako wybieralne kafelki z portretem, poziomem, przydziałem oraz wyróżnieniem niewydanych punktów, gotowego awansu zawodowego albo talentu do wyboru. Wybranie osoby otwiera w tej samej przestrzeni zarządzania jej szczegóły, ogólne PD, statystyki, kompetencje, praktykę wszystkich ścieżek i talenty formalnych profesji. Gracz może tam rozdzielić punkty zdobyte za poziom pomiędzy zdrowie, tlen, udźwig lub pasywne kompetencje; wybór osoby nie zmienia jej obsady budynku. Dom II udostępnia w tym samym widoku formalne nadanie jednej dodatkowej specjalizacji oraz trwały wybór jednego z dwóch talentów opanowanej profesji.
+
+[DOCELOWE] Dom Wspólnoty I jest miejscem jawnej decyzji `ODEŚLIJ Z PRZYSTANI`; globalna karta Załogi może otwierać ten sam przepływ, ale nie posiada osobnej reguły, limitu ani kosztu.
+
+[AKTYWNE] — ŁĄCZNOŚĆ PRZYSTANI
+
+Po załączeniu złącza J-7 podstawowy moduł radiowy w Domu Wspólnoty I zaczyna odbierać i wysyłać krótkie transmisje. To przez niego Przystań po raz pierwszy kontaktuje się z Platformą Północną.
+
+Poziom III rzeczywiście uruchamia pełną Radiostację: stabilne połączenie dalekiego zasięgu, ciągłą koordynację podczas Czarnego Frontu oraz możliwość utrzymania Wspólnej Linii. Nie dodaje specjalizacji Radiowca. Do finałowego nadawania potrzebny jest aktywny Dom III i co najmniej jedna zdolna osoba; jej tożsamość zależy od stanu załogi.
+
+[DOCELOWE] — POZA ZAKRESEM DOMU
+
+Sąsiedztwo, segmenty, pływaki, uszkodzenia pojedynczych budynków, aktywne prawo osady, radiowe namierzanie źródeł i pogrzeby wymagają osobnych pionów. Nie są ukrytymi efektami nazw poziomów.
+
+6. NURKOWANIE
+
+[AKTYWNE]
+
+Gracz steruje jednym nurkiem w ciągłym świecie 2D. Płytkie Dachy Umarłego Miasta są czytelne dzięki światłu docierającemu z powierzchni, natomiast wraz z głębokością światło otoczenia płynnie zanika. Podstawowe ograniczenia to tlen, zdrowie, stan kombinezonu, zimno, światło, sloty, udźwig, prądy, hałas, zagrożenie i droga powrotna.
+
+Kamera pozostaje stabilnie wycentrowana na nurku i używa stałego zbliżenia `1,20`. Przy bazowym obrazie `1280 × 720` pokazuje około `1067 × 600` jednostek świata, dzięki czemu wyprawa skupia się na najbliższym oświetlonym otoczeniu. Sprint nie oddala obrazu, a interfejs zachowuje własny rozmiar niezależnie od kamery.
+
+Sylwetka nurka zachowuje czytelny, chłodny brzeg także w najciemniejszych partiach, bez tworzenia dodatkowego światła ani zmiany reakcji zagrożeń. Zwykły oddech wypuszcza pęcherzyki przy automacie, a rzeczywisty napęd względem wody krótko wzburza dwa ślady drobnej zawiesiny za płetwami; bierny dryf z prądem nie udaje pracy nóg. Potwierdzona praca lub użycie narzędzia dostaje krótki akcent przy dłoni, trafienie — zwięzły impuls na sylwetce, przeciek — pęcherzyki przy zaworze butli, a holowanie subtelnie zmienia ciężar pozy. Sygnały wyłącznie pokazują już rozstrzygnięty stan albo wynik i nie zmieniają hałasu, zasięgu, czasu interakcji, obrażeń ani ruchu. Profile jakości zmieniają gęstość efektów, a ograniczenie ruchu zmniejsza ich ilość, czas i amplitudę bez usuwania informacji o kierunku pływania, przecieku lub działaniu.
+
+Sterowanie:
+
+- `WASD` albo strzałki — ruch;
+- `SHIFT` — szybsze pływanie kosztem tlenu i hałasu;
+- `E` lub `SPACJA` — interakcja;
+- `R` — próba naprawy; holowanie ją blokuje, a tylko udana naprawa uszkodzonego kombinezonu zużywa jeden ładunek i generuje hałas;
+- `F` — włączenie albo wyłączenie wyposażonej latarni; bez wyposażonej latarni akcja nie tworzy światła;
+- `I` — plecak i porzucanie części stosu.
+- `1` — wybór Noża ratowniczego;
+- `2` — wybór pistoletu harpunowego, jeżeli został zabrany na wyprawę;
+- `LPM` — atak wybranym narzędziem w kierunku kursora.
+
+Akcje klawiaturowe są remapowalne, a widoczne podpowiedzi, w tym ostrzeżenie przecieku, zawsze pokazują aktualnie przypisany klawisz. Atak pozostaje przypisany do `LPM`, ponieważ jego kierunek wynika z pozycji kursora.
+
+Plecak ma równoległy limit typów oraz kilogramów. Bazowy udźwig mieszkańca wynosi 18 kg. Wagi jednej sztuki: jedzenie 1,0 kg, deski 1,2, złom 1,5, tkaniny i guma 0,8, części techniczne 2,0, chemikalia i leki 0,7. Pełne obciążenie podnosi zużycie tlenu maksymalnie o 32%. Nie istnieje trzeci, ogólny limit liczby sztuk w slocie. Szczegół danych: architektura, sekcje 5 i 11.3.
+
+Kontener pozwala wybrać rodzaj i liczbę sztuk. Niewzięta reszta pozostaje w tym samym miejscu. Porzucony z plecaka stos tworzy fizyczny, trwały pakunek; częściowe ponowne podjęcie zachowuje dokładną resztę.
+
+[AKTYWNE] — NÓŻ RATOWNICZY
+
+Podczas pierwszej wyprawy drugiego dnia nurek nie ma noża. Widzi zablokowane sieciami i roślinnością przejście przy kablu, ale nie może go sforsować. Trzeciego dnia tutorial uczy obsługi Warsztatu i natychmiast odblokowuje Nóż ratowniczy.
+
+Od chwili wykonania nóż jest trwałym, nieutracalnym narzędziem kampanii. Nie zajmuje slotu ani udźwigu i umożliwia wymagane interakcje z sieciami oraz roślinnością.
+
+Po wybraniu klawiszem `1` nóż służy także do szybkiego, cichego ataku w krótkim zasięgu w kierunku kursora. Nie zużywa amunicji. Atak nie zastępuje kontekstowego przecinania przeszkód przez `E` lub `Spację`.
+
+[AKTYWNE] — PISTOLET HARPUNOWY I WALKA
+
+Pistolet harpunowy jest trwałym wyposażeniem wytwarzanym w Warsztacie II za 6 złomu, 3 tkaniny i gumę oraz 2 części techniczne. Zlecenie wymaga 200 punktów pracy. Po wyposażeniu i wybraniu klawiszem `2` nurek celuje kursorem, a `LPM` wystrzeliwuje harpun w tym kierunku.
+
+Każda wyprawa zaczyna się z sześcioma harpunami. Amunicja odnawia się podczas przygotowania kolejnej wyprawy i nie jest osobnym zasobem magazynu. Strzał ma większy zasięg i obrażenia niż nóż, ale emituje znacznie więcej hałasu. Atak jest zablokowany podczas holowania oraz pod modalnymi decyzjami wyprawy.
+
+Aktywne zagrożenia mają zdrowie, reagują na trafienie i mogą zostać wyeliminowane. Pokonany przeciwnik znika do końca bieżącej próby. Ponowienie tutorialowej próby albo rozpoczęcie późniejszej wyprawy odtwarza go; zabicie nie zmienia trwałego świata i nie daje łupu.
+
+Wytworzony pistolet może zostać utracony ze zmarłym nurkiem i odzyskany z plecaka na tych samych zasadach co pozostałe ulepszone wyposażenie.
+
+[AKTYWNE] — POZOSTAŁE NARZĘDZIA I SPRZĘT
+
+- łom — drzwi, skrzynie, skróty i uwolnienie Leona;
+- 1–2 ładunki naprawcze — naprawa kombinezonu i hałas;
+- boja — od Stacji III, jedna na wyprawę;
+- worek wypornościowy — od Stacji IV, oznaczenie ciężkiego obiektu.
+
+Latarnia i butla są wybieralnym sprzętem kampanii. Awaryjne warianty I są dostępne od początku i nie przepadają. Latarnia I daje słabszy, krótszy krąg światła, a Latarnia II produkowana w Warsztacie I świeci wyraźnie dalej i mocniej. Wyposażoną latarnię można w dowolnym momencie aktywnej wyprawy włączyć albo wyłączyć; jej rzeczywisty stan jest stale widoczny w HUD-zie. Bez latarni w slocie światła nurek nie może korzystać z oświetlenia. Warsztat produkuje także Butle II–III. Ulepszenie zabrane przez zmarłego nurka pozostaje w odzyskiwalnym plecaku w miejscu śmierci.
+
+[AKTYWNE] — WIDOCZNOŚĆ WRAZ Z GŁĘBOKOŚCIĄ
+
+Decyzja gracza / warunek:
+
+W pierwszym, płytkim regionie gracz może bezpiecznie poznawać podstawy nurkowania bez używania latarni. Niżej światło otoczenia zanika płynnie, dlatego gracz decyduje, kiedy włączyć wyposażoną latarnię i zaakceptować widoczność dla zagrożeń reagujących na bliskie światło.
+
+Widoczny skutek i feedback:
+
+Otoczenie stopniowo ciemnieje wraz z aktualną głębokością, niezależnie od wyposażenia. Włączona Latarnia I tworzy mniejszy krąg widzenia, a Latarnia II większy i jaśniejszy. HUD zawsze pokazuje model, stan WŁ./WYŁ. i aktualny klawisz przełączania.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+Ciemność pozostaje miękką barierą, nie niewidzialnym zakazem wejścia do regionu. Wyłączenie latarni usuwa jej lokalne światło i przestaje wzbudzać zagrożenia samym świeceniem, ale nie rozjaśnia głębokiego otoczenia. Próba użycia bez wyposażonej latarni daje czytelny komunikat i nie zmienia sesji.
+
+Odwołania: ARD-0003, ARD-0007, ARD-0015, ARD-0040; architektura, sekcje 5.2, 5.5, 9.3, 12.1 i 12.3.
+
+[AKTYWNE]
+
+6.1. Powrót i śmierć
+
+Normalny powrót wymaga fizycznego dotarcia do aktywnej liny: głównej albo ustawionej przy wybranej boi. Nie ma ręcznej komendy natychmiastowego wynurzenia.
+
+Operator działa tylko wtedy, gdy Stacja II-IV ma zdolną do pracy, inną osobę przypisaną do drugiego stanowiska i zamrożoną w setupie wyprawy, start nastąpił z głównego wejścia, a utrata przytomności nastąpiła w zamrożonym zasięgu 330/440/550 jednostek dla tempa Ostrożnego/Normalnego/Intensywnego. Sam poziom Stacji nie zapewnia ratunku. Szansa wynosi 65% na Łagodnym, 50% na Standardzie i 35% na Surowym. Sukces zostawia nurka z 1–35 zdrowia, urazem i zerowym tlenem, a zwykły niesiony łup przepada bez odzyskiwalnego plecaka.
+
+Każde wyzerowanie tlenu podczas obowiązkowej wyprawy tutorialowej resetuje lokalną próbę bez wyniku i bez zakończenia dnia. Po tutorialu śmierć jest trwała: postać ginie, zabrany sprzęt i łup pozostają w odzyskiwalnym plecaku w miejscu śmierci, Nadzieja spada, a kampania trwa z nieutracalnym sprzętem podstawowym. Gra zapamiętuje miejsce zgonu jako dane, ale nie renderuje osobnego ciała. Szczegół trwałego stanu: architektura, sekcje 5 i 11.3.
+
+[AKTYWNE] — STAŁE URZĄDZENIA FABULARNE
+
+Złącze J-7, terminal Archiwum, Generator R-3 i Rozdzielnia C-4 są stałymi urządzeniami świata, nie przedmiotami plecaka. Ich uruchomienie trafia do kampanii dopiero przez zakończony wynik wyprawy. Po tutorialu aktywacja może pozostać trwała również wtedy, gdy nurek zginie podczas późniejszej drogi powrotnej; śmierć nadal zachowuje wszystkie własne konsekwencje. W tutorialu nieudana próba nie utrwala żadnej zmiany.
+
+Aktywny pion obejmuje Złącze J-7, terminal Zalanego Archiwum w R1-09, Generator R-3 w Elektrowni R3-04, Rozdzielnię C-4 oraz opcjonalny montaż Rozdzielacza w R4-06. J-7 pojawia się od dnia 3 i rozpoczyna jeden jawny licznik Czarnego Frontu: 15 dni na Łagodnym, 12 na Standardowym i 10 na Surowym; profil własny wyprowadza termin z osi pogody. Dzień aktywacji pokazuje pełną wartość, a każdy następny ukończony dzień odejmuje dokładnie jeden niezależnie od wyprawy i kryzysu. Od dnia 4 gracz może otworzyć łomem terminal Archiwum i po zatwierdzonym wyniku wyprawy przesłać mapę Wspólnej Linii do Przystani. Mapa nie jest przedmiotem plecaka. Po transmisji gracz diagnozuje R-3, wykonuje Regulator w zwykłej kolejce Warsztatu, a podczas kolejnej wyprawy montuje go i uruchamia generator. Następnie uruchamia C-4, opcjonalnie produkuje Rozdzielacz i montuje go przy rozdzielni.
+
+[DOCELOWE] — POZA ZAKRESEM NURKOWANIA
+
+Balon, ręczne awaryjne wynurzenie, flary, przecinak, przynęta, medykament dla samego nurka, panika i wybieralny loadout stałych narzędzi nie są aktywne.
+
+6.2. Ratunek Leona
+
+[AKTYWNE]
+
+Leon Wrona czeka w Zatopionym Hotelu R1-03. Uwolnienie wymaga łomu, który jest stałym narzędziem każdej wyprawy. Nie istnieje wybór leku z magazynu bazy: aby podnieść jego zdrowie do 48, nurek musi wcześniej znaleźć pod wodą 1 jednostkę chemikaliów i leków oraz zachować ją w plecaku; bez niej holuje Leona krytycznie z 24 zdrowia.
+
+- po stabilizacji: ruch nurka 64%, koszt tlenu +25%;
+- bez stabilizacji: ruch 48%, koszt tlenu +55%;
+- podczas holowania nie można zbierać ani używać narzędzi, ale można wrócić do liny.
+
+Bezpieczny powrót dodaje Leona przed racjami, schronieniem i leczeniem tego samego dnia. Śmierć wyprawy utrwala jego zgon. Jeżeli gracz go nie rozstrzygnie, Leon czeka bezterminowo — nie istnieje ukryty zegar śmierci między dniami.
+
+[DOCELOWE] — ROLA LEONA W NOWEJ FABULE
+
+Leon nie jest pierwszym głosem odbieranym przez radio i nie uruchamia Aktu I. Pozostaje opcjonalnym ratunkiem w Zatopionym Hotelu. Po ocaleniu ujawnia, że pracował przy Generatorze R-3, podpowiada bezpieczniejszą procedurę naprawy i komentuje decyzję o podziale energii. Jeżeli nie żyje albo nie został uratowany, wymagane informacje nadal znajdują się w Zalanym Archiwum.
+
+6.3. Gwarancja odzyskiwalności i profile wypraw
+
+[AKTYWNE]
+
+Każdy autorsko rozmieszczony zasób ma najwcześniejszy, jawny profil wyprawy, dla którego projekt gwarantuje nie tylko dopłynięcie, ale zebranie wymaganej ilości i normalny, fizyczny powrót do aktywnej liny. Profil określa niezależnie etap Stacji, Warsztatu, butlę, latarnię, nurka, dostępne wcześniej boje i skróty oraz jeden z publicznych presetów trudności. Późny zasób nie musi być dostępny z Butlą I, ale materiał potrzebny do wykonania kolejnego ulepszenia nie może wymagać tego samego ulepszenia do odzyskania.
+
+Gwarantowana ilość oznacza:
+
+- dla zwykłego kontenera — co najmniej jedną wybraną sztukę; raport dodatkowo podaje bezpieczne maksimum na wyprawę i liczbę wymaganych wypraw;
+- dla wolnostojącego pickupu — cały pickup;
+- dla tutoriala, ratunku, uruchomienia stałego urządzenia i innego celu obowiązkowego — pełny wymagany cel;
+- dla ilościowego zapytania projektanta — dokładnie wskazany zestaw, na przykład 10 desek, 2 tkaniny i gumy oraz 5 chemikaliów i leków, z jawnym rozróżnieniem jednej wspólnej wyprawy od kilku niezależnych wypraw.
+
+`FEASIBLE` oznacza wykonaną trasę zakończoną żywym nurkiem przy linie i z tlenem większym od zera. `SAFE` wymaga ponadto obowiązkowej, strojalnej rezerwy tlenu. Certyfikat korzysta z rzeczywistej kolizji, wymiaru nurka, prądów, obciążenia, slotów, narzędzi, czasu interakcji, zimna, kombinezonu, zamkniętych przeszkód i aktywnych zagrożeń. Operator nie jest normalnym powrotem i nie spełnia gwarancji dostarczenia zasobu.
+
+Gwarancja jest twarda dla Łagodnego, Standardu i Surowego w przypisanym profilu progresji. Konfiguracja Niestandardowa otrzymuje pełną diagnozę, lecz nie obietnicę dodatniego wyniku. Zamknięty skrót pozostaje zamknięty, dopóki profil jawnie nie zakłada jego wcześniejszego utrwalenia. Boja ustawiona podczas bieżącej wyprawy nie staje się linią tej samej wyprawy; jako wejście może wystąpić wyłącznie w późniejszym profilu i dopiero po osobnym, bezpiecznym certyfikacie jej ustawienia.
+
+Wynik projektowy wskazuje co najmniej pozycję, profil, wejście, trasę, wymagany i pozostały tlen, rezerwę, ciężar, sloty, bezpieczną ilość, ekspozycję na przeciwników oraz konkretną przyczynę odrzucenia. Dzięki temu nowe rozmieszczenie przedmiotu jest przyjmowane tylko wtedy, gdy narzędzie potrafi dostarczyć powtarzalne świadectwo pełnej wyprawy.
+
+7. STAŁY I TRWAŁY ŚWIAT
+
+[AKTYWNE]
+
+Mapa ma 11 520 × 6 480 jednostek, cztery regiony, 28 landmarków, 39 zwykłych połączeń i osiem trwałych skrótów — 47 połączeń łącznie — 12 stałych, jednostkowych znalezisk, stałe kontenery, prądy, jedno zagrożenie, jedno spotkanie ratunkowe i trzy ciężkie obiekty.
+
+Geometria, pozycje ważnych obiektów i bramy skrótów są autorsko stałe. Seed kampanii nie zmienia funkcjonalnej topologii ani tras; wpływa tylko na jawnie losowane lub skalowane elementy, takie jak zaokrąglenie łupu kontenerowego.
+
+[AKTYWNE] — AUTORSKA MAPA W GODOT
+
+Decyzja twórcy / warunek:
+
+Twórca otwiera produkcyjną scenę świata podwodnego w edytorze Godot. Widzi warstwy całej mapy oraz instancje regionów, landmarków, tras, prądów, przeszkód, źródeł łupu, zagrożeń, celów interaktywnych i dekoracji. Może dodawać dostarczone prefaby, przesuwać je w widoku 2D, obracać i skalować tam, gdzie dopuszcza to dany typ, zmieniać ich dane oraz przypisywać własne sceny wizualne z assetami. Gracz nie wykonuje tych operacji podczas kampanii.
+
+Widoczny skutek i feedback:
+
+Zapisana i poprawnie zwalidowana scena jest dokładnie tym statycznym światem, który składa wyprawa — bez osobnego szkicu, katalogu publikacyjnego ani drugiej listy pozycji w kodzie. Markery, obrysy, etykiety, trasy i przypisane prefaby są widoczne bez uruchamiania gry. Walidacja wskazuje brakujące lub powielone ID, obiekt w niewłaściwej gałęzi drzewa, błędne referencje, cele poza mapą, niedozwolone prefaby i utratę podstawowej przechodniości.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+Tożsamość trwałych obiektów wynika ze stabilnego ID. Zmiana wyłącznie prezentacyjna może odświeżyć wygląd bez kasowania postępu, ale zmiana topologii, położenia, zawartości, interakcji, przeszkody albo bazowej nawigacji tworzy inny statyczny świat i blokuje kontynuację niezgodnej kampanii zamiast po cichu przesuwać jej stan. Bazowy kontur wielkoskalowych skał ma jedno semantyczne źródło: edycja tej maski wyprowadza zarówno widoczny teren, jak i fizyczną granicę. Pojedyncze nowe lub poprawiane przeszkody nadal należy authorować jako prefaby mapy; niewidoczna korekta kolizji służy wyłącznie elementowi, którego wygląd już istnieje. Każda zmiana celu objętego gwarancją odzyskiwalności nadal musi zachować normalną drogę powrotu na profilach Łagodnym, Standardowym i Surowym.
+
+Odwołania: ARD-0072, ARD-0075, ARD-0085; architektura, sekcje 9.1, 9.1.1, 11 i 13.
+
+Widoczny kontur skał i kolizje terenu przedstawiają tę samą przestrzeń, aby pokazana droga była również drogą dostępną w grze. Techniczne wyprowadzanie obu reprezentacji ze wspólnego źródła i jego pokrycie należą do architektury, sekcje 9 i 13.
+
+Na mapie nie istnieje drugi Dzwon, dodatkowy punkt wejścia ani osobna interakcja; aktywny „Dzwon głębinowy” pozostaje wyłącznie nazwą Stacji IV.
+
+Trwałość obejmuje:
+
+- otwarte kontenery i dokładną resztę ich zawartości;
+- zabrane pickupy;
+- boje i skróty;
+- oznaczone i odzyskane ciężkie obiekty;
+- porzucone pakunki;
+- ID landmarku zgonu jako telemetrię oraz osobny, odzyskiwalny plecak z utraconym sprzętem; runtime nie renderuje ciała;
+- wynik ratunku;
+- odkryte podczas wyprawy miejsca, które dają PD; obecna gra nie odtwarza między wyprawami pełnej mapy odkryć ani fog-of-war.
+
+[AKTYWNE] — TRWAŁOŚĆ URZĄDZEŃ KAMPANII
+
+Trwały świat zachowuje załączenie J-7, przesłanie mapy z Archiwum, diagnozę i uruchomienie R-3, aktywację C-4 oraz montaż Rozdzielacza. Żadna z tych czynności nie tworzy zwykłego przedmiotu plecaka; gotowy Rozdzielacz jest jednorazowym narzędziem kampanii udostępnianym wyłącznie do montażu.
+
+Wszystkie cztery regiony istnieją i są fizycznie osiągalne od początku. Dystans, tlen, światło, głębokość, zimno, jakość kombinezonu, prądy, kolizje terenu i dostępne wejścia tworzą miękką barierę. Poziom Stacji nie ustawia niewidzialnego zakazu wejścia do biomu.
+
+7.1. Cztery biomy
+
+[AKTYWNE] — GEOGRAFIA
+
+- Dachy Umarłego Miasta — najpłytsze ruiny, Zalane Archiwum R1-09, Zatopiony Hotel i kontrolowane miejsce nauki.
+- Zielone Osiedla — roślinny region z tkaninami, lekami, przeszkodami i drogami do dalszych skrótów.
+- Rdzawy Pas — strefa przemysłowa z Elektrownią R3-04, ciężkimi mechanizmami i zasobami technicznymi.
+- Czarne Serce — najgłębszy region z centralnymi urządzeniami dawnej sieci.
+
+Aktywne wspólne mechaniki różnicujące podróż to odległość, głębokość i zimno, ciemność, prądy, rodzaj łupu, pojedyncze wymagania narzędzi oraz pierwsze zagrożenie reagujące na hałas i bliskie światło.
+
+[AKTYWNE] — GEOGRAFIA KAMPANII „WSPÓLNA LINIA”
+
+- Dachy prowadzą od kabla pod Przystanią do złącza J-7 oraz później do terminala mapy wspólnej sieci w Zalanym Archiwum.
+- Zielone Osiedla dostarczają materiały i skróty potrzebne do rozbudowy Stacji, Warsztatu oraz pełnej Radiostacji; nie zawierają obowiązkowego przenoszonego klucza fabularnego.
+- Rdzawy Pas zawiera Generator Pływowy R-3, który trzeba zdiagnozować, naprawić wykonanym w Warsztacie regulatorem i uruchomić na miejscu.
+- Czarne Serce zawiera Centralną Rozdzielnię C-4, gdzie nurek przygotowuje końcowy podział energii pomiędzy Przystań i Platformę Północną.
+
+[AKTYWNE] — BIEŻĄCA TOŻSAMOŚĆ REGIONÓW
+
+Regiony nie mają jeszcze pełnej, odrębnej warstwy mechanik definiującej każdy biom. Ich bieżąca tożsamość wynika z autorskiej geografii, głębokości, zimna, prądów, łupu i obiektów; nie należy przedstawiać tego jako ukończonego systemu biomów sterowanego danymi. Szczegół techniczny: architektura, sekcja 9.3.
+
+[AKTYWNE] — CZYTELNA TOŻSAMOŚĆ WIZUALNA REGIONÓW
+
+Decyzja gracza / warunek:
+
+Podczas zejścia gracz rozpoznaje region nie tylko po nazwie i głębokości, lecz również po spójnej palecie, przejrzystości wody, zawiesinie, świetle i charakterze powierzchni. Dachy pozostają chłodne i stosunkowo czytelne, Zielone Osiedla bardziej organiczne i oliwkowe, Rdzawy Pas cięższy oraz bursztynowo-rdzawy, a Czarne Serce głębsze i chłodniejsze, lecz nadal czytelne w półtonach oraz oszczędne w punktach światła.
+
+Widoczny skutek i feedback:
+
+Oprawa przyjmuje kierunek „naturalnego realizmu podwodnego”: wiarygodność wynika z absorpcji barw, spadku kontrastu z dystansem, warstw głębi, miękkiego światła rozproszonego oraz naturalnego zaniku poświat. Obraz pozostaje spokojny, przejrzysty i oparty na czytelnych półtonach — głębia nie zmienia eksploracji w horror, nie tworzy agresywnej winiety ani dużych połaci pozbawionej szczegółu czerni. Stylizacja pozostaje tylko tam, gdzie chroni czytelność sylwetki nurka, zagrożeń, interakcji i drogi; nie opiera obrazu na grubym komiksowym konturze, płaskim cieniowaniu ani jednolitym neonowym gradiencie.
+
+Skały otrzymują nieregularną drobną strukturę, osad i kierunkowe modelowanie krawędzi zgodnej z kolizją zamiast równomiernej obwódki. Woda ma subtelne caustics, głębię barwy, zawiesinę, pył i lokalny ruch prądu; plany dalsze są miększe i mniej nasycone, a pełnoekranowa atmosfera zachowuje czytelność sylwetki nurka, punktów interakcji i HUD-u. Unikalne urządzenia, landmarki i dekoracje pozostają autorskimi elementami osadzonymi na wspólnej powierzchni.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+Profil jakości zmienia koszt i gęstość efektów, nie przechodniość ani zasady widoczności. Tryb ograniczenia ruchu usuwa refrakcję i uspokaja animowaną zawiesinę, zachowując statyczną paletę, kontrast i wszystkie sygnały gameplayowe. Ta warstwa nie ustanawia jeszcze pełnych mechanik biomów opisanych niżej.
+
+Odwołania: ARD-0040, ARD-0049, ARD-0052, ARD-0066, ARD-0085; architektura, sekcje 9.1, 9.3, 12.1 i 12.3.
+
+[DOCELOWE] — PEŁNA TOŻSAMOŚĆ
+
+- Dachy: szkło, zawalenia, drzwi i kontrolowane miejsce nauki.
+- Zielone Osiedla: toksyczne zakwity, oplątanie i lokalnie zmienna roślinność.
+- Rdzawy Pas: elektryka, toksyny, ciężkie mechanizmy i hałas przemysłowy.
+- Czarne Serce: ciśnienie, śluzy, muł, ekstremalne zimno i dodatkowe stworzenia.
+
+Ruchoma roślinność nie może zmieniać stałej topologii ani blokować jedynej drogi obowiązkowej. Jeżeli powstanie, ma działać lokalnie w opcjonalnych przejściach, a jej zmiana musi przetrwać zapis i ponowne wczytanie.
+
+Odradzanie alg, małży i innych zasobów biologicznych także pozostaje docelowe; obecna zawartość kontenerów i 12 stałych pickupów są zasobami skończonymi.
+
+Na profilu Standard skończona, autorska pula mapy obejmuje 58 jednostek jedzenia: 17 w Dachach Umarłego Miasta, 22 w Zielonych Osiedlach, 10 w Rdzawym Pasie i 9 w Czarnym Sercu. Obowiązkowa skrzynia tutorialowa nadal zawiera dokładnie 6 jednostek, a dodatkowe zapasy są rozłożone pomiędzy zwykłe kontenery dalszych tras i podlegają ich normalnemu skalowaniu trudnością. Wczesna wyprawa nastawiona na żywność powinna pozwolić wrócić z około 8–12 jednostkami, a późniejsza z 12–18, zależnie od udźwigu, wybranej trasy i pozostawionej wcześniej zawartości.
+
+8. TRUDNOŚĆ I PRESJA
+
+[AKTYWNE]
+
+Profile Łagodny, Standard i Surowy oraz ośmiosiowy Niestandardowy zamrażają konfigurację kampanii. Osiami są zasoby startowe, zużycie jedzenia, gospodarka, społeczeństwo, nurkowanie, pogoda, wydarzenia i wybaczanie błędów.
+
+Trudność wpływa na zasoby startowe, koszt budowy, koszt napraw, gęstość zwykłego łupu kontenerowego, Nadzieję, leczenie, tlen, kombinezon, zimno, prądy, hałas, agresję zagrożeń, efektywną wagę przedmiotów w plecaku, zwykłe sztormy, wydarzenia i Operatora. Nie zmienia trwałego osobistego udźwigu mieszkańca ani nie skaluje stałych kosztów receptur, 12 jednostkowych pickupów i obowiązkowego łupu tutoriala.
+
+Gra rozróżnia dwa znaczenia kryzysu:
+
+- krytyczne pasmo presji może wynikać z jedzenia, głodu, Nadziei, integralności, liczby zdolnych pracowników albo śmierci nurka i steruje bezpiecznym doborem wydarzeń;
+- fabularny kryzys przywództwa zaczyna się wyłącznie po rozliczeniu Nadziei równej zero i uruchamia licznik trzech dni.
+
+Pasmo presji nie rozpoczyna fabularnego kryzysu.
+
+[AKTYWNE] — CZAS DO CZARNEGO FRONTU
+
+Punktem wyjścia do balansu są:
+
+- Łagodny — 15 pełnych dni po Akcie I;
+- Standard — 12 pełnych dni;
+- Surowy — 10 pełnych dni;
+- Niestandardowy — jawna wartość wyprowadzona z osi pogody i pokazana przed rozpoczęciem kampanii.
+
+Próg przetrwania pozostaje taki sam na wszystkich profilach: w chwili rozpoczęcia Czarnego Frontu integralność Przystani musi wynosić 100%. Trudność zmienia ilość czasu, presję zwykłej pogody, ekonomię i ryzyko wypraw, ale nie ukrywa łagodniejszego progu 99%.
+
+Licznik nie zatrzymuje się podczas kryzysu przywództwa, dnia bez wyprawy ani nieukończonej misji. Czarny Front nie może przyjść wcześniej przez losowanie i nie można przesunąć go dialogiem.
+
+[AKTYWNE] — WYSTARCZALNOŚĆ KAMPANII
+
+Na trzech publicznych presetach autorska pula zasobów i certyfikowane trasy mają umożliwiać przy poprawnej grze:
+
+- odbudowę sześciu budynków co najmniej do poziomów wymaganych przez główną ścieżkę;
+- doprowadzenie integralności do 100%;
+- wykonanie sprzętu koniecznego do bezpiecznego dotarcia do R-3 i C-4;
+- wykonanie Regulatora R-3 oraz, przy ambitnej ścieżce, Rozdzielacza Wspólnej Linii;
+- uzyskanie każdego z trzech zakończeń.
+
+Nie jest to obietnica przejścia bez strat ani gwarancja dla każdej kombinacji Niestandardowej. Gracz nadal może utracić materiały, ludzi, sprzęt albo czas.
+
+9. KAMPANIA, MISJE, FABUŁA
+
+[AKTYWNE] — KAMPANIA „WSPÓLNA LINIA”
+
+Wspólna Linia jest jedyną kampanią gry. Nie istnieje alternatywny Projekt Świt, zbieranie jego artefaktów ani zakończenie Odejście. Nowa wersja rozpoczyna kampanię od nowa i nie wczytuje zapisów utworzonych dla wcześniejszego modelu fabuły; dawnych plików nie usuwa z dysku.
+
+Deszcz pada od pięciu lat. Mira Boruta, Anka Ryl i Igor Sowa odnajdują na otwartym morzu opuszczoną platformę serwisową oznaczoną jako Pomost 7. Z desek, beczek, blachy i fragmentów zatopionego miasta budują na niej Przystań.
+
+Pod platformą biegnie stara magistrala energetyczno-komunikacyjna. Jej załączenie przywraca Przystani podstawowe światło i łączność, ale ujawnia, że Pomost 7 należy do większej sieci. Z tej samej resztki energii korzysta Platforma Północna, na której działające pompy powstrzymują morze przed zalaniem części mieszkalnej.
+
+Ocaleni z Północnej ostrzegają Przystań przed Czarnym Frontem. Od tego momentu kampania staje się wyścigiem z czasem: platforma musi osiągnąć i utrzymać 100% integralności, a każda wyprawa, budowa, receptura i przyjęta osoba zabiera część pozostałych dni.
+
+Główne pytanie opowieści brzmi:
+
+„Czy człowiek ma obowiązek ratować innych, kiedy nie ma jeszcze pewności, że zdoła uratować własny dom?”
+
+Platforma Północna nie jest antagonistą. Jej mieszkańcy potrzebują energii do pomp i ogrzewania. Przystań potrzebuje tej samej linii do światła, ładowania sprzętu, radia i przygotowań. Obie społeczności mają rację, lecz stara sieć nie została zaprojektowana do utrzymania dwóch osad podczas największego obciążenia.
+
+9.1. ZASADY PROWADZENIA FABUŁY
+
+Po tutorialu żadna główna scena nie wymaga przeżycia Miry, Anki ani Igora. Osobiste dialogi są używane, gdy dana osoba żyje, ale wymagane informacje przekazuje aktualny Głos Przystani, Głos techniczny albo neutralny raport systemu.
+
+Dziennik misji prowadzi gracza, lecz poza trzema dniami tutoriala nie stawia niewidzialnych ścian. Wszystkie cztery regiony pozostają fizycznie dostępne; dystans, tlen, sprzęt, zimno, prądy, skróty i ryzyko tworzą miękkie bariery.
+
+Północna nie ma osobnego, ukrytego zegara śmierci. Jej pogarszający się stan jest wiązany z tym samym jawnym licznikiem Czarnego Frontu. Każda ważna zmiana jest przekazywana przez radio i zapisywana w dzienniku.
+
+[AKTYWNE] — FABULARNE SCENY PRZYSTANI I FINAŁU
+
+Okno fabularne działa podczas bezpiecznych scen Przystani, a po ostatecznym wyborze także nad ekranem wyniku. Nie otwiera się podczas wyprawy, nie zasłania sterowania nurkiem i nie udaje łączności radiowej, której załoga jeszcze nie posiada. Odkrycia dokonane pod wodą stają się tematem rozmowy dopiero po bezpiecznym powrocie. HUD nurkowania zachowuje wyłącznie dokładny cel, blocker powrotu i nawigację potrzebną do wykonania mechaniki.
+
+Rozmowa ma formę krótkiej sceny, a nie pojedynczego komunikatu narratora. Panel pokazuje naraz jedno przejście oraz wspólny tytuł i kontekst miejsca lub chwili. Wypowiedź pokazuje imię, rolę i portret po stronie przypisanej uczestnikowi; bezosobowe didaskalium albo potwierdzony skutek w świecie otrzymuje własne oznaczenie bez fikcyjnego mówcy i portretu. Każdy uczestnik zachowuje przydzieloną stronę przez całą scenę, a kolejność wypowiedzi jej nie zmienia. Portret po prawej jest odbity lewo-prawo, dzięki czemu obie postacie są wizualnie zwrócone ku środkowi rozmowy; ramka i tekst zachowują zwykłą orientację. `DALEJ` albo Enter przechodzi do następnego przejścia, a dopiero ostatnie zamyka całą scenę.
+
+Obowiązkowe raporty mają pierwszeństwo przed fabułą. Po zakończeniu dnia gracz najpierw czyta raport, następnie rozstrzyga ewentualne wydarzenie poranka i dopiero po przejściu do planowania Bazy widzi rozmowę. Oznacza to między innymi, że dialog dnia 2 otwiera się dopiero po użyciu `ROZPOCZNIJ DZIEŃ 2`, a nie nad podsumowaniem dnia 1. Pierwsza rozmowa kampanii może rozpocząć się po intro, ponieważ nie poprzedza jej raport. Podczas dialogu plansza Bazy, ocean, pogoda, światło, platforma i muzyka nadal pracują; pełnoekranowa warstwa rozmowy przechwytuje jednak mysz i klawiaturę, więc gracz nie wykonuje równocześnie poleceń gospodarki.
+
+Tutorial wykorzystuje rozmowy tylko w ważnych przejściach fabularnych: Mira i Anka ustalają potrzebę pierwszego dachu oraz drogi w dół, Anka i Igor omawiają czarny kabel, Warsztat i pierwsze zejście, a po pierwszym powrocie Igor i Anka rozpoznają blokadę oraz potrzebę Noża ratowniczego. Po bezpiecznym powrocie z J-7 odzyskanie zasilania, pierwsza odpowiedź od żywych ludzi od pięciu lat, koszt podłączenia Północnej oraz ostrzeżenie o Czarnym Froncie tworzą jedną ciągłą scenę zamiast technicznego debriefu i osobnego powitania. Pozostałe kroki zachowują czytelną kapsułę celu, podświetlenie albo nawigację bez przerywania ich kolejnymi oknami fabularnymi. Zamknięcie rozmowy nie zalicza kroku i nie omija wymaganej akcji.
+
+Po tutorialu pełne rozmowy pojawiają się przy kamieniach, które zmieniają wiedzę, relację z Północną albo moralne znaczenie decyzji: Archiwum, uruchomienie R-3, C-4, montaż Rozdzielacza i ostatni dzień. Klara wraca w środkowej części kampanii, dzięki czemu Północna pozostaje grupą konkretnych ludzi, a nie tylko treścią raportu i finałowego wyboru. Czysto techniczne potwierdzenia diagnozy, wykonania Regulatora i wykonania Rozdzielacza są krótkimi, dwu- lub trzyprzejściowymi interludiami. Dziennik misji nadal przechowuje wymagany cel.
+
+Głos Przystani i Głos techniczny wybierają żyjącą, obecną i zdolną osobę z właściwego kontekstu; jeżeli nie da się zbudować wiarygodnej wymiany dwóch osób, scena może przejść w monolog albo neutralny raport bez udawania, że zmarła lub nieobecna postać nadal mówi. Samo obejrzenie albo zamknięcie rozmowy nie zmienia kampanii, nie zapisuje osobnej flagi i nie tworzy nowej bramki postępu.
+
+Didaskalia opisują wyłącznie działanie, obraz, reakcję albo dźwięk możliwy do zaobserwowania w bieżącym stanie — na przykład opór bezpiecznika, trzask radia, milczenie rozmówcy lub zmianę rytmu pomp. Osobna, zwięzła karta skutku może nazwać potwierdzoną zmianę świata, lecz nie podaje następnego celu, wymagań receptury ani instrukcji obsługi. Te informacje należą do trackera, Warsztatu i dziennika. Pełna scena ważnego kamienia milowego ma zwykle od czterech do sześciu krótkich przejść: obraz sytuacji, różne reakcje uczestników, znaczenie lub konflikt oraz konsekwencję. Krótkie interludium techniczne może mieć dwa albo trzy przejścia i nie udaje pełnej rozmowy.
+
+[AKTYWNE] — JĘZYK DŹWIĘKOWY FABUŁY
+
+Decyzja gracza / warunek:
+
+Dialog pozostaje tekstem. Wybrane przejścia scen otrzymują krótki, diegetyczny dźwięk urządzenia lub otoczenia dokładnie wtedy, gdy opisany obiekt zaczyna działać, zmienia stan albo staje się przedmiotem uwagi. Nie ma voice-overu, mówionych kwestii ani dźwięku dodawanego do każdego naciśnięcia `DALEJ`.
+
+Widoczny skutek i feedback:
+
+Powracają te same rozpoznawalne motywy: ciężkie załączenie starej linii, klik i szum otwartego kanału, awaryjny albo równy rytm pomp Północnej, mechaniczny odczyt Archiwum, dwa styki linii C-4 oraz narastające naprężenie Czarnego Frontu. Wariant dźwięku zmienia znaczenie razem z historią: nierówne pompy po J-7 stają się równym rytmem po uruchomieniu R-3, konflikt dwóch styków przechodzi w próbę Rozdzielacza, a w „Ciszy po burzy” otwarty kanał bez znanego rytmu pomp staje się świadomym brakiem odpowiedzi. Trzy zakończenia wracają do dźwięków radia, pomp i dwóch linii zamiast korzystać z triumfalnej fanfary.
+
+Ograniczenia i wyjątki istotne dla gracza:
+
+Jedno przejście uruchamia najwyżej jeden krótki efekt, który nie jest zapętlany i zostaje przerwany przy przejściu dalej, zamknięciu rozmowy albo zmianie sceny. Kwestie moralnego wyboru, przyznanie odpowiedzialności w Archiwum i ostatni obraz zakończenia mogą celowo pozostać bez efektu. Brak motywu nie wycisza muzyki, deszczu ani całej gry; oznacza tylko brak oczekiwanej odpowiedzi w tej warstwie. Dźwięk wzmacnia pamięć i nastrój, ale nigdy nie jest jedynym nośnikiem informacji potrzebnej do zrozumienia fabuły lub wykonania celu.
+
+Odwołania: ARD-0087; architektura, sekcje 12.1 i 13.
+
+Dokładny następny cel Wspólnej Linii i licznik Czarnego Frontu pozostają czytelne obok śledzonej misji. Podczas przygotowania wyprawy prowadzenie kampanii wskazuje właściwe urządzenie przed celem zwykłej misji, lecz nie wysyła nurka pod wodę w etapach wymagających wyłącznie pracy Warsztatu.
+
+9.2. AKT I — MARTWA LINIA
+
+[AKTYWNE]
+
+Akt I trwa dokładnie trzy prowadzone dni. Uczy budowania, przydzielania ludzi, racji, kończenia dnia, wyprawy, łupu, drogi powrotnej, Warsztatu i trwałego odblokowania noża.
+
+Pakiet startowy tutoriala gwarantuje na każdym profilu co najmniej materiały wymagane przez skalowane koszty Domu Wspólnoty I, Stacji Nurkowej I i Warsztatu Odzysku I. Nie zapewnia nadwyżki tych materiałów i nie zmienia gospodarki po ukończeniu tutoriala.
+
+DZIEŃ 1 — PIERWSZY DACH
+
+Po intro gracz widzi pustą, częściowo zniszczoną platformę z sześcioma ruinami przyszłych budynków.
+
+Cele:
+
+1. Wybuduj Dom Wspólnoty I.
+2. Wybuduj Stację Nurkową I.
+3. Przydziel mieszkańców.
+4. Ustaw racje.
+5. Zakończ dzień.
+
+W kroku racji kapsuła tutoriala pojawia się po prawej, przy górnej akcji planu, a przycisk `PLAN DNIA • RACJE` otrzymuje bursztynowe wyróżnienie celu. Po otwarciu Planu dnia kapsuła przechodzi na przeciwną stronę, aby nie zasłaniać kontrolek; wyróżnienie znika po jawnym wyborze polityki racji.
+
+Dom Wspólnoty zapewnia pierwsze suche schronienie, a Stacja otwiera drogę do zasobów pod platformą.
+
+Po zakończeniu dnia mieszkańcy odnajdują w Domu martwą tablicę elektryczną. Przez pokład schodzi do wody gruby czarny kabel oznaczony:
+
+POMOST 7 — MAGISTRALA SERWISOWA
+
+Na platformie nie ma prądu ani łączności. Oględziny wskazują, że punkt załączenia znajduje się pod wodą.
+
+DZIEŃ 2 — PIERWSZE ZEJŚCIE
+
+Poranny raport pokazuje, że ubyło jedzenia, a materiały po budowie dwóch pierwszych obiektów prawie się skończyły.
+
+Cele:
+
+1. Zleć budowę Warsztatu Odzysku I.
+2. Wybierz Igora jako nurka.
+3. Rozpocznij pierwszą wyprawę.
+4. Zdobądź wskazane minimum: 1 jednostkę jedzenia, 1 deskę oraz 3 złomu i 2 tkaniny i gumy potrzebne na Nóż ratowniczy. Nadwyżkę można pozostawić w skrzyniach.
+5. Wróć do głównej liny.
+
+Pod Przystanią Igor odnajduje podstawowy łup oraz kabel biegnący po dnie. Przewód prowadzi między resztkami konstrukcji, lecz dalsze przejście blokują sieci, liny i roślinność.
+
+Podczas prowadzonych kroków wyprawy bursztynowa strzałka porusza się po stałym okręgu wokół nurka i obraca w pełnym kierunku bieżącego celu. Prowadzi kolejno do obowiązkowych źródeł łupu, zablokowanego przejścia i głównej liny; znika po zbliżeniu się do celu oraz po zakończeniu tutoriala.
+
+Komunikat:
+
+PRZEJŚCIE ZABLOKOWANE
+WYMAGANY NÓŻ RATOWNICZY
+
+Igor nie może iść dalej. Zbiera obowiązkowe minimum i wraca do liny; skrzynie nie muszą być opróżnione, a pozostawiona zawartość czeka pod wodą. Powrót kończy wyprawę oraz cały dzień. Aktywny Warsztat czeka na obsadę i plan kolejnego dnia.
+
+DZIEŃ 3 — ZAŁĄCZENIE
+
+Poranny raport kieruje gracza do aktywnego Warsztatu. Tutorial prowadzi gracza przez jego obsługę:
+
+1. Otwórz panel Warsztatu.
+2. Przydziel pracownika.
+3. Wybierz Nóż ratowniczy.
+4. Zatwierdź wykorzystanie materiałów.
+5. Odbierz trwałe odblokowanie narzędzia.
+6. Przygotuj Igora do wyprawy.
+7. Zanurkuj jeszcze tego samego dnia.
+
+Po przydzieleniu pracownika panel Warsztatu przechodzi z OBSADY do DZIAŁANIA i wskazuje wykonanie Noża, aby kolejny krok nie pozostawał ukryty w poprzedniej zakładce. Instrukcja podaje nazwę wymaganej akcji i jej pełny koszt.
+
+Igor wraca do wcześniejszej przeszkody, przecina blokadę i podąża za kablem przez Dachy Umarłego Miasta. Przewód prowadzi do podwodnej rozdzielni:
+
+J-7 — POMOST 7
+
+Złącze nie jest zniszczone. Znajduje się w pozycji serwisowego odłączenia. Pomost 7 został kiedyś celowo wyłączony z sieci.
+
+Podczas finałowego zejścia bieżące polecenie pozostaje widoczne bez najeżdżania kursorem. Przed załączeniem J-7 strzałka wokół nurka wskazuje rzeczywiste położenie Węzła J-7, a przy głównej linie pojawia się informacja, że powrót jest zablokowany do czasu wykonania tego celu. Po załączeniu złącza strzałka natychmiast przełącza się na główną linę. Dopiero bezpieczny powrót kończy wyprawę i dzień oraz zapisuje jej wynik.
+
+KONIEC AKTU I — PLATFORMA PÓŁNOCNA
+
+Po powrocie nurka załoga z oporem uruchamia główny bezpiecznik. Przekaźnik uderza w obudowę, zapalają się lampy i moduł radiowy, a w szumie po raz pierwszy od pięciu lat otwiera się obcy kanał. Odzyskanie zasilania i pierwszy kontakt tworzą jedną scenę.
+
+KLARA WYSOCKA:
+„Pomost Siedem? Potwierdźcie. Kto załączył linię?”
+
+GŁOS PRZYSTANI:
+„Tu Przystań. Węzeł był odłączony. Właśnie go uruchomiliśmy.”
+
+KLARA:
+„Klara Wysocka, Platforma Północna. W tej samej chwili nasze napięcie spadło, a pompy przeszły na zasilanie awaryjne. Ciągniemy z jednego banku.”
+
+GŁOS PRZYSTANI:
+„Jeśli się odłączymy, znów zostaniemy bez światła i łączności. Jeśli zostaniemy — zabieramy wam czas.”
+
+KLARA:
+„Front za [liczba dni profilu] dni. Pomost przetrwa tylko przy 100% integralności — nie 99%. Wysyłam współrzędne Archiwum. Tam jest mapa sieci.”
+
+Po zamknięciu sceny stały tracker Bazy przejmuje instrukcję mechaniczną; nie powstaje osobna karta skutku:
+
+NOWY CEL: NAPRAW PRZYSTAŃ DO 100%
+CZARNY FRONT ZA: [LICZBA DNI PROFILU]
+
+Rozpoczyna się jawne odliczanie.
+
+9.3. AKT II — DŁUG PRĄDU
+
+Akt II jest swobodniejszą częścią kampanii. Gracz równocześnie rozbudowuje sześć budynków, zdobywa jedzenie i materiały, utrzymuje mieszkańców przy życiu, naprawia integralność oraz odkrywa historię wspólnej sieci.
+
+MISJA GŁÓWNA — 100/100
+
+Cel pozostaje aktywny do finału:
+
+Doprowadź integralność Przystani do 100% i utrzymaj ją do uderzenia Czarnego Frontu.
+
+Warsztat każdego dnia wybiera między produkcją, ciężkim odzyskiem a naprawą. Wykonanie sprzętu lub części fabularnej może być konieczne do dalszej eksploracji, ale zabiera dzień, w którym platforma nie otrzyma zwykłej naprawy.
+
+Pierwsze osiągnięcie 100% zmienia wpis na:
+
+UTRZYMAJ INTEGRALNOŚĆ: 100/100
+
+Zwykła pogoda może ponownie obniżyć wartość. Interfejs zawsze pokazuje przewidywany wynik bieżącego planu.
+
+MISJA — SZEŚĆ MIEJSC
+
+Gracz buduje trzy pozostałe obiekty poziomu I w dowolnej kolejności:
+
+- Chatę Rybacką;
+- Kuchnię i Wędzarnię;
+- Lecznicę i Suszarnię.
+
+Znaczenie wszystkich sześciu budynków podczas odliczania:
+
+- Dom Wspólnoty — schronienie, Nadzieja, podstawowa łączność i późniejsza Radiostacja;
+- Stacja Nurkowa — dostęp do głębszych obszarów i bezpieczniejsze wyprawy;
+- Warsztat Odzysku — naprawa integralności, sprzęt i części sieci;
+- Chata Rybacka — odnawialne źródło jedzenia;
+- Kuchnia i Wędzarnia — mniejsze zużycie zapasów;
+- Lecznica i Suszarnia — leczenie urazów, chorób i skutków finału.
+
+Ukończenie wszystkich sześciu poziomów I zamyka cel FUNDAMENT PRZYSTANI, ale nie zatrzymuje licznika.
+
+MISJA — PÓŁNOCNA NA REZERWIE
+
+Każdego poranka radio może przekazać krótki raport Platformy Północnej. Jej dolne kondygnacje są zalane, a pompy stale wypychają wodę z części mieszkalnej i magazynu.
+
+Po podłączeniu Przystani Północna kolejno wyłącza część lamp, ogrzewanie i urządzenia pomocnicze. Radio działa okresowo, a pompy pracują coraz wolniej.
+
+Klara nie żąda natychmiastowego odłączenia Pomostu 7, ponieważ rozumie, że bez zasilania i informacji Przystań nie przygotuje się do sztormu. Ostrzega jednak:
+
+„Każdy dzień, w którym korzystacie z tej linii, skraca czas działania naszych pomp.”
+
+Pogarszanie stanu Północnej jest częścią tego samego odliczania. Gra nie ukrywa drugiego timera i nie zabija osady wcześniej przez losowanie.
+
+MISJA — MAPA WSPÓLNEJ SIECI
+
+Klara przekazuje współrzędne starego terminala w Zalanym Archiwum R1-09.
+
+Nurek:
+
+1. dociera do Archiwum;
+2. otwiera wejście;
+3. przywraca lokalne zasilanie;
+4. uruchamia terminal;
+5. przesyła dane naprawionym kablem do Przystani;
+6. wraca do liny.
+
+Nie zabiera skrzynki ani klucza fabularnego. Rezultatem jest uruchomione urządzenie i przesłana mapa.
+
+Mapa pokazuje:
+
+- Pomost 7 — Przystań;
+- Platformę Północną;
+- Generator Pływowy R-3 w Rdzawym Pasie;
+- Centralną Rozdzielnię C-4 w Czarnym Sercu.
+
+Obie platformy korzystają ze starego banku akumulatorów. Generator R-3, który powinien uzupełniać energię, nie działa od kilku lat. Ponowne podłączenie Pomostu 7 nie odebrało Północnej sprawnego źródła — przyspieszyło wyczerpywanie ostatniego wspólnego zapasu. Bank może podtrzymać jedną priorytetową linię podczas Czarnego Frontu, ale nie obie naraz.
+
+MISJA — DLACZEGO NAS ODŁĄCZONO
+
+Dziennik Archiwum ujawnia, że po pierwszym wielkim zalaniu Pomost 7 był pustym punktem serwisowym, a Platforma Północna nadal chroniła ludzi. Operatorzy Północnej odłączyli nieużywany węzeł, aby pompy mogły pracować dłużej. Odkrycie jest pełną sceną, ponieważ zmienia moralne znaczenie całej kampanii.
+
+RAPORT ARCHIWUM:
+„POMOST 7 — OBSADA: 0. PRIORYTET BANKU: POMPY PÓŁNOCNEJ. ODŁĄCZYĆ.”
+
+KLARA:
+„To nasi operatorzy odłączyli Pomost Siedem. Wtedy był pusty, a przełączenie banku utrzymało nasze pompy.”
+
+GŁOS PRZYSTANI:
+„Nie odcięli osady. Odcięli pusty pomost. A teraz jesteśmy.”
+
+KLARA:
+„Właśnie dlatego mamy problem.”
+
+Nie ma sabotażysty ani jednego złoczyńcy. Dawna decyzja ocaliła jedną grupę kosztem porzucenia pustej platformy. Finał postawi gracza przed podobnym wyborem, ale da mu szansę przygotowania trzeciego rozwiązania.
+
+MISJA OPCJONALNA — CZŁOWIEK Z HOTELU
+
+Leon Wrona pozostaje w Zatopionym Hotelu i korzysta z aktywnej mechaniki ratunku. Nie rozpoczyna głównej fabuły.
+
+Po uratowaniu ujawnia, że pracował przy Generatorze R-3. Dzięki temu:
+
+- opisuje procedurę naprawy;
+- wskazuje zagrożenie przy panelu generatora;
+- komentuje decyzję o podziale energii;
+- staje się kolejnym mieszkańcem, którego trzeba wyżywić, osłonić i ewentualnie leczyć.
+
+Brak Leona nie blokuje kampanii; komplet wymaganych danych znajduje się w Archiwum.
+
+KONIEC AKTU II — ENERGIA DLA JEDNYCH
+
+Akt II kończy się normalnie, gdy:
+
+- wszystkie sześć budynków ma co najmniej poziom I;
+- mapa wspólnej sieci została przesłana;
+- gracz przynajmniej raz osiągnął 100% integralności.
+
+Aby kampania nie utknęła przez niewykonany cel, Akt III rozpoczyna się najpóźniej przy sześciu dniach do Czarnego Frontu. Nieukończone zadania pozostają aktywne.
+
+Podczas rozmowy Klara informuje, że bank Północnej nie wytrzyma maksymalnego obciążenia sztormu. Generator R-3 może ustabilizować obie platformy w zwykłych warunkach, ale stara Rozdzielnia C-4 podczas głównej fali potrafi bezpiecznie zasilać tylko jedną linię.
+
+Głos techniczny przedstawia możliwość wykonania prowizorycznego rozdzielacza. Wymaga on materiałów, pracy Warsztatu i zejścia do Czarnego Serca — dokładnie tych zasobów i dni, które można przeznaczyć na utrzymanie 100% Przystani.
+
+9.4. AKT III — NOC BEZ BRZEGU
+
+Akt III korzysta z tego samego licznika. Nie dodaje drugiego terminu ani dodatkowych dni.
+
+Podstawowy cel nadal brzmi:
+
+W CHWILI UDERZENIA CZARNEGO FRONTU PRZYSTAŃ MUSI MIEĆ 100% INTEGRALNOŚCI.
+
+Dodatkowym, świadomym wyborem jest próba uratowania Platformy Północnej.
+
+MISJA — SERCE RDZY
+
+Generator Pływowy R-3 znajduje się w przemysłowej części Rdzawego Pasa.
+
+Pierwsza wyprawa:
+
+1. odnajdź generator;
+2. oczyść wejście;
+3. otwórz panel diagnostyczny;
+4. sprawdź mechanizmy;
+5. odczytaj parametry przepalonego regulatora;
+6. wróć do Przystani.
+
+Generator pozostaje częścią świata. Nie można włożyć go do plecaka.
+
+MISJA — REGULATOR R-3
+
+Po diagnozie Warsztat otrzymuje jednorazowe zlecenie Regulator R-3. Wymaga ono Warsztatu II, 6 złomu, 3 tkanin i gumy, 2 części technicznych oraz 200 punktów pracy. Każdy dzień dodatniego postępu jest dniem bez automatycznej naprawy integralności.
+
+Przed zatwierdzeniem plan pokazuje konsekwencję dla 100% oraz pozostałego czasu.
+
+MISJA — URUCHOM GENERATOR
+
+Podczas kolejnej wyprawy nurek wraca do R-3, montuje regulator i uruchamia generator.
+
+Skutki:
+
+- napięcie na Przystani stabilizuje się;
+- Północna odzyskuje część energii;
+- radio działa bez ciągłych przerw;
+- Centralna Rozdzielnia C-4 staje się gotowa do konfiguracji.
+
+Po uruchomieniu R-3 Klara wraca na linię bez ciągłych przerw. Po raz pierwszy zamiast alarmu słychać w tle równy rytm pomp: konkretny dowód, że naprawa pomogła ludziom Północnej. Klara od razu przypomina, że w zwykłym morzu energii wystarcza dla obu platform, lecz podczas szczytu Frontu C-4 nadal wybierze tylko jeden kierunek.
+
+Generator wystarcza dla obu osad w zwykłych warunkach. Podczas Czarnego Frontu szczytowe zapotrzebowanie nadal przekracza bezpieczny limit starej rozdzielni.
+
+MISJA — PRAWDZIWA RADIOSTACJA
+
+Podstawowy moduł z Aktu I pozwala na krótkie rozmowy z Północną. Dom Wspólnoty III — Radiostacja — zapewnia stabilne połączenie dalekiego zasięgu i ciągłą koordynację podczas sztormu.
+
+Radiostacja nie jest wymagana do uratowania wyłącznie Przystani. Jest konieczna do zakończenia WSPÓLNA LINIA.
+
+MISJA OPCJONALNA — ROZDZIELACZ WSPÓLNEJ LINII
+
+Warsztat może wykonać prowizoryczny Rozdzielacz Wspólnej Linii. Zlecenie wymaga stałego kosztu i pełnej pracy Warsztatu, przez co ponownie konkuruje z naprawą platformy.
+
+Rozdzielacz nie tworzy energii. Pozwala jedynie podzielić obciążenie generatora pomiędzy obie linie podczas największej fali. Bez sprawnego R-3, Radiostacji i 100% integralności nie daje bezpiecznego wyniku.
+
+MISJA — CZARNE SERCE
+
+Centralna Rozdzielnia C-4 znajduje się w najgłębszym regionie mapy. Dystans, zimno, prądy, ciemność, sprzęt i droga powrotna są naturalnymi wymaganiami wyprawy.
+
+Nurek:
+
+1. dociera do C-4;
+2. otwiera panel awaryjny;
+3. montuje Rozdzielacz, jeżeli został wykonany;
+4. przywraca sterowanie liniami;
+5. zapisuje dostępne konfiguracje;
+6. wraca fizycznie do liny.
+
+Po tutorialu uruchomienie C-4 może pozostać trwałe nawet wtedy, gdy nurek zginie w drodze powrotnej. Jego śmierć nadal powoduje utratę osoby, sprzętu, łupu i Nadziei.
+
+Powrót z C-4 uruchamia scenę moralnego wyboru, nie techniczny raport o kolejnym projekcie. Panel pokazuje dwie linie i alarm jednego priorytetu; Klara mówi Przystani, by w razie braku czasu wybrała własnych ludzi, a Głos techniczny przedstawia Rozdzielacz jako kosztowną próbę zmiany zasad tego wyboru. Dokładny koszt, wymagany poziom Warsztatu i następny cel pozostają w jego panelu oraz trackerze.
+
+OSTATNI DZIEŃ
+
+Przy komunikacie:
+
+CZARNY FRONT ZA: 1 DZIEŃ
+
+gracza czeka ostatni pełny dzień planowania i ostatnia możliwość nurkowania. Może naprawiać, budować, produkować, przygotować jedzenie, obsadzić Lecznicę albo dokończyć C-4.
+
+Ostatni poranek wraca do rytmu pierwszego kontaktu: Klara prosi Pomost 7 o potwierdzenie, Głos Przystani odpowiada „Tu Przystań. Odbieramy”, a obie osady deklarują pozostanie na częstotliwości do świtu. Scena buduje napięcie i relację; dokładny termin uderzenia oraz warunek integralności pozostają stale widoczne w HUD-zie.
+
+Po rozliczeniu dnia gra sprawdza integralność.
+
+- 99% lub mniej — natychmiastowa porażka; nie ma dodatkowej doby ani losowego ratunku.
+- 100% — rozpoczyna się finał i wybór energii.
+
+9.5. FINAŁOWY WYBÓR ENERGII
+
+[AKTYWNE]
+
+PRZYSTAŃ
+
+Cała dostępna energia zostaje skierowana do Pomostu 7. Jest to zawsze dostępna, najbezpieczniejsza konfiguracja dla własnej osady. Platforma Północna traci zasilanie pomp, a jej ostatnia transmisja urywa się podczas sztormu.
+
+PÓŁNOCNA
+
+Energia zostaje skierowana do Platformy Północnej. Wymaga uruchomionego R-3 i aktywnej C-4. Pompy Północnej działają przez całą noc, natomiast Przystań pozostaje bez głównego zasilania i przetrwa wyłącznie dzięki pełnej integralności, schronieniu, zapasom i przygotowaniu ludzi.
+
+WSPÓLNA LINIA
+
+Energia zostaje rozdzielona pomiędzy obie platformy. Wymagane są:
+
+- 100% integralności Przystani;
+- działający Generator R-3;
+- aktywna Centralna Rozdzielnia C-4;
+- zamontowany Rozdzielacz Wspólnej Linii;
+- Dom Wspólnoty III — Radiostacja;
+- co najmniej jedna zdolna osoba do ciągłej obsługi Domu.
+
+Obie osady otrzymują mniej energii, ale zachowują podstawowe pompy, światło awaryjne i łączność. Jest to najtrudniejsza ścieżka, ponieważ wymaga poświęcenia kilku dni Warsztatu i wypraw bez zaniedbania 100% integralności.
+
+10. ZAKOŃCZENIE I KRONIKA
+
+[AKTYWNE] — ZAKOŃCZENIA KAMPANII „WSPÓLNA LINIA”
+
+Runtime rozstrzyga bez losowania wszystkie trzy konfiguracje, zapisuje wybraną linię, los Platformy Północnej oraz typowane podsumowanie, pokazuje odpowiadający wynik i buduje Kronikę opisaną w 10.6–10.7.
+
+10.1. PRECEDENCJA STANÓW TERMINALNYCH
+
+1. Brak żywych mieszkańców albo integralność 0 przed finałem — GAME OVER.
+2. Nadejście Czarnego Frontu przy integralności 99% lub niższej — GAME OVER.
+3. Nadejście Czarnego Frontu przy integralności 100% — rozliczenie wybranej konfiguracji energii i zakończenia.
+
+Aktywny kryzys przywództwa nie zatrzymuje odliczania i nie odkłada sztormu. Może pogorszyć stan wspólnoty, lecz nie tworzy dodatkowego dnia. Te same przygotowania i ten sam zapis dają ten sam wynik; finał nie wykonuje ukrytego ponownego losowania.
+
+10.2. PORAŻKA — ROZTRZASKANA PRZYSTAŃ
+
+Warunek:
+
+- integralność jest niższa niż 100% w chwili rozpoczęcia Czarnego Frontu;
+- integralność albo liczba żywych spadła do zera wcześniej.
+
+Scena pokazuje pękające połączenia, odrywające się fragmenty pokładu, gasnące lampy i główną linę znikającą pod wodą.
+
+Ekran porażki podaje:
+
+- dzień nadejścia sztormu;
+- integralność bezpośrednio przed finałem;
+- brakującą wartość do 100%;
+- liczbę wykonanych napraw;
+- stan Generatora R-3 i C-4;
+- ostatnią ukończoną misję;
+- listę mieszkańców.
+
+10.3. ZAKOŃCZENIE — CISZA PO BURZY
+
+Warunek:
+
+- Przystań rozpoczęła finał ze 100% integralności;
+- wybrano konfigurację PRZYSTAŃ albo nie przygotowano innej dostępnej drogi;
+- co najmniej jedna osoba przeżyła.
+
+O świcie Pomost 7 nadal unosi się na wodzie. Mieszkańcy sprawdzają pokład, rannych i zapasy. Z uszkodzonej obudowy radia kapie woda.
+
+Aktualny Głos Przystani nadaje:
+
+„Północna, tu Przystań. Potwierdźcie.”
+
+Odpowiada tylko szum; po raz pierwszy w transmisji nie słychać nawet rytmu pomp. Ktoś wyciąga rękę do wyłącznika radia, lecz Głos Przystani zatrzymuje ją słowami:
+
+„Nie wyłączaj. Jeszcze raz.”
+
+Nie jest to proste „złe zakończenie”. Gracz ocalił ludzi, za których bezpośrednio odpowiadał. Kronika zapisuje jednak, że podczas sztormu wspólna linia została zamknięta.
+
+10.4. ZAKOŃCZENIE — DŁUG SPŁACONY
+
+Warunek:
+
+- Przystań rozpoczęła finał ze 100% integralności;
+- Generator R-3 i C-4 działały;
+- wybrano konfigurację PÓŁNOCNA;
+- co najmniej jedna osoba na Przystani przeżyła.
+
+Podczas sztormu światła Przystani gasną. Mieszkańcy zabezpieczają konstrukcję ręcznie. Finał nie dopisuje jednak ukrytych urazów ani dodatkowego uszkodzenia platformy: zatwierdzony wariant zachowuje 100% integralności Przystani po sztormie.
+
+O świcie radio odzyskuje podstawową moc. Zielona lampka rozcina ciemność Domu Wspólnoty.
+
+KLARA:
+„Przystań, potwierdźcie.”
+
+GŁOS PRZYSTANI:
+„Jesteśmy.”
+
+W tle transmisji pompy Północnej przechodzą w równy rytm.
+
+PÓŁNOCNA:
+„U nas też.”
+
+Przystań i Platforma Północna przetrwały. Kosztem decyzji jest noc bez głównego zasilania i ryzyko podjęte przez mieszkańców, a nie automatyczna kara dopisana po rozstrzygnięciu.
+
+10.5. ZAKOŃCZENIE — OSTATNI POMOST
+
+Warunek:
+
+- Przystań rozpoczęła finał ze 100% integralności;
+- R-3, C-4, Rozdzielacz i Radiostacja były gotowe;
+- wybrano WSPÓLNĄ LINIĘ;
+- obie platformy i co najmniej jedna osoba na Przystani przetrwały.
+
+Przez całą noc obie osady pozostają w kontakcie. Kiedy fala uderza w Północną, Przystań przekazuje jej odczyty obciążenia. Kiedy napięcie spada na Pomoście 7, Północna ogranicza własne systemy i oddaje część mocy.
+
+O świcie:
+
+PÓŁNOCNA:
+„Pompy trzymają.”
+
+GŁOS PRZYSTANI:
+„Pokład trzyma.”
+
+Po chwili Radiostacja odbiera słaby, współczesny sygnał z innego kierunku. Na ekranie odbiornika pojawia się urywany zapis transmisji:
+
+NIEZNANY SYGNAŁ:
+„…Pomost Siedem… czy ktoś…”
+
+GŁOS PRZYSTANI:
+„Słyszymy. Mów dalej.”
+
+Nikt nie wyłącza radia.
+
+10.6. KRONIKA PRZYSTANI
+
+[AKTYWNE]
+
+Po każdym udanym zakończeniu Kronika powstaje z faktycznego zapisu i pokazuje:
+
+- nazwę zakończenia;
+- dzień nadejścia Czarnego Frontu;
+- dzień pierwszego osiągnięcia 100% integralności;
+- integralność przed i po sztormie;
+- liczbę dni utrzymania pełnej integralności;
+- liczbę wypraw i bezpiecznych powrotów;
+- śmierci nurków oraz odzyskane plecaki;
+- żyjących i zmarłych mieszkańców;
+- uratowane, przyjęte i odrzucone osoby;
+- los Leona;
+- poziomy sześciu budynków;
+- pozostałe jedzenie, leki i materiały;
+- stan R-3, C-4, Rozdzielacza i Radiostacji;
+- wybraną konfigurację energii;
+- los Platformy Północnej;
+- końcową Nadzieję;
+- najważniejsze decyzje wydarzeń.
+
+Kronika nie wybiera automatycznie osoby opuszczającej Przystań. Nikt nie otrzymuje statusu odejścia na podstawie kolejności w liście mieszkańców.
+
+10.7. KONTYNUUJ KRONIKĘ
+
+[AKTYWNE]
+
+Po wybraniu tej opcji:
+
+- pozostaje ten sam zapis kampanii;
+- Czarny Front jest trwale zakończony;
+- mapa zachowuje kontenery, skróty, boje, urządzenia, plecaki i miejsca śmierci;
+- mieszkańcy zachowują zdrowie, głód, rozwój, specjalizacje i relacje narracyjne;
+- można dalej budować, nurkować i rozstrzygać wydarzenia;
+- nikt automatycznie nie opuszcza Przystani;
+- nie powstaje nowy ląd ani nowy region bez osobnej decyzji produktowej.
+
+[DOCELOWE] Jeżeli Platforma Północna przetrwała, pojawiają się późniejsze wydarzenia radiowe, wymiana informacji i prośby o pomoc. Jej mieszkańcy nie są automatycznie dodawani do rosteru Przystani.
+
+Jeżeli Północna została utracona, jej częstotliwość pozostaje martwa, a Kronika zachowuje ostatnią odebraną transmisję.
+
+11. PRZYKŁAD WYKONALNEGO DNIA
+
+[DOCELOWE] — PRZYKŁAD MODELU NOWEJ KAMPANII
+
+Jest dzień dziewiąty na profilu Standard. Do Czarnego Frontu pozostały cztery pełne dni. Integralność Przystani wynosi 91%.
+
+W osadzie mieszka pięć osób: troje założycieli oraz przyjęci wcześniej Zofia i Paweł. Magazyn ma 18 jednostek jedzenia. Działa Chata I z Mirą, Kuchnia I z jedną zdolną osobą, Dom Wspólnoty I oraz Warsztat II z Anką. Dla jednoznaczności przykładu wszyscy pracownicy są zdolni, tempo budynków jest Normalne, a presja łowiska po regeneracji wynosi zero.
+
+Warsztat mógłby naprawić 6 punktów integralności: 5 z poziomu II i 1 za Mechanika. Gracz wybiera jednak ukończenie Regulatora R-3, którego koszt został wcześniej zarezerwowany. Dodatni postęp produkcji blokuje naprawę tego dnia. Prognoza pogody pokazuje 2 punkty uszkodzenia po rozliczeniu, więc przewidywana integralność spada z 91 do 89%.
+
+Nurek wraca z 10 jednostkami jedzenia, innym łupem i uratowanym Leonem. Wynik wyprawy jest stosowany przed racjami, więc podczas posiłku żyje już sześć osób.
+
+Bilans jedzenia:
+
+- zapas początkowy: 18;
+- nominalny połów Miry w Chacie I: +6;
+- łup wyprawy: +10;
+- dostępne przed racjami: 34;
+- koszt pełnych racji z Kuchnią I: `round(6 × 4 × 0,92) = 22`;
+- zapas po posiłku: 12.
+
+Wszyscy dostają pełną rację. Leon potrzebuje schronienia. Dom I ma cztery miejsca, więc dwie z sześciu osób są bez dachu i dają łącznie -8 Nadziei. Lecznica ukończona dopiero podczas tego rozliczenia nie ma wcześniejszej migawki zdolnej obsady i nie leczy Leona tej samej nocy.
+
+Raport pokazuje równocześnie:
+
+- bezpieczny powrót, łup i ratunek;
+- pełne racje i koszt schronienia;
+- ukończony Regulator R-3;
+- brak naprawy Warsztatu z powodu produkcji;
+- integralność 91 -> 89;
+- Czarny Front za trzy dni.
+
+To jest sedno nowej kampanii: uratowany człowiek jest nagrodą i kosztem, a część potrzebna do ocalenia drugiej platformy konkuruje bezpośrednio z naprawą własnego domu.
+
+12. GRANICA ROADMAPY
+
+[DOCELOWE] — ZATWIERDZONY ZAKRES NIEWDROŻONY
+
+Zatwierdzone, lecz nadal niewdrożone piony produktu:
+
+- pełna integracja rotacji załogi: ekspedycje łodzią, odejścia, kandydatury, poranny commit i zapis;
+- późniejsze zdarzenia radiowe zależne od losu Platformy Północnej;
+- pełne osobiste warianty dialogów ról odpornych na śmierć konkretnych bohaterów;
+- relacje, konflikty i konsekwencje cech wykraczające poza warianty dialogów i Kronikę;
+- pełna mechaniczna tożsamość czterech biomów;
+- dodatkowe zagrożenia, ratunki i narzędzia;
+- odradzanie wybranych zasobów biologicznych;
+- ewentualna nowa fizyczna platforma lub dzielnice wyłącznie po osobnej decyzji produktowej.

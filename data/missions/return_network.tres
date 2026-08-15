@@ -1,0 +1,39 @@
+[gd_resource type="Resource" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="PlaceBuoy"]
+script = ExtResource("2_objective")
+id = "place_navigation_buoy"
+kind = "buoy_count"
+text = "Ustaw co najmniej jedną boję nawigacyjną."
+description = "Boje tworzą stałe punkty orientacyjne dla kolejnych wypraw."
+required_count = 1
+target_landmark_id = "R2-02"
+landmark_label = "Park — punkt B-01"
+guidance = "Po ulepszeniu Stacji Nurkowej do III poziomu ustaw pierwszą boję w Parku (R2-02, B-01)."
+
+[sub_resource type="Resource" id="OpenShortcut"]
+script = ExtResource("2_objective")
+id = "open_navigation_shortcut"
+kind = "shortcut_count"
+text = "Otwórz co najmniej jeden trwały skrót."
+description = "Skróty skracają drogę powrotną i łączą odległe części zatopionego miasta."
+required_count = 1
+target_landmark_id = "R1-04"
+landmark_label = "Parking — skrót SC-01"
+guidance = "Otwórz trwały skrót SC-01 między Parkingiem (R1-04) a Stacją Nurkową."
+
+[resource]
+script = ExtResource("1_mission")
+id = "return_network"
+category = "side"
+title = "SIEĆ POWROTÓW"
+summary = "Zacznij budować trwałą sieć orientacji: ustaw boję i otwórz skrót w zatopionym mieście."
+completion_text = "Pierwsze stałe punkty tworzą bezpieczniejszą sieć powrotów."
+sort_order = 140
+unlock_kind = "building_level"
+unlock_target_id = "diving_station"
+unlock_required_level = 3
+objectives = Array[Resource]([SubResource("PlaceBuoy"), SubResource("OpenShortcut")])

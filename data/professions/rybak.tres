@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionDefinition.gd" id="1_profession"]
+
+[resource]
+script = ExtResource("1_profession")
+id = "rybak"
+display_name = "Rybactwo"
+building_definition_id = "fishing_hut"
+description = "Praktyka zdobywana podczas rzeczywistych połowów w Chacie Rybackiej."
+specialist_benefit = "Zwiększa dzienny połów."
+sort_order = 10

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ostatni Pomost Art"
+  short_description: "Profesjonalny workflow grafiki, animacji i VFX"
+  default_prompt: "Użyj $ostatni-pomost-art, aby prześledzić aktywny asset, profesjonalnie utworzyć, poprawić lub ocenić grafikę, animację albo VFX i domknąć dowód w runtime."
+
+policy:
+  allow_implicit_invocation: true

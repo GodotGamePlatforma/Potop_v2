@@ -1,0 +1,27 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DiveThreatDefinition.gd" id="1_threat"]
+[ext_resource type="Texture2D" path="res://assets/diving/threats/noise_eel.png" id="2_texture"]
+
+[resource]
+script = ExtResource("1_threat")
+id = "noise_eel"
+display_name = "Slepy wegorz"
+description = "Drapieznik ukryty w ruinach. Nie widzi nurka, ale reaguje na halas narzedzi, sprint i mocne swiatlo z bliska."
+noise_detection_radius = 420.0
+light_detection_radius = 155.0
+noise_threshold = 16.0
+light_sensitivity = 0.28
+alert_rate = 58.0
+alert_decay_rate = 14.0
+warning_threshold = 36.0
+attack_threshold = 100.0
+attack_radius = 190.0
+attack_cooldown = 4.5
+post_attack_alert = 24.0
+attack_suit_damage = 24
+attack_health_damage = 6
+max_health = 100
+accent_color = Color(0.82, 0.35, 0.29, 1)
+world_texture = ExtResource("2_texture")
+world_sprite_scale = 0.72

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "medyk_profilaktyk"
+profession_id = "medyk"
+display_name = "Profilaktyk"
+description = "Gdy posiadacz jest zdolny i przypisany do aktywnej Lecznicy, każda nowa presja z kontaktu w pracy lub społeczności spada o 1, ale nie poniżej 1; efekt nie zużywa leku, nie usuwa istniejącego Narażenia i nie wpływa na inne źródła."
+parameters = {"contact_pressure_reduction": 1, "minimum_contact_pressure": 1}
+sort_order = 20

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DiveLightingDefinition.gd" id="1_lighting"]
+
+[resource]
+script = ExtResource("1_lighting")
+shallow_visibility_max_depth = 35.0
+deep_darkness_min_depth = 105.0
+shallow_ambient_color = Color(0.96, 0.98, 1, 1)
+deep_ambient_color = Color(0.32, 0.38, 0.48, 1)
+transition_power = 1.0

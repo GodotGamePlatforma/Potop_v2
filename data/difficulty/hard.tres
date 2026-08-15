@@ -1,0 +1,36 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DifficultyProfile.gd" id="1_difficulty"]
+
+[resource]
+script = ExtResource("1_difficulty")
+profile_id = &"hard"
+profile_name = "Surowy"
+available_in_menu = true
+balance_version = 3
+configuration_signature = ""
+snapshot_sealed = false
+starting_food = 36
+starting_planks = 8
+starting_scrap = 5
+food_per_adult = 4
+loot_density_multiplier = 0.85
+build_cost_multiplier = 1.15
+repair_cost_multiplier = 1.2
+hope_loss_multiplier = 1.2
+hope_gain_multiplier = 0.85
+recovery_speed_multiplier = 0.8
+disease_pressure_modifier = 1
+oxygen_use_multiplier = 1.15
+suit_damage_multiplier = 1.2
+cold_rate_multiplier = 1.2
+threat_aggression_multiplier = 1.2
+current_strength_multiplier = 1.15
+noise_range_multiplier = 1.15
+backpack_weight_multiplier = 1.1
+storm_frequency_multiplier = 1.2
+storm_damage_multiplier = 1.25
+quiet_day_weight = 32.0
+relief_event_weight_multiplier = 0.85
+hardship_event_weight_multiplier = 1.2
+operator_rescue_chance = 0.35

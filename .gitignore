@@ -1,0 +1,25 @@
+# Godot Engine artifacts
+.godot/
+*.import
+!assets/audio/base/oddech_przystani.ogg.import
+!assets/audio/narrative/*.wav.import
+!assets/diving/diver/animated_16f_v1/*.png.import
+!assets/diving/world/materials/underwater_rock_detail*.png.import
+/android/
+/tmp/
+/.tmp_*/
+
+# Local scratch and editor backups
+/temp_*
+/temp/
+/.verify_*/
+*.backup
+*.blend1
+
+# Python cache
+__pycache__/
+*.py[cod]
+tools/audio/__pycache__/
+
+# Build output (if you compile modules)
+bin/

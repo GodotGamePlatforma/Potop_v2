@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DiveProgressionProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+profile_id = &"tank_ii_workshop_ii"
+display_name = "Butla II / Warsztat II"
+campaign_day = 3
+station_level = 2
+workshop_level = 2
+diver_id = "igor"
+oxygen_tank_id = "oxygen_tank_mk2"
+light_id = "diving_lantern_mk1"
+start_entry_point = "R1-00"
+story_access_ids = Array[String](["rescue_knife_unlocked"])

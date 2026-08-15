@@ -1,0 +1,15 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DivingGearDefinition.gd" id="1_gear"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "harpoon_pistol"
+display_name = "Pistolet harpunowy"
+description = "Podwodna broń Warsztatu II. Celuje kursorem i rozpoczyna każdą wyprawę z sześcioma harpunami."
+equipment_slot = "weapon"
+tier = 2
+weapon_damage = 55
+weapon_range = 720.0
+weapon_cooldown = 0.9
+ammunition_per_dive = 6

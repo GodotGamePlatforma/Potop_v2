@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "nurek_technik_glebinowy"
+profession_id = "nurek"
+display_name = "Technik głębinowy"
+description = "Przytrzymanie naprawy przez 1,8 sekundy uruchamia cichy wariant: naprawa ma 60% zwykłej siły i wytwarza 25% zwykłego hałasu."
+parameters = {"hold_seconds": 1.8, "noise_multiplier": 0.25, "repair_amount_multiplier": 0.6}
+sort_order = 20

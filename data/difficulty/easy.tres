@@ -1,0 +1,36 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DifficultyProfile.gd" id="1_difficulty"]
+
+[resource]
+script = ExtResource("1_difficulty")
+profile_id = &"easy"
+profile_name = "Lagodny"
+available_in_menu = true
+balance_version = 3
+configuration_signature = ""
+snapshot_sealed = false
+starting_food = 72
+starting_planks = 16
+starting_scrap = 10
+food_per_adult = 4
+loot_density_multiplier = 1.2
+build_cost_multiplier = 0.85
+repair_cost_multiplier = 0.8
+hope_loss_multiplier = 0.8
+hope_gain_multiplier = 1.15
+recovery_speed_multiplier = 1.2
+disease_pressure_modifier = -1
+oxygen_use_multiplier = 0.85
+suit_damage_multiplier = 0.8
+cold_rate_multiplier = 0.85
+threat_aggression_multiplier = 0.8
+current_strength_multiplier = 0.85
+noise_range_multiplier = 0.85
+backpack_weight_multiplier = 0.9
+storm_frequency_multiplier = 0.8
+storm_damage_multiplier = 0.8
+quiet_day_weight = 60.0
+relief_event_weight_multiplier = 1.25
+hardship_event_weight_multiplier = 0.75
+operator_rescue_chance = 0.65

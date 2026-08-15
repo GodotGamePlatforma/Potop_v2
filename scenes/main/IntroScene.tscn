@@ -1,0 +1,416 @@
+[gd_scene load_steps=18 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/IntroController.gd" id="1_controller"]
+[ext_resource type="Texture2D" path="res://assets/intro/drowned_city.png" id="2_city"]
+[ext_resource type="Texture2D" path="res://assets/intro/platform_discovery.png" id="3_discovery"]
+[ext_resource type="Texture2D" path="res://assets/intro/last_bridge.png" id="4_bridge"]
+[ext_resource type="Texture2D" path="res://assets/intro/platform_prerender.png" id="5_platform"]
+[ext_resource type="Shader" path="res://assets/intro/intro_rain_overlay.gdshader" id="6_rain"]
+[ext_resource type="Shader" path="res://assets/intro/intro_cinematic_overlay.gdshader" id="7_overlay"]
+[ext_resource type="AudioStream" path="res://assets/audio/intro/intro_ambient.ogg" id="8_ambient"]
+[ext_resource type="Script" path="res://scripts/ui/SurvivorPortrait.gd" id="9_survivor_portrait"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rain"]
+resource_local_to_scene = true
+shader = ExtResource("6_rain")
+shader_parameter/anim_time = 0.0
+shader_parameter/rain_intensity = 0.76
+shader_parameter/viewport_size = Vector2(1280, 720)
+shader_parameter/rain_direction = Vector2(0.22, 1)
+shader_parameter/surface_pass = false
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_overlay"]
+resource_local_to_scene = true
+shader = ExtResource("7_overlay")
+shader_parameter/strength = 1.0
+shader_parameter/viewport_size = Vector2(1280, 720)
+shader_parameter/anim_time = 0.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_subtitle"]
+bg_color = Color(0.012, 0.035, 0.043, 0.88)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.77, 0.57, 0.27, 0.72)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+shadow_color = Color(0, 0, 0, 0.6)
+shadow_size = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_title"]
+bg_color = Color(0.007, 0.024, 0.031, 0.66)
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.77, 0.57, 0.27, 0.46)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_portrait"]
+bg_color = Color(0.008, 0.027, 0.034, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.77, 0.57, 0.27, 0.82)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_skip"]
+bg_color = Color(0.018, 0.052, 0.063, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.48, 0.59, 0.58, 0.72)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_skip_hover"]
+bg_color = Color(0.055, 0.105, 0.116, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.86, 0.67, 0.34, 0.94)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_skip_pressed"]
+bg_color = Color(0.09, 0.135, 0.14, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.94, 0.77, 0.45, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="IntroScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+clip_contents = true
+script = ExtResource("1_controller")
+
+[node name="BlackBackground" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.004, 0.012, 0.016, 1)
+
+[node name="VisualStage" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CityPlate" type="TextureRect" parent="VisualStage"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 2
+texture = ExtResource("2_city")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="DiscoveryPlate" type="TextureRect" parent="VisualStage"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 2
+texture = ExtResource("3_discovery")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="PlatformReveal" type="TextureRect" parent="VisualStage"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 2
+texture = ExtResource("5_platform")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BridgePlate" type="TextureRect" parent="VisualStage"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 2
+texture = ExtResource("4_bridge")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="RainOverlay" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("ShaderMaterial_rain")
+color = Color(1, 1, 1, 1)
+
+[node name="WaterlineSweep" type="ColorRect" parent="."]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = -3.0
+offset_bottom = 3.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.42, 0.72, 0.73, 0.72)
+
+[node name="CinematicOverlay" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("ShaderMaterial_overlay")
+color = Color(1, 1, 1, 1)
+
+[node name="ChapterLabel" type="Label" parent="."]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 0
+offset_left = 42.0
+offset_top = 38.0
+offset_right = 360.0
+offset_bottom = 72.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.92, 0.76, 0.45, 1)
+theme_override_colors/font_outline_color = Color(0.01, 0.025, 0.03, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+text = "PIĘĆ LAT DESZCZU"
+
+[node name="TitleGroup" type="Control" parent="."]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Center" type="CenterContainer" parent="TitleGroup"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -36.0
+offset_bottom = -36.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TitlePanel" type="PanelContainer" parent="TitleGroup/Center"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_title")
+
+[node name="Margin" type="MarginContainer" parent="TitleGroup/Center/TitlePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 52
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 52
+theme_override_constants/margin_bottom = 22
+
+[node name="VBox" type="VBoxContainer" parent="TitleGroup/Center/TitlePanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 7
+alignment = 1
+
+[node name="GameTitle" type="Label" parent="TitleGroup/Center/TitlePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.8, 0.49, 1)
+theme_override_colors/font_outline_color = Color(0.006, 0.018, 0.023, 1)
+theme_override_constants/outline_size = 7
+theme_override_font_sizes/font_size = 56
+text = "OSTATNI POMOST"
+horizontal_alignment = 1
+
+[node name="DayTitle" type="Label" parent="TitleGroup/Center/TitlePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.79, 0.78, 1)
+theme_override_colors/font_outline_color = Color(0.006, 0.018, 0.023, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 15
+text = "PRZYSTAŃ  •  DZIEŃ 1  •  PIERWSZY ODDECH"
+horizontal_alignment = 1
+
+[node name="SubtitlePanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 12
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -455.0
+offset_top = -166.0
+offset_right = 455.0
+offset_bottom = -38.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_subtitle")
+
+[node name="Margin" type="MarginContainer" parent="SubtitlePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 25
+theme_override_constants/margin_bottom = 15
+
+[node name="CaptionRow" type="HBoxContainer" parent="SubtitlePanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="MiraPortraitFrame" type="PanelContainer" parent="SubtitlePanel/Margin/CaptionRow"]
+custom_minimum_size = Vector2(84, 98)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_portrait")
+
+[node name="PortraitMargin" type="MarginContainer" parent="SubtitlePanel/Margin/CaptionRow/MiraPortraitFrame"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 2
+theme_override_constants/margin_top = 2
+theme_override_constants/margin_right = 2
+theme_override_constants/margin_bottom = 2
+
+[node name="MiraPortrait" type="Control" parent="SubtitlePanel/Margin/CaptionRow/MiraPortraitFrame/PortraitMargin"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("9_survivor_portrait")
+
+[node name="VBox" type="VBoxContainer" parent="SubtitlePanel/Margin/CaptionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="SpeakerLabel" type="Label" parent="SubtitlePanel/Margin/CaptionRow/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.72, 0.38, 1)
+theme_override_colors/font_outline_color = Color(0.005, 0.02, 0.024, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 14
+text = "MIRA"
+
+[node name="NarrationLabel" type="Label" parent="SubtitlePanel/Margin/CaptionRow/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 66)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.86, 0.91, 0.9, 1)
+theme_override_colors/font_outline_color = Color(0.004, 0.016, 0.021, 0.98)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 26
+text = "Pięć lat temu zaczął padać deszcz."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="IntroSkipButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -184.0
+offset_top = 26.0
+offset_right = -28.0
+offset_bottom = 64.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.78, 0.85, 0.83, 1)
+theme_override_colors/font_hover_color = Color(0.98, 0.83, 0.52, 1)
+theme_override_colors/font_focus_color = Color(0.98, 0.83, 0.52, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.9, 0.68, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBox_skip")
+theme_override_styles/hover = SubResource("StyleBox_skip_hover")
+theme_override_styles/focus = SubResource("StyleBox_skip_hover")
+theme_override_styles/pressed = SubResource("StyleBox_skip_pressed")
+text = "POMIŃ  [ESC]"
+tooltip_text = "Pomiń intro i przejdź do pierwszego dnia."
+
+[node name="FadeOverlay" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.003, 0.011, 0.015, 1)
+
+[node name="AmbientPlayer" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+stream = ExtResource("8_ambient")
+bus = &"Master"
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+unique_name_in_owner = true

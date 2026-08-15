@@ -1,0 +1,54 @@
+[gd_resource type="Resource" script_class="DiseaseDefinition" format=3 uid="uid://bkk48offawd2m"]
+
+[ext_resource type="Script" uid="uid://65pxca0vsaey" path="res://scripts/definitions/DiseaseDefinition.gd" id="1_disease"]
+[ext_resource type="Script" uid="uid://djyshtndr6msx" path="res://scripts/definitions/DiseaseStageDefinition.gd" id="2_stage"]
+
+[sub_resource type="Resource" id="Exposed"]
+script = ExtResource("2_stage")
+phase_id = "exposed"
+display_name = "Narażenie"
+next_phase_id = "symptomatic"
+
+[sub_resource type="Resource" id="Symptomatic"]
+script = ExtResource("2_stage")
+phase_id = "symptomatic"
+display_name = "Objawy"
+next_phase_id = "severe"
+work_efficiency_multiplier = 0.65
+dive_allowed = false
+infectious = true
+contact_pressure = 2
+
+[sub_resource type="Resource" id="Severe"]
+script = ExtResource("2_stage")
+phase_id = "severe"
+display_name = "Stan ciężki"
+next_phase_id = "recovering"
+work_efficiency_multiplier = 0.0
+dive_allowed = false
+infectious = true
+contact_pressure = 3
+daily_health_delta = -15
+
+[sub_resource type="Resource" id="Recovering"]
+script = ExtResource("2_stage")
+phase_id = "recovering"
+display_name = "Rekonwalescencja"
+next_phase_id = "immune"
+work_efficiency_multiplier = 0.8
+dive_allowed = false
+
+[sub_resource type="Resource" id="Immune"]
+script = ExtResource("2_stage")
+phase_id = "immune"
+display_name = "Odporność"
+
+[resource]
+script = ExtResource("1_disease")
+id = "flood_fever"
+display_name = "Gorączka Zalewowa"
+configuration_signature = "0f332829078acde18d0a45f0ad2489a3687c900325f5a6cd598dad0bef6e5586"
+authored_source_pressures = {
+"R1-06": 3
+}
+stages = Array[Resource]([SubResource("Exposed"), SubResource("Symptomatic"), SubResource("Severe"), SubResource("Recovering"), SubResource("Immune")])

@@ -1,0 +1,36 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DifficultyProfile.gd" id="1_difficulty"]
+
+[resource]
+script = ExtResource("1_difficulty")
+profile_id = &"custom"
+profile_name = "Niestandardowy"
+available_in_menu = true
+balance_version = 3
+configuration_signature = ""
+snapshot_sealed = false
+starting_food = 48
+starting_planks = 12
+starting_scrap = 8
+food_per_adult = 4
+loot_density_multiplier = 1.0
+build_cost_multiplier = 1.0
+repair_cost_multiplier = 1.0
+hope_loss_multiplier = 1.0
+hope_gain_multiplier = 1.0
+recovery_speed_multiplier = 1.0
+disease_pressure_modifier = 0
+oxygen_use_multiplier = 1.0
+suit_damage_multiplier = 1.0
+cold_rate_multiplier = 1.0
+threat_aggression_multiplier = 1.0
+current_strength_multiplier = 1.0
+noise_range_multiplier = 1.0
+backpack_weight_multiplier = 1.0
+storm_frequency_multiplier = 1.0
+storm_damage_multiplier = 1.0
+quiet_day_weight = 45.0
+relief_event_weight_multiplier = 1.0
+hardship_event_weight_multiplier = 1.0
+operator_rescue_chance = 0.5

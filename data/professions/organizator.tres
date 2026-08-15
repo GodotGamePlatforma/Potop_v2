@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionDefinition.gd" id="1_profession"]
+
+[resource]
+script = ExtResource("1_profession")
+id = "organizator"
+display_name = "Organizacja"
+building_definition_id = "community_house"
+description = "Praktyka zdobywana podczas podtrzymywania Nadziei w Domu Wspólnoty."
+specialist_benefit = "Dodatkowo zwiększa Nadzieję Przystani."
+sort_order = 50

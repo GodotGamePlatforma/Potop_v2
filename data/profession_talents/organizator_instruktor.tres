@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "organizator_instruktor"
+profession_id = "organizator"
+display_name = "Instruktor"
+description = "Raz dziennie, w tym samym rzeczywistym zdarzeniu pracy, daje innemu współpracownikowi bez talentu Instruktor i z praktyką poniżej 100 dodatkowe 10 praktyki profesji; wybiera najniższą praktykę (remis rozstrzyga ID), maksymalnie do 100."
+parameters = {"practice_bonus": 10, "uses_per_day": 1}
+sort_order = 20

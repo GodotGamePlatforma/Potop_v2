@@ -1,0 +1,11 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/diving/DiveRecoveryQuery.gd" id="1_query"]
+
+[resource]
+script = ExtResource("1_query")
+query_id = &"tutorial_sc01_j7"
+target_ids = Array[String](["SC-01", "junction_j7"])
+trip_mode = 0
+allow_combining_sources = true
+require_full_targets = false

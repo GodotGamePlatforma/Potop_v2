@@ -1,0 +1,56 @@
+[gd_resource type="Resource" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="BuildFishingHut"]
+script = ExtResource("2_objective")
+id = "build_fishing_hut"
+kind = "building_built"
+text = "Wybuduj Chatę Rybacką."
+description = "Zapewni wspólnocie stały połów i pierwsze bezpieczne źródło żywności."
+target_id = "fishing_hut"
+
+[sub_resource type="Resource" id="BuildKitchen"]
+script = ExtResource("2_objective")
+id = "build_kitchen"
+kind = "building_built"
+text = "Wybuduj Kuchnię i Wędzarnię."
+description = "Pozwoli przygotowywać posiłki i lepiej wykorzystywać zapasy."
+target_id = "kitchen"
+
+[sub_resource type="Resource" id="BuildWorkshop"]
+script = ExtResource("2_objective")
+id = "build_workshop"
+kind = "building_built"
+text = "Wybuduj Warsztat Odzysku."
+description = "Otworzy dostęp do ulepszonego sprzętu nurkowego i ciężkich prac."
+target_id = "workshop"
+
+[sub_resource type="Resource" id="BuildInfirmary"]
+script = ExtResource("2_objective")
+id = "build_infirmary"
+kind = "building_built"
+text = "Wybuduj Lecznicę i Suszarnię."
+description = "Da rannym suche łóżka i miejsce do leczenia."
+target_id = "infirmary"
+
+[sub_resource type="Resource" id="BuildCommunityHouse"]
+script = ExtResource("2_objective")
+id = "build_community_house"
+kind = "building_built"
+text = "Wybuduj Dom Wspólnoty."
+description = "Stworzy miejsce zebrań i podtrzyma Nadzieję mieszkańców."
+target_id = "community_house"
+
+[resource]
+script = ExtResource("1_mission")
+id = "foundation_harbor"
+category = "main"
+title = "FUNDAMENT PRZYSTANI"
+summary = "Stacja Nurkowa już działa. Dokończ pięć pozostałych podstawowych budynków, aby Przystań mogła samodzielnie przetrwać. Liczą się wyłącznie ukończone konstrukcje."
+completion_text = "Przystań ma pełne zaplecze potrzebne do dalszej rozbudowy."
+sort_order = 10
+auto_track_on_activate = true
+unlock_kind = "tutorial_complete"
+objectives = Array[Resource]([SubResource("BuildFishingHut"), SubResource("BuildKitchen"), SubResource("BuildWorkshop"), SubResource("BuildInfirmary"), SubResource("BuildCommunityHouse")])

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "mechanik_konserwator"
+profession_id = "mechanik"
+display_name = "Konserwator"
+description = "Rzeczywista naprawa platformy przywraca dodatkowe 2 punkty integralności bez zwiększania kosztu złomu."
+parameters = {"repair_integrity_bonus": 2}
+sort_order = 10

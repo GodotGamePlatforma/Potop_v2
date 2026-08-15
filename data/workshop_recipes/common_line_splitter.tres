@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WorkshopRecipeDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/WorkshopRecipeDefinition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "common_line_splitter"
+display_name = "Rozdzielacz Wspólnej Linii"
+description = "Rozdziela ustabilizowane zasilanie C-4 na dalsze odcinki Wspólnej Linii. Po wykonaniu trzeba zamontować go przy Rozdzielni C-4."
+output_campaign_id = "common_line_splitter"
+required_workshop_level = 3
+required_work_points = 400
+prerequisite_story_flag = "c4_switchboard_active"
+craft_cost = {
+"fabric_rubber": 5,
+"scrap": 10,
+"tech_parts": 4
+}

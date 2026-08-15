@@ -1,0 +1,11 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/diving/DiveRecoveryQuery.gd" id="1_query"]
+
+[resource]
+script = ExtResource("1_query")
+query_id = &"target_tutorial_market_crate"
+target_ids = Array[String](["tutorial_market_crate"])
+trip_mode = 0
+allow_combining_sources = false
+require_full_targets = true

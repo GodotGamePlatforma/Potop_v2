@@ -1,0 +1,27 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="RescueLeon"]
+script = ExtResource("2_objective")
+id = "rescue_hotel_leon"
+kind = "rescue_outcome"
+text = "Odnajdź i uratuj Leona Wronę."
+description = "Uwolnij ocalałego, w razie potrzeby ustabilizuj go lekami i wróć z nim do liny. Jego śmierć oznacza niepowodzenie zadania."
+target_id = "rescue_hotel_leon"
+target_landmark_id = "R1-03"
+landmark_label = "Zatopiony Hotel"
+guidance = "W Zatopionym Hotelu (R1-03) czeka uwięziony Leon. Łom jest stałym narzędziem wyprawy; jeśli Leon będzie wymagał stabilizacji, znajdź pod wodą leki i zachowaj je w plecaku."
+
+[resource]
+script = ExtResource("1_mission")
+id = "rescue_leon"
+category = "side"
+title = "GŁOS Z HOTELU"
+summary = "Spod wody dochodzi słaby głos. Ktoś wciąż żyje w Zatopionym Hotelu."
+completion_text = "Leon bezpiecznie dotarł do Przystani."
+failure_text = "Głos w hotelu ucichł na zawsze."
+sort_order = 110
+unlock_kind = "tutorial_complete"
+objectives = Array[Resource]([SubResource("RescueLeon")])

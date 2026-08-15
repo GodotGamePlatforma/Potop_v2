@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "medyk_rehabilitant"
+profession_id = "medyk"
+display_name = "Rehabilitant"
+description = "Pacjent objęty rzeczywistą terapią kończy dzień z dodatkowym zmniejszeniem zmęczenia o 4 punkty."
+parameters = {"treated_fatigue_delta": -4}
+sort_order = 10

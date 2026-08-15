@@ -1,0 +1,33 @@
+class_name GamePhase
+extends RefCounted
+
+enum Phase {
+	MAIN_MENU,
+	DAY_START_REPORT,
+	BASE_PLANNING,
+	EXPEDITION_SETUP,
+	DIVING,
+	DIVE_RESULT,
+	DAY_RESOLUTION,
+	END_DAY_REPORT,
+	CRISIS,
+	GAME_OVER,
+	ENDING,
+}
+
+const LABELS := {
+	Phase.MAIN_MENU: "MAIN_MENU",
+	Phase.DAY_START_REPORT: "DAY_START_REPORT",
+	Phase.BASE_PLANNING: "BASE_PLANNING",
+	Phase.EXPEDITION_SETUP: "EXPEDITION_SETUP",
+	Phase.DIVING: "DIVING",
+	Phase.DIVE_RESULT: "DIVE_RESULT",
+	Phase.DAY_RESOLUTION: "DAY_RESOLUTION",
+	Phase.END_DAY_REPORT: "END_DAY_REPORT",
+	Phase.CRISIS: "CRISIS",
+	Phase.GAME_OVER: "GAME_OVER",
+	Phase.ENDING: "ENDING",
+}
+
+static func label(phase: int) -> String:
+	return LABELS.get(phase, "UNKNOWN")

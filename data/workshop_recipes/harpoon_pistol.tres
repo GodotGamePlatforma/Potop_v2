@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/WorkshopRecipeDefinition.gd" id="1_recipe"]
+
+[resource]
+script = ExtResource("1_recipe")
+id = "harpoon_pistol"
+display_name = "Pistolet harpunowy"
+description = "Zbuduj podwodną broń dystansową z sześcioma odnawianymi harpunami na wyprawę."
+output_gear_id = "harpoon_pistol"
+required_workshop_level = 2
+required_work_points = 200
+craft_cost = {"fabric_rubber": 3, "scrap": 6, "tech_parts": 2}

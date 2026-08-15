@@ -1,0 +1,588 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/SettingsMenu.gd" id="1_settings"]
+[ext_resource type="Theme" path="res://assets/ui/main_menu_theme.tres" id="2_theme"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_shell"]
+bg_color = Color(0.055, 0.105, 0.112, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.42, 0.61, 0.6, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.72)
+shadow_size = 22
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_nav"]
+bg_color = Color(0.035, 0.075, 0.082, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.23, 0.37, 0.37, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_card"]
+bg_color = Color(0.042, 0.086, 0.094, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.22, 0.36, 0.36, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_capture"]
+bg_color = Color(0.035, 0.075, 0.086, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.91, 0.73, 0.37, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.8)
+shadow_size = 18
+
+[node name="SettingsOverlay" type="Control"]
+visible = false
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+theme = ExtResource("2_theme")
+script = ExtResource("1_settings")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.004, 0.012, 0.016, 0.74)
+
+[node name="SafeMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 18.0
+offset_right = -24.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_top = 0
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 0
+
+[node name="Center" type="CenterContainer" parent="SafeMargin"]
+layout_mode = 2
+
+[node name="SettingsPanel" type="PanelContainer" parent="SafeMargin/Center"]
+custom_minimum_size = Vector2(1100, 650)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_shell")
+
+[node name="OuterMargin" type="MarginContainer" parent="SafeMargin/Center/SettingsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="RootLayout" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Heading" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Header/Heading"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.8, 0.48, 1)
+theme_override_font_sizes/font_size = 30
+text = "USTAWIENIA"
+
+[node name="Subtitle" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Header/Heading"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.75, 0.74, 1)
+theme_override_font_sizes/font_size = 13
+text = "Ustawienia użytkownika są niezależne od zapisu kampanii."
+
+[node name="CloseButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Header"]
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+tooltip_text = "Anuluj zmiany i zamknij"
+text = "×"
+
+[node name="TopSeparator" type="HSeparator" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout"]
+layout_mode = 2
+
+[node name="Body" type="HBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="NavigationPanel" type="PanelContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body"]
+custom_minimum_size = Vector2(212, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_nav")
+
+[node name="NavigationMargin" type="MarginContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 12
+
+[node name="CategoryButtons" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DisplayCategoryButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin/CategoryButtons"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+text = "OBRAZ"
+alignment = 0
+
+[node name="AudioCategoryButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin/CategoryButtons"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+toggle_mode = true
+text = "DŹWIĘK"
+alignment = 0
+
+[node name="ControlsCategoryButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin/CategoryButtons"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+toggle_mode = true
+text = "STEROWANIE"
+alignment = 0
+
+[node name="GeneralCategoryButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin/CategoryButtons"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+toggle_mode = true
+text = "OGÓLNE"
+alignment = 0
+
+[node name="NavigationSpacer" type="Control" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin/CategoryButtons"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="NavigationHint" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/NavigationPanel/NavigationMargin/CategoryButtons"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.56, 0.56, 1)
+theme_override_font_sizes/font_size = 11
+text = "ESC  •  anuluj i wróć"
+horizontal_alignment = 1
+
+[node name="ContentCard" type="PanelContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_card")
+
+[node name="ContentMargin" type="MarginContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="ContentScroll" type="ScrollContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Sections" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DisplaySection" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="SectionTitle" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.76, 0.44, 1)
+theme_override_font_sizes/font_size = 22
+text = "OBRAZ"
+
+[node name="SectionDescription" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.72, 0.71, 1)
+text = "Tryb okna, płynność, wygładzanie krawędzi i szczegółowość efektów."
+autowrap_mode = 2
+
+[node name="DisplayGrid" type="GridContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection"]
+layout_mode = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 12
+columns = 2
+
+[node name="ModeLabel" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+layout_mode = 2
+text = "Tryb wyświetlania"
+
+[node name="DisplayModePicker" type="OptionButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+custom_minimum_size = Vector2(300, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ResolutionLabel" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+layout_mode = 2
+text = "Rozdzielczość okna"
+
+[node name="ResolutionPicker" type="OptionButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+custom_minimum_size = Vector2(300, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VsyncLabel" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+layout_mode = 2
+text = "Synchronizacja pionowa"
+
+[node name="VsyncCheck" type="CheckButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "WŁĄCZONA"
+
+[node name="FpsLabel" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+layout_mode = 2
+text = "Limit klatek na sekundę"
+
+[node name="FpsPicker" type="OptionButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+custom_minimum_size = Vector2(300, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="QualityLabel" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+layout_mode = 2
+text = "Jakość grafiki"
+
+[node name="QualityPicker" type="OptionButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection/DisplayGrid"]
+custom_minimum_size = Vector2(300, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DisplayWarning" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/DisplaySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.77, 0.67, 0.44, 1)
+theme_override_font_sizes/font_size = 12
+text = "Zmiana trybu lub rozdzielczości wymaga potwierdzenia w ciągu 15 sekund. W przeciwnym razie poprzedni obraz zostanie przywrócony."
+autowrap_mode = 2
+
+[node name="AudioSection" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 14
+
+[node name="SectionTitle" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.76, 0.44, 1)
+theme_override_font_sizes/font_size = 22
+text = "DŹWIĘK"
+
+[node name="SectionDescription" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.72, 0.71, 1)
+text = "Projekt używa obecnie jednej rzeczywistej magistrali Master. Podgląd jest słyszalny od razu, lecz ANULUJ przywróci poprzednią głośność."
+autowrap_mode = 2
+
+[node name="VolumeRow" type="HBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="VolumeTitle" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection/VolumeRow"]
+custom_minimum_size = Vector2(184, 0)
+layout_mode = 2
+text = "Głośność główna"
+
+[node name="MasterVolumeSlider" type="HSlider" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection/VolumeRow"]
+custom_minimum_size = Vector2(330, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 0.8
+
+[node name="VolumeValue" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection/VolumeRow"]
+custom_minimum_size = Vector2(58, 0)
+layout_mode = 2
+text = "80%"
+horizontal_alignment = 2
+
+[node name="MasterMuteCheck" type="CheckButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "Wycisz wszystkie dźwięki"
+
+[node name="TestToneButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection"]
+custom_minimum_size = Vector2(280, 44)
+layout_mode = 2
+size_flags_horizontal = 0
+text = "ODTWÓRZ DŹWIĘK TESTOWY"
+
+[node name="AudioHint" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/AudioSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.43, 0.58, 0.58, 1)
+theme_override_font_sizes/font_size = 12
+text = "Krótki ton jest generowany lokalnie i przechodzi przez magistralę Master."
+autowrap_mode = 2
+
+[node name="ControlsSection" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 7
+
+[node name="SectionTitle" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.76, 0.44, 1)
+theme_override_font_sizes/font_size = 22
+text = "STEROWANIE"
+
+[node name="SectionDescription" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.72, 0.71, 1)
+text = "Skróty wyprawy i Bazy są w dwóch kolumnach; konflikty sprawdzamy osobno. ESC anuluje, DELETE czyści drugi klawisz."
+autowrap_mode = 2
+
+[node name="BindingsHeader" type="GridContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+columns = 2
+
+[node name="ActionHeader" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection/BindingsHeader"]
+custom_minimum_size = Vector2(0, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.48, 0.64, 0.63, 1)
+theme_override_font_sizes/font_size = 11
+text = "WYPRAWA"
+
+[node name="PrimaryHeader" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection/BindingsHeader"]
+custom_minimum_size = Vector2(0, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.48, 0.64, 0.63, 1)
+theme_override_font_sizes/font_size = 11
+text = "BAZA"
+
+[node name="SecondaryHeader" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection/BindingsHeader"]
+visible = false
+custom_minimum_size = Vector2(0, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.64, 0.63, 1)
+theme_override_font_sizes/font_size = 11
+text = "DODATKOWY"
+horizontal_alignment = 1
+
+[node name="BindingRows" type="GridContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 5
+columns = 2
+
+[node name="BindingStatus" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/ControlsSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.55, 0.45, 1)
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
+
+[node name="GeneralSection" type="VBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 14
+
+[node name="SectionTitle" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/GeneralSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.76, 0.44, 1)
+theme_override_font_sizes/font_size = 22
+text = "OGÓLNE"
+
+[node name="SectionDescription" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/GeneralSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.72, 0.71, 1)
+text = "Opcje komfortu i zachowania aplikacji."
+
+[node name="ReducedMotionCheck" type="CheckButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/GeneralSection"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "Ogranicz animacje interfejsu i budynków"
+
+[node name="ReducedMotionDescription" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/GeneralSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.59, 0.59, 1)
+theme_override_font_sizes/font_size = 12
+text = "Wyłącza pulsowanie, przejścia paneli i mikroanimacje budynków. Animacja morza oraz pogody pozostaje aktywna."
+autowrap_mode = 2
+
+[node name="PauseFocusCheck" type="CheckButton" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/GeneralSection"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "Wstrzymaj grę po utracie fokusu okna"
+
+[node name="PauseFocusDescription" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Body/ContentCard/ContentMargin/ContentScroll/Sections/GeneralSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.59, 0.59, 1)
+theme_override_font_sizes/font_size = 12
+text = "Chroni wyprawę przed upływem czasu, gdy przełączysz się do innego programu."
+autowrap_mode = 2
+
+[node name="BottomSeparator" type="HSeparator" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout"]
+layout_mode = 2
+
+[node name="Footer" type="HBoxContainer" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DefaultsButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Footer"]
+custom_minimum_size = Vector2(230, 46)
+layout_mode = 2
+text = "PRZYWRÓĆ DOMYŚLNE"
+
+[node name="StatusLabel" type="Label" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.55, 0.69, 0.68, 1)
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="CancelButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Footer"]
+custom_minimum_size = Vector2(140, 46)
+layout_mode = 2
+text = "ANULUJ"
+
+[node name="ApplyButton" type="Button" parent="SafeMargin/Center/SettingsPanel/OuterMargin/RootLayout/Footer"]
+custom_minimum_size = Vector2(160, 46)
+layout_mode = 2
+text = "ZASTOSUJ"
+
+[node name="CaptureOverlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="CaptureBackdrop" type="ColorRect" parent="CaptureOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.76)
+
+[node name="CaptureCenter" type="CenterContainer" parent="CaptureOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CapturePanel" type="PanelContainer" parent="CaptureOverlay/CaptureCenter"]
+custom_minimum_size = Vector2(520, 260)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_capture")
+
+[node name="CaptureMargin" type="MarginContainer" parent="CaptureOverlay/CaptureCenter/CapturePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 28
+
+[node name="CaptureLayout" type="VBoxContainer" parent="CaptureOverlay/CaptureCenter/CapturePanel/CaptureMargin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="CaptureTitle" type="Label" parent="CaptureOverlay/CaptureCenter/CapturePanel/CaptureMargin/CaptureLayout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.8, 0.48, 1)
+theme_override_font_sizes/font_size = 22
+text = "NACIŚNIJ KLAWISZ"
+horizontal_alignment = 1
+
+[node name="CapturePrompt" type="Label" parent="CaptureOverlay/CaptureCenter/CapturePanel/CaptureMargin/CaptureLayout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.77, 0.85, 0.83, 1)
+text = "Nowe przypisanie"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="CaptureHint" type="Label" parent="CaptureOverlay/CaptureCenter/CapturePanel/CaptureMargin/CaptureLayout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.64, 0.63, 1)
+theme_override_font_sizes/font_size = 12
+text = "ESC anuluje. DELETE usuwa tylko dodatkowy klawisz. F10 jest zarezerwowany."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="CaptureSpacer" type="Control" parent="CaptureOverlay/CaptureCenter/CapturePanel/CaptureMargin/CaptureLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="CaptureCancelButton" type="Button" parent="CaptureOverlay/CaptureCenter/CapturePanel/CaptureMargin/CaptureLayout"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "ANULUJ"
+
+[node name="DisplayConfirmation" type="ConfirmationDialog" parent="."]
+title = "Czy obraz jest widoczny?"
+initial_position = 1
+size = Vector2i(560, 220)
+exclusive = true
+dialog_text = "Zachować nowe ustawienia obrazu?"
+ok_button_text = "ZACHOWAJ"
+cancel_button_text = "COFNIJ"
+
+[node name="DisplayRollbackTimer" type="Timer" parent="."]
+wait_time = 1.0
+
+[node name="TestTonePlayer" type="AudioStreamPlayer" parent="."]
+bus = &"Master"

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionTalentDefinition.gd" id="1_talent"]
+
+[resource]
+script = ExtResource("1_talent")
+id = "rybak_straznik_lowiska"
+profession_id = "rybak"
+display_name = "Strażnik łowiska"
+description = "Każda zdobyta jednostka żywności wytwarza tylko 70% zwykłej presji na łowisko. Wielkość połowu się nie zmienia."
+parameters = {"pressure_multiplier": 0.7}
+sort_order = 10

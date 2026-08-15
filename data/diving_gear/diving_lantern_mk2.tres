@@ -1,0 +1,15 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DivingGearDefinition.gd" id="1_gear"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "diving_lantern_mk2"
+display_name = "Latarnia nurkowa II"
+description = "Wzmocniona latarnia z Warsztatu Odzysku. Wyraźnie zwiększa bezpieczny obszar widzenia."
+equipment_slot = "light"
+tier = 2
+light_inner_radius = 230.0
+light_outer_radius = 480.0
+light_energy = 1.1
+light_color = Color(0.76, 0.92, 1, 1)

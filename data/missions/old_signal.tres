@@ -1,0 +1,26 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="ActivateArchiveTerminal"]
+script = ExtResource("2_objective")
+id = "transmit_common_line_map"
+kind = "fixed_device_activated"
+text = "Uruchom terminal i prześlij mapę Wspólnej Linii."
+description = "Otwórz wejście, przywróć lokalne zasilanie i wyślij dane naprawionym kablem. Nie zabierasz przedmiotu fabularnego."
+target_id = "archive_terminal"
+target_landmark_id = "R1-09"
+landmark_label = "Zalane Archiwum"
+guidance = "Wyrusz do Zalanego Archiwum R1-09, uruchom terminal, prześlij mapę i wróć do aktywnej liny."
+
+[resource]
+script = ExtResource("1_mission")
+id = "old_signal"
+category = "main"
+title = "MAPA WSPÓLNEJ SIECI"
+summary = "Klara przekazała współrzędne starego terminala w Zalanym Archiwum. Dane wyjaśnią połączenie Przystani z Platformą Północną."
+completion_text = "Mapa ujawnia wspólny bank energii, Generator R-3 i Centralną Rozdzielnię C-4."
+sort_order = 20
+unlock_kind = "tutorial_complete"
+objectives = Array[Resource]([SubResource("ActivateArchiveTerminal")])

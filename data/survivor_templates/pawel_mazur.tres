@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/SurvivorDefinition.gd" id="1_survivor"]
+
+[resource]
+script = ExtResource("1_survivor")
+id = "pawel_mazur"
+display_name = "Paweł Mazur"
+age_group = "adult"
+biography = "Cieśla okrętowy, który utrzymywał ich tratwę na wodzie przez wiele tygodni."
+profession = "cieśla"
+positive_trait = "spokojny"
+negative_trait = "uparty"
+portrait_id = "pawel_mazur"
+health = 76
+morale = 45

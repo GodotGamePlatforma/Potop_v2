@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DiveProgressionProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+profile_id = &"story_r3_diagnostic_main_line"
+display_name = "Wspólna Linia / diagnostyka R-3 / główna lina"
+campaign_day = 5
+station_level = 3
+workshop_level = 3
+diver_id = "igor"
+oxygen_tank_id = "oxygen_tank_mk3"
+light_id = "diving_lantern_mk1"
+opened_shortcut_ids = Array[String](["SC-01"])
+activated_fixed_device_ids = Array[String](["junction_j7", "archive_terminal"])
+start_entry_point = "R1-00"
+story_access_ids = Array[String](["rescue_knife_unlocked", "archive_terminal_active"])

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DivingGearDefinition.gd" id="1_gear"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "diving_lantern_mk1"
+display_name = "Latarnia nurkowa I"
+description = "Awaryjna latarnia stacji nurkowej. Daje ograniczony, miękko wygaszany krąg widoczności."
+equipment_slot = "light"
+tier = 1
+light_inner_radius = 155.0
+light_outer_radius = 350.0
+light_energy = 1.0
+light_color = Color(0.72, 0.9, 1, 1)
+is_emergency_default = true

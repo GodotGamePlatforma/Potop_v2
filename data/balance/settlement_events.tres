@@ -1,0 +1,333 @@
+[gd_resource type="Resource" load_steps=45 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/SettlementEventBalanceDefinition.gd" id="1_balance"]
+[ext_resource type="Script" path="res://scripts/definitions/SettlementEventWeightRuleDefinition.gd" id="2_rule"]
+[ext_resource type="Script" path="res://scripts/definitions/SettlementEventWeightCurveDefinition.gd" id="3_curve"]
+[ext_resource type="Script" path="res://scripts/definitions/SettlementEventWeightBandDefinition.gd" id="4_band"]
+
+[sub_resource type="Resource" id="PopulationWorkersCritical"]
+script = ExtResource("4_band")
+label = "healthy_workers <= 1"
+maximum_enabled = true
+maximum_value = 1.0
+maximum_inclusive = true
+multiplier = 8.0
+
+[sub_resource type="Resource" id="PopulationWorkersLow"]
+script = ExtResource("4_band")
+label = "1 < healthy_workers <= 2"
+minimum_enabled = true
+minimum_value = 1.0
+minimum_inclusive = false
+maximum_enabled = true
+maximum_value = 2.0
+maximum_inclusive = true
+multiplier = 4.0
+
+[sub_resource type="Resource" id="PopulationWorkersLimited"]
+script = ExtResource("4_band")
+label = "2 < healthy_workers <= 3"
+minimum_enabled = true
+minimum_value = 2.0
+minimum_inclusive = false
+maximum_enabled = true
+maximum_value = 3.0
+maximum_inclusive = true
+multiplier = 1.6
+
+[sub_resource type="Resource" id="PopulationWorkersCurve"]
+script = ExtResource("3_curve")
+metric = "healthy_workers"
+fallback_multiplier = 0.55
+bands = Array[Resource]([SubResource("PopulationWorkersCritical"), SubResource("PopulationWorkersLow"), SubResource("PopulationWorkersLimited")])
+
+[sub_resource type="Resource" id="PopulationShelterAvailable"]
+script = ExtResource("4_band")
+label = "free_shelter >= 2"
+minimum_enabled = true
+minimum_value = 2.0
+multiplier = 1.3
+
+[sub_resource type="Resource" id="PopulationShelterFull"]
+script = ExtResource("4_band")
+label = "free_shelter <= 0"
+maximum_enabled = true
+maximum_value = 0.0
+maximum_inclusive = true
+multiplier = 0.7
+
+[sub_resource type="Resource" id="PopulationShelterCurve"]
+script = ExtResource("3_curve")
+metric = "free_shelter"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("PopulationShelterAvailable"), SubResource("PopulationShelterFull")])
+
+[sub_resource type="Resource" id="PopulationFoodCritical"]
+script = ExtResource("4_band")
+label = "food_days < 0.75"
+maximum_enabled = true
+maximum_value = 0.75
+multiplier = 0.65
+
+[sub_resource type="Resource" id="PopulationFoodCurve"]
+script = ExtResource("3_curve")
+metric = "food_days"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("PopulationFoodCritical")])
+
+[sub_resource type="Resource" id="PopulationRule"]
+script = ExtResource("2_rule")
+trigger_tag = "population_need"
+event_probability_bonus = 0.08
+bonus_activation_multiplier = 3.0
+required_available_impact_tags = Array[String](["workforce_relief", "population_gain"])
+curves = Array[Resource]([SubResource("PopulationWorkersCurve"), SubResource("PopulationShelterCurve"), SubResource("PopulationFoodCurve")])
+
+[sub_resource type="Resource" id="FoodCritical"]
+script = ExtResource("4_band")
+label = "food_days < 0.75"
+maximum_enabled = true
+maximum_value = 0.75
+multiplier = 4.0
+
+[sub_resource type="Resource" id="FoodLow"]
+script = ExtResource("4_band")
+label = "0.75 <= food_days < 1.5"
+minimum_enabled = true
+minimum_value = 0.75
+maximum_enabled = true
+maximum_value = 1.5
+multiplier = 2.2
+
+[sub_resource type="Resource" id="FoodAbundant"]
+script = ExtResource("4_band")
+label = "food_days >= 3"
+minimum_enabled = true
+minimum_value = 3.0
+multiplier = 0.6
+
+[sub_resource type="Resource" id="FoodNeedCurve"]
+script = ExtResource("3_curve")
+metric = "food_days"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("FoodCritical"), SubResource("FoodLow"), SubResource("FoodAbundant")])
+
+[sub_resource type="Resource" id="FoodNeedRule"]
+script = ExtResource("2_rule")
+trigger_tag = "food_need"
+event_probability_bonus = 0.08
+bonus_activation_multiplier = 2.0
+required_available_impact_tags = Array[String](["food_relief"])
+curves = Array[Resource]([SubResource("FoodNeedCurve")])
+
+[sub_resource type="Resource" id="MaterialsCritical"]
+script = ExtResource("4_band")
+label = "material_stock < 10"
+maximum_enabled = true
+maximum_value = 10.0
+multiplier = 3.0
+
+[sub_resource type="Resource" id="MaterialsLow"]
+script = ExtResource("4_band")
+label = "10 <= material_stock < 20"
+minimum_enabled = true
+minimum_value = 10.0
+maximum_enabled = true
+maximum_value = 20.0
+multiplier = 1.6
+
+[sub_resource type="Resource" id="MaterialsAbundant"]
+script = ExtResource("4_band")
+label = "material_stock >= 50"
+minimum_enabled = true
+minimum_value = 50.0
+multiplier = 0.65
+
+[sub_resource type="Resource" id="MaterialsNeedCurve"]
+script = ExtResource("3_curve")
+metric = "material_stock"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("MaterialsCritical"), SubResource("MaterialsLow"), SubResource("MaterialsAbundant")])
+
+[sub_resource type="Resource" id="MaterialsNeedRule"]
+script = ExtResource("2_rule")
+trigger_tag = "material_need"
+event_probability_bonus = 0.06
+bonus_activation_multiplier = 1.5
+required_available_impact_tags = Array[String](["material_relief"])
+curves = Array[Resource]([SubResource("MaterialsNeedCurve")])
+
+[sub_resource type="Resource" id="IntegrityCritical"]
+script = ExtResource("4_band")
+label = "integrity < 35"
+maximum_enabled = true
+maximum_value = 35.0
+multiplier = 5.0
+
+[sub_resource type="Resource" id="IntegrityLow"]
+script = ExtResource("4_band")
+label = "35 <= integrity < 55"
+minimum_enabled = true
+minimum_value = 35.0
+maximum_enabled = true
+maximum_value = 55.0
+multiplier = 2.5
+
+[sub_resource type="Resource" id="IntegrityStrong"]
+script = ExtResource("4_band")
+label = "integrity >= 80"
+minimum_enabled = true
+minimum_value = 80.0
+multiplier = 0.6
+
+[sub_resource type="Resource" id="IntegrityNeedCurve"]
+script = ExtResource("3_curve")
+metric = "integrity"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("IntegrityCritical"), SubResource("IntegrityLow"), SubResource("IntegrityStrong")])
+
+[sub_resource type="Resource" id="IntegrityNeedRule"]
+script = ExtResource("2_rule")
+trigger_tag = "low_integrity"
+event_probability_bonus = 0.08
+bonus_activation_multiplier = 2.0
+required_available_impact_tags = Array[String](["integrity_relief"])
+curves = Array[Resource]([SubResource("IntegrityNeedCurve")])
+
+[sub_resource type="Resource" id="HopeCritical"]
+script = ExtResource("4_band")
+label = "hope < 20"
+maximum_enabled = true
+maximum_value = 20.0
+multiplier = 5.0
+
+[sub_resource type="Resource" id="HopeLow"]
+script = ExtResource("4_band")
+label = "20 <= hope < 40"
+minimum_enabled = true
+minimum_value = 20.0
+maximum_enabled = true
+maximum_value = 40.0
+multiplier = 2.2
+
+[sub_resource type="Resource" id="HopeHigh"]
+script = ExtResource("4_band")
+label = "hope >= 70"
+minimum_enabled = true
+minimum_value = 70.0
+multiplier = 0.65
+
+[sub_resource type="Resource" id="HopeNeedCurve"]
+script = ExtResource("3_curve")
+metric = "hope"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("HopeCritical"), SubResource("HopeLow"), SubResource("HopeHigh")])
+
+[sub_resource type="Resource" id="HopeNeedRule"]
+script = ExtResource("2_rule")
+trigger_tag = "low_hope"
+event_probability_bonus = 0.08
+bonus_activation_multiplier = 2.0
+required_available_impact_tags = Array[String](["hope_relief"])
+curves = Array[Resource]([SubResource("HopeNeedCurve")])
+
+[sub_resource type="Resource" id="FoodSurplusCritical"]
+script = ExtResource("4_band")
+label = "food_days < 1"
+maximum_enabled = true
+maximum_value = 1.0
+multiplier = 0.25
+
+[sub_resource type="Resource" id="FoodSurplusComfortable"]
+script = ExtResource("4_band")
+label = "2 <= food_days < 3"
+minimum_enabled = true
+minimum_value = 2.0
+maximum_enabled = true
+maximum_value = 3.0
+multiplier = 1.6
+
+[sub_resource type="Resource" id="FoodSurplusAbundant"]
+script = ExtResource("4_band")
+label = "food_days >= 3"
+minimum_enabled = true
+minimum_value = 3.0
+multiplier = 3.0
+
+[sub_resource type="Resource" id="FoodSurplusCurve"]
+script = ExtResource("3_curve")
+metric = "food_days"
+fallback_multiplier = 0.8
+bands = Array[Resource]([SubResource("FoodSurplusCritical"), SubResource("FoodSurplusComfortable"), SubResource("FoodSurplusAbundant")])
+
+[sub_resource type="Resource" id="FoodSurplusRule"]
+script = ExtResource("2_rule")
+trigger_tag = "food_surplus"
+event_probability_bonus = 0.0
+bonus_activation_multiplier = 1.5
+required_available_impact_tags = Array[String](["hope_relief"])
+curves = Array[Resource]([SubResource("FoodSurplusCurve")])
+
+[sub_resource type="Resource" id="MedicineEmpty"]
+script = ExtResource("4_band")
+label = "medicine_stock == 0"
+minimum_enabled = true
+minimum_value = 0.0
+maximum_enabled = true
+maximum_value = 0.0
+maximum_inclusive = true
+multiplier = 4.0
+
+[sub_resource type="Resource" id="MedicineLow"]
+script = ExtResource("4_band")
+label = "0 < medicine_stock <= 2"
+minimum_enabled = true
+minimum_value = 0.0
+minimum_inclusive = false
+maximum_enabled = true
+maximum_value = 2.0
+maximum_inclusive = true
+multiplier = 2.0
+
+[sub_resource type="Resource" id="MedicineAbundant"]
+script = ExtResource("4_band")
+label = "medicine_stock >= 6"
+minimum_enabled = true
+minimum_value = 6.0
+multiplier = 0.6
+
+[sub_resource type="Resource" id="MedicineNeedCurve"]
+script = ExtResource("3_curve")
+metric = "medicine_stock"
+fallback_multiplier = 1.0
+bands = Array[Resource]([SubResource("MedicineEmpty"), SubResource("MedicineLow"), SubResource("MedicineAbundant")])
+
+[sub_resource type="Resource" id="MedicineNeedRule"]
+script = ExtResource("2_rule")
+trigger_tag = "medicine_need"
+event_probability_bonus = 0.05
+bonus_activation_multiplier = 1.5
+required_available_impact_tags = Array[String](["medicine_relief"])
+curves = Array[Resource]([SubResource("MedicineNeedCurve")])
+
+[resource]
+script = ExtResource("1_balance")
+balance_id = "settlement_events_v1"
+balance_version = 1
+minimum_event_day = 3
+fallback_quiet_day_percentage = 45.0
+minimum_event_probability = 0.25
+maximum_event_probability = 0.8
+maximum_need_probability_bonus = 0.2
+minimum_weight_multiplier = 0.1
+maximum_weight_multiplier = 5.5
+force_workforce_recovery = true
+critical_alive_maximum = 2
+critical_healthy_workers_maximum = 1
+forced_minimum_food_days = 0.75
+forced_minimum_free_shelter = 2
+forced_recovery_role = "workforce"
+recovery_safe_tones = Array[String](["relief", "opportunity"])
+recovery_match_weight_multiplier = 2.4
+preferred_impact_weight_multiplier = 1.35
+trigger_rules = Array[Resource]([SubResource("PopulationRule"), SubResource("FoodNeedRule"), SubResource("MaterialsNeedRule"), SubResource("IntegrityNeedRule"), SubResource("HopeNeedRule"), SubResource("FoodSurplusRule"), SubResource("MedicineNeedRule")])

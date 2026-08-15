@@ -1,0 +1,26 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="RecoverHeavyObject"]
+script = ExtResource("2_objective")
+id = "recover_heavy_object"
+kind = "heavy_recovered_count"
+text = "Oznacz i wydobądź co najmniej jeden ciężki obiekt."
+description = "Dzwon głębinowy i Wyciągarka pozwalają sprowadzać do Przystani znaleziska niemożliwe do uniesienia przez nurka."
+required_count = 1
+target_landmark_id = "R1-07"
+landmark_label = "Statek w Ulicy"
+guidance = "Wypatrz silnik statku przy Statku w Ulicy (R1-07), oznacz go pod wodą, a następnie użyj ciężkiego odzysku w bazie."
+
+[resource]
+script = ExtResource("1_mission")
+id = "heavy_recovery"
+category = "side"
+title = "CIĘŻKI ODZYSK"
+summary = "Wykorzystaj Stację Nurkową IV i Warsztat III, aby odzyskać pierwszy ciężki obiekt."
+completion_text = "Ciężki ładunek dotarł do Przystani i otwiera nowe możliwości odbudowy."
+sort_order = 150
+unlock_kind = "heavy_recovery_available"
+objectives = Array[Resource]([SubResource("RecoverHeavyObject")])

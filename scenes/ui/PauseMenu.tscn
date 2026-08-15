@@ -1,0 +1,323 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/PauseMenu.gd" id="1_pause"]
+[ext_resource type="Theme" path="res://assets/ui/main_menu_theme.tres" id="2_theme"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.055, 0.105, 0.112, 0.985)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.48, 0.68, 0.66, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.8)
+shadow_size = 24
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary"]
+bg_color = Color(0.42, 0.286, 0.118, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.91, 0.72, 0.37, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary_hover"]
+bg_color = Color(0.55, 0.37, 0.14, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.85, 0.55, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_secondary"]
+bg_color = Color(0.067, 0.14, 0.153, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.46, 0.47, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_secondary_hover"]
+bg_color = Color(0.105, 0.205, 0.218, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.48, 0.7, 0.69, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_disabled"]
+bg_color = Color(0.052, 0.073, 0.076, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.19, 0.25, 0.25, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_danger"]
+bg_color = Color(0.16, 0.065, 0.058, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.25, 0.21, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_danger_hover"]
+bg_color = Color(0.27, 0.09, 0.075, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9, 0.39, 0.31, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 11.0
+content_margin_right = 16.0
+content_margin_bottom = 11.0
+
+[node name="PauseMenu" type="Control"]
+visible = false
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+theme = ExtResource("2_theme")
+script = ExtResource("1_pause")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.003, 0.011, 0.014, 0.76)
+
+[node name="SafeMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Center" type="CenterContainer" parent="SafeMargin"]
+layout_mode = 2
+mouse_filter = 1
+
+[node name="PausePanel" type="PanelContainer" parent="SafeMargin/Center"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="OuterMargin" type="MarginContainer" parent="SafeMargin/Center/PausePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 18
+
+[node name="Layout" type="VBoxContainer" parent="SafeMargin/Center/PausePanel/OuterMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Eyebrow" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.73, 0.71, 1)
+theme_override_font_sizes/font_size = 12
+text = "OSTATNI POMOST  •  SESJA WSTRZYMANA"
+horizontal_alignment = 1
+
+[node name="Title" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.84, 0.61, 1)
+theme_override_font_sizes/font_size = 30
+text = "PAUZA"
+horizontal_alignment = 1
+
+[node name="ContextLabel" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.78, 0.76, 1)
+theme_override_font_sizes/font_size = 13
+text = "PRZYSTAŃ  •  DZIEŃ 1"
+horizontal_alignment = 1
+
+[node name="TopSeparator" type="HSeparator" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+
+[node name="ContinueButton" type="Button" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath(".")
+theme_override_colors/font_color = Color(1, 0.94, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBox_primary")
+theme_override_styles/hover = SubResource("StyleBox_primary_hover")
+theme_override_styles/pressed = SubResource("StyleBox_primary")
+theme_override_styles/focus = SubResource("StyleBox_primary_hover")
+text = "KONTYNUUJ"
+
+[node name="SaveButton" type="Button" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath(".")
+theme_override_colors/font_color = Color(0.88, 0.93, 0.91, 1)
+theme_override_colors/font_disabled_color = Color(0.42, 0.48, 0.47, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBox_secondary")
+theme_override_styles/hover = SubResource("StyleBox_secondary_hover")
+theme_override_styles/pressed = SubResource("StyleBox_secondary")
+theme_override_styles/focus = SubResource("StyleBox_secondary_hover")
+theme_override_styles/disabled = SubResource("StyleBox_disabled")
+text = "ZAPISZ GRĘ"
+
+[node name="SaveNote" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.54, 0.67, 0.66, 1)
+theme_override_font_sizes/font_size = 11
+text = "Zapisuje bieżący stan kampanii w bezpiecznym punkcie."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="StatusLabel" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.51, 0.76, 0.63, 1)
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="BottomSeparator" type="HSeparator" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+
+[node name="SettingsButton" type="Button" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath(".")
+theme_override_colors/font_color = Color(0.88, 0.93, 0.91, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBox_secondary")
+theme_override_styles/hover = SubResource("StyleBox_secondary_hover")
+theme_override_styles/pressed = SubResource("StyleBox_secondary")
+theme_override_styles/focus = SubResource("StyleBox_secondary_hover")
+text = "USTAWIENIA"
+
+[node name="MainMenuButton" type="Button" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath(".")
+theme_override_colors/font_color = Color(0.94, 0.75, 0.69, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBox_danger")
+theme_override_styles/hover = SubResource("StyleBox_danger_hover")
+theme_override_styles/pressed = SubResource("StyleBox_danger")
+theme_override_styles/focus = SubResource("StyleBox_danger_hover")
+text = "POWRÓT DO MENU GŁÓWNEGO"
+
+[node name="MainMenuNote" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.51, 0.48, 1)
+theme_override_font_sizes/font_size = 11
+text = "Niezapisane zmiany od ostatniego zapisu zostaną utracone."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ExitSeparator" type="HSeparator" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+
+[node name="QuitButton" type="Button" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath(".")
+theme_override_colors/font_color = Color(0.94, 0.75, 0.69, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBox_danger")
+theme_override_styles/hover = SubResource("StyleBox_danger_hover")
+theme_override_styles/pressed = SubResource("StyleBox_danger")
+theme_override_styles/focus = SubResource("StyleBox_danger_hover")
+text = "WYJDŹ Z GRY"
+
+[node name="QuitNote" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.51, 0.48, 1)
+theme_override_font_sizes/font_size = 11
+text = "Aplikacja zostanie zamknięta bez dodatkowego zapisu."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Hint" type="Label" parent="SafeMargin/Center/PausePanel/OuterMargin/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.49, 0.49, 1)
+theme_override_font_sizes/font_size = 11
+text = "ESC  •  KONTYNUUJ"
+horizontal_alignment = 1

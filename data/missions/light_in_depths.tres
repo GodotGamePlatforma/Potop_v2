@@ -1,0 +1,25 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="CraftLantern"]
+script = ExtResource("2_objective")
+id = "craft_diving_lantern_mk2"
+kind = "gear_owned"
+text = "Wykonaj Latarnię nurkową II."
+description = "Jaśniejsze światło ułatwi eksplorację dalszych i ciemniejszych rejonów."
+target_id = "diving_lantern_mk2"
+
+[resource]
+script = ExtResource("1_mission")
+id = "light_in_depths"
+category = "side"
+title = "ŚWIATŁO W GŁĘBINACH"
+summary = "Użyj Warsztatu Odzysku, aby przygotować mocniejszą latarnię nurkową."
+completion_text = "Mocniejsza latarnia rozcina mrok pod Przystanią."
+sort_order = 120
+unlock_kind = "building_built"
+unlock_target_id = "workshop"
+unlock_required_level = 1
+objectives = Array[Resource]([SubResource("CraftLantern")])

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="SurviveCrisis"]
+script = ExtResource("2_objective")
+id = "restore_hope"
+kind = "crisis_recovered"
+text = "Przywróć Nadzieję do co najmniej 15 przed upływem czasu."
+description = "Kryzys przejmuje śledzenie i rozstrzygnięcie kampanii, ale zwykłe prace Wspólnej Linii nadal trwają."
+
+[resource]
+script = ExtResource("1_mission")
+id = "leadership_crisis"
+category = "urgent"
+title = "KRYZYS PRZYWÓDZTWA"
+summary = "Wspólnota traci wiarę w przetrwanie. Odbuduj Nadzieję, zanim Przystań się rozpadnie."
+completion_text = "Mieszkańcy odzyskali wspólny cel."
+failure_text = "Przystań rozpadła się pod ciężarem kryzysu."
+sort_order = 0
+urgent = true
+repeatable = true
+unlock_kind = "crisis_active"
+objectives = Array[Resource]([SubResource("SurviveCrisis")])

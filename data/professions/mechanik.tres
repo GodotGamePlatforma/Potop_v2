@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionDefinition.gd" id="1_profession"]
+
+[resource]
+script = ExtResource("1_profession")
+id = "mechanik"
+display_name = "Mechanika"
+building_definition_id = "workshop"
+description = "Praktyka zdobywana przy produkcji, naprawie lub wydobyciu ciężkich obiektów."
+specialist_benefit = "Zwiększa skuteczność napraw platformy."
+sort_order = 30

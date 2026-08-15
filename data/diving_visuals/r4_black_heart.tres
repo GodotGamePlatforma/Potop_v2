@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="UnderwaterRegionVisualProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/UnderwaterRegionVisualProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+region_id = "r4"
+display_name = "Czarne Serce"
+start_depth_ratio = 0.607
+end_depth_ratio = 1.0
+water_near_color = Color(0.24, 0.39, 0.42, 1)
+water_far_color = Color(0.13, 0.28, 0.33, 1)
+caustics_color = Color(0.60, 0.72, 0.72, 1)
+water_clarity = 0.76
+caustics_strength = 0.10
+suspended_particle_density = 0.24
+current_distortion_strength = 0.14
+rock_base_tint = Color(0.58, 0.60, 0.58, 1)
+rock_shadow_tint = Color(0.22, 0.26, 0.26, 1)
+rock_edge_color = Color(0.57, 0.63, 0.61, 1)
+detail_world_scale = 210.0
+detail_strength = 0.84
+edge_width_texels = 1.45
+edge_highlight_strength = 0.20

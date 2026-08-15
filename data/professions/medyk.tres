@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ProfessionDefinition.gd" id="1_profession"]
+
+[resource]
+script = ExtResource("1_profession")
+id = "medyk"
+display_name = "Medycyna"
+building_definition_id = "infirmary"
+description = "Praktyka zdobywana po rzeczywistym udzieleniu opieki pacjentowi."
+specialist_benefit = "Zwiększa skuteczność leczenia."
+sort_order = 40

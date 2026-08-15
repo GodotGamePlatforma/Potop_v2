@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/ItemDefinition.gd" id="1_item"]
+
+[resource]
+script = ExtResource("1_item")
+id = "meds_chemicals"
+display_name = "Chemikalia i leki"
+description = "Leki i odczynniki potrzebne do ulepszeń Lecznicy II–IV, leczenia pacjentów oraz stabilizacji Leona."
+stack_limit = 999
+weight = 0.7
+tags = Array[String](["medical", "chemical"])

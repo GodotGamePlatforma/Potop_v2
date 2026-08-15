@@ -1,0 +1,26 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/MissionDefinition.gd" id="1_mission"]
+[ext_resource type="Script" path="res://scripts/definitions/MissionObjectiveDefinition.gd" id="2_objective"]
+
+[sub_resource type="Resource" id="CraftTank"]
+script = ExtResource("2_objective")
+id = "craft_better_oxygen_tank"
+kind = "gear_owned"
+text = "Wykonaj Butlę tlenową II lub III."
+description = "Większy zapas tlenu wydłuży wyprawy i pozwoli bezpieczniej docierać w odległe rejony."
+target_id = "oxygen_tank_mk2"
+target_ids = Array[String](["oxygen_tank_mk2", "oxygen_tank_mk3"])
+
+[resource]
+script = ExtResource("1_mission")
+id = "more_air"
+category = "side"
+title = "WIĘCEJ POWIETRZA"
+summary = "Rozwinięty Warsztat pozwala zbudować pojemniejszą butlę tlenową."
+completion_text = "Nowa butla daje nurkom więcej czasu pod wodą."
+sort_order = 130
+unlock_kind = "building_level"
+unlock_target_id = "workshop"
+unlock_required_level = 2
+objectives = Array[Resource]([SubResource("CraftTank")])

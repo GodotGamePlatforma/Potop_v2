@@ -1,0 +1,46 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/BuildingDefinition.gd" id="1_building"]
+[ext_resource type="Script" path="res://scripts/definitions/BuildingLevelDefinition.gd" id="2_level"]
+
+[sub_resource type="Resource" id="Level1"]
+script = ExtResource("2_level")
+level = 1
+display_name = "Pomost i sieci"
+worker_slots = 1
+capabilities = {"fishing_pressure_per_food": 0.016, "food_per_worker": 5}
+build_cost = {"fabric_rubber": 1, "planks": 5, "scrap": 2}
+
+[sub_resource type="Resource" id="Level2"]
+script = ExtResource("2_level")
+level = 2
+display_name = "Wędziska i magazyn przynęt"
+worker_slots = 2
+capabilities = {"fishing_pressure_per_food": 0.01, "food_per_worker": 5}
+upgrade_cost = {"fabric_rubber": 2, "planks": 7, "scrap": 4}
+
+[sub_resource type="Resource" id="Level3"]
+script = ExtResource("2_level")
+level = 3
+display_name = "Sieci głębinowe"
+worker_slots = 2
+capabilities = {"fishing_pressure_per_food": 0.008, "food_per_worker": 6}
+upgrade_cost = {"fabric_rubber": 3, "planks": 10, "scrap": 7, "tech_parts": 2}
+
+[sub_resource type="Resource" id="Level4"]
+script = ExtResource("2_level")
+level = 4
+display_name = "Akwakultura"
+worker_slots = 3
+capabilities = {"fishing_pressure_per_food": 0.006, "food_per_worker": 6}
+upgrade_cost = {"fabric_rubber": 5, "planks": 14, "scrap": 10, "tech_parts": 5}
+
+[resource]
+script = ExtResource("1_building")
+id = "fishing_hut"
+display_name = "Chata Rybacka"
+description = "Zdolna obsada dostarcza jedzenie na koniec dnia, zwiększając przy tym presję na lokalne łowisko."
+max_level = 4
+requires_edge = true
+levels = Array[Resource]([SubResource("Level1"), SubResource("Level2"), SubResource("Level3"), SubResource("Level4")])
+specialist_bonus = {"profession": "rybak", "production_bonus": 1}

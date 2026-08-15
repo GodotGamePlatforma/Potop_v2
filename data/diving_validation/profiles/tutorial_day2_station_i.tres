@@ -1,0 +1,15 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DiveProgressionProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+profile_id = &"tutorial_day2_station_i"
+display_name = "Tutorial dzień 2 / Butla I / Stacja I"
+campaign_day = 2
+station_level = 1
+workshop_level = 0
+diver_id = "igor"
+oxygen_tank_id = "oxygen_tank_mk1"
+light_id = "diving_lantern_mk1"
+start_entry_point = "R1-00"

@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/diving/DiveMapObject.gd" id="1"]
+
+[node name="MapRegion" type="Node2D"]
+script = ExtResource("1")
+kind = 13
+display_name = "Nowy region"
+bounds_size = Vector2(1200, 900)
+depth_range = Vector2(8, 35)

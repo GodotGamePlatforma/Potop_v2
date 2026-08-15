@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="UnderwaterRegionVisualProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/UnderwaterRegionVisualProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+region_id = "r2"
+display_name = "Zielone Osiedla"
+start_depth_ratio = 0.237
+end_depth_ratio = 0.401
+water_near_color = Color(0.10, 0.24, 0.20, 1)
+water_far_color = Color(0.045, 0.12, 0.11, 1)
+caustics_color = Color(0.55, 0.70, 0.52, 1)
+water_clarity = 0.68
+caustics_strength = 0.20
+suspended_particle_density = 0.38
+current_distortion_strength = 0.16
+rock_base_tint = Color(0.39, 0.44, 0.39, 1)
+rock_shadow_tint = Color(0.10, 0.13, 0.11, 1)
+rock_edge_color = Color(0.43, 0.52, 0.43, 1)
+detail_world_scale = 238.0
+detail_strength = 0.80
+edge_width_texels = 1.40
+edge_highlight_strength = 0.28

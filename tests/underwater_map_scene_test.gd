@@ -1,0 +1,1108 @@
+extends SceneTree
+
+const MapCompilerScript := preload("res://scripts/diving/UnderwaterMapSceneCompiler.gd")
+const MapSceneScript := preload("res://scripts/diving/UnderwaterMapScene.gd")
+const MapObjectScript := preload("res://scripts/diving/DiveMapObject.gd")
+const MapConnectionScript := preload("res://scripts/diving/DiveMapConnection.gd")
+const MapNavigationRasterScript := preload("res://scripts/diving/MapNavigationRaster.gd")
+const RuntimeMapScript := preload("res://scripts/diving/UnderwaterMapRuntime.gd")
+const WorldStateScript := preload("res://scripts/data/UnderwaterWorldState.gd")
+const CommonLineCableVisualScript := preload("res://scripts/diving/DiveCommonLineCableVisual.gd")
+
+const TUTORIAL_POSITIONS := {
+	"exit_line": Vector2(5713.388, 388.22977),
+	"tutorial_market_crate": Vector2(5204.0, 700.0),
+	"tutorial_workshop_case": Vector2(2804.0, 804.0),
+	"SC-01": Vector2(2464.0, 940.0),
+	"junction_j7": Vector2(2244.0, 1220.0),
+}
+const STORY_POSITIONS := {
+	"archive_terminal": Vector2(7980.0, 1100.0),
+	"rescue_hotel_leon": Vector2(8604.0, 708.0),
+	"r3_diagnostic_panel": Vector2(9760.0, 2700.0),
+	"r3_generator": Vector2(10300.0, 3040.0),
+}
+const C4_POSITIONS := {
+	"c4_switchboard": Vector2(5700.0, 5800.0),
+	"c4_splitter_mount": Vector2(6100.0, 5800.0),
+	"heart_structural_cache": Vector2(6500.0, 5800.0),
+	"heart_reconstruction_reserve": Vector2(6900.0, 5800.0),
+}
+const R3_FOOD_PICKUP_POSITION := Vector2(2204.0, 2576.0)
+const BUOY_POSITIONS := {
+	"B-01": Vector2(3324.0, 1548.0),
+	"B-02": Vector2(1778.0, 2485.0),
+	"B-03": Vector2(1980.0, 4332.0),
+}
+const MIN_CRITICAL_INTERACTABLE_SEPARATION := 300.0
+const CRITICAL_INTERACTABLE_PAIRS := [
+	["archive_terminal", "SC-02"],
+	["archive_terminal", "archive_maintenance_store"],
+	["rescue_hotel_leon", "hotel_linen_cache"],
+	["r3_diagnostic_panel", "r3_generator"],
+	["r3_diagnostic_panel", "power_plant_service_store"],
+	["r3_generator", "power_plant_service_store"],
+	["c4_switchboard", "c4_splitter_mount"],
+	["c4_switchboard", "city_reconstruction_reserve"],
+	["c4_splitter_mount", "city_reconstruction_reserve"],
+	["c4_splitter_mount", "heart_structural_cache"],
+	["ship_engine_r1", "ship_carpentry_store"],
+	["shipyard_winch_r3", "pickup_r3_planks_01"],
+	["shipyard_winch_r3", "shipyard_material_rack"],
+	["scrapyard_generator_r3", "pickup_r3_scrap_01"],
+	["scrapyard_generator_r3", "scrapyard_sorting_cache"],
+]
+const CABLE_DECORATION_ID := "common_line_cable_r1_j7"
+const CABLE_VISUAL_PATH := "res://scenes/diving/map_visuals/CommonLineCableVisual.tscn"
+const STORY_CABLE_VISUAL_PATHS := {
+	"common_line_cable_j7_archive": "res://scenes/diving/map_visuals/CommonLineArchiveCableVisual.tscn",
+	"common_line_cable_archive_r3": "res://scenes/diving/map_visuals/CommonLineR3CableVisual.tscn",
+	"common_line_cable_r3_c4": "res://scenes/diving/map_visuals/CommonLineC4CableVisual.tscn",
+}
+const STORY_CABLE_ENDPOINTS := {
+	"common_line_cable_j7_archive": [TUTORIAL_POSITIONS["junction_j7"], STORY_POSITIONS["archive_terminal"]],
+	"common_line_cable_archive_r3": [STORY_POSITIONS["archive_terminal"], STORY_POSITIONS["r3_generator"]],
+	"common_line_cable_r3_c4": [STORY_POSITIONS["r3_generator"], C4_POSITIONS["c4_switchboard"]],
+}
+const BLOCKAGE_VISUAL_PATH := "res://scenes/diving/map_visuals/TutorialCableBlockageVisual.tscn"
+
+const REQUIRED_AUTHORING_GROUPS := [
+	"VisualLayers",
+	"Terrain",
+	"DepthRegions",
+	"Landmarks",
+	"Entries",
+	"Routes",
+	"CurrentZones",
+	"Gameplay",
+	"Gameplay/Containers",
+	"Gameplay/Pickups",
+	"Gameplay/Threats",
+	"Gameplay/HeavyObjects",
+	"Gameplay/RescueEncounters",
+	"Gameplay/BuoyAnchors",
+	"Gameplay/ShortcutGates",
+	"Gameplay/FixedDevices",
+	"StaticObstacles",
+	"Decorations",
+	"RuntimeDynamic",
+]
+
+const REQUIRED_PREFABS := [
+	"MapRegion.tscn",
+	"MapLandmark.tscn",
+	"MapEntryPoint.tscn",
+	"MapExitLine.tscn",
+	"MapConnection.tscn",
+	"MapCurrentZone.tscn",
+	"MapLootContainer.tscn",
+	"MapPickup.tscn",
+	"MapThreat.tscn",
+	"MapHeavyObject.tscn",
+	"MapRescue.tscn",
+	"MapBuoy.tscn",
+	"MapShortcutGate.tscn",
+	"MapFixedDevice.tscn",
+	"MapObstacle.tscn",
+	"MapDecoration.tscn",
+]
+
+var _failures := 0
+
+
+func _initialize() -> void:
+	var compiler = MapCompilerScript.new()
+	var world = WorldStateScript.new()
+	world.setup(91_001)
+	var generation_errors: PackedStringArray = compiler.generate(world, 91_001)
+	_assert(generation_errors.is_empty(), "Scena mapy musi kompilować się bez błędów: %s" % "; ".join(generation_errors))
+	_test_prefab_catalog()
+	_test_shared_obstacle_raster()
+	_test_chunked_boundary_segments()
+	if generation_errors.is_empty():
+		_test_compiled_manifest(world)
+		_test_stale_source_version_is_rejected(compiler, world)
+		_test_unique_authoring_ids()
+		_test_visual_only_change_preserves_signature(compiler)
+		_test_gameplay_position_change_updates_signature(compiler)
+		_test_cable_transform_preserves_signature(compiler)
+		_test_loot_content_change_updates_signature(compiler)
+		_test_terrain_presentation_preserves_signature(compiler)
+		_test_curve_route_is_compiled(compiler)
+		_test_chunk_size_changes_signature(compiler)
+		_test_obstacle_transform_is_compiled(compiler)
+		_test_decoration_without_visual_is_rejected(compiler)
+		_test_duplicate_id_is_rejected(compiler)
+		await _test_runtime_layer_preserves_authored_siblings(world)
+	if _failures > 0:
+		push_error("Underwater map scene test failed with %d assertion(s)." % _failures)
+		quit(1)
+		return
+	print("Underwater map scene test passed: the Godot scene, prefabs and shared obstacle raster are the only validated map source.")
+	quit(0)
+
+
+func _test_prefab_catalog() -> void:
+	for prefab_name in REQUIRED_PREFABS:
+		var prefab_path := "res://scenes/diving/map_objects/%s" % prefab_name
+		_assert(ResourceLoader.exists(prefab_path), "Brakuje prefabu authoringu mapy: %s." % prefab_path)
+
+
+func _test_compiled_manifest(world) -> void:
+	var blueprint = world.blueprint
+	_assert(int(blueprint.map_source_version) == int(MapCompilerScript.MAP_SOURCE_VERSION), "Migawka musi wskazywać aktualną wersję sceny.")
+	_assert(not str(blueprint.map_gameplay_signature).is_empty(), "Migawka musi wskazywać bieżącą tożsamość gameplayową mapy.")
+	_assert(not str(blueprint.map_id).is_empty(), "Scena musi przekazać stabilne Map ID.")
+	_assert(str(blueprint.map_gameplay_signature).length() == 64, "Mapa musi otrzymać 64-znakowy podpis gameplayowy.")
+	_assert(not blueprint.entry_landmark_id.is_empty() and blueprint.landmark_lookup.has(blueprint.entry_landmark_id), "Entry Point musi wskazywać istniejący landmark.")
+	_assert(blueprint.fixed_device_spawns.size() == 6, "Mapa musi kompilować J-7, Archiwum, dwa etapy R-3, Rozdzielnię C-4 i gniazdo Rozdzielacza.")
+	_assert(blueprint.shortcut_spawns.size() == 8, "Mapa musi zachować dokładnie osiem istniejących skrótów; blokada kabla wykorzystuje SC-01 zamiast tworzyć dziewiąty.")
+	_assert(_vectors_match(blueprint.exit_position, TUTORIAL_POSITIONS["exit_line"]), "Lina platformy musi zachować zatwierdzoną pozycję startową kabla.")
+	var junction: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "junction_j7")
+	_assert(junction.get("id", "") == "junction_j7" and junction.get("device_role", "") == "common_line_junction", "J-7 musi zachować stabilne ID i typowaną rolę urządzenia.")
+	_assert(int(junction.get("available_from_day", 0)) == 3, "J-7 musi być dostępne dopiero w trzecim dniu kampanii.")
+	_assert(_record_position_matches(junction, TUTORIAL_POSITIONS["junction_j7"]), "J-7 musi kończyć kabel w zatwierdzonej pozycji tutoriala.")
+	var archive_terminal: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "archive_terminal")
+	_assert(archive_terminal.get("landmark_id", "") == "R1-09" and archive_terminal.get("device_role", "") == "common_line_archive_terminal", "Terminal Archiwum musi należeć do R1-09 i zachować typowaną rolę.")
+	_assert(int(archive_terminal.get("available_from_day", 0)) == 4 and archive_terminal.get("required_tool", "") == "crowbar", "Terminal Archiwum musi być dostępny po tutorialu i wymagać łomu.")
+	_assert(_record_position_matches(archive_terminal, STORY_POSITIONS["archive_terminal"]), "Terminal Archiwum musi zachować zatwierdzony, rozdzielony punkt interakcji.")
+	var r3_diagnostic: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "r3_diagnostic_panel")
+	_assert(r3_diagnostic.get("landmark_id", "") == "R3-04" and r3_diagnostic.get("required_tool", "") == "r3_diagnostic_access", "Diagnostyka R-3 musi należeć do Elektrowni i wymagać zamrożonego dostępu uzyskanego po Archiwum.")
+	_assert(_record_position_matches(r3_diagnostic, STORY_POSITIONS["r3_diagnostic_panel"]), "Panel diagnostyczny R-3 musi mieć własny, zatwierdzony punkt interakcji.")
+	var r3_generator: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "r3_generator")
+	_assert(r3_generator.get("landmark_id", "") == "R3-04" and r3_generator.get("required_tool", "") == "r3_regulator", "Generator R-3 musi wymagać wykonanego Regulatora R-3.")
+	_assert(_record_position_matches(r3_generator, STORY_POSITIONS["r3_generator"]), "Generator R-3 musi mieć własny, zatwierdzony punkt interakcji.")
+	var c4_switchboard: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "c4_switchboard")
+	_assert(c4_switchboard.get("landmark_id", "") == "R4-06" and c4_switchboard.get("required_tool", "") == "c4_control_access", "Rozdzielnia C-4 musi należeć do Serca i wymagać aktywnego sterowania R-3.")
+	_assert(_record_position_matches(c4_switchboard, C4_POSITIONS["c4_switchboard"]), "Rozdzielnia C-4 musi mieć własny, zatwierdzony punkt interakcji.")
+	var splitter_mount: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "c4_splitter_mount")
+	_assert(splitter_mount.get("landmark_id", "") == "R4-06" and splitter_mount.get("required_tool", "") == "common_line_splitter", "Gniazdo Rozdzielacza musi należeć do Serca i wymagać wykonanego Rozdzielacza.")
+	_assert(_record_position_matches(splitter_mount, C4_POSITIONS["c4_splitter_mount"]), "Gniazdo Rozdzielacza C-4 musi mieć własny, zatwierdzony punkt interakcji.")
+	_assert(blueprint.entry_position != Vector2.ZERO and blueprint.exit_position != Vector2.ZERO, "Scena musi zawierać jawne pozycje wejścia i wyjścia.")
+	_assert(not blueprint.regions.is_empty(), "Mapa musi zawierać co najmniej jeden region.")
+	_assert(not blueprint.landmarks.is_empty(), "Mapa musi zawierać co najmniej jeden landmark.")
+	_assert(not blueprint.loot_spawns.is_empty(), "Mapa musi zawierać prefab źródła łupu lub itemu.")
+	for loot_record in blueprint.loot_spawns:
+		_assert(
+			not str(loot_record.get("landmark_id", "")).is_empty(),
+			"Każde źródło łupu i każdy pickup muszą jawnie wskazywać swój landmark: %s."
+			% str(loot_record.get("id", ""))
+		)
+	var expected_food_by_loot_id := {
+		"tutorial_market_crate": 6,
+		"pharmacy_medicine_case": 4,
+		"hotel_linen_cache": 6,
+		"pickup_r1_food_01": 1,
+		"greenhouse_supply_box": 8,
+		"seed_bank_vault": 11,
+		"park_service_shed": 2,
+		"pickup_r2_food_01": 1,
+		"port_tool_crate": 3,
+		"power_plant_service_store": 3,
+		"scrapyard_sorting_cache": 3,
+		"pickup_r3_food_01": 1,
+		"metro_maintenance_store": 2,
+		"bunker_construction_reserve": 2,
+		"city_center_relief_store": 4,
+		"pickup_r4_food_01": 1,
+	}
+	var expected_food_ids_by_region := {
+		"R1": ["tutorial_market_crate", "pharmacy_medicine_case", "hotel_linen_cache", "pickup_r1_food_01"],
+		"R2": ["greenhouse_supply_box", "seed_bank_vault", "park_service_shed", "pickup_r2_food_01"],
+		"R3": ["port_tool_crate", "power_plant_service_store", "scrapyard_sorting_cache", "pickup_r3_food_01"],
+		"R4": ["metro_maintenance_store", "bunker_construction_reserve", "city_center_relief_store", "pickup_r4_food_01"],
+	}
+	var expected_food_by_region := {"R1": 17, "R2": 22, "R3": 10, "R4": 9}
+	var total_food := 0
+	for loot_record in blueprint.loot_spawns:
+		var contents: Dictionary = loot_record.get("contents", {})
+		var food_amount := int(contents.get("food", 0))
+		total_food += food_amount
+		if food_amount > 0:
+			var loot_id := str(loot_record.get("id", ""))
+			_assert(expected_food_by_loot_id.has(loot_id), "Każde źródło żywności musi należeć do jawnego kontraktu regionalnego: %s." % loot_id)
+			_assert(food_amount == int(expected_food_by_loot_id.get(loot_id, -1)), "Źródło %s musi zachować uzgodnioną ilość żywności." % loot_id)
+	_assert(total_food == 58, "Standardowa mapa musi zawierać dokładnie 58 jednostek żywności.")
+	for region_id in expected_food_ids_by_region.keys():
+		var region_food := 0
+		for loot_id in expected_food_ids_by_region.get(region_id, []):
+			var record := _record_by_id(blueprint.loot_spawns, str(loot_id))
+			var contents: Dictionary = record.get("contents", {})
+			region_food += int(contents.get("food", 0))
+		_assert(region_food == int(expected_food_by_region.get(region_id, -1)), "Region %s musi zachować uzgodniony budżet żywności." % region_id)
+	var tutorial_food: Dictionary = _record_by_id(blueprint.loot_spawns, "tutorial_market_crate")
+	_assert(int(tutorial_food.get("mandatory_order", -1)) == 0 and int(tutorial_food.get("contents", {}).get("food", 0)) == 6, "Obowiązkowe 6 żywności tutoriala musi pozostać dokładne; runtime wyłącza skalowanie dla każdego mandatory_order >= 0.")
+	_assert(_record_position_matches(tutorial_food, TUTORIAL_POSITIONS["tutorial_market_crate"]), "Skrzynia targowa musi leżeć na pierwszym zakotwiczeniu kabla.")
+	var tutorial_workshop: Dictionary = _record_by_id(blueprint.loot_spawns, "tutorial_workshop_case")
+	_assert(_record_position_matches(tutorial_workshop, TUTORIAL_POSITIONS["tutorial_workshop_case"]), "Skrzynia warsztatowa musi leżeć na drugim zakotwiczeniu kabla.")
+	var r3_food_pickup: Dictionary = _record_by_id(blueprint.loot_spawns, "pickup_r3_food_01")
+	_assert(_record_position_matches(r3_food_pickup, R3_FOOD_PICKUP_POSITION), "Żywność R-3 musi zachować punkt z bezpiecznym prześwitem i odstępem selektora.")
+	_assert(_nearest_landmark_id(blueprint, r3_food_pickup) == "R3-01", "Żywność R-3 musi przestrzennie należeć do Nadbrzeża R3-01 zgodnie z authored linkiem.")
+	var structural_cache: Dictionary = _record_by_id(blueprint.loot_spawns, "heart_structural_cache")
+	_assert(_record_position_matches(structural_cache, C4_POSITIONS["heart_structural_cache"]), "Rdzeń konstrukcyjny musi być oddzielony od urządzeń C-4.")
+	var reconstruction_reserve: Dictionary = _record_by_id(blueprint.loot_spawns, "heart_reconstruction_reserve")
+	_assert(_record_position_matches(reconstruction_reserve, C4_POSITIONS["heart_reconstruction_reserve"]), "Rezerwa odbudowy musi być oddzielona od pozostałych interakcji C-4.")
+	_assert(not blueprint.heavy_object_spawns.is_empty(), "Mapa musi zawierać prefab ciężkiego obiektu.")
+	_assert(not blueprint.rescue_spawns.is_empty(), "Mapa musi zawierać prefab celu ratunkowego.")
+	var leon: Dictionary = _record_by_id(blueprint.rescue_spawns, "rescue_hotel_leon")
+	_assert(_record_position_matches(leon, STORY_POSITIONS["rescue_hotel_leon"]), "Leon musi mieć własny, zatwierdzony punkt interakcji w hotelu.")
+	_assert(_nearest_landmark_id(blueprint, leon) == "R1-03", "Punkt ratunku Leona musi przestrzennie należeć do Zatopionego Hotelu R1-03.")
+	_assert(_nearest_landmark_id(blueprint, _record_by_id(blueprint.heavy_object_spawns, "ship_engine_r1")) == "R1-07", "Silnik statku musi pozostać przy Statku w Ulicy R1-07.")
+	_assert(_nearest_landmark_id(blueprint, _record_by_id(blueprint.heavy_object_spawns, "shipyard_winch_r3")) == "R3-02", "Wyciągarka musi pozostać przy Starej Stoczni R3-02.")
+	_assert(_nearest_landmark_id(blueprint, _record_by_id(blueprint.heavy_object_spawns, "scrapyard_generator_r3")) == "R3-06", "Ciężki generator musi pozostać przy Złomowisku R3-06.")
+	_assert(not blueprint.buoy_spawns.is_empty(), "Mapa musi zawierać prefab boi.")
+	for buoy_id in BUOY_POSITIONS:
+		var buoy: Dictionary = _record_by_id(blueprint.buoy_spawns, buoy_id)
+		_assert(
+			_record_position_matches(buoy, BUOY_POSITIONS[buoy_id]),
+			"Kotwica %s musi zachować zatwierdzony, bezpieczny punkt wejścia." % buoy_id
+		)
+	_assert(not blueprint.shortcut_spawns.is_empty(), "Mapa musi zawierać prefab bramy skrótu.")
+	_assert(_has_authoring_kind(blueprint.decoration_spawns, "exit_line"), "Linia wyjścia musi zachować rekord prezentacyjny do przypięcia prefabu.")
+	var cable_blockage: Dictionary = _record_by_id(blueprint.shortcut_spawns, "SC-01")
+	_assert(_record_position_matches(cable_blockage, TUTORIAL_POSITIONS["SC-01"]), "Blokada SC-01 musi leżeć na zatwierdzonym zakotwiczeniu kabla.")
+	_assert(str(cable_blockage.get("connection_id", "")) == "SC-01", "Blokada kabla musi zachować istniejące połączenie SC-01.")
+	_assert(str(cable_blockage.get("required_tool", "")) == "knife", "Blokada kabla musi wymagać noża.")
+	_assert(str(cable_blockage.get("interaction_action", "")) == "cut", "Blokada kabla musi publikować akcję przecięcia.")
+	_assert(str(cable_blockage.get("visual_scene_path", "")) == BLOCKAGE_VISUAL_PATH, "SC-01 musi używać dedykowanego prefabu sieci i roślinności.")
+	var cable_decoration: Dictionary = _record_by_id(blueprint.decoration_spawns, CABLE_DECORATION_ID)
+	_assert(str(cable_decoration.get("visual_scene_path", "")) == CABLE_VISUAL_PATH, "Kabel platforma — J-7 musi mieć jawny prefab wizualny.")
+	_assert(not bool(cable_decoration.get("blocks_navigation", true)), "Kabel jest wskazówką prezentacyjną i nie może blokować nawigacji.")
+	_assert(_record_position_matches(cable_decoration, TUTORIAL_POSITIONS["exit_line"]), "Początek prefabu kabla musi być zakotwiczony przy linie platformy.")
+	_assert_visual_scene_collision_free(CABLE_VISUAL_PATH, "Prefab kabla")
+	_assert_visual_scene_collision_free(BLOCKAGE_VISUAL_PATH, "Prefab blokady kabla")
+	_assert_tutorial_cable_anchors(cable_decoration)
+	_assert_story_cables_are_non_blocking(blueprint)
+	_assert_critical_interactable_separation(blueprint)
+	_assert_all_selectable_interactables_are_separated(blueprint)
+	_assert_unique_static_gameplay_positions(blueprint)
+
+
+func _test_unique_authoring_ids() -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var object_ids: Dictionary = {}
+	var connection_ids: Dictionary = {}
+	for node in map_root.find_children("*", "", true, false):
+		if node is DiveMapObject:
+			var object := node as DiveMapObject
+			_assert(not object.object_id.is_empty(), "Każdy prefab obiektu, w tym dekoracja, musi mieć Object ID.")
+			_assert(not object_ids.has(object.object_id), "Object ID musi być unikalne: %s." % object.object_id)
+			object_ids[object.object_id] = true
+		elif node is DiveMapConnection:
+			var connection := node as DiveMapConnection
+			_assert(not connection.connection_id.is_empty(), "Każda trasa musi mieć Connection ID.")
+			_assert(not connection_ids.has(connection.connection_id), "Connection ID musi być unikalne: %s." % connection.connection_id)
+			connection_ids[connection.connection_id] = true
+	for group_path in REQUIRED_AUTHORING_GROUPS:
+		_assert(map_root.get_node_or_null(group_path) != null, "Scena musi mieć wymaganą gałąź authoringu: %s." % group_path)
+	map_root.free()
+
+
+func _test_visual_only_change_preserves_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_003)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem prezentacji.")
+	if not baseline_errors.is_empty():
+		map_root.free()
+		return
+	var authored_object: DiveMapObject
+	for node in map_root.find_children("*", "", true, false):
+		if node is DiveMapObject and (node as DiveMapObject).kind == DiveMapObject.Kind.LOOT_CONTAINER:
+			authored_object = node as DiveMapObject
+			break
+	_assert(authored_object != null, "Test wymaga co najmniej jednego kontenera w scenie.")
+	if authored_object == null:
+		map_root.free()
+		return
+	authored_object.visual_offset += Vector2(17.0, -9.0)
+	authored_object.visual_rotation_degrees += 7.5
+	authored_object.skew += deg_to_rad(3.0)
+	var changed: Dictionary = compiler.compile_map(map_root, 91_003)
+	var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+	_assert(changed_errors.is_empty(), "Zmiana prezentacyjna nie może zepsuć kompilacji mapy.")
+	if changed_errors.is_empty():
+		var baseline_blueprint = baseline.get("blueprint")
+		var changed_blueprint = changed.get("blueprint")
+		_assert(str(baseline_blueprint.map_gameplay_signature) == str(changed_blueprint.map_gameplay_signature), "Offset, obrót i skew prezentacji nie mogą zmieniać podpisu gameplayowego obiektu punktowego.")
+		var changed_record := _record_by_id(changed_blueprint.loot_spawns, authored_object.object_id)
+		_assert(changed_record.get("visual_offset", Vector2.ZERO) == authored_object.visual_offset, "Kompilator musi przekazać offset prefabu do runtime.")
+	map_root.free()
+
+
+func _test_gameplay_position_change_updates_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_015)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem pozycji gameplayowej.")
+	if baseline_errors.is_empty():
+		var tutorial_container := _authored_object_by_id(map_root, "tutorial_market_crate")
+		_assert(tutorial_container != null, "Test pozycji gameplayowej wymaga tutorial_market_crate.")
+		if tutorial_container != null:
+			tutorial_container.position += Vector2(8.0, 0.0)
+			var changed: Dictionary = compiler.compile_map(map_root, 91_015)
+			var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+			_assert(changed_errors.is_empty(), "Niewielkie przesunięcie kontenera na otwartej komórce nie może zepsuć kompilacji mapy.")
+			if changed_errors.is_empty():
+				var baseline_blueprint = baseline.get("blueprint")
+				var changed_blueprint = changed.get("blueprint")
+				_assert(
+					str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature),
+					"Zmiana pozycji statycznego interaktywnego przedmiotu musi zmieniać podpis gameplayowy mapy."
+				)
+	map_root.free()
+
+
+func _test_cable_transform_preserves_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_016)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem transformacji kabla.")
+	if baseline_errors.is_empty():
+		var cable_decoration := _authored_object_by_id(map_root, CABLE_DECORATION_ID)
+		_assert(cable_decoration != null, "Test transformacji prezentacyjnej wymaga dekoracji kabla platforma — J-7.")
+		if cable_decoration != null:
+			cable_decoration.position += Vector2(17.0, -9.0)
+			cable_decoration.rotation += 0.07
+			cable_decoration.scale = Vector2(1.01, 0.99)
+			var changed: Dictionary = compiler.compile_map(map_root, 91_016)
+			var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+			_assert(changed_errors.is_empty(), "Zmiana transformacji bezkolizyjnego kabla nie może zepsuć kompilacji mapy.")
+			if changed_errors.is_empty():
+				var baseline_blueprint = baseline.get("blueprint")
+				var changed_blueprint = changed.get("blueprint")
+				var changed_record := _record_by_id(changed_blueprint.decoration_spawns, CABLE_DECORATION_ID)
+				_assert(
+					str(baseline_blueprint.map_gameplay_signature) == str(changed_blueprint.map_gameplay_signature),
+					"Transformacja kabla-dekoracji nie może zmieniać podpisu gameplayowego mapy."
+				)
+				_assert(
+					_record_position_matches(changed_record, cable_decoration.global_position),
+					"Kompilator musi mimo to przekazać zmienioną transformację kabla do prezentacji runtime."
+				)
+	map_root.free()
+
+
+func _test_loot_content_change_updates_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_014)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem zawartości łupu.")
+	if baseline_errors.is_empty():
+		var authored_object: DiveMapObject
+		for node in map_root.find_children("*", "", true, false):
+			if node is DiveMapObject and (node as DiveMapObject).object_id == "hotel_linen_cache":
+				authored_object = node as DiveMapObject
+				break
+		_assert(authored_object != null, "Test podpisu zawartości wymaga hotel_linen_cache.")
+		if authored_object != null:
+			authored_object.contents = authored_object.contents.duplicate(true)
+			authored_object.contents["food"] = int(authored_object.contents.get("food", 0)) + 1
+			var changed: Dictionary = compiler.compile_map(map_root, 91_014)
+			var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+			_assert(changed_errors.is_empty(), "Poprawna zmiana zawartości łupu nie może zepsuć kompilacji mapy.")
+			if changed_errors.is_empty():
+				var baseline_blueprint = baseline.get("blueprint")
+				var changed_blueprint = changed.get("blueprint")
+				_assert(str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature), "Zmiana zawartości łupu musi zmieniać podpis gameplayowy mapy.")
+	map_root.free()
+
+
+func _test_terrain_presentation_preserves_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_013)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem prezentacji terenu.")
+	if baseline_errors.is_empty():
+		_assert(map_root.terrain_render_sdf_texture != null, "Scena mapy musi przypisywać pochodny SDF konturu terenu.")
+		_assert(map_root.terrain_render_sdf_texture.get_size() == map_root.navigation_grid_texture.get_size(), "Pochodny SDF musi odpowiadać siatce kanonicznej maski.")
+		var profile = map_root.terrain_visual_profiles[0]
+		profile = profile.duplicate(true)
+		profile.rock_edge_color = Color(0.91, 0.27, 0.18, 1.0)
+		map_root.terrain_visual_profiles[0] = profile
+		map_root.terrain_detail_texture = GradientTexture2D.new()
+		var changed_sdf_image: Image = map_root.terrain_render_sdf_texture.get_image().duplicate()
+		var changed_sdf_sample: Color = changed_sdf_image.get_pixel(0, 0)
+		changed_sdf_image.set_pixel(0, 0, Color(1.0 - changed_sdf_sample.r, 0.0, 0.0, 1.0))
+		map_root.terrain_render_sdf_texture = ImageTexture.create_from_image(changed_sdf_image)
+		var changed: Dictionary = compiler.compile_map(map_root, 91_013)
+		var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+		_assert(changed_errors.is_empty(), "Zmiana profilu i materiału terenu nie może zepsuć kompilacji mapy.")
+		if changed_errors.is_empty():
+			var baseline_blueprint = baseline.get("blueprint")
+			var changed_blueprint = changed.get("blueprint")
+			_assert(str(baseline_blueprint.map_gameplay_signature) == str(changed_blueprint.map_gameplay_signature), "Profil, materiał i pochodny SDF terenu nie mogą zmieniać podpisu gameplayowego.")
+	map_root.free()
+
+
+func _test_curve_route_is_compiled(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var connection: DiveMapConnection
+	for node in map_root.find_children("*", "", true, false):
+		if node is DiveMapConnection:
+			connection = node as DiveMapConnection
+			break
+	_assert(connection != null, "Test wymaga co najmniej jednego połączenia w scenie.")
+	if connection == null:
+		map_root.free()
+		return
+	var landmarks: Dictionary = {}
+	for node in map_root.find_children("*", "", true, false):
+		if node is DiveMapObject and (node as DiveMapObject).kind == DiveMapObject.Kind.LANDMARK:
+			var landmark := node as DiveMapObject
+			landmarks[landmark.object_id] = landmark
+	var from_landmark := landmarks.get(connection.from_landmark_id) as DiveMapObject
+	var to_landmark := landmarks.get(connection.to_landmark_id) as DiveMapObject
+	_assert(from_landmark != null and to_landmark != null, "Testowana trasa musi wskazywać istniejące landmarki.")
+	if from_landmark == null or to_landmark == null:
+		map_root.free()
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_007)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem Curve2D.")
+	if not baseline_errors.is_empty():
+		map_root.free()
+		return
+	var from_world := from_landmark.global_position
+	var to_world := to_landmark.global_position
+	var midpoint_world := (from_world + to_world) * 0.5
+	var toward_center := map_root.world_size * 0.5 - midpoint_world
+	if toward_center.length_squared() > 0.001:
+		midpoint_world += toward_center.normalized() * minf(from_world.distance_to(to_world) * 0.08, 120.0)
+	var authored_curve := Curve2D.new()
+	authored_curve.add_point(connection.to_local(from_world))
+	authored_curve.add_point(connection.to_local(midpoint_world))
+	authored_curve.add_point(connection.to_local(to_world))
+	connection.curve = authored_curve
+	var changed: Dictionary = compiler.compile_map(map_root, 91_007)
+	var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+	_assert(changed_errors.is_empty(), "Poprawna ręczna Curve2D musi dać się skompilować: %s" % "; ".join(changed_errors))
+	if changed_errors.is_empty():
+		var baseline_blueprint = baseline.get("blueprint")
+		var changed_blueprint = changed.get("blueprint")
+		var route_record := _record_by_id(changed_blueprint.connections, connection.connection_id)
+		var path_points: PackedVector2Array = route_record.get("path_points", PackedVector2Array())
+		_assert(path_points.size() > 2, "Kompilator musi zapisać wypieczony przebieg krzywej, nie tylko dwa punkty kontrolne.")
+		_assert(str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature), "Zmiana przebiegu trasy musi zmieniać podpis gameplayowy.")
+	map_root.free()
+
+
+func _test_chunk_size_changes_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_006)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem rozmiaru chunków.")
+	if baseline_errors.is_empty():
+		map_root.chunk_size = maxi(map_root.chunk_size + 64, 64)
+		var changed: Dictionary = compiler.compile_map(map_root, 91_006)
+		var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+		_assert(changed_errors.is_empty(), "Poprawny rozmiar chunków nie może zepsuć kompilacji mapy.")
+		if changed_errors.is_empty():
+			var baseline_blueprint = baseline.get("blueprint")
+			var changed_blueprint = changed.get("blueprint")
+			_assert(
+				str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature),
+				"Zmiana rozmiaru chunków musi zmieniać podpis gameplayowy."
+			)
+	map_root.free()
+
+
+func _test_obstacle_transform_is_compiled(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_004)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem przeszkody.")
+	if not baseline_errors.is_empty():
+		map_root.free()
+		return
+	var obstacle := MapObjectScript.new()
+	obstacle.kind = MapObjectScript.Kind.OBSTACLE
+	obstacle.object_id = "test_rotated_obstacle"
+	obstacle.display_name = "Testowa obrócona przeszkoda"
+	obstacle.bounds_size = Vector2(180.0, 72.0)
+	obstacle.position = Vector2(5_760.0, 3_240.0)
+	obstacle.rotation = 0.42
+	obstacle.scale = Vector2(1.25, 0.8)
+	obstacle.skew = 0.11
+	obstacle.blocks_navigation = false
+	map_root.get_node("StaticObstacles").add_child(obstacle)
+	var changed: Dictionary = compiler.compile_map(map_root, 91_004)
+	var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+	_assert(changed_errors.is_empty(), "Poprawna obrócona przeszkoda scenowa musi dać się skompilować: %s" % "; ".join(changed_errors))
+	if changed_errors.is_empty():
+		var baseline_blueprint = baseline.get("blueprint")
+		var changed_blueprint = changed.get("blueprint")
+		var record := _record_by_id(changed_blueprint.obstacle_spawns, obstacle.object_id)
+		var polygon: PackedVector2Array = record.get("navigation_polygon", PackedVector2Array())
+		_assert(polygon.size() == 4, "Przeszkoda musi przekazać pełny, przetransformowany obrys nawigacyjny.")
+		_assert(str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature), "Dodanie przeszkody musi zmienić podpis gameplayowy.")
+	map_root.free()
+
+
+func _test_shared_obstacle_raster() -> void:
+	var image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	image.fill(Color.BLACK)
+	var base: Dictionary = MapNavigationRasterScript.build(image, Vector2(80.0, 80.0), [])
+	var base_cells: PackedByteArray = base.get("cells", PackedByteArray())
+	_assert(MapNavigationRasterScript.cell_is_open(base_cells, 8, 8, Vector2i(4, 4)), "Czarna komórka fixture powinna być przechodnia przed dodaniem przeszkody.")
+	var transform := Transform2D(PI * 0.25, Vector2.ONE, 0.13, Vector2(40.0, 40.0))
+	var half := Vector2(18.0, 7.0)
+	var obstacle := {
+		"id": "raster_obstacle",
+		"blocks_navigation": true,
+		"navigation_polygon": PackedVector2Array([
+			transform * Vector2(-half.x, -half.y),
+			transform * Vector2(half.x, -half.y),
+			transform * Vector2(half.x, half.y),
+			transform * Vector2(-half.x, half.y),
+		]),
+	}
+	var blocked: Dictionary = MapNavigationRasterScript.build(image, Vector2(80.0, 80.0), [obstacle])
+	var blocked_errors: PackedStringArray = blocked.get("errors", PackedStringArray())
+	var blocked_cells: PackedByteArray = blocked.get("cells", PackedByteArray())
+	_assert(blocked_errors.is_empty(), "Wspólny raster powinien przyjąć obrócony i pochylony wielokąt przeszkody.")
+	_assert(not MapNavigationRasterScript.cell_is_open(blocked_cells, 8, 8, Vector2i(4, 4)), "Obrócona i pochylona przeszkoda musi zablokować środkową komórkę.")
+
+
+func _test_chunked_boundary_segments() -> void:
+	var image := Image.create(4, 2, false, Image.FORMAT_RGBA8)
+	image.fill(Color.BLACK)
+	image.set_pixel(2, 0, Color.WHITE)
+	image.set_pixel(2, 1, Color.WHITE)
+	var ungrouped_raster: Dictionary = MapNavigationRasterScript.build(
+		image,
+		Vector2(40.0, 20.0),
+		[]
+	)
+	var raster: Dictionary = MapNavigationRasterScript.build(
+		image,
+		Vector2(40.0, 20.0),
+		[],
+		20
+	)
+	var global_segments: PackedVector2Array = raster.get(
+		"boundary_segments",
+		PackedVector2Array()
+	)
+	var segments_by_chunk: Dictionary = raster.get("boundary_segments_by_chunk", {})
+	_assert(
+		var_to_str(global_segments) == var_to_str(ungrouped_raster.get("boundary_segments", PackedVector2Array())),
+		"Włączenie podziału na chunki nie może zmienić globalnych boundary_segments ani ich kolejności."
+	)
+	_assert(
+		segments_by_chunk.keys() == ["0:0", "1:0"],
+		"Segmenty graniczne muszą tworzyć deterministyczne klucze chunków x:y."
+	)
+	var grouped_point_count := 0
+	var unique_segments: Dictionary = {}
+	for chunk_key in segments_by_chunk.keys():
+		var chunk_segments: PackedVector2Array = segments_by_chunk.get(
+			chunk_key,
+			PackedVector2Array()
+		)
+		grouped_point_count += chunk_segments.size()
+		for point_index in range(0, chunk_segments.size(), 2):
+			var start_key := var_to_str(chunk_segments[point_index])
+			var end_key := var_to_str(chunk_segments[point_index + 1])
+			var segment_key := (
+				"%s>%s" % [start_key, end_key]
+				if start_key < end_key
+				else "%s>%s" % [end_key, start_key]
+			)
+			_assert(
+				not unique_segments.has(segment_key),
+				"Żaden segment graniczny nie może być zduplikowany między chunkami."
+			)
+			unique_segments[segment_key] = chunk_key
+	_assert(
+		grouped_point_count == global_segments.size(),
+		"Podział na chunki musi zachować wszystkie i tylko globalne segmenty graniczne."
+	)
+	_assert(
+		_segment_owner(segments_by_chunk, Vector2(20.0, 0.0), Vector2(20.0, 10.0)) == "0:0",
+		"Granica przy x=20 musi należeć wyłącznie do chunka komórki, która ją wytworzyła."
+	)
+	_assert(
+		_segment_owner(segments_by_chunk, Vector2(30.0, 10.0), Vector2(30.0, 0.0)) == "1:0",
+		"Granica przy x=30 musi należeć wyłącznie do chunka komórki po prawej stronie blokady."
+	)
+	var direct_groups := MapNavigationRasterScript.boundary_segments_by_chunk(
+		raster.get("cells", PackedByteArray()),
+		4,
+		2,
+		Vector2(10.0, 10.0),
+		20
+	)
+	_assert(
+		var_to_str(direct_groups) == var_to_str(segments_by_chunk),
+		"Publiczna metoda podziału musi zwracać ten sam deterministyczny wynik co build()."
+	)
+
+	var cache_key := "underwater_map_scene_test_chunked_boundaries"
+	var cached_first: Dictionary = MapNavigationRasterScript.build_cached(
+		cache_key,
+		image,
+		Vector2(40.0, 20.0),
+		[],
+		20
+	)
+	var mutated_groups: Dictionary = cached_first.get("boundary_segments_by_chunk", {})
+	var mutated_chunk: PackedVector2Array = mutated_groups.get("0:0", PackedVector2Array())
+	mutated_chunk.append(Vector2(999.0, 999.0))
+	mutated_chunk.append(Vector2(1000.0, 1000.0))
+	mutated_groups["0:0"] = mutated_chunk
+	cached_first["boundary_segments_by_chunk"] = mutated_groups
+	var cached_second: Dictionary = MapNavigationRasterScript.build_cached(
+		cache_key,
+		image,
+		Vector2(40.0, 20.0),
+		[],
+		20
+	)
+	_assert(
+		var_to_str(cached_second.get("boundary_segments_by_chunk", {})) == var_to_str(segments_by_chunk),
+		"Cache rastra musi zwracać defensywną kopię zagnieżdżonych segmentów chunków."
+	)
+
+
+func _segment_owner(
+	segments_by_chunk: Dictionary,
+	segment_start: Vector2,
+	segment_end: Vector2
+) -> String:
+	var owner := ""
+	for chunk_key in segments_by_chunk.keys():
+		var chunk_segments: PackedVector2Array = segments_by_chunk.get(
+			chunk_key,
+			PackedVector2Array()
+		)
+		for point_index in range(0, chunk_segments.size(), 2):
+			if (
+				chunk_segments[point_index].is_equal_approx(segment_start)
+				and chunk_segments[point_index + 1].is_equal_approx(segment_end)
+			):
+				if not owner.is_empty():
+					return "duplicate"
+				owner = str(chunk_key)
+	return owner
+
+
+func _test_decoration_without_visual_is_rejected(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var decoration := MapObjectScript.new()
+	decoration.kind = MapObjectScript.Kind.DECORATION
+	decoration.object_id = "test_decoration_without_visual"
+	decoration.display_name = "Dekoracja bez grafiki"
+	decoration.position = Vector2(128.0, 128.0)
+	map_root.get_node("Decorations").add_child(decoration)
+	var result: Dictionary = compiler.compile_map(map_root, 91_008)
+	var errors: PackedStringArray = result.get("errors", PackedStringArray())
+	_assert(not errors.is_empty(), "Dekoracja bez Visual Scene musi zablokować kompilację zamiast tworzyć niewidoczny runtime.")
+	map_root.free()
+
+
+func _test_duplicate_id_is_rejected(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var existing_id := ""
+	for node in map_root.find_children("*", "", true, false):
+		if node is DiveMapObject and not (node as DiveMapObject).object_id.is_empty():
+			existing_id = (node as DiveMapObject).object_id
+			break
+	var duplicate := MapObjectScript.new()
+	duplicate.kind = MapObjectScript.Kind.OBSTACLE
+	duplicate.object_id = existing_id
+	duplicate.display_name = "Duplikat testowy"
+	duplicate.bounds_size = Vector2(32, 32)
+	duplicate.position = Vector2(64, 64)
+	map_root.get_node("StaticObstacles").add_child(duplicate)
+	var result: Dictionary = compiler.compile_map(map_root, 91_002)
+	var errors: PackedStringArray = result.get("errors", PackedStringArray())
+	_assert(not existing_id.is_empty() and not errors.is_empty(), "Powielony Object ID musi zablokować kompilację mapy.")
+	map_root.free()
+
+
+func _test_runtime_layer_preserves_authored_siblings(world) -> void:
+	var runtime = RuntimeMapScript.new()
+	runtime.name = "RuntimeMapTest"
+	var authored_sibling := Node2D.new()
+	authored_sibling.name = "AuthoredSentinel"
+	runtime.add_child(authored_sibling)
+	root.add_child(runtime)
+	await process_frame
+	runtime.configure(world, world.entry_sector_id)
+	_assert(runtime.get_node_or_null("AuthoredSentinel") == authored_sibling, "Przebudowa runtime nie może usuwać node'a dodanego w scenie.")
+	root.remove_child(runtime)
+	runtime.queue_free()
+
+
+func _instantiate_map() -> UnderwaterMapScene:
+	var scene := ResourceLoader.load(MapCompilerScript.MAP_SCENE_PATH, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
+	var map_root: UnderwaterMapScene
+	if scene != null:
+		map_root = scene.instantiate() as UnderwaterMapScene
+	_assert(map_root != null, "Produkcyjna scena mapy musi dać się zinstancjonować.")
+	return map_root
+
+
+func _authored_object_by_id(map_root: UnderwaterMapScene, object_id: String) -> DiveMapObject:
+	for node in map_root.find_children("*", "", true, false):
+		if node is DiveMapObject and (node as DiveMapObject).object_id == object_id:
+			return node as DiveMapObject
+	return null
+
+
+func _assert_tutorial_cable_anchors(cable_record: Dictionary) -> void:
+	var packed := ResourceLoader.load(CABLE_VISUAL_PATH) as PackedScene
+	_assert(packed != null, "Prefab kabla musi dać się załadować do kontroli zakotwiczeń.")
+	if packed == null:
+		return
+	var cable_visual := packed.instantiate() as Node2D
+	_assert(cable_visual != null, "Prefab kabla musi mieć root Node2D do kontroli zakotwiczeń.")
+	if cable_visual == null:
+		return
+	var route_points: Array = CommonLineCableVisualScript.ROUTE_POINTS
+	var tutorial_anchor_indices: Array = CommonLineCableVisualScript.TUTORIAL_ANCHOR_INDICES
+	_assert(route_points.size() >= 7, "Prefab kabla musi publikować pełną trasę od platformy do J-7.")
+	_assert(
+		var_to_str(tutorial_anchor_indices) == var_to_str([1, 3, 5, 6]),
+		"Prefab kabla musi jawnie oznaczać kotwy: targ, warsztat, SC-01 i J-7."
+	)
+	if route_points.size() < 7:
+		cable_visual.free()
+		return
+	var object_transform := Transform2D(
+		float(cable_record.get("visual_object_rotation", 0.0)),
+		cable_record.get("visual_object_scale", Vector2.ONE),
+		float(cable_record.get("visual_object_skew", 0.0)),
+		cable_record.get("position", Vector2.ZERO)
+	)
+	var visual_transform := Transform2D(
+		float(cable_record.get("visual_rotation", 0.0)),
+		cable_record.get("visual_scale", Vector2.ONE),
+		0.0,
+		cable_record.get("visual_offset", Vector2.ZERO)
+	)
+	var world_transform := object_transform * visual_transform * cable_visual.transform
+	var anchor_contract := [
+		{"point_index": 0, "position_id": "exit_line"},
+		{"point_index": 1, "position_id": "tutorial_market_crate"},
+		{"point_index": 3, "position_id": "tutorial_workshop_case"},
+		{"point_index": 5, "position_id": "SC-01"},
+		{"point_index": 6, "position_id": "junction_j7"},
+	]
+	for anchor in anchor_contract:
+		var point_index := int(anchor.get("point_index", -1))
+		var position_id := str(anchor.get("position_id", ""))
+		var world_point: Vector2 = world_transform * (route_points[point_index] as Vector2)
+		_assert(
+			_vectors_match(world_point, TUTORIAL_POSITIONS[position_id]),
+			"Trasa kabla musi przechodzić przez kotwę %s w zatwierdzonej pozycji." % position_id
+		)
+	cable_visual.free()
+
+
+func _assert_visual_scene_collision_free(scene_path: String, context: String) -> void:
+	var packed := ResourceLoader.load(scene_path) as PackedScene
+	_assert(packed != null, "%s musi wskazywać istniejący PackedScene." % context)
+	if packed == null:
+		return
+	var candidate := packed.instantiate()
+	_assert(candidate is Node2D, "%s musi mieć root Node2D." % context)
+	if not (candidate is Node2D):
+		if candidate != null:
+			candidate.free()
+		return
+	var visual_nodes: Array[Node] = []
+	visual_nodes.append(candidate)
+	visual_nodes.append_array(candidate.find_children("*", "", true, false))
+	for node in visual_nodes:
+		_assert(
+			not (node is CollisionObject2D or node is CollisionShape2D or node is CollisionPolygon2D),
+			"%s nie może zawierać kolizji: %s." % [context, node.name]
+		)
+	candidate.free()
+
+
+func _assert_story_cables_are_non_blocking(blueprint) -> void:
+	for decoration_id_value in STORY_CABLE_ENDPOINTS.keys():
+		var decoration_id := str(decoration_id_value)
+		var record: Dictionary = _record_by_id(blueprint.decoration_spawns, decoration_id)
+		_assert(not record.is_empty(), "Mapa musi zawierać odcinek kabla fabularnego %s." % decoration_id)
+		if record.is_empty():
+			continue
+		_assert(
+			not bool(record.get("blocks_navigation", true)),
+			"Kabel fabularny %s musi pozostać bezkolizyjną dekoracją." % decoration_id
+		)
+		var visual_path := str(record.get("visual_scene_path", ""))
+		var expected_visual_path := str(STORY_CABLE_VISUAL_PATHS.get(decoration_id, ""))
+		_assert(
+			visual_path == expected_visual_path,
+			"Kabel fabularny %s musi używać dedykowanego prefabu %s." % [decoration_id, expected_visual_path]
+		)
+		_assert_visual_scene_collision_free(visual_path, "Prefab kabla fabularnego %s" % decoration_id)
+		_assert_story_cable_endpoints(record, STORY_CABLE_ENDPOINTS[decoration_id])
+		if decoration_id == "common_line_cable_archive_r3":
+			_assert_story_cable_passes_point(record, STORY_POSITIONS["r3_diagnostic_panel"])
+
+
+func _assert_story_cable_endpoints(record: Dictionary, expected_endpoints: Array) -> void:
+	var decoration_id := str(record.get("id", ""))
+	var scene_path := str(record.get("visual_scene_path", ""))
+	var packed := ResourceLoader.load(scene_path) as PackedScene
+	_assert(packed != null, "Prefab kabla %s musi dać się załadować do kontroli endpointów." % decoration_id)
+	if packed == null:
+		return
+	var cable_visual := packed.instantiate() as Node2D
+	_assert(cable_visual != null, "Prefab kabla %s musi mieć root Node2D." % decoration_id)
+	if cable_visual == null:
+		return
+	var visual_script := cable_visual.get_script() as Script
+	var script_constants: Dictionary = visual_script.get_script_constant_map() if visual_script != null else {}
+	var route_points = script_constants.get("ROUTE_POINTS", [])
+	_assert(route_points.size() >= 2, "Prefab kabla %s musi publikować co najmniej dwa ROUTE_POINTS." % decoration_id)
+	_assert(expected_endpoints.size() == 2, "Kontrakt kabla %s musi wskazywać dokładnie początek i koniec." % decoration_id)
+	if route_points.size() < 2 or expected_endpoints.size() != 2:
+		cable_visual.free()
+		return
+	var object_transform := Transform2D(
+		float(record.get("visual_object_rotation", 0.0)),
+		record.get("visual_object_scale", Vector2.ONE),
+		float(record.get("visual_object_skew", 0.0)),
+		record.get("position", Vector2.ZERO)
+	)
+	var visual_transform := Transform2D(
+		float(record.get("visual_rotation", 0.0)),
+		record.get("visual_scale", Vector2.ONE),
+		0.0,
+		record.get("visual_offset", Vector2.ZERO)
+	)
+	var world_transform := object_transform * visual_transform * cable_visual.transform
+	var world_start: Vector2 = world_transform * (route_points[0] as Vector2)
+	var world_end: Vector2 = world_transform * (route_points[route_points.size() - 1] as Vector2)
+	_assert(
+		_vectors_match(world_start, expected_endpoints[0] as Vector2),
+		"Kabel %s musi zaczynać się przy zatwierdzonym urządzeniu %s; otrzymano %s."
+		% [decoration_id, expected_endpoints[0], world_start]
+	)
+	_assert(
+		_vectors_match(world_end, expected_endpoints[1] as Vector2),
+		"Kabel %s musi kończyć się przy zatwierdzonym urządzeniu %s; otrzymano %s."
+		% [decoration_id, expected_endpoints[1], world_end]
+	)
+	cable_visual.free()
+
+
+func _assert_story_cable_passes_point(record: Dictionary, expected_world_point: Vector2) -> void:
+	var packed := ResourceLoader.load(str(record.get("visual_scene_path", ""))) as PackedScene
+	if packed == null:
+		return
+	var cable_visual := packed.instantiate() as Node2D
+	if cable_visual == null:
+		return
+	var visual_script := cable_visual.get_script() as Script
+	var route_points = visual_script.get_script_constant_map().get("ROUTE_POINTS", []) if visual_script != null else []
+	var object_transform := Transform2D(
+		float(record.get("visual_object_rotation", 0.0)),
+		record.get("visual_object_scale", Vector2.ONE),
+		float(record.get("visual_object_skew", 0.0)),
+		record.get("position", Vector2.ZERO)
+	)
+	var visual_transform := Transform2D(
+		float(record.get("visual_rotation", 0.0)),
+		record.get("visual_scale", Vector2.ONE),
+		0.0,
+		record.get("visual_offset", Vector2.ZERO)
+	)
+	var world_transform := object_transform * visual_transform * cable_visual.transform
+	var passes_point := false
+	for route_point in route_points:
+		if _vectors_match(world_transform * (route_point as Vector2), expected_world_point):
+			passes_point = true
+			break
+	_assert(passes_point, "Kabel Archiwum — R-3 musi przechodzić przez panel diagnostyczny przed generatorem.")
+	cable_visual.free()
+
+
+func _assert_critical_interactable_separation(blueprint) -> void:
+	var records_by_id := _static_gameplay_records_by_id(blueprint)
+	for pair in CRITICAL_INTERACTABLE_PAIRS:
+		var first_id := str(pair[0])
+		var second_id := str(pair[1])
+		_assert(records_by_id.has(first_id), "Kontrakt odstępu wymaga celu %s." % first_id)
+		_assert(records_by_id.has(second_id), "Kontrakt odstępu wymaga celu %s." % second_id)
+		if not records_by_id.has(first_id) or not records_by_id.has(second_id):
+			continue
+		var first: Dictionary = records_by_id[first_id]
+		var second: Dictionary = records_by_id[second_id]
+		var first_position = first.get("position", null)
+		var second_position = second.get("position", null)
+		_assert(first_position is Vector2 and second_position is Vector2, "Oba cele pary %s/%s muszą publikować pozycję." % [first_id, second_id])
+		if not (first_position is Vector2 and second_position is Vector2):
+			continue
+		var distance := (first_position as Vector2).distance_to(second_position as Vector2)
+		_assert(
+			distance + 0.001 >= MIN_CRITICAL_INTERACTABLE_SEPARATION,
+			"Krytyczne interakcje %s i %s muszą dzielić co najmniej %.0f jednostek; jest %.1f."
+			% [first_id, second_id, MIN_CRITICAL_INTERACTABLE_SEPARATION, distance]
+		)
+
+
+func _static_gameplay_records_by_id(blueprint) -> Dictionary:
+	var result: Dictionary = {}
+	for records in [
+		blueprint.loot_spawns,
+		blueprint.threat_spawns,
+		blueprint.heavy_object_spawns,
+		blueprint.rescue_spawns,
+		blueprint.buoy_spawns,
+		blueprint.shortcut_spawns,
+		blueprint.fixed_device_spawns,
+	]:
+		for record in records:
+			var record_id := str(record.get("id", ""))
+			if not record_id.is_empty():
+				result[record_id] = record
+	return result
+
+
+func _assert_all_selectable_interactables_are_separated(blueprint) -> void:
+	var selectable_records: Array[Dictionary] = []
+	for records in [
+		blueprint.loot_spawns,
+		blueprint.heavy_object_spawns,
+		blueprint.rescue_spawns,
+		blueprint.buoy_spawns,
+		blueprint.shortcut_spawns,
+		blueprint.fixed_device_spawns,
+	]:
+		for record in records:
+			selectable_records.append(record)
+	for first_index in range(selectable_records.size()):
+		var first := selectable_records[first_index]
+		for second_index in range(first_index + 1, selectable_records.size()):
+			var second := selectable_records[second_index]
+			var first_position: Vector2 = first.get("position", Vector2.ZERO)
+			var second_position: Vector2 = second.get("position", Vector2.ZERO)
+			var distance := first_position.distance_to(second_position)
+			_assert(
+				distance + 0.001 >= MIN_CRITICAL_INTERACTABLE_SEPARATION,
+				"Interaktywne cele %s i %s muszą dzielić co najmniej %.0f jednostek, aby selektor nie wybierał sąsiedniego obiektu; jest %.1f."
+				% [
+					str(first.get("id", "")),
+					str(second.get("id", "")),
+					MIN_CRITICAL_INTERACTABLE_SEPARATION,
+					distance,
+				]
+			)
+
+
+func _nearest_landmark_id(blueprint, record: Dictionary) -> String:
+	var position_value = record.get("position", null)
+	if not (position_value is Vector2):
+		return ""
+	var landmark: Dictionary = blueprint.get_nearest_landmark(position_value as Vector2)
+	return str(landmark.get("id", ""))
+
+
+func _test_stale_source_version_is_rejected(compiler, world) -> void:
+	var stale_world = WorldStateScript.new()
+	stale_world.blueprint = world.blueprint.duplicate(true)
+	stale_world.delta = world.delta.duplicate(true)
+	var stale_blueprint = stale_world.blueprint
+	var original_delta = stale_world.delta
+	var original_active_landmark_id := str(original_delta.active_landmark_id)
+	var original_discovered_landmarks: Array[String] = original_delta.discovered_landmarks.duplicate()
+	stale_blueprint.map_source_version = MapCompilerScript.MAP_SOURCE_VERSION - 1
+
+	var errors: PackedStringArray = compiler.ensure_world_is_current(stale_world)
+	_assert(errors.has("Zapis kampanii nie używa aktualnego źródła mapy."), "Migawka source-v3 musi zostać odrzucona przed odświeżeniem mapy.")
+	_assert(stale_world.blueprint == stale_blueprint, "Odrzucenie nieaktualnej wersji źródła nie może zastąpić blueprintu.")
+	_assert(
+		stale_world.delta == original_delta
+		and str(stale_world.delta.active_landmark_id) == original_active_landmark_id
+		and stale_world.delta.discovered_landmarks == original_discovered_landmarks,
+		"Odrzucenie nieaktualnej wersji źródła nie może mutować WorldDelta."
+	)
+
+
+func _assert_unique_static_gameplay_positions(blueprint) -> void:
+	var static_record_groups := [
+		{"name": "loot", "records": blueprint.loot_spawns},
+		{"name": "threat", "records": blueprint.threat_spawns},
+		{"name": "heavy", "records": blueprint.heavy_object_spawns},
+		{"name": "rescue", "records": blueprint.rescue_spawns},
+		{"name": "buoy", "records": blueprint.buoy_spawns},
+		{"name": "shortcut", "records": blueprint.shortcut_spawns},
+		{"name": "fixed_device", "records": blueprint.fixed_device_spawns},
+	]
+	var position_owners: Dictionary = {}
+	for group in static_record_groups:
+		var category := str(group.get("name", "unknown"))
+		var records: Array = group.get("records", [])
+		for record in records:
+			var record_id := str(record.get("id", ""))
+			var position_value = record.get("position", null)
+			_assert(position_value is Vector2, "Statyczny cel %s/%s musi publikować pozycję Vector2." % [category, record_id])
+			if not (position_value is Vector2):
+				continue
+			var position := position_value as Vector2
+			var previous_owner := str(position_owners.get(position, ""))
+			_assert(
+				previous_owner.is_empty(),
+				"Statyczne cele gameplayowe nie mogą współdzielić punktu %s: %s i %s/%s." % [position, previous_owner, category, record_id]
+			)
+			if previous_owner.is_empty():
+				position_owners[position] = "%s/%s" % [category, record_id]
+
+
+func _record_position_matches(record: Dictionary, expected: Vector2) -> bool:
+	var position_value = record.get("position", null)
+	return position_value is Vector2 and _vectors_match(position_value as Vector2, expected)
+
+
+func _vectors_match(actual: Vector2, expected: Vector2) -> bool:
+	return actual.is_equal_approx(expected)
+
+
+func _has_authoring_kind(records: Array, authoring_kind: String) -> bool:
+	for record in records:
+		if str(record.get("authoring_kind", "")) == authoring_kind:
+			return true
+	return false
+
+
+func _record_by_id(records: Array, record_id: String) -> Dictionary:
+	for record in records:
+		if str(record.get("id", "")) == record_id:
+			return record
+	return {}
+
+
+func _assert(condition: bool, message: String) -> void:
+	if condition:
+		return
+	_failures += 1
+	push_error("Underwater map scene assertion failed: " + message)

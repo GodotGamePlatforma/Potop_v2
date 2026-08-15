@@ -1,0 +1,26 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/GameRoot.gd" id="1_game_root"]
+[ext_resource type="PackedScene" path="res://scenes/ui/PauseMenu.tscn" id="2_pause_menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/NarrativeDialoguePanel.tscn" id="3_narrative"]
+[ext_resource type="PackedScene" path="res://scenes/ui/SettingsMenu.tscn" id="4_settings"]
+
+[node name="GameRoot" type="Node"]
+script = ExtResource("1_game_root")
+
+[node name="SceneMount" type="Node" parent="."]
+
+[node name="NarrativeLayer" type="CanvasLayer" parent="."]
+layer = 150
+
+[node name="NarrativeDialoguePanel" parent="NarrativeLayer" instance=ExtResource("3_narrative")]
+
+[node name="PauseLayer" type="CanvasLayer" parent="."]
+layer = 200
+
+[node name="PauseMenu" parent="PauseLayer" instance=ExtResource("2_pause_menu")]
+
+[node name="PauseSettingsLayer" type="CanvasLayer" parent="."]
+layer = 220
+
+[node name="SettingsMenu" parent="PauseSettingsLayer" instance=ExtResource("4_settings")]

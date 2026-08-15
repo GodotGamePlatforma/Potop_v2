@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/SurvivorDefinition.gd" id="1_survivor"]
+
+[resource]
+script = ExtResource("1_survivor")
+id = "zofia_kruk"
+display_name = "Zofia Kruk"
+age_group = "adult"
+biography = "Prowadziła małą szklarnię na dachu szkoły. Umie wyhodować coś jadalnego nawet w słonej mgle."
+profession = "ogrodniczka"
+positive_trait = "zaradna"
+negative_trait = "nieufna"
+portrait_id = "zofia_kruk"
+health = 82
+morale = 48

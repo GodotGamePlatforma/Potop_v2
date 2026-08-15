@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DivingGearDefinition.gd" id="1_gear"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "oxygen_tank_mk2"
+display_name = "Butla tlenowa II"
+description = "Powiększona butla z Warsztatu Odzysku o pojemności 130 jednostek tlenu."
+equipment_slot = "oxygen_tank"
+tier = 2
+oxygen_capacity = 130.0

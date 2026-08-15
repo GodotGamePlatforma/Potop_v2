@@ -1,0 +1,45 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/BuildingDefinition.gd" id="1_building"]
+[ext_resource type="Script" path="res://scripts/definitions/BuildingLevelDefinition.gd" id="2_level"]
+
+[sub_resource type="Resource" id="Level1"]
+script = ExtResource("2_level")
+level = 1
+display_name = "Suche łóżka"
+worker_slots = 1
+capabilities = {"formal_isolation_capacity": 0, "healing_per_patient": 12, "medicine_per_patient": 1, "patient_capacity": 1}
+build_cost = {"fabric_rubber": 2, "planks": 6, "scrap": 3}
+
+[sub_resource type="Resource" id="Level2"]
+script = ExtResource("2_level")
+level = 2
+display_name = "Gabinet medyczny"
+worker_slots = 1
+capabilities = {"formal_isolation_capacity": 0, "healing_per_patient": 18, "medicine_per_patient": 1, "patient_capacity": 2}
+upgrade_cost = {"fabric_rubber": 3, "meds_chemicals": 1, "planks": 8, "scrap": 5}
+
+[sub_resource type="Resource" id="Level3"]
+script = ExtResource("2_level")
+level = 3
+display_name = "Izolatka"
+worker_slots = 2
+capabilities = {"formal_isolation_capacity": 2, "healing_per_patient": 24, "medicine_per_patient": 1, "patient_capacity": 4}
+upgrade_cost = {"fabric_rubber": 5, "meds_chemicals": 2, "planks": 11, "scrap": 8, "tech_parts": 2}
+
+[sub_resource type="Resource" id="Level4"]
+script = ExtResource("2_level")
+level = 4
+display_name = "Ambulatorium"
+worker_slots = 2
+capabilities = {"formal_isolation_capacity": 4, "healing_per_patient": 32, "medicine_per_patient": 1, "patient_capacity": 6}
+upgrade_cost = {"fabric_rubber": 8, "meds_chemicals": 3, "planks": 15, "scrap": 12, "tech_parts": 5}
+
+[resource]
+script = ExtResource("1_building")
+id = "infirmary"
+display_name = "Lecznica i Suszarnia"
+description = "Przy zdolnej obsadzie prowadzi wspólną opiekę nad rannymi i chorymi. Od poziomu III zapewnia formalną izolację."
+max_level = 4
+levels = Array[Resource]([SubResource("Level1"), SubResource("Level2"), SubResource("Level3"), SubResource("Level4")])
+specialist_bonus = {"profession": "medyk", "healing_bonus": 5}
