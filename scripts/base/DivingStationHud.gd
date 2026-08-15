@@ -14,6 +14,21 @@ const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd"
 const SurvivorPortraitScript := preload("res://scripts/ui/SurvivorPortrait.gd")
 const SurvivorInfoPresenterScript := preload("res://scripts/ui/SurvivorInfoPresenter.gd")
 
+# Stacja jest osadzona w jasnym obszarze działania BuildingPanel.
+const UI_WORKSPACE := Color("f7f0e2")
+const UI_CARD := Color("e4d9c5")
+const UI_LINE := Color("c7b38e")
+const UI_TEXT := Color("203b3b")
+const UI_MUTED := Color("607578")
+const UI_TEAL := Color("147b80")
+const UI_AMBER := Color("a66318")
+const UI_AMBER_BRIGHT := Color("f2af36")
+const UI_GREEN := Color("4f843c")
+const UI_GREEN_SURFACE := Color("e6f0d9")
+const UI_CORAL := Color("a83e36")
+const UI_CORAL_SURFACE := Color("f5e4df")
+const UI_MARINE := Color("10464e")
+
 var _state
 var _definition
 var _building
@@ -88,7 +103,7 @@ func _build_diver_candidates_panel() -> PanelContainer:
 	content.add_theme_constant_override("separation", 6)
 	margin.add_child(content)
 	_add_eyebrow(content, "ZAŁOGA WYPRAWY")
-	_add_wrapped_label(content, "Wybierz wolnego mieszkańca. Obsada budynków nie może nurkować.", Color("8fa2a5"), 10)
+	_add_wrapped_label(content, "Wybierz wolnego mieszkańca. Obsada budynków nie może nurkować.", UI_MUTED, 10)
 	var scroll := ScrollContainer.new()
 	scroll.name = "DiverCandidateScroll"
 	scroll.custom_minimum_size = Vector2(190, 220)
@@ -109,9 +124,9 @@ func _build_diver_candidates_panel() -> PanelContainer:
 	if _state.current_day_plan != null and not str(_state.current_day_plan.selected_diver_id).is_empty():
 		var clear_button := Button.new()
 		clear_button.name = "DiverSelectionClear"
-		clear_button.text = "WYCZYŚĆ WYBÓR"
+		clear_button.text = "ZAPOMNIJ NURKA"
 		clear_button.disabled = not _state.can_edit_day_plan()
-		clear_button.tooltip_text = _day_plan_edit_blocker() if clear_button.disabled else "Usuń bieżący wybór nurka."
+		clear_button.tooltip_text = _day_plan_edit_blocker() if clear_button.disabled else "Usuń zapamiętany wybór nurka."
 		if not clear_button.disabled:
 			clear_button.pressed.connect(func(): diver_selected.emit(""))
 		content.add_child(clear_button)
@@ -129,10 +144,10 @@ func _diver_candidate_button(survivor) -> Button:
 	button.tooltip_text = _candidate_tooltip(selected, blocker)
 	button.disabled = not selected and not blocker.is_empty()
 	button.add_theme_font_size_override("font_size", 11)
-	button.add_theme_color_override("font_color", Color("d9e6df"))
-	button.add_theme_color_override("font_hover_color", Color("fff1bf"))
-	button.add_theme_color_override("font_focus_color", Color("fff1bf"))
-	button.add_theme_color_override("font_disabled_color", Color("829390"))
+	button.add_theme_color_override("font_color", UI_TEXT)
+	button.add_theme_color_override("font_hover_color", UI_TEXT)
+	button.add_theme_color_override("font_focus_color", UI_TEXT)
+	button.add_theme_color_override("font_disabled_color", Color(UI_MUTED, 0.70))
 	button.add_theme_stylebox_override("normal", _candidate_style(selected, false))
 	button.add_theme_stylebox_override("hover", _candidate_style(selected, true))
 	if not button.disabled:
@@ -181,7 +196,7 @@ func _build_readiness_banner(diver) -> PanelContainer:
 	var marker := Label.new()
 	marker.text = "✓" if ready else "!"
 	marker.add_theme_font_size_override("font_size", 19)
-	marker.add_theme_color_override("font_color", Color("88d49d") if ready else Color("efa09a"))
+	marker.add_theme_color_override("font_color", UI_GREEN if ready else UI_CORAL)
 	row.add_child(marker)
 	var readiness_label := Label.new()
 	readiness_label.name = "DiveReadinessLabel"
@@ -189,7 +204,7 @@ func _build_readiness_banner(diver) -> PanelContainer:
 	readiness_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	readiness_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	readiness_label.add_theme_font_size_override("font_size", 12)
-	readiness_label.add_theme_color_override("font_color", Color("b8e5c4") if ready else Color("f0b1aa"))
+	readiness_label.add_theme_color_override("font_color", UI_GREEN if ready else UI_CORAL)
 	row.add_child(readiness_label)
 	return panel
 
@@ -219,10 +234,10 @@ func _build_diver_panel(diver) -> PanelContainer:
 		empty_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		empty_text.add_theme_font_size_override("font_size", 17)
-		empty_text.add_theme_color_override("font_color", Color("627579"))
+		empty_text.add_theme_color_override("font_color", UI_MUTED)
 		empty_avatar.add_child(empty_text)
 		content.add_child(empty_avatar)
-		_add_wrapped_label(content, "Wybierz wolnego mieszkańca z kolumny Załoga wyprawy.", Color("9aabad"), 12)
+		_add_wrapped_label(content, "Wybierz wolnego mieszkańca z kolumny Załoga wyprawy.", UI_MUTED, 12)
 		return panel
 	var preparation_analysis := _preparation_analysis()
 
@@ -255,7 +270,7 @@ func _build_diver_panel(diver) -> PanelContainer:
 	name_label.name = "DiverNameLabel"
 	name_label.text = diver.display_name
 	name_label.add_theme_font_size_override("font_size", 18)
-	name_label.add_theme_color_override("font_color", Color("f1e6ca"))
+	name_label.add_theme_color_override("font_color", UI_TEXT)
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	identity_text.add_child(name_label)
 	var profession := Label.new()
@@ -269,25 +284,25 @@ func _build_diver_panel(diver) -> PanelContainer:
 		else "NIEZDOLNY — %s" % diver.dive_blocker()
 	)
 	profession.add_theme_font_size_override("font_size", 11)
-	profession.add_theme_color_override("font_color", Color("7fcf9a") if diver.can_dive() else Color("e58d83"))
+	profession.add_theme_color_override("font_color", UI_GREEN if diver.can_dive() else UI_CORAL)
 	identity_text.add_child(profession)
-	_add_stat(content, "DiverHealth", "ZDROWIE", diver.health, diver.get_max_health(), Color("c95755"), "%d / %d" % [diver.health, diver.get_max_health()], SurvivorInfoPresenterScript.stat_tooltip(diver, "health"))
+	_add_stat(content, "DiverHealth", "ZDROWIE", diver.health, diver.get_max_health(), UI_CORAL, "%d / %d" % [diver.health, diver.get_max_health()], SurvivorInfoPresenterScript.stat_tooltip(diver, "health"))
 	var oxygen_capacity := float(preparation_analysis.get("oxygen_capacity", 0.0))
-	_add_stat(content, "DiverOxygen", "POJEMNOŚĆ TLENOWA", oxygen_capacity, oxygen_capacity, Color("65c7d2"), "%.0f / %.0f" % [oxygen_capacity, oxygen_capacity], "Tlen dostępny na planowanej wyprawie po połączeniu osobistej pojemności, wyposażonej butli i aktywnych premii.")
+	_add_stat(content, "DiverOxygen", "POJEMNOŚĆ TLENOWA", oxygen_capacity, oxygen_capacity, UI_TEAL, "%.0f / %.0f" % [oxygen_capacity, oxygen_capacity], "Tlen dostępny na planowanej wyprawie po połączeniu osobistej pojemności, wyposażonej butli i aktywnych premii.")
 	var carry_capacity: float = float(preparation_analysis.get("carry_capacity", diver.get_carry_capacity()))
 	var carry_tooltip := SurvivorInfoPresenterScript.stat_tooltip(diver, "carry")
 	if bool(preparation_analysis.get("station_staffed", false)):
 		carry_tooltip += "\n\nObsługa Stacji daje +5% udźwigu na tę wyprawę."
-	_add_stat(content, "DiverCarry", "UDŹWIG ŁUPU", carry_capacity, carry_capacity, Color("d1a85c"), "%.1f kg" % carry_capacity, carry_tooltip)
+	_add_stat(content, "DiverCarry", "UDŹWIG ŁUPU", carry_capacity, carry_capacity, UI_AMBER, "%.1f kg" % carry_capacity, carry_tooltip)
 
 	var details_button := Button.new()
 	details_button.text = "PROFIL, CECHY I STANY  %s" % ("▴" if _profile_details_expanded else "▾")
 	details_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	details_button.custom_minimum_size = Vector2(0, 34)
 	details_button.add_theme_font_size_override("font_size", 11)
-	details_button.add_theme_color_override("font_color", Color("aec6c3"))
-	details_button.add_theme_color_override("font_hover_color", Color("f3d178"))
-	details_button.add_theme_color_override("font_focus_color", Color("f3d178"))
+	details_button.add_theme_color_override("font_color", UI_TEAL)
+	details_button.add_theme_color_override("font_hover_color", UI_AMBER)
+	details_button.add_theme_color_override("font_focus_color", UI_AMBER)
 	content.add_child(details_button)
 	var details := VBoxContainer.new()
 	details.name = "DiverProfileDetails"
@@ -298,7 +313,7 @@ func _build_diver_panel(diver) -> PanelContainer:
 	biography.text = diver.biography
 	biography.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	biography.add_theme_font_size_override("font_size", 11)
-	biography.add_theme_color_override("font_color", Color("8fa2a5"))
+	biography.add_theme_color_override("font_color", UI_MUTED)
 	details.add_child(biography)
 	var traits_heading := _add_eyebrow(details, "CECHY I UMIEJĘTNOŚCI")
 	traits_heading.tooltip_text = "%s\n\n%s" % [SurvivorInfoPresenterScript.section_tooltip("traits"), SurvivorInfoPresenterScript.section_tooltip("competencies")]
@@ -315,7 +330,7 @@ func _build_diver_panel(diver) -> PanelContainer:
 	if not diver.negative_trait.is_empty():
 		traits.append("Słabość: %s" % diver.negative_trait.capitalize())
 	traits.append("Udźwig wyprawy: %.1f kg" % carry_capacity)
-	var traits_label := _add_wrapped_label(details, "  •  ".join(traits), Color("a7d99f"), 12, "DiverTraitsLabel")
+	var traits_label := _add_wrapped_label(details, "  •  ".join(traits), UI_GREEN, 12, "DiverTraitsLabel")
 	traits_label.tooltip_text = "%s\n\n%s" % [
 		SurvivorInfoPresenterScript.trait_tooltip(str(diver.positive_trait), true),
 		SurvivorInfoPresenterScript.trait_tooltip(str(diver.negative_trait), false),
@@ -332,12 +347,12 @@ func _build_diver_panel(diver) -> PanelContainer:
 		competency.text = "%s %d/%d" % [str(CompetencySystemScript.LABELS[competency_id]), CompetencySystemScript.level(diver, competency_id), CompetencySystemScript.MAX_LEVEL]
 		competency.tooltip_text = CompetencySystemScript.tooltip_text(diver, competency_id)
 		competency.add_theme_font_size_override("font_size", 10)
-		competency.add_theme_color_override("font_color", Color("9fc7c3"))
+		competency.add_theme_color_override("font_color", UI_TEAL)
 		competency_grid.add_child(competency)
 
 	var states_heading := _add_eyebrow(details, "STANY")
 	states_heading.tooltip_text = SurvivorInfoPresenterScript.section_tooltip("states")
-	var states_label := _add_wrapped_label(details, "  •  ".join(_state_labels(diver)), Color("b7c9c7"), 12, "DiverStatesLabel")
+	var states_label := _add_wrapped_label(details, "  •  ".join(_state_labels(diver)), UI_MUTED, 12, "DiverStatesLabel")
 	states_label.tooltip_text = SurvivorInfoPresenterScript.combined_state_tooltip(diver)
 	details_button.pressed.connect(_toggle_section.bind(details_button, details, "profile"))
 	return panel
@@ -380,22 +395,22 @@ func _build_equipment_panel(diver) -> PanelContainer:
 	details_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	details_button.custom_minimum_size = Vector2(0, 34)
 	details_button.add_theme_font_size_override("font_size", 11)
-	details_button.add_theme_color_override("font_color", Color("aec6c3"))
-	details_button.add_theme_color_override("font_hover_color", Color("f3d178"))
-	details_button.add_theme_color_override("font_focus_color", Color("f3d178"))
+	details_button.add_theme_color_override("font_color", UI_TEAL)
+	details_button.add_theme_color_override("font_hover_color", UI_AMBER)
+	details_button.add_theme_color_override("font_focus_color", UI_AMBER)
 	content.add_child(details_button)
 	content.add_child(details)
 	var oxygen_tank_title := Label.new()
 	oxygen_tank_title.text = "BUTLA TLENOWA"
 	oxygen_tank_title.add_theme_font_size_override("font_size", 12)
-	oxygen_tank_title.add_theme_color_override("font_color", Color("8fa3a6"))
+	oxygen_tank_title.add_theme_color_override("font_color", UI_MUTED)
 	details.add_child(oxygen_tank_title)
 	_build_oxygen_tank_picker(details)
 
 	var light_title := Label.new()
 	light_title.text = "ŹRÓDŁO ŚWIATŁA"
 	light_title.add_theme_font_size_override("font_size", 12)
-	light_title.add_theme_color_override("font_color", Color("8fa3a6"))
+	light_title.add_theme_color_override("font_color", UI_MUTED)
 	details.add_child(light_title)
 	_build_light_picker(details)
 	_build_entry_picker(details)
@@ -462,9 +477,9 @@ func _build_oxygen_tank_picker(content: VBoxContainer, detail_content: VBoxConta
 			description += " Po rozwoju nurka i premiach wyprawa otrzyma %.0f jednostek tlenu." % final_capacity
 		else:
 			description += " Przydziel nurka, aby zobaczyć końcową pojemność wyprawy."
-		_add_wrapped_label(description_host, description, Color("91a8aa"), 11, "EquippedOxygenTankDescription")
+		_add_wrapped_label(description_host, description, UI_MUTED, 11, "EquippedOxygenTankDescription")
 	else:
-		_add_wrapped_label(description_host, "Wybierz posiadaną butlę. Bez sprawnej butli wyprawa nie może się rozpocząć.", Color("e58d83"), 11, "EquippedOxygenTankDescription")
+		_add_wrapped_label(description_host, "Wybierz posiadaną butlę. Bez sprawnej butli wyprawa nie może się rozpocząć.", UI_CORAL, 11, "EquippedOxygenTankDescription")
 
 func _build_light_picker(content: VBoxContainer, detail_content: VBoxContainer = null) -> void:
 	var description_host := detail_content if detail_content != null else content
@@ -496,16 +511,16 @@ func _build_light_picker(content: VBoxContainer, detail_content: VBoxContainer =
 	content.add_child(picker)
 	var equipped_definition = _database.diving_gear.get(equipped_id) if _database != null else null
 	if equipped_definition != null:
-		_add_wrapped_label(description_host, "%s: pełna widoczność do %.0f, miękkie wygasanie do %.0f jednostek." % [equipped_definition.display_name, equipped_definition.light_inner_radius, equipped_definition.light_outer_radius], Color("91a8aa"), 11, "EquippedLightDescription")
+		_add_wrapped_label(description_host, "%s: pełna widoczność do %.0f, miękkie wygasanie do %.0f jednostek." % [equipped_definition.display_name, equipped_definition.light_inner_radius, equipped_definition.light_outer_radius], UI_MUTED, 11, "EquippedLightDescription")
 	else:
-		_add_wrapped_label(description_host, "Wybierz posiadaną latarnię. Bez światła wyprawa nie może się rozpocząć.", Color("e58d83"), 11, "EquippedLightDescription")
+		_add_wrapped_label(description_host, "Wybierz posiadaną latarnię. Bez światła wyprawa nie może się rozpocząć.", UI_CORAL, 11, "EquippedLightDescription")
 
 func _build_entry_picker(content: VBoxContainer, detail_content: VBoxContainer = null) -> void:
 	var description_host := detail_content if detail_content != null else content
 	var title := Label.new()
 	title.text = "WEJŚCIE DO WODY"
 	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color("8fa3a6"))
+	title.add_theme_color_override("font_color", UI_MUTED)
 	content.add_child(title)
 	var picker := OptionButton.new()
 	picker.name = "EntryPointPicker"
@@ -537,11 +552,11 @@ func _build_entry_picker(content: VBoxContainer, detail_content: VBoxContainer =
 		_add_wrapped_label(
 			description_host,
 			str(analysis.get("entry_point_selection_reason", "Brak alternatywnego wejścia do wody.")),
-			Color("799094"),
+			UI_MUTED,
 			11
 		)
 	else:
-		_add_wrapped_label(description_host, "Wybrane wejście zostanie zapisane w planie dnia i zamrożone przy starcie wyprawy.", Color("91a8aa"), 11)
+		_add_wrapped_label(description_host, "Wybrane wejście zostanie zapisane w planie dnia i zamrożone przy starcie wyprawy.", UI_MUTED, 11)
 
 func _build_action_row() -> void:
 	var row := HBoxContainer.new()
@@ -555,7 +570,7 @@ func _build_action_row() -> void:
 		var pending := Label.new()
 		pending.text = "Rozbudowa do poziomu %d oczekuje na migrację starszego zapisu." % _building.pending_level
 		pending.add_theme_font_size_override("font_size", 12)
-		pending.add_theme_color_override("font_color", Color("e9b65e"))
+		pending.add_theme_color_override("font_color", UI_AMBER)
 		add_child(pending)
 
 
@@ -578,7 +593,7 @@ func create_dive_button() -> Button:
 
 func diver_button_target(button: Button) -> void:
 	var style := _dive_button_style(true)
-	style.border_color = Color("ffd36c")
+	style.border_color = UI_AMBER_BRIGHT
 	style.set_border_width_all(3)
 	button.add_theme_stylebox_override("normal", style)
 
@@ -608,17 +623,17 @@ func _equipment_card(title: String, value: String, detail: String) -> PanelConta
 	var title_label := Label.new()
 	title_label.text = title
 	title_label.add_theme_font_size_override("font_size", 11)
-	title_label.add_theme_color_override("font_color", Color("84999c"))
+	title_label.add_theme_color_override("font_color", UI_MUTED)
 	column.add_child(title_label)
 	var value_label := Label.new()
 	value_label.text = value
 	value_label.add_theme_font_size_override("font_size", 16)
-	value_label.add_theme_color_override("font_color", Color("f0d38e"))
+	value_label.add_theme_color_override("font_color", UI_AMBER)
 	column.add_child(value_label)
 	var detail_label := Label.new()
 	detail_label.text = detail
 	detail_label.add_theme_font_size_override("font_size", 11)
-	detail_label.add_theme_color_override("font_color", Color("758a8d"))
+	detail_label.add_theme_color_override("font_color", UI_MUTED)
 	column.add_child(detail_label)
 	return card
 
@@ -638,14 +653,14 @@ func _tool_card(title: String, detail: String) -> PanelContainer:
 	var title_label := Label.new()
 	title_label.text = title
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_color_override("font_color", Color("e7c978"))
+	title_label.add_theme_color_override("font_color", UI_AMBER)
 	title_label.add_theme_font_size_override("font_size", 12)
 	column.add_child(title_label)
 	var detail_label := Label.new()
 	detail_label.text = detail
 	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	detail_label.add_theme_color_override("font_color", Color("83979a"))
+	detail_label.add_theme_color_override("font_color", UI_MUTED)
 	detail_label.add_theme_font_size_override("font_size", 10)
 	column.add_child(detail_label)
 	return card
@@ -657,14 +672,14 @@ func _add_stat(content: VBoxContainer, node_prefix: String, title: String, value
 	title_label.text = title
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_label.add_theme_font_size_override("font_size", 11)
-	title_label.add_theme_color_override("font_color", Color("93a6a9"))
+	title_label.add_theme_color_override("font_color", UI_MUTED)
 	title_label.tooltip_text = tooltip
 	labels.add_child(title_label)
 	var value_label := Label.new()
 	value_label.name = "%sLabel" % node_prefix
 	value_label.text = value_text
 	value_label.add_theme_font_size_override("font_size", 12)
-	value_label.add_theme_color_override("font_color", Color("e2e8e3"))
+	value_label.add_theme_color_override("font_color", UI_TEXT)
 	value_label.tooltip_text = tooltip
 	labels.add_child(value_label)
 	var bar := ProgressBar.new()
@@ -673,7 +688,7 @@ func _add_stat(content: VBoxContainer, node_prefix: String, title: String, value
 	bar.max_value = maxf(maximum, 1.0)
 	bar.value = clampf(value, 0.0, bar.max_value)
 	bar.show_percentage = false
-	bar.add_theme_stylebox_override("background", _bar_style(Color("1b272b")))
+	bar.add_theme_stylebox_override("background", _bar_style(UI_LINE))
 	bar.add_theme_stylebox_override("fill", _bar_style(color))
 	bar.tooltip_text = tooltip
 	content.add_child(bar)
@@ -682,7 +697,7 @@ func _add_eyebrow(content: VBoxContainer, value: String) -> Label:
 	var label := Label.new()
 	label.text = value
 	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color("e0bd69"))
+	label.add_theme_color_override("font_color", UI_AMBER)
 	content.add_child(label)
 	return label
 
@@ -803,8 +818,8 @@ func _day_plan_edit_blocker() -> String:
 
 func _section_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("0b1317e8")
-	style.border_color = Color("385258")
+	style.bg_color = Color(UI_WORKSPACE, 0.98)
+	style.border_color = UI_LINE
 	style.set_border_width_all(1)
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
@@ -814,8 +829,8 @@ func _section_style() -> StyleBoxFlat:
 
 func _avatar_style(is_filled: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("173038") if is_filled else Color("111b1f")
-	style.border_color = Color("d0a84b") if is_filled else Color("33464b")
+	style.bg_color = UI_MARINE if is_filled else UI_CARD
+	style.border_color = UI_AMBER_BRIGHT if is_filled else UI_LINE
 	style.set_border_width_all(2)
 	style.corner_radius_top_left = 3
 	style.corner_radius_top_right = 3
@@ -825,8 +840,8 @@ func _avatar_style(is_filled: bool) -> StyleBoxFlat:
 
 func _candidate_style(selected: bool, hovered: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("264238") if selected else (Color("1c2b2f") if hovered else Color("101b1f"))
-	style.border_color = Color("e0bd69") if selected else (Color("6d9793") if hovered else Color("385258"))
+	style.bg_color = UI_CARD if selected else (Color("efe7d7") if hovered else UI_WORKSPACE)
+	style.border_color = UI_AMBER_BRIGHT if selected else (UI_TEAL if hovered else UI_LINE)
 	style.set_border_width_all(2 if selected else 1)
 	style.corner_radius_top_left = 3
 	style.corner_radius_top_right = 3
@@ -836,8 +851,8 @@ func _candidate_style(selected: bool, hovered: bool) -> StyleBoxFlat:
 
 func _equipment_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("121e22")
-	style.border_color = Color("3a5156")
+	style.bg_color = UI_CARD
+	style.border_color = UI_LINE
 	style.set_border_width_all(1)
 	style.corner_radius_top_left = 3
 	style.corner_radius_top_right = 3
@@ -847,8 +862,8 @@ func _equipment_style() -> StyleBoxFlat:
 
 func _readiness_style(is_ready: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("10251c") if is_ready else Color("291817")
-	style.border_color = Color("4c8b61") if is_ready else Color("8b4b46")
+	style.bg_color = UI_GREEN_SURFACE if is_ready else UI_CORAL_SURFACE
+	style.border_color = UI_GREEN if is_ready else UI_CORAL
 	style.set_border_width_all(1)
 	style.corner_radius_top_left = 3
 	style.corner_radius_top_right = 3
@@ -867,8 +882,8 @@ func _bar_style(color: Color) -> StyleBoxFlat:
 
 func _dive_button_style(is_hovered: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("9c5f25") if is_hovered else Color("75461f")
-	style.border_color = Color("d5ad55")
+	style.bg_color = UI_AMBER_BRIGHT if is_hovered else Color("e5a12d")
+	style.border_color = UI_AMBER
 	style.set_border_width_all(2)
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4

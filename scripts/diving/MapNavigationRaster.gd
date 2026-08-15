@@ -3,10 +3,10 @@ extends RefCounted
 
 static var _cached_rasters: Dictionary = {}
 
-## Shared conversion of the authored navigation texture plus scene-authored
-## obstacles into the runtime navigation grid.  The compiler and gameplay use
-## this exact implementation so an obstacle cannot validate differently than
-## it behaves during a dive.
+## Shared composition of the scene-authored Polygon2D macroterrain plus local
+## MapObstacle records into the runtime navigation grid. The image entry point
+## remains an adapter for fixtures and derivative checks; production compiler
+## and gameplay consume build_from_cells() from the scene authority.
 ##
 ## Passing a positive chunk_size additionally exposes
 ## boundary_segments_by_chunk. Its x:y keys identify the chunk containing the
@@ -20,20 +20,12 @@ static func build(
 	chunk_size: int = 0,
 	include_boundary_data: bool = true
 ) -> Dictionary:
-	var errors := PackedStringArray()
 	if image == null or image.is_empty():
-		errors.append("Nie można odczytać tekstury nawigacji sceny mapy.")
-		return {"errors": errors}
+		return {"errors": PackedStringArray(["Nie można odczytać tekstury nawigacji sceny mapy."])}
 	var width := image.get_width()
 	var height := image.get_height()
 	if width <= 0 or height <= 0:
-		errors.append("Tekstura nawigacji sceny mapy ma nieprawidłowy rozmiar.")
-		return {"errors": errors}
-	if world_size.x <= 0.0 or world_size.y <= 0.0:
-		errors.append("Scena mapy ma nieprawidłowy rozmiar świata.")
-		return {"errors": errors}
-
-	var cell_scale := Vector2(world_size.x / float(width), world_size.y / float(height))
+		return {"errors": PackedStringArray(["Tekstura nawigacji sceny mapy ma nieprawidłowy rozmiar."])}
 	var cells := PackedByteArray()
 	cells.resize(width * height)
 	for y in range(height):
@@ -41,6 +33,40 @@ static func build(
 			# Preserve the established map-mask contract: bright pixels are
 			# blocked (0), darker pixels are traversable (1).
 			cells[y * width + x] = 0 if image.get_pixel(x, y).r > 0.5 else 1
+	return build_from_cells(
+		cells,
+		width,
+		height,
+		world_size,
+		obstacle_spawns,
+		chunk_size,
+		include_boundary_data
+	)
+
+
+## Applies scene-authored obstacles and derives collision boundaries from an
+## already compiled semantic terrain raster. The input array is never mutated;
+## this lets the scene Polygon2D authority be cached and shared by compiler and
+## runtime without obstacle records leaking between calls.
+static func build_from_cells(
+	base_cells: PackedByteArray,
+	width: int,
+	height: int,
+	world_size: Vector2,
+	obstacle_spawns: Array,
+	chunk_size: int = 0,
+	include_boundary_data: bool = true
+) -> Dictionary:
+	var errors := PackedStringArray()
+	if width <= 0 or height <= 0 or base_cells.size() != width * height:
+		errors.append("Scenowy raster makroterenu ma nieprawidłowy rozmiar.")
+		return {"errors": errors}
+	if world_size.x <= 0.0 or world_size.y <= 0.0:
+		errors.append("Scena mapy ma nieprawidłowy rozmiar świata.")
+		return {"errors": errors}
+
+	var cell_scale := Vector2(world_size.x / float(width), world_size.y / float(height))
+	var cells := base_cells.duplicate()
 
 	for raw_record in obstacle_spawns:
 		if not (raw_record is Dictionary):
@@ -93,6 +119,49 @@ static func build_cached(
 	if _cached_rasters.has(effective_cache_key):
 		return (_cached_rasters[effective_cache_key] as Dictionary).duplicate(true)
 	var raster := build(image, world_size, obstacle_spawns, chunk_size, include_boundary_data)
+	if (raster.get("errors", PackedStringArray()) as PackedStringArray).is_empty():
+		_cached_rasters[effective_cache_key] = raster.duplicate(true)
+	return raster
+
+
+static func build_from_cells_cached(
+	cache_key: String,
+	base_cells: PackedByteArray,
+	width: int,
+	height: int,
+	world_size: Vector2,
+	obstacle_spawns: Array,
+	chunk_size: int = 0,
+	include_boundary_data: bool = true
+) -> Dictionary:
+	if cache_key.is_empty():
+		return build_from_cells(
+			base_cells,
+			width,
+			height,
+			world_size,
+			obstacle_spawns,
+			chunk_size,
+			include_boundary_data
+		)
+	var effective_cache_key := "%s|scene_cells=%dx%d|collision_chunk=%d|boundary=%d" % [
+		cache_key,
+		width,
+		height,
+		maxi(chunk_size, 0),
+		int(include_boundary_data),
+	]
+	if _cached_rasters.has(effective_cache_key):
+		return (_cached_rasters[effective_cache_key] as Dictionary).duplicate(true)
+	var raster := build_from_cells(
+		base_cells,
+		width,
+		height,
+		world_size,
+		obstacle_spawns,
+		chunk_size,
+		include_boundary_data
+	)
 	if (raster.get("errors", PackedStringArray()) as PackedStringArray).is_empty():
 		_cached_rasters[effective_cache_key] = raster.duplicate(true)
 	return raster

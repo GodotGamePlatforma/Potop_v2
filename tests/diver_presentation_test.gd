@@ -105,6 +105,25 @@ func _test_runtime_presentation_contract() -> void:
 	diver._update_socket_markers()
 	_check(breath.position.is_equal_approx(Vector2(-authored.x, authored.y)), "Runtime sockets should mirror with the diver facing direction.")
 
+	var lantern_cone := diver.get_node("LanternCone") as Polygon2D
+	var dive_light := diver.get_node("DiveLight") as PointLight2D
+	sprite.flip_h = false
+	diver._update_socket_markers()
+	diver.set_lantern_presentation(true, Color(0.72, 0.9, 1.0, 1.0), 350.0, 1.0)
+	var lantern_state: Dictionary = diver.lantern_presentation_state()
+	_check(bool(lantern_state.get("visible", false)) and is_equal_approx(float(lantern_state.get("scale", 0.0)), 1.0), "Lantern I should expose its presentation cone at canonical scale.")
+	_check(int(lantern_state.get("z_index", 0)) == -21 and not bool(lantern_state.get("z_as_relative", true)), "The lantern volume should remain behind semantic terrain on an absolute canvas layer.")
+	_check(lantern_cone.position.is_equal_approx(diver.to_local(dive_light.global_position)) and lantern_cone.scale.x > 0.0, "The right-facing lantern cone should stay mounted at the authored lamp socket.")
+	sprite.flip_h = true
+	diver._update_socket_markers()
+	diver._update_light_mount()
+	_check(lantern_cone.position.is_equal_approx(diver.to_local(dive_light.global_position)) and lantern_cone.scale.x < 0.0, "The left-facing lantern cone should mirror around the same authored lamp socket.")
+	var cone_scale_before_reduced := lantern_cone.scale
+	diver.set_reduced_motion(true)
+	_check(lantern_cone.visible and lantern_cone.scale.is_equal_approx(cone_scale_before_reduced), "Reduced motion must not weaken or resize the static lantern signal.")
+	diver.set_lantern_presentation(false, Color.WHITE, 350.0, 0.0)
+	_check(not lantern_cone.visible, "Switching the lantern off should hide only its presentation cone.")
+
 	var wake_upper := visual_effects.get_node("WakeEmitterUpper") as GPUParticles2D
 	var wake_lower := visual_effects.get_node("WakeEmitterLower") as GPUParticles2D
 	diver.velocity = Vector2(90.0, 0.0)

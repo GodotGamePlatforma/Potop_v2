@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build the presentation-only signed-distance contour for the dive terrain.
 
-The source PNG remains the canonical navigation/collision mask.  This tool only
-derives a smoother raster for the terrain shader and records enough hashes to
-make the generated asset reproducible and reviewable.
+The input PNG is itself a committed derivative of the Polygon2D authority in
+UnderwaterMap.tscn. This second-stage tool only derives a smoother raster for
+the terrain shader and records enough hashes to make the chain reproducible.
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ def _manifest_bytes(source_bytes: bytes, png_bytes: bytes, width: int, height: i
         "height": height,
         "output_path": "res://assets/diving/world/map_v2/world_collision_render_sdf_v1.png",
         "output_sha256": sha256(png_bytes).hexdigest(),
-        "semantic_contract": "bright_blocked_dark_traversable",
+        "semantic_contract": "derived_bright_blocked_dark_traversable",
         "smooth_radius_texels": SMOOTH_RADIUS_TEXELS,
         "source_path": "res://assets/diving/world/map_v2/world_collision_grid.png",
         "source_sha256": sha256(source_bytes).hexdigest(),

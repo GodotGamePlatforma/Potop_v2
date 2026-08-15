@@ -2,6 +2,7 @@ class_name UnderwaterTerrainRenderer
 extends Node2D
 
 const WATER_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_water.gdshader")
+const BACKDROP_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_biome_backdrop.gdshader")
 const TERRAIN_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_terrain.gdshader")
 const QUALITY_IDS: Array[String] = ["low", "medium", "high"]
 const REQUIRED_PROFILE_COUNT := 4
@@ -19,6 +20,7 @@ const GLOBAL_MATERIAL_KEY := "global_depth_profile"
 
 @export_group("Layering")
 @export var water_z_index: int = -100
+@export var backdrop_z_index: int = -95
 @export var terrain_z_index: int = -20
 
 @export_group("Animation")
@@ -30,12 +32,15 @@ const GLOBAL_MATERIAL_KEY := "global_depth_profile"
 
 var _active_chunk_keys: Array[String] = []
 var _global_water: Polygon2D
+var _global_backdrop: Polygon2D
 var _global_terrain: Sprite2D
 var _water_materials: Dictionary = {}
+var _backdrop_materials: Dictionary = {}
 var _terrain_materials: Dictionary = {}
 var _graphics_quality: String = "high"
 var _reduced_motion: bool = false
 var _anim_time: float = 0.0
+var _view_center: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -61,6 +66,7 @@ func set_active_chunks(chunk_keys: Array[String]) -> void:
 	requested.sort()
 	_active_chunk_keys = requested
 	_ensure_global_water()
+	_ensure_global_backdrop()
 	_ensure_global_terrain()
 
 
@@ -68,10 +74,14 @@ func rebuild_visuals() -> void:
 	if _global_water != null and is_instance_valid(_global_water):
 		_global_water.queue_free()
 	_global_water = null
+	if _global_backdrop != null and is_instance_valid(_global_backdrop):
+		_global_backdrop.queue_free()
+	_global_backdrop = null
 	if _global_terrain != null and is_instance_valid(_global_terrain):
 		_global_terrain.queue_free()
 	_global_terrain = null
 	_water_materials.clear()
+	_backdrop_materials.clear()
 	_terrain_materials.clear()
 	var requested: Array[String] = []
 	requested.assign(_active_chunk_keys)
@@ -84,10 +94,14 @@ func clear_visuals() -> void:
 	if _global_water != null and is_instance_valid(_global_water):
 		_global_water.queue_free()
 	_global_water = null
+	if _global_backdrop != null and is_instance_valid(_global_backdrop):
+		_global_backdrop.queue_free()
+	_global_backdrop = null
 	if _global_terrain != null and is_instance_valid(_global_terrain):
 		_global_terrain.queue_free()
 	_global_terrain = null
 	_water_materials.clear()
+	_backdrop_materials.clear()
 	_terrain_materials.clear()
 
 
@@ -115,6 +129,16 @@ func advance_animation(delta: float) -> void:
 	_refresh_animation_parameter()
 
 
+func set_view_center(value: Vector2) -> void:
+	if not is_finite(value.x) or not is_finite(value.y):
+		return
+	_view_center = value - global_position
+	for material_variant in _backdrop_materials.values():
+		var material := material_variant as ShaderMaterial
+		if material != null:
+			material.set_shader_parameter("view_center", _view_center)
+
+
 func active_chunk_keys() -> Array[String]:
 	var result: Array[String] = []
 	result.assign(_active_chunk_keys)
@@ -132,10 +156,17 @@ func presentation_state() -> Dictionary:
 		"uses_derived_contour_sdf": contour_sdf != null,
 		"uses_detail_texture": rock_detail_texture != null,
 		"water_material_count": _water_materials.size(),
+		"backdrop_material_count": _backdrop_materials.size(),
 		"terrain_material_count": _terrain_materials.size(),
-		"uses_global_depth_profiles": _water_materials.size() <= 1 and _terrain_materials.size() <= 1,
+		"uses_global_depth_profiles": _water_materials.size() <= 1 and _backdrop_materials.size() <= 1 and _terrain_materials.size() <= 1,
 		"uses_global_water_layer": _global_water != null and is_instance_valid(_global_water),
+		"uses_global_backdrop_layer": _global_backdrop != null and is_instance_valid(_global_backdrop),
 		"uses_global_terrain_layer": _global_terrain != null and is_instance_valid(_global_terrain),
+		"backdrop_z_index": backdrop_z_index,
+		"backdrop_quality_level": QUALITY_IDS.find(_graphics_quality),
+		"backdrop_reduced_motion": _reduced_motion,
+		"backdrop_anim_time": 0.0 if _reduced_motion else _anim_time,
+		"backdrop_view_center": _view_center,
 	}
 
 
@@ -209,6 +240,25 @@ func _ensure_global_water() -> void:
 	add_child(_global_water)
 
 
+func _ensure_global_backdrop() -> void:
+	if _global_backdrop != null and is_instance_valid(_global_backdrop):
+		return
+	if _sorted_profiles().size() != REQUIRED_PROFILE_COUNT:
+		return
+	_global_backdrop = Polygon2D.new()
+	_global_backdrop.name = "DistantBiomeBackground"
+	_global_backdrop.polygon = PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(world_size.x, 0.0),
+		world_size,
+		Vector2(0.0, world_size.y),
+	])
+	_global_backdrop.z_index = backdrop_z_index
+	_global_backdrop.z_as_relative = false
+	_global_backdrop.material = _backdrop_material()
+	add_child(_global_backdrop)
+
+
 func _ensure_global_terrain() -> void:
 	if _global_terrain != null and is_instance_valid(_global_terrain):
 		return
@@ -256,6 +306,20 @@ func _terrain_material() -> ShaderMaterial:
 	material.set_shader_parameter("world_origin", global_position)
 	_apply_dynamic_parameters(material)
 	_terrain_materials[GLOBAL_MATERIAL_KEY] = material
+	return material
+
+
+func _backdrop_material() -> ShaderMaterial:
+	if _backdrop_materials.has(GLOBAL_MATERIAL_KEY):
+		return _backdrop_materials[GLOBAL_MATERIAL_KEY] as ShaderMaterial
+	var material := ShaderMaterial.new()
+	material.shader = BACKDROP_SHADER
+	_apply_backdrop_profile_parameters(material)
+	material.set_shader_parameter("world_size", world_size)
+	material.set_shader_parameter("world_origin", global_position)
+	material.set_shader_parameter("view_center", _view_center)
+	_apply_backdrop_dynamic_parameters(material)
+	_backdrop_materials[GLOBAL_MATERIAL_KEY] = material
 	return material
 
 
@@ -310,11 +374,33 @@ func _apply_terrain_profile_parameters(material: ShaderMaterial) -> void:
 		))
 
 
+func _apply_backdrop_profile_parameters(material: ShaderMaterial) -> void:
+	var profiles := _sorted_profiles()
+	if profiles.size() != REQUIRED_PROFILE_COUNT:
+		return
+	material.set_shader_parameter("r1_depth_end", profiles[0].end_depth_ratio)
+	material.set_shader_parameter("r2_depth_end", profiles[1].end_depth_ratio)
+	material.set_shader_parameter("r3_depth_end", profiles[2].end_depth_ratio)
+	for index in range(REQUIRED_PROFILE_COUNT):
+		var profile := profiles[index]
+		var prefix := "r%d" % (index + 1)
+		material.set_shader_parameter("%s_backdrop_tint" % prefix, profile.backdrop_tint)
+		material.set_shader_parameter("%s_backdrop_accent" % prefix, profile.backdrop_accent)
+		material.set_shader_parameter("%s_backdrop_strength" % prefix, profile.backdrop_strength)
+		material.set_shader_parameter("%s_backdrop_motion_scale" % prefix, profile.backdrop_motion_scale)
+		material.set_shader_parameter("%s_backdrop_motif_scale" % prefix, profile.backdrop_motif_scale)
+
+
 func _refresh_dynamic_material_parameters() -> void:
 	for material_variant in _water_materials.values():
 		var material := material_variant as ShaderMaterial
 		if material != null:
 			_apply_dynamic_parameters(material)
+	for material_variant in _backdrop_materials.values():
+		var material := material_variant as ShaderMaterial
+		if material != null:
+			material.set_shader_parameter("world_origin", global_position)
+			_apply_backdrop_dynamic_parameters(material)
 	for material_variant in _terrain_materials.values():
 		var material := material_variant as ShaderMaterial
 		if material != null:
@@ -327,6 +413,10 @@ func _refresh_animation_parameter() -> void:
 		var material := material_variant as ShaderMaterial
 		if material != null:
 			material.set_shader_parameter("anim_time", _anim_time)
+	for material_variant in _backdrop_materials.values():
+		var material := material_variant as ShaderMaterial
+		if material != null:
+			material.set_shader_parameter("anim_time", 0.0 if _reduced_motion else _anim_time)
 	for material_variant in _terrain_materials.values():
 		var material := material_variant as ShaderMaterial
 		if material != null:
@@ -337,6 +427,12 @@ func _apply_dynamic_parameters(material: ShaderMaterial) -> void:
 	material.set_shader_parameter("quality_level", float(QUALITY_IDS.find(_graphics_quality)))
 	material.set_shader_parameter("reduced_motion", _reduced_motion)
 	material.set_shader_parameter("anim_time", _anim_time)
+
+
+func _apply_backdrop_dynamic_parameters(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("quality_level", QUALITY_IDS.find(_graphics_quality))
+	material.set_shader_parameter("reduced_motion", _reduced_motion)
+	material.set_shader_parameter("anim_time", 0.0 if _reduced_motion else _anim_time)
 
 
 func _sorted_profiles() -> Array[UnderwaterRegionVisualProfile]:

@@ -108,6 +108,8 @@ static func preflight_errors(state) -> PackedStringArray:
 	_require_exact(errors, state.tutorial, TutorialStateScript, "tutorial")
 	_require_exact(errors, state.diving_equipment, DivingEquipmentStateScript, "diving_equipment")
 	_require_exact(errors, state.current_day_plan, DayPlanStateScript, "current_day_plan")
+	if typeof(state.preferred_diver_id) != TYPE_STRING:
+		errors.append("preferred_diver_id nie jest Stringiem.")
 
 	_require_exact(errors, state.mission_progress, MissionProgressStateScript, "mission_progress")
 	_require_exact(errors, state.pressure_state, PressureStateScript, "pressure_state")
@@ -293,6 +295,7 @@ static func validation_errors(state) -> PackedStringArray:
 	for catalog_error in profession_talent_system.validation_errors():
 		errors.append("Katalog talentów zawodowych: %s" % catalog_error)
 	var survivor_by_id := _validate_survivors(errors, state.survivors, profession_talent_system)
+	_validate_preferred_diver(errors, state, survivor_by_id)
 	_validate_disease_state(errors, state, survivor_by_id)
 	var building_by_id := _validate_buildings(errors, state, survivor_by_id)
 	_validate_platform(errors, state.platform, building_by_id)
@@ -1406,6 +1409,18 @@ static func _validate_selected_diver(errors: Array[String], state, plan, survivo
 		errors.append("Wybrany nurek %s ma niepusty odwrotny przydział %s." % [selected_diver_id, reverse_assignment])
 	if not survivor.can_dive():
 		errors.append("Wybrany nurek %s nie spełnia warunków can_dive()." % selected_diver_id)
+
+
+static func _validate_preferred_diver(errors: Array[String], state, survivor_by_id: Dictionary) -> void:
+	var preferred_diver_id := str(state.preferred_diver_id).strip_edges()
+	if preferred_diver_id.is_empty():
+		return
+	if not survivor_by_id.has(preferred_diver_id):
+		errors.append("Zapamiętany nurek %s nie istnieje." % preferred_diver_id)
+		return
+	var survivor = survivor_by_id[preferred_diver_id]
+	if not survivor.is_alive():
+		errors.append("Zapamiętany nurek %s nie żyje ani nie jest dostępny w kampanii." % preferred_diver_id)
 
 
 static func _validate_planned_survivor_ids(

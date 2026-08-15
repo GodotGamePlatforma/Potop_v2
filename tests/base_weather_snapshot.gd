@@ -57,6 +57,12 @@ func _ready() -> void:
 			"weather": _profile(WeatherStateScript.Condition.STORM, 1.00, 1.00, 1.16, 1.00, 1.00, 1.34),
 		},
 		{
+			"quality": "high",
+			"file_name": "base_weather_storm_powered.png",
+			"weather": _profile(WeatherStateScript.Condition.STORM, 1.00, 1.00, 1.16, 1.00, 1.00, 1.34),
+			"powered": true,
+		},
+		{
 			"quality": "medium",
 			"file_name": "base_weather_storm_medium.png",
 			"weather": _profile(WeatherStateScript.Condition.STORM, 1.00, 1.00, 1.16, 1.00, 1.00, 1.34),
@@ -104,8 +110,13 @@ func _ready() -> void:
 		if snapshot_case.weather != null:
 			weather = (snapshot_case.weather as Resource).duplicate(true)
 			state.weather = weather
+		if bool(snapshot_case.get("powered", false)):
+			state.story_flags.junction_j7_active = true
 		base.bind(game, state)
 		base.set_graphics_quality(str(snapshot_case.quality))
+		if bool(snapshot_case.get("powered", false)) and not _validate_powered_capture_runtime(base):
+			get_tree().quit(1)
+			return
 		_prepare_gpu_particles(base)
 		base.set_animation_time_for_tests(SHARED_WAVE_PHASE_TIME / weather.wave_speed_multiplier)
 		_seek_gpu_particles(base)
@@ -121,7 +132,7 @@ func _ready() -> void:
 			% [str(cases[0].quality), _capture_resolution.x, _capture_resolution.y]
 		)
 	else:
-		print("Fresh-runtime canonical 1280x720 snapshots saved for four weather states plus storm medium/low.")
+		print("Fresh-runtime canonical 1280x720 snapshots saved for four weather states, storm after J-7 and storm medium/low.")
 	get_tree().quit(0)
 
 
@@ -212,6 +223,38 @@ func _validate_day_one_runtime(state, base: Node) -> bool:
 	if tutorial_panel == null or not tutorial_panel.visible or resource_bar == null:
 		push_error("Full-runtime base snapshots must include the HUD and day-one tutorial callout.")
 		return false
+	if state.story_flags == null or bool(state.story_flags.junction_j7_active):
+		push_error("Day-one base snapshots must begin before persisted J-7 activation.")
+		return false
+	var environment = base.get_node_or_null("BaseEnvironment")
+	if environment == null or not environment.has_method("world_state_for_tests"):
+		push_error("Day-one base snapshots require the real BaseEnvironment world state.")
+		return false
+	var world_state: Dictionary = environment.world_state_for_tests()
+	if (
+		bool(world_state.get("powered_presentation", true))
+		or int(world_state.get("light_count", 0)) != 1
+		or int(world_state.get("directional_light_count", 0)) != 1
+		or int(world_state.get("spot_light_count", -1)) != 0
+		or int(world_state.get("omni_light_count", -1)) != 0
+		or int(world_state.get("deck_light_mount_count", 0)) != 3
+		or int(world_state.get("deck_light_local_light_count", -1)) != 0
+		or int(world_state.get("deck_light_beam_count", 0)) != 3
+		or int(world_state.get("deck_light_beam_visible_count", -1)) != 0
+		or int(world_state.get("deck_light_source_glow_count", 0)) != 3
+		or int(world_state.get("deck_light_source_glow_visible_count", -1)) != 0
+		or int(world_state.get("deck_light_fixture_geometry_count", -1)) != 0
+		or int(world_state.get("deck_light_vfx_geometry_count", 0)) != 6
+		or int(world_state.get("deck_light_vfx_shadow_casting_count", -1)) != 0
+		or int(world_state.get("deck_light_anchor_match_count", 0)) != 3
+		or float(world_state.get("deck_light_aim_alignment_min", 0.0)) <= 0.999
+		or float(world_state.get("deck_light_beam_end_clearance_min", 0.0)) <= 0.0
+		or float(world_state.get("deck_light_beam_end_clearance_max", 1.0)) >= 0.35
+		or bool(world_state.get("amber_lamp_emission_enabled", true))
+		or not is_zero_approx(float(world_state.get("amber_lamp_emission_energy", 1.0)))
+	):
+		push_error("Before J-7 the world must retain only its directional sun while three fixtureless VFX sources and beams stay hidden, with M_AmberLamp emission disabled.")
+		return false
 	return true
 
 
@@ -244,6 +287,38 @@ func _validate_start_capture_runtime(state, base: Node, quality: String) -> bool
 			if bool(visible):
 				push_error("Start snapshot displayed a built variant on day one.")
 				return false
+	return true
+
+
+func _validate_powered_capture_runtime(base: Node) -> bool:
+	var environment = base.get_node_or_null("BaseEnvironment")
+	if environment == null or not environment.has_method("world_state_for_tests"):
+		push_error("Powered base snapshot requires the real BaseEnvironment world state.")
+		return false
+	var world_state: Dictionary = environment.world_state_for_tests()
+	if not bool(world_state.get("powered_presentation", false)) or int(world_state.get("amber_lamp_material_count", 0)) <= 0 or bool(world_state.get("amber_lamp_emission_enabled", true)) or not is_zero_approx(float(world_state.get("amber_lamp_emission_energy", 1.0))):
+		push_error("Powered base snapshot requires J-7 presentation without M_AmberLamp emission.")
+		return false
+	if (
+		int(world_state.get("light_count", 0)) != 1
+		or int(world_state.get("directional_light_count", 0)) != 1
+		or int(world_state.get("spot_light_count", -1)) != 0
+		or int(world_state.get("omni_light_count", -1)) != 0
+		or int(world_state.get("deck_light_mount_count", 0)) != 3
+		or int(world_state.get("deck_light_mount_parented_count", 0)) != 3
+		or int(world_state.get("deck_light_local_light_count", -1)) != 0
+		or int(world_state.get("deck_light_beam_count", 0)) != 3
+		or int(world_state.get("deck_light_beam_visible_count", 0)) != 3
+		or int(world_state.get("deck_light_beam_parented_count", 0)) != 3
+		or int(world_state.get("deck_light_source_glow_count", 0)) != 3
+		or int(world_state.get("deck_light_source_glow_visible_count", 0)) != 3
+		or int(world_state.get("deck_light_source_glow_parented_count", 0)) != 3
+	):
+		push_error("Powered base snapshot must retain one shared sun and exactly three mounted source-glow and directional-beam VFX groups without local Light3D nodes.")
+		return false
+	if int(world_state.get("deck_light_fixture_geometry_count", -1)) != 0 or int(world_state.get("deck_light_vfx_geometry_count", 0)) != 6 or int(world_state.get("deck_light_vfx_shadow_casting_count", -1)) != 0 or int(world_state.get("deck_light_anchor_match_count", 0)) != 3 or float(world_state.get("deck_light_aim_alignment_min", 0.0)) <= 0.999 or float(world_state.get("deck_light_beam_end_clearance_min", 0.0)) <= 0.0 or float(world_state.get("deck_light_beam_end_clearance_max", 1.0)) >= 0.35:
+		push_error("Powered base snapshot requires three fixtureless source halos and three shadowless beams at the approved rig anchors, ending just above the deck without a local lighting response.")
+		return false
 	return true
 
 

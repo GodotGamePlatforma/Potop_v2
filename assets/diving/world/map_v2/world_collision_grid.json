@@ -1,0 +1,16 @@
+{
+  "authority_node_path": "Terrain/TerrainNavigation",
+  "authority_path": "res://scenes/diving/UnderwaterMap.tscn",
+  "cells_sha256": "7c6ce97c39e58d5008032ca9dc16ad2464be5518b8cf9960adfad9f6df5a8c02",
+  "generator": "scripts/diving/DiveTerrainDerivatives.gd",
+  "generator_version": 1,
+  "geometry_sha256": "cf030739b7d322f84633b100be268a9b6f409f8b3d6bf4d2223c8b97b204de0e",
+  "grid_step": 8.0,
+  "height": 810,
+  "output_path": "res://assets/diving/world/map_v2/world_collision_grid.png",
+  "output_sha256": "40798e139fcb909aa136190f1142c0b6150fdb242263b87cc1c3fe7bf89b2050",
+  "semantic_contract": "polygon_scene_default_blocked_open_then_islands",
+  "width": 1440,
+  "world_height": 6480.0,
+  "world_width": 11520.0
+}

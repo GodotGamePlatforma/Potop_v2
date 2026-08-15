@@ -1,0 +1,63 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/diving/world/backdrops/r3/r3_power_plant_midground_v1.png" id="1_plate"]
+[ext_resource type="Shader" path="res://assets/diving/world/shaders/underwater_authored_backdrop.gdshader" id="2_shader"]
+[ext_resource type="Shader" path="res://assets/diving/world/shaders/underwater_authored_foreground.gdshader" id="3_foreground_shader"]
+[ext_resource type="Texture2D" path="res://assets/diving/world/map_v2/world_collision_render_sdf_v1.png" id="4_terrain_sdf"]
+[ext_resource type="Texture2D" path="res://assets/diving/world/materials/underwater_rock_detail_premium_v5.png" id="5_rock_albedo"]
+[ext_resource type="Texture2D" path="res://assets/diving/world/foregrounds/r3/r3_power_plant_cavern_overhang_v1.png" id="6_cavern_overhang"]
+[ext_resource type="Shader" path="res://assets/diving/world/shaders/underwater_authored_cutout.gdshader" id="7_cutout_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_r3_plate"]
+shader = ExtResource("2_shader")
+shader_parameter/water_haze = Color(0.018, 0.165, 0.215, 1)
+shader_parameter/haze_strength = 0.045
+shader_parameter/opacity = 1.0
+shader_parameter/edge_softness = 0.065
+shader_parameter/warm_practical_lift = 0.11
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_r3_foreground"]
+shader = ExtResource("3_foreground_shader")
+shader_parameter/terrain_sdf = ExtResource("4_terrain_sdf")
+shader_parameter/authored_rock_albedo = ExtResource("5_rock_albedo")
+shader_parameter/world_size = Vector2(11520, 6480)
+shader_parameter/world_origin = Vector2(0, 0)
+shader_parameter/material_world_scale = 286.0
+shader_parameter/base_tint = Color(0.11, 0.145, 0.135, 1)
+shader_parameter/shadow_tint = Color(0.014, 0.024, 0.024, 1)
+shader_parameter/edge_tint = Color(0.13, 0.26, 0.25, 1)
+shader_parameter/rust_tint = Color(0.31, 0.125, 0.045, 1)
+shader_parameter/rust_strength = 0.2
+shader_parameter/wet_sheen_strength = 0.14
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_r3_cutout"]
+shader = ExtResource("7_cutout_shader")
+shader_parameter/water_haze = Color(0.015, 0.12, 0.15, 1)
+shader_parameter/terrain_sdf = ExtResource("4_terrain_sdf")
+shader_parameter/world_size = Vector2(11520, 6480)
+shader_parameter/world_origin = Vector2(0, 0)
+shader_parameter/haze_strength = 0.055
+shader_parameter/key_start = 0.55
+shader_parameter/key_end = 0.74
+shader_parameter/opacity = 1.0
+shader_parameter/exposure = 0.74
+
+[node name="R3PowerPlantMidgroundVisual" type="Node2D"]
+
+[node name="EnvironmentPlate" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_r3_plate")
+position = Vector2(0, 137)
+scale = Vector2(1.02, 1.02)
+texture = ExtResource("1_plate")
+
+[node name="AuthoredTerrainSkin" type="Polygon2D" parent="."]
+z_index = 36
+material = SubResource("ShaderMaterial_r3_foreground")
+polygon = PackedVector2Array(-1050, -600, 1050, -600, 1050, 600, -1050, 600)
+
+[node name="AuthoredCavernOverhang" type="Sprite2D" parent="."]
+z_index = 37
+material = SubResource("ShaderMaterial_r3_cutout")
+position = Vector2(160, -20)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("6_cavern_overhang")

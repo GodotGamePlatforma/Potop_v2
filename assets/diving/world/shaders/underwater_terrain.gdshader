@@ -76,6 +76,15 @@ float terrain_fbm(vec2 point) {
 }
 
 
+float authored_detail_luminance(vec3 linear_color) {
+	// source_color textures are sampled in linear space. Convert back to a
+	// perceptual range before treating the authored albedo as a height field;
+	// otherwise dark wet rock collapses into an almost uniform value.
+	vec3 perceptual_color = pow(max(linear_color, vec3(0.0)), vec3(1.0 / 2.2));
+	return dot(perceptual_color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+
 float region_depth(float depth_ratio, float start_depth, float end_depth) {
 	return clamp((depth_ratio - start_depth) / max(end_depth - start_depth, 0.0001), 0.0, 1.0);
 }
@@ -104,20 +113,19 @@ float rock_height(vec2 detail_uv) {
 	if (!has_detail_texture) {
 		return terrain_fbm(detail_uv * 1.35);
 	}
-	float primary = dot(texture(rock_detail_texture, detail_uv).rgb, vec3(0.2126, 0.7152, 0.0722));
+	float primary = authored_detail_luminance(texture(rock_detail_texture, detail_uv).rgb);
 	if (quality_level <= 1.5) {
 		return primary;
 	}
 	vec2 rotated_uv = mat2(vec2(0.86, -0.51), vec2(0.51, 0.86)) * detail_uv;
-	float secondary = dot(texture(rock_detail_texture, rotated_uv * 1.83 + vec2(0.37, 0.19)).rgb, vec3(0.2126, 0.7152, 0.0722));
-	float isotropic_detail = mix(primary, secondary, 0.42);
-	return clamp(0.5 + (isotropic_detail - 0.5) * 1.28, 0.0, 1.0);
+	float secondary = authored_detail_luminance(texture(rock_detail_texture, rotated_uv * 1.83 + vec2(0.37, 0.19)).rgb);
+	return mix(primary, secondary, 0.14);
 }
 
 
 float rock_relief_height(vec2 detail_uv) {
 	if (has_detail_texture) {
-		return dot(texture(rock_detail_texture, detail_uv).rgb, vec3(0.2126, 0.7152, 0.0722));
+		return authored_detail_luminance(texture(rock_detail_texture, detail_uv).rgb);
 	}
 	return terrain_fbm(detail_uv * 1.35);
 }
@@ -161,6 +169,12 @@ void fragment() {
 	float safe_detail_scale = max(detail_world_scale, 1.0);
 	vec2 detail_uv = world_position / safe_detail_scale;
 	float detail_height = rock_height(detail_uv);
+	vec3 authored_albedo = vec3(0.5);
+	float primary_surface = 0.5;
+	if (has_detail_texture) {
+		authored_albedo = texture(rock_detail_texture, detail_uv).rgb;
+		primary_surface = authored_detail_luminance(authored_albedo);
+	}
 	float relief_step = mix(0.018, 0.010, step(1.5, quality_level));
 	float relief_x = 0.0;
 	float relief_y = 0.0;
@@ -170,6 +184,11 @@ void fragment() {
 		relief_y = rock_relief_height(detail_uv + vec2(0.0, relief_step)) - relief_height;
 	}
 	vec3 relief_normal = normalize(vec3(-relief_x * 4.2, -relief_y * 4.2, 1.0));
+	// Feed the authored relief into Godot's 2D light pass. The same material
+	// remains fully readable without the lantern, while local lights now reveal
+	// wet ridges instead of brightening every rock pixel uniformly.
+	NORMAL_MAP = relief_normal * 0.5 + 0.5;
+	NORMAL_MAP_DEPTH = mix(0.32, 0.82, step(1.5, quality_level));
 	float diffuse_relief = clamp(dot(relief_normal, normalize(vec3(-0.38, -0.72, 0.78))) * 0.5 + 0.5, 0.0, 1.0);
 	float macro_relief = terrain_fbm(world_position / 610.0 + vec2(0.17, -0.31));
 	float mineral_breakup = terrain_fbm(world_position / 188.0 + vec2(2.7, 1.3));
@@ -177,8 +196,20 @@ void fragment() {
 	float shaped_detail = mix(0.5, detail_height, detail_strength);
 	float material_value = clamp(shaped_detail * 0.58 + diffuse_relief * 0.30 + macro_relief * 0.12, 0.0, 1.0);
 	vec3 rock_color = mix(shadow_tint, base_tint, smoothstep(0.08, 0.92, material_value));
+	if (has_detail_texture) {
+		// Preserve the authored material's wet cracks and boulder boundaries as
+		// albedo variation instead of reducing the texture to procedural noise.
+		float authored_linear_luma = max(dot(authored_albedo, vec3(0.2126, 0.7152, 0.0722)), 0.018);
+		vec3 authored_chroma = clamp(authored_albedo / authored_linear_luma, vec3(0.76), vec3(1.24));
+		float authored_value = mix(0.56, 1.22, smoothstep(0.20, 0.68, primary_surface));
+		rock_color *= authored_chroma * authored_value;
+	}
 	rock_color *= mix(0.91, 1.055, macro_relief * 0.62 + mineral_breakup * 0.38);
 	rock_color = mix(rock_color, base_tint * vec3(0.90, 0.92, 0.88), sediment * 0.11);
+	float wet_sheen = pow(clamp(diffuse_relief, 0.0, 1.0), 7.0)
+		* smoothstep(0.54, 0.88, detail_height)
+		* step(0.5, quality_level);
+	rock_color += edge_tint * wet_sheen * mix(0.035, 0.085, step(1.5, quality_level));
 
 	float motion_time = reduced_motion ? 0.0 : anim_time;
 	vec2 caustics_uv = world_position / 118.0;
@@ -194,6 +225,6 @@ void fragment() {
 	float edge_breakup = smoothstep(0.24, 0.82, value_noise(world_position / 76.0 + vec2(3.2, -1.6)));
 	rock_color = mix(rock_color, shadow_tint * 0.86, edge * mix(0.13, 0.05, edge_facing));
 	float edge_glint = edge * edge_highlight_strength * mix(0.10, 0.54, edge_facing) * mix(0.22, 1.0, edge_breakup);
-	rock_color = mix(rock_color, edge_tint, clamp(edge_glint * 0.28, 0.0, 0.22));
+	rock_color = mix(rock_color, edge_tint, clamp(edge_glint * 0.32, 0.0, 0.22));
 	COLOR = vec4(max(rock_color, vec3(0.0)), rock_alpha);
 }

@@ -65,11 +65,12 @@ func _initialize() -> void:
 		"energy_configuration": "common_line", "north_platform_survived": true, "hope": 50, "important_decisions": []
 	}
 	state.prepare_weather_for_day(); state.prepare_pressure_for_day(); state.begin_new_day_plan()
+	state.preferred_diver_id = "igor"
 	state.underwater_world.delta.activated_fixed_devices.assign(["junction_j7", "archive_terminal", "r3_diagnostic_panel", "r3_generator", "c4_switchboard", "c4_splitter_mount"])
 	_assert(manager.save_game(state) == OK, "Bieżący format kampanii musi przejść zapis.")
 	_assert(_legacy_fixture_is_untouched(), "Zapis bieżącej kampanii nie może modyfikować starego pliku.")
 	var loaded = manager.load_game()
-	_assert(loaded != null and loaded.format_revision == GameFormatScript.CAMPAIGN_FORMAT_REVISION and loaded.story_flags.chronicle_summary.outcome_id == "last_bridge", "Bieżący format musi zachować Kronikę.")
+	_assert(loaded != null and loaded.format_revision == GameFormatScript.CAMPAIGN_FORMAT_REVISION and loaded.story_flags.chronicle_summary.outcome_id == "last_bridge" and loaded.preferred_diver_id == "igor", "Bieżący format musi zachować Kronikę i zapamiętanego nurka.")
 	var loaded_operator = loaded.find_survivor(operator.id) if loaded != null else null
 	_assert(loaded_operator != null and loaded_operator.competency_levels == {"swimming": 2, "oxygen_economy": 3, "resilience": 1}, "Bieżący format musi zachować kompetencje.")
 	operator.competency_levels["active_dash"] = 1

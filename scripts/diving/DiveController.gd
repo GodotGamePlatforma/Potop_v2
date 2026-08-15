@@ -173,6 +173,9 @@ func set_graphics_quality(quality_id: String) -> void:
 		_underwater_environment.set_graphics_quality(_graphics_quality)
 	if dive_map != null and dive_map.has_method("set_graphics_quality"):
 		dive_map.set_graphics_quality(_graphics_quality)
+	if _current_visual != null and _current_visual.has_method("set_graphics_quality"):
+		_current_visual.set_graphics_quality(_graphics_quality)
+	_light_system.apply_graphics_quality(diver_light, _graphics_quality)
 
 
 func set_reduced_motion(enabled: bool) -> void:
@@ -1913,8 +1916,11 @@ func _configure_lighting() -> void:
 		diver_light,
 		_equipped_light_definition,
 		session != null and bool(session.light_enabled),
-		_dive_lighting_definition
+		_dive_lighting_definition,
+		0.0,
+		_graphics_quality
 	)
+	_sync_diver_lantern_presentation(configured and session != null and bool(session.light_enabled))
 	if session != null and not configured:
 		session.light_enabled = false
 
@@ -1937,7 +1943,22 @@ func _apply_diver_light_state() -> void:
 		return
 	if _equipped_light_definition == null or not _equipped_light_definition.is_valid_light():
 		session.light_enabled = false
-	_light_system.set_light_enabled(diver_light, _equipped_light_definition, session.light_enabled)
+	var enabled := _light_system.set_light_enabled(diver_light, _equipped_light_definition, session.light_enabled)
+	_sync_diver_lantern_presentation(enabled)
+
+
+func _sync_diver_lantern_presentation(enabled: bool) -> void:
+	if diver == null or not diver.has_method("set_lantern_presentation"):
+		return
+	if _equipped_light_definition == null or not _equipped_light_definition.is_valid_light():
+		diver.set_lantern_presentation(false, Color.WHITE, 350.0, 0.0)
+		return
+	diver.set_lantern_presentation(
+		enabled,
+		Color(_equipped_light_definition.light_color),
+		float(_equipped_light_definition.light_outer_radius),
+		float(_equipped_light_definition.light_energy)
+	)
 
 
 func _is_diver_light_active() -> bool:
@@ -1995,6 +2016,8 @@ func _build_current_visual() -> void:
 	_current_visual = DiveCurrentVisualScript.new()
 	_current_visual.name = "CurrentVisual"
 	add_child(_current_visual)
+	if _current_visual.has_method("set_graphics_quality"):
+		_current_visual.set_graphics_quality(_graphics_quality)
 	if _current_visual.has_method("set_reduced_motion"):
 		_current_visual.set_reduced_motion(_reduced_motion)
 

@@ -232,6 +232,7 @@ func _run() -> void:
 	_validate_complete_catalog_contract()
 	_validate_assignment_table_contract()
 	_validate_profile_contracts_and_real_builder()
+	_validate_routing_signature_snapshot_lifetime()
 	_validate_tutorial_route_resource_contracts()
 	_validate_profile_dag_contract(not bool(earliest_shard.get("enabled", false)))
 	if earliest_only:
@@ -1298,13 +1299,27 @@ func _validate_earliest_profile_frontier(shard: Dictionary = {}) -> void:
 	if profile_order.size() != ALL_PROFILE_PATHS.size():
 		_assert(false, "Nie można uruchomić frontieru na niepoprawnym DAG profili.")
 		return
+	var frontier_mode := (
+		"shard-%d-of-%d" % [int(shard.get("index", 0)) + 1, int(shard.get("count", 1))]
+		if bool(shard.get("enabled", false))
+		else "complete"
+	)
+	print(
+		"DIVE_RECOVERY_FRONTIER START mode=%s profiles=%d"
+		% [frontier_mode, profile_order.size()]
+	)
 	var safe_profiles_by_query: Dictionary = {}
 	var frontier_evidence: Dictionary = {}
 	var union_target_ids: Dictionary = {}
 	var union_queries: Dictionary = {}
 	var standard_difficulty_path := "res://data/difficulty/standard.tres"
 	var standard_cases_by_profile: Dictionary = {}
-	for profile_id in profile_order:
+	for profile_index in range(profile_order.size()):
+		var profile_id: String = profile_order[profile_index]
+		print(
+			"DIVE_RECOVERY_FRONTIER BUILD phase=union profile=%s difficulty=standard ordinal=%d/%d"
+			% [profile_id, profile_index + 1, profile_order.size()]
+		)
 		var standard_case: Dictionary = await _build_earliest_profile_case(
 			profile_id,
 			standard_difficulty_path
@@ -1317,14 +1332,28 @@ func _validate_earliest_profile_frontier(shard: Dictionary = {}) -> void:
 	var selected_query_lookup: Dictionary = {}
 	for query_id in selected_query_ids:
 		selected_query_lookup[query_id] = true
+	print(
+		"DIVE_RECOVERY_FRONTIER CATALOG mode=%s total_queries=%d selected_queries=%d"
+		% [frontier_mode, all_query_ids.size(), selected_query_ids.size()]
+	)
+	var replayed_candidate_count := 0
 
-	for profile_id in profile_order:
+	for profile_index in range(profile_order.size()):
+		var profile_id: String = profile_order[profile_index]
+		print(
+			"DIVE_RECOVERY_FRONTIER PROFILE_BEGIN profile=%s ordinal=%d/%d"
+			% [profile_id, profile_index + 1, profile_order.size()]
+		)
 		var profile_cases: Array[Dictionary] = []
 		for difficulty_path in DIFFICULTY_PATHS:
 			var profile_case: Dictionary
 			if difficulty_path == standard_difficulty_path:
 				profile_case = standard_cases_by_profile.get(profile_id, {})
 			else:
+				print(
+					"DIVE_RECOVERY_FRONTIER BUILD phase=replay profile=%s difficulty=%s"
+					% [profile_id, str(difficulty_path).get_file().get_basename()]
+				)
 				profile_case = await _build_earliest_profile_case(profile_id, difficulty_path)
 			profile_cases.append(profile_case)
 			_accumulate_snapshot_union(profile_case, union_target_ids, union_queries)
@@ -1336,14 +1365,37 @@ func _validate_earliest_profile_frontier(shard: Dictionary = {}) -> void:
 				continue
 			var preflight_result := _preflight_earliest_candidate(profile_cases, query_id)
 			if not bool(preflight_result.get("valid", false)):
+				print(
+					"DIVE_RECOVERY_FRONTIER PREFLIGHT_SKIP profile=%s query=%s reason=%s"
+					% [profile_id, query_id, str(preflight_result.get("reason_code", ""))]
+				)
 				_record_frontier_evidence(frontier_evidence, query_id, profile_id, preflight_result)
 				continue
+			replayed_candidate_count += 1
+			print(
+				"DIVE_RECOVERY_FRONTIER REPLAY_BEGIN ordinal=%d profile=%s query=%s difficulties=%d"
+				% [replayed_candidate_count, profile_id, query_id, DIFFICULTY_PATHS.size()]
+			)
 			var replay_result := _replay_earliest_candidate(profile_cases, query_id)
+			print(
+				"DIVE_RECOVERY_FRONTIER REPLAY_END ordinal=%d profile=%s query=%s safe=%s reason=%s"
+				% [
+					replayed_candidate_count,
+					profile_id,
+					query_id,
+					str(bool(replay_result.get("safe", false))),
+					str(replay_result.get("reason_code", "")),
+				]
+			)
 			_record_frontier_evidence(frontier_evidence, query_id, profile_id, replay_result)
 			if bool(replay_result.get("safe", false)):
 				safe_profiles.append(profile_id)
 				safe_profiles_by_query[query_id] = safe_profiles
 		_validate_earliest_cases_are_detached(profile_cases, profile_id)
+		print(
+			"DIVE_RECOVERY_FRONTIER PROFILE_END profile=%s ordinal=%d/%d"
+			% [profile_id, profile_index + 1, profile_order.size()]
+		)
 
 	_validate_snapshot_union_contract(union_target_ids, union_queries)
 	var actual_earliest_profiles: Dictionary = {}
@@ -1355,6 +1407,10 @@ func _validate_earliest_profile_frontier(shard: Dictionary = {}) -> void:
 			"Brak profilu SAFE dla query %s. Dowody frontieru: %s"
 			% [query_id, str(frontier_evidence.get(query_id, {}))]
 		)
+	print(
+		"DIVE_RECOVERY_FRONTIER DISCOVERY_END mode=%s selected_queries=%d replayed_candidates=%d"
+		% [frontier_mode, selected_query_ids.size(), replayed_candidate_count]
+	)
 	_validate_or_report_earliest_profiles(
 		actual_earliest_profiles,
 		union_queries,
@@ -1546,6 +1602,7 @@ func _replay_earliest_candidate(profile_cases: Array[Dictionary], query_id: Stri
 	var observations: Array[String] = []
 	for profile_case in profile_cases:
 		var difficulty = profile_case.difficulty
+		var profile_id := str(profile_case.profile.profile_id)
 		replayed_difficulties[str(difficulty.profile_id)] = true
 		var queries_by_id: Dictionary = profile_case.get("queries_by_id", {})
 		_assert(queries_by_id.has(query_id), "Potencjalne minimum %s musi istnieć na każdym poziomie trudności." % query_id)
@@ -1553,6 +1610,10 @@ func _replay_earliest_candidate(profile_cases: Array[Dictionary], query_id: Stri
 			all_safe = false
 			continue
 		var query = queries_by_id[query_id]
+		print(
+			"DIVE_RECOVERY_FRONTIER DIFFICULTY_BEGIN profile=%s query=%s difficulty=%s"
+			% [profile_id, query_id, str(difficulty.profile_id)]
+		)
 		var report = _analyzer.analyze_query(
 			profile_case.scenario.setup,
 			profile_case.snapshot,
@@ -1560,6 +1621,17 @@ func _replay_earliest_candidate(profile_cases: Array[Dictionary], query_id: Stri
 			ResourceLoader.load(POLICY_PATH),
 			profile_case.profile.profile_id,
 			difficulty.profile_id
+		)
+		print(
+			"DIVE_RECOVERY_FRONTIER DIFFICULTY_END profile=%s query=%s difficulty=%s feasible=%s safe=%s reason=%s"
+			% [
+				profile_id,
+				query_id,
+				str(difficulty.profile_id),
+				str(bool(report.feasible)),
+				str(bool(report.safe)),
+				str(report.reason_code),
+			]
 		)
 		var query_safe: bool = bool(report.feasible) and bool(report.safe) and report.reason_code == CertificateScript.OK_SAFE
 		all_safe = all_safe and query_safe
@@ -1877,6 +1949,52 @@ func _validate_detached_shortcut_sequence() -> void:
 	_assert(sequence.feasible and sequence.safe, "Interakcja ze skrótem musi odmaskować bramę w odłączonym snapshotcie przed kolejnym odcinkiem.")
 	_assert(sequence.certificates.size() == 1 and sequence.certificates[0].target_ids == ["SC-TEST", "after_gate_container"], "Sekwencja musi certyfikować skrót, cel za bramą i normalny powrót.")
 	_assert(not snapshot.is_position_clear(Vector2(405.0, 305.0)), "Wejściowy snapshot musi pozostać niemutowany po sekwencyjnym replayu.")
+
+
+func _validate_routing_signature_snapshot_lifetime() -> void:
+	var analyzer = AnalyzerScript.new()
+	var policy = ResourceLoader.load(POLICY_PATH)
+	var source_snapshot = _planner_margin_snapshot(true)
+	var source_snapshot_ref: WeakRef = weakref(source_snapshot)
+	var source_signature: String = analyzer._routing_signature(source_snapshot)
+	_assert(not source_signature.is_empty(), "Podpis routingu wejściowego snapshotu nie może być pusty.")
+	_assert(
+		not source_snapshot.has_meta(&"recovery_routing_signature"),
+		"Obliczenie podpisu nie może mutować metadanych wejściowego snapshotu."
+	)
+
+	var detached_snapshot = analyzer._detached_navigation_snapshot(source_snapshot)
+	_assert(
+		detached_snapshot != null
+		and detached_snapshot.has_meta(&"recovery_routing_signature")
+		and str(detached_snapshot.get_meta(&"recovery_routing_signature")) == source_signature,
+		"Lokalna kopia replayu musi przechowywać obliczony podpis routingu w metadanych."
+	)
+	var detached_snapshot_ref: WeakRef = weakref(detached_snapshot)
+	detached_snapshot = null
+	_assert(
+		detached_snapshot_ref.get_ref() == null,
+		"Memoizacja podpisu nie może zatrzymywać lokalnej kopii replayu po zwolnieniu ostatniej referencji."
+	)
+
+	var planning_snapshot = analyzer._planning_navigation_snapshot(source_snapshot, policy)
+	_assert(
+		planning_snapshot != null
+		and planning_snapshot.has_meta(&"recovery_routing_signature"),
+		"Lokalny snapshot bezpieczeństwa planera musi przechowywać podpis routingu w metadanych."
+	)
+	var planning_snapshot_ref: WeakRef = weakref(planning_snapshot)
+	planning_snapshot = null
+	_assert(
+		planning_snapshot_ref.get_ref() == null,
+		"Memoizacja podpisu nie może zatrzymywać snapshotu bezpieczeństwa po zwolnieniu ostatniej referencji."
+	)
+
+	source_snapshot = null
+	_assert(
+		source_snapshot_ref.get_ref() == null,
+		"Analizator nie może przechowywać silnej referencji do wejściowego snapshotu po obliczeniu podpisu."
+	)
 
 
 func _validate_current_aware_planner_margin() -> void:

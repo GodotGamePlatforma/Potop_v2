@@ -30,6 +30,22 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	var platform_import_path := "res://assets/base_3d/start_platform_ruins.glb.import"
+	var platform_import_settings := FileAccess.get_file_as_string(platform_import_path)
+	_assert(
+		not platform_import_settings.is_empty()
+		and platform_import_settings.contains("gltf/embedded_image_handling=3"),
+		"Import GLB platformy musi byc wersjonowany i osadzac 40 tekstur bezstratnie zamiast wypisywac duplikaty obok modelu."
+	)
+	var extracted_platform_textures: Array[String] = []
+	for file_name in DirAccess.get_files_at("res://assets/base_3d"):
+		if file_name.begins_with("start_platform_ruins_") and file_name.ends_with(".png"):
+			extracted_platform_textures.append(file_name)
+	_assert(
+		extracted_platform_textures.is_empty(),
+		"Import GLB nie moze generowac zewnetrznych duplikatow tekstur: %s" % [str(extracted_platform_textures)]
+	)
+
 	var environment = BaseEnvironmentScript.new()
 	environment.build()
 	root.add_child(environment)
@@ -267,7 +283,32 @@ func _run() -> void:
 	var shared_sun := environment.world_3d.get_node_or_null("SunDirectionalLight3D") as DirectionalLight3D
 	_assert(shared_sun != null, "BaseWorld3D musi miec jedno jawnie nazwane swiatlo reprezentujace slonce.")
 	_assert(environment.world_3d.get_node_or_null("SeaFill") == null, "Odbite swiatlo morza ma pochodzic z ambientu i nieba, nie z drugiego DirectionalLight3D.")
-	_assert(int(initial_world.get("light_count", 0)) == 1, "Baza moze miec tylko jedno wspolne Light3D; lokalne fill lights nie moga maskowac kalibracji slonca.")
+	_assert(
+		int(initial_world.get("light_count", 0)) == 1
+		and int(initial_world.get("directional_light_count", 0)) == 1
+		and int(initial_world.get("spot_light_count", -1)) == 0
+		and int(initial_world.get("omni_light_count", -1)) == 0
+		and int(initial_world.get("deck_light_mount_count", 0)) == 3
+		and int(initial_world.get("deck_light_local_light_count", -1)) == 0
+		and int(initial_world.get("deck_light_beam_count", 0)) == 3
+		and int(initial_world.get("deck_light_source_glow_count", 0)) == 3
+		and int(initial_world.get("deck_light_beam_visible_count", -1)) == 0
+		and int(initial_world.get("deck_light_source_glow_visible_count", -1)) == 0,
+		"Przed J-7 swiat ma zawierac tylko wspolne slonce, a trzy zrodla VFX, rozblyski i wiazki maja istniec bez widocznego wkladu."
+	)
+	_assert(
+		int(initial_world.get("deck_light_mount_parented_count", 0)) == 3
+		and int(initial_world.get("deck_light_beam_parented_count", 0)) == 3
+		and int(initial_world.get("deck_light_source_glow_parented_count", 0)) == 3
+		and int(initial_world.get("deck_light_fixture_geometry_count", -1)) == 0
+		and int(initial_world.get("deck_light_vfx_geometry_count", 0)) == 6
+		and int(initial_world.get("deck_light_anchor_match_count", 0)) == 3
+		and float(initial_world.get("deck_light_aim_alignment_min", 0.0)) > 0.999
+		and float(initial_world.get("deck_light_beam_end_clearance_min", 0.0)) > 0.0
+		and float(initial_world.get("deck_light_beam_end_clearance_max", 1.0)) < 0.35
+		and int(initial_world.get("deck_light_vfx_shadow_casting_count", -1)) == 0,
+		"Trzy grupy J-7 musza dziedziczyc PlatformRig3D, pozostac w zatwierdzonych kotwicach i konczyc bezcieniowe wiazki tuz nad pokladem bez fizycznej geometrii opraw."
+	)
 	_assert(int(initial_world.get("directional_light_count", 0)) == 1 and int(initial_world.get("shadow_casting_directional_light_count", 0)) == 1, "Platforma, ruiny i budynki musza dzielic dokladnie jedno kierunkowe slonce z cieniem.")
 	_assert(bool(initial_world.get("sun_shadow_enabled", false)) and int(initial_world.get("sun_sky_mode", -1)) == DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY, "Wspolne slonce musi oswietlac modele, rzucac cienie i reprezentowac tarcze w proceduralnym niebie.")
 	var initial_sun_direction: Vector3 = initial_world.get("sun_direction", Vector3.ZERO)
@@ -657,6 +698,99 @@ func _run() -> void:
 	_assert(float(calm_sun_state.get("shadow_angular_distance", 0.0)) < float(moderate_sun_state.get("shadow_angular_distance", 0.0)) and float(moderate_sun_state.get("shadow_angular_distance", 0.0)) < float(rough_sun_state.get("shadow_angular_distance", 0.0)) and float(rough_sun_state.get("shadow_angular_distance", 0.0)) < float(storm_sun_state.get("shadow_angular_distance", 0.0)), "Chmury musza stopniowo zmiekczac cien wspolnego slonca od calm do storm.")
 	_assert(Vector3(calm_sun_state.get("sun_direction", Vector3.ZERO)).is_equal_approx(initial_sun_direction) and Vector3(moderate_sun_state.get("sun_direction", Vector3.ZERO)).is_equal_approx(initial_sun_direction) and Vector3(rough_sun_state.get("sun_direction", Vector3.ZERO)).is_equal_approx(initial_sun_direction) and Vector3(storm_sun_state.get("sun_direction", Vector3.ZERO)).is_equal_approx(initial_sun_direction), "Pogoda moze zmieniac energie, barwe i miekkosc, ale nie kierunek wspolnego slonca.")
 
+	storm_weather.wind_direction = DIRECTIONAL_SCATTERING_WIND
+	environment.configure_weather(storm_weather)
+	environment.set_powered_presentation(false)
+	var unpowered_world: Dictionary = environment.world_state_for_tests()
+	var unpowered_ocean_weather := float(ocean_material.get_shader_parameter("weather_intensity"))
+	var unpowered_ocean_rain := float(ocean_material.get_shader_parameter("rain_intensity"))
+	var unpowered_ocean_wave_speed := float(ocean_material.get_shader_parameter("wave_speed_scale"))
+	_assert(not bool(unpowered_world.get("powered_presentation", true)), "Przed J-7 baza nie moze deklarowac zasilonej warstwy prezentacji.")
+	_assert(int(unpowered_world.get("amber_lamp_material_count", 0)) > 0 and not bool(unpowered_world.get("amber_lamp_emission_enabled", true)) and is_zero_approx(float(unpowered_world.get("amber_lamp_emission_energy", 1.0))), "M_AmberLamp musi pozostac bez emisji przed J-7.")
+
+	environment.set_powered_presentation(true)
+	var powered_world: Dictionary = environment.world_state_for_tests()
+	_assert(bool(powered_world.get("powered_presentation", false)), "Potwierdzone J-7 ma wlaczyc wylacznie pochodna prezentacje zasilonej Przystani.")
+	_assert(int(powered_world.get("amber_lamp_material_count", 0)) == int(unpowered_world.get("amber_lamp_material_count", 0)) and not bool(powered_world.get("amber_lamp_emission_enabled", true)) and is_zero_approx(float(powered_world.get("amber_lamp_emission_energy", 1.0))), "J-7 nie moze wlaczyc emisji M_AmberLamp sugerujacej zrodlo na pokladzie lub zurawiu.")
+	_assert(
+		int(powered_world.get("light_count", 0)) == 1
+		and int(powered_world.get("directional_light_count", 0)) == 1
+		and int(powered_world.get("spot_light_count", -1)) == 0
+		and int(powered_world.get("omni_light_count", -1)) == 0
+		and int(powered_world.get("deck_light_mount_count", 0)) == 3
+		and int(powered_world.get("deck_light_mount_parented_count", 0)) == 3
+		and int(powered_world.get("deck_light_local_light_count", -1)) == 0
+		and int(powered_world.get("deck_light_beam_count", 0)) == 3
+		and int(powered_world.get("deck_light_beam_visible_count", 0)) == 3
+		and int(powered_world.get("deck_light_beam_parented_count", 0)) == 3
+		and int(powered_world.get("deck_light_source_glow_count", 0)) == 3
+		and int(powered_world.get("deck_light_source_glow_visible_count", 0)) == 3
+		and int(powered_world.get("deck_light_source_glow_parented_count", 0)) == 3,
+		"Po J-7 dokladnie trzy zrodla VFX maja pokazac rozblysk i kierunkowa wiazke bez dodawania lokalnego Light3D."
+	)
+	_assert(
+		int(powered_world.get("deck_light_fixture_geometry_count", -1)) == 0
+		and int(powered_world.get("deck_light_vfx_geometry_count", 0)) == 6
+		and int(powered_world.get("deck_light_vfx_shadow_casting_count", -1)) == 0
+		and int(powered_world.get("deck_light_anchor_match_count", 0)) == 3
+		and float(powered_world.get("deck_light_aim_alignment_min", 0.0)) > 0.999
+		and float(powered_world.get("deck_light_beam_end_clearance_min", 0.0)) > 0.0
+		and float(powered_world.get("deck_light_beam_end_clearance_max", 1.0)) < 0.35,
+		"Trzy pary halo/wiazka maja pozostac VFX bez opraw, w zatwierdzonych kotwicach i konczyc sie tuz nad lewa, srodkowa i prawa czescia pokladu."
+	)
+	_assert(_same_power_invariant_weather(unpowered_world, powered_world), "Zasilona prezentacja nie moze zmienic slonca, deszczu, ruchu platformy ani roughness/clearcoat aktywnego materialu PBR.")
+	_assert(is_equal_approx(float(ocean_material.get_shader_parameter("weather_intensity")), unpowered_ocean_weather) and is_equal_approx(float(ocean_material.get_shader_parameter("rain_intensity")), unpowered_ocean_rain) and is_equal_approx(float(ocean_material.get_shader_parameter("wave_speed_scale")), unpowered_ocean_wave_speed), "Zasilenie nie moze reinterpretowac stanu morza, deszczu ani predkosci fal.")
+	_assert(is_equal_approx(float(powered_world.get("ambient_energy", 0.0)), float(unpowered_world.get("ambient_energy", -1.0))) and Color(powered_world.get("ambient_color", Color.BLACK)).is_equal_approx(Color(unpowered_world.get("ambient_color", Color.WHITE))), "J-7 nie moze dodac globalnego bonusu energii ani barwy ambientu.")
+	for powered_quality in ["low", "medium", "high"]:
+		environment.set_graphics_quality(powered_quality)
+		await process_frame
+		var powered_quality_world: Dictionary = environment.world_state_for_tests()
+		_assert(
+			int(powered_quality_world.get("light_count", 0)) == 1
+			and int(powered_quality_world.get("directional_light_count", 0)) == 1
+			and int(powered_quality_world.get("spot_light_count", -1)) == 0
+			and int(powered_quality_world.get("omni_light_count", -1)) == 0
+			and int(powered_quality_world.get("deck_light_mount_count", 0)) == 3
+			and int(powered_quality_world.get("deck_light_local_light_count", -1)) == 0
+			and int(powered_quality_world.get("deck_light_beam_count", 0)) == 3
+			and int(powered_quality_world.get("deck_light_beam_visible_count", 0)) == 3
+			and int(powered_quality_world.get("deck_light_source_glow_count", 0)) == 3
+			and int(powered_quality_world.get("deck_light_source_glow_visible_count", 0)) == 3
+			and int(powered_quality_world.get("deck_light_vfx_shadow_casting_count", -1)) == 0
+			and int(powered_quality_world.get("deck_light_fixture_geometry_count", -1)) == 0
+			and int(powered_quality_world.get("deck_light_vfx_geometry_count", 0)) == 6
+			and int(powered_quality_world.get("deck_light_anchor_match_count", 0)) == 3
+			and float(powered_quality_world.get("deck_light_aim_alignment_min", 0.0)) > 0.999
+			and float(powered_quality_world.get("deck_light_beam_end_clearance_min", 0.0)) > 0.0
+			and float(powered_quality_world.get("deck_light_beam_end_clearance_max", 1.0)) < 0.35,
+			"Profil %s musi zachowac trzy zrodla, trzy rozblyski i trzy kierunkowe wiazki J-7 bez geometrii opraw ani lokalnego Light3D." % powered_quality
+		)
+	environment.set_reduced_motion(true)
+	var reduced_powered_world: Dictionary = environment.world_state_for_tests()
+	_assert(int(reduced_powered_world.get("light_count", 0)) == 1 and int(reduced_powered_world.get("spot_light_count", -1)) == 0 and int(reduced_powered_world.get("omni_light_count", -1)) == 0 and int(reduced_powered_world.get("deck_light_local_light_count", -1)) == 0 and int(reduced_powered_world.get("deck_light_beam_visible_count", 0)) == 3 and int(reduced_powered_world.get("deck_light_source_glow_visible_count", 0)) == 3 and int(reduced_powered_world.get("deck_light_fixture_geometry_count", -1)) == 0 and int(reduced_powered_world.get("deck_light_vfx_geometry_count", 0)) == 6, "Reduced motion nie moze wylaczyc zrodel ani kierunkowych VFX zasilonej Przystani lub dodac lokalnego Light3D.")
+	environment.set_reduced_motion(false)
+
+	environment.set_powered_presentation(false)
+	var restored_unpowered_world: Dictionary = environment.world_state_for_tests()
+	_assert(
+		not bool(restored_unpowered_world.get("powered_presentation", true))
+		and not bool(restored_unpowered_world.get("amber_lamp_emission_enabled", true))
+		and is_zero_approx(float(restored_unpowered_world.get("amber_lamp_emission_energy", 1.0)))
+		and int(restored_unpowered_world.get("light_count", 0)) == 1
+		and int(restored_unpowered_world.get("spot_light_count", -1)) == 0
+		and int(restored_unpowered_world.get("omni_light_count", -1)) == 0
+		and int(restored_unpowered_world.get("deck_light_local_light_count", -1)) == 0
+		and int(restored_unpowered_world.get("deck_light_beam_visible_count", -1)) == 0
+		and int(restored_unpowered_world.get("deck_light_source_glow_visible_count", -1)) == 0
+		and int(restored_unpowered_world.get("deck_light_mount_count", 0)) == 3
+		and int(restored_unpowered_world.get("deck_light_beam_count", 0)) == 3
+		and int(restored_unpowered_world.get("deck_light_source_glow_count", 0)) == 3
+		and int(restored_unpowered_world.get("deck_light_fixture_geometry_count", -1)) == 0
+		and int(restored_unpowered_world.get("deck_light_vfx_geometry_count", 0)) == 6
+		and _same_power_invariant_weather(unpowered_world, restored_unpowered_world),
+		"Wylaczenie pochodnej prezentacji ma ukryc trzy zrodla i wiazki bez lokalnego swiatla, dryfu pogody, materialu PBR, ambientu lub emisji M_AmberLamp."
+	)
+
 	if _failed:
 		quit(1)
 		return
@@ -723,6 +857,23 @@ func _same_weather_lighting(left: Dictionary, right: Dictionary) -> bool:
 		and is_equal_approx(float(left.get("ambient_energy", 0.0)), float(right.get("ambient_energy", -1.0)))
 		and Color(left.get("ambient_color", Color.BLACK)).is_equal_approx(Color(right.get("ambient_color", Color.WHITE)))
 		and is_equal_approx(float(left.get("sun_shadow_opacity", 0.0)), float(right.get("sun_shadow_opacity", -1.0)))
+	)
+
+
+func _same_power_invariant_weather(left: Dictionary, right: Dictionary) -> bool:
+	return (
+		is_equal_approx(float(left.get("sun_energy", 0.0)), float(right.get("sun_energy", -1.0)))
+		and Color(left.get("sun_color", Color.BLACK)).is_equal_approx(Color(right.get("sun_color", Color.WHITE)))
+		and Vector3(left.get("sun_direction", Vector3.ZERO)).is_equal_approx(Vector3(right.get("sun_direction", Vector3.ONE)))
+		and is_equal_approx(float(left.get("ambient_energy", 0.0)), float(right.get("ambient_energy", -1.0)))
+		and Color(left.get("ambient_color", Color.BLACK)).is_equal_approx(Color(right.get("ambient_color", Color.WHITE)))
+		and is_equal_approx(float(left.get("sun_shadow_opacity", 0.0)), float(right.get("sun_shadow_opacity", -1.0)))
+		and is_equal_approx(float(left.get("rain_amount_ratio", 0.0)), float(right.get("rain_amount_ratio", -1.0)))
+		and is_equal_approx(float(left.get("rain_near_amount_ratio", 0.0)), float(right.get("rain_near_amount_ratio", -1.0)))
+		and is_equal_approx(float(left.get("wet_material_min_roughness", 0.0)), float(right.get("wet_material_min_roughness", -1.0)))
+		and is_equal_approx(float(left.get("wet_material_max_clearcoat", 0.0)), float(right.get("wet_material_max_clearcoat", -1.0)))
+		and Vector3(left.get("platform_position", Vector3.ZERO)).is_equal_approx(Vector3(right.get("platform_position", Vector3.ONE)))
+		and Vector3(left.get("platform_rotation", Vector3.ZERO)).is_equal_approx(Vector3(right.get("platform_rotation", Vector3.ONE)))
 	)
 
 

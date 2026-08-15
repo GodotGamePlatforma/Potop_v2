@@ -6,9 +6,13 @@ extends Node2D
 ## normal Godot scene instances in the Scene Tree, Inspector and 2D viewport.
 ## Runtime never writes campaign progress back into this scene.
 const MAP_COMPILER_PATH := "res://scripts/diving/UnderwaterMapSceneCompiler.gd"
+const TERRAIN_DERIVATIVES_PATH := "res://scripts/diving/DiveTerrainDerivatives.gd"
 const REQUIRED_AUTHORING_NODES := [
 	"VisualLayers",
 	"Terrain",
+	"Terrain/TerrainNavigation",
+	"Terrain/TerrainNavigation/TraversableAreas",
+	"Terrain/TerrainNavigation/BlockedIslands",
 	"DepthRegions",
 	"Landmarks",
 	"Entries",
@@ -45,6 +49,14 @@ const REQUIRED_AUTHORING_NODES := [
 	set(value):
 		navigation_grid_texture = value
 		update_configuration_warnings()
+@export var navigation_cells_sha256: String = "":
+	set(value):
+		navigation_cells_sha256 = value.strip_edges().to_lower()
+		update_configuration_warnings()
+@export var navigation_signature_sha256: String = "":
+	set(value):
+		navigation_signature_sha256 = value.strip_edges().to_lower()
+		update_configuration_warnings()
 
 @export_group("Terrain presentation")
 @export var terrain_render_sdf_texture: Texture2D:
@@ -61,7 +73,7 @@ const REQUIRED_AUTHORING_NODES := [
 		update_configuration_warnings()
 
 @export_group("Authoring viewport")
-@export var show_terrain_mask_preview: bool = true:
+@export var show_terrain_mask_preview: bool = false:
 	set(value):
 		show_terrain_mask_preview = value
 		queue_redraw()
@@ -84,6 +96,7 @@ const REQUIRED_AUTHORING_NODES := [
 
 @export_group("Authoring actions")
 @export_tool_button("Waliduj mapę", "Callable") var validate_map_action: Callable = validate_map_in_editor
+@export_tool_button("Odbuduj PNG i SDF terenu", "Callable") var rebuild_terrain_action: Callable = rebuild_terrain_derivatives_in_editor
 @export_tool_button("Odśwież podglądy prefabów", "Reload") var refresh_previews_action: Callable = refresh_editor_previews
 
 var _last_validation_errors := PackedStringArray()
@@ -120,14 +133,49 @@ func refresh_editor_previews() -> void:
 	queue_redraw()
 
 
+func rebuild_terrain_derivatives_in_editor() -> void:
+	if not Engine.is_editor_hint():
+		return
+	# Persist the points first, so the manifest can never describe an unsaved
+	# in-memory contour that disappears after closing the editor.
+	if EditorInterface.get_edited_scene_root() == self:
+		var save_error := EditorInterface.save_scene()
+		if save_error != OK:
+			push_error("[UnderwaterMap] Nie można zapisać sceny przed odbudową terenu: %s." % error_string(save_error))
+			return
+	var derivatives_script := load(TERRAIN_DERIVATIVES_PATH) as Script
+	if derivatives_script == null:
+		push_error("[UnderwaterMap] Nie można załadować generatora pochodnych terenu.")
+		return
+	var result: Dictionary = derivatives_script.rebuild(self)
+	var errors: PackedStringArray = result.get("errors", PackedStringArray())
+	if not errors.is_empty():
+		for derivative_error in errors:
+			push_error("[UnderwaterMap] %s" % derivative_error)
+		return
+	if EditorInterface.get_edited_scene_root() == self:
+		var save_error := EditorInterface.save_scene()
+		if save_error != OK:
+			push_error("[UnderwaterMap] Pochodne są gotowe, ale nie można zapisać ich skrótów w scenie: %s." % error_string(save_error))
+			return
+	EditorInterface.get_resource_filesystem().scan()
+	print("[UnderwaterMap] Odbudowano pochodny raster PNG, manifest i prezentacyjny SDF terenu.")
+	queue_redraw()
+	update_configuration_warnings()
+
+
 func _get_configuration_warnings() -> PackedStringArray:
 	var warnings := PackedStringArray()
 	if map_id.is_empty():
 		warnings.append("Mapa wymaga stabilnego Map ID.")
 	if navigation_grid_texture == null:
-		warnings.append("Mapa wymaga bazowej tekstury nawigacji.")
+		warnings.append("Mapa wymaga pochodnego rastra PNG wygenerowanego ze scenowych Polygon2D.")
+	if not _is_sha256(navigation_cells_sha256):
+		warnings.append("Mapa wymaga zapisanego skrótu SHA-256 komórek makroterenu.")
+	if not _is_sha256(navigation_signature_sha256):
+		warnings.append("Mapa wymaga zapisanego skrótu SHA-256 zgodności zapisu mapy.")
 	if terrain_render_sdf_texture == null:
-		warnings.append("Mapa wymaga prezentacyjnego SDF wyprowadzonego z tekstury nawigacji.")
+		warnings.append("Mapa wymaga prezentacyjnego SDF wyprowadzonego z pochodnego rastra PNG.")
 	elif navigation_grid_texture != null and terrain_render_sdf_texture.get_size() != navigation_grid_texture.get_size():
 		warnings.append("Prezentacyjny SDF musi mieć rozmiar zgodny z teksturą nawigacji.")
 	if terrain_detail_texture == null:
@@ -150,11 +198,19 @@ func _get_configuration_warnings() -> PackedStringArray:
 	return warnings
 
 
+func _is_sha256(value: String) -> bool:
+	return value.length() == 64 and value.is_valid_hex_number(false)
+
+
 func _draw() -> void:
 	if not Engine.is_editor_hint():
 		return
 	if show_terrain_mask_preview and navigation_grid_texture != null:
 		draw_texture_rect(navigation_grid_texture, Rect2(Vector2.ZERO, world_size), false, Color(0.14, 0.20, 0.22, 0.48), false)
+	else:
+		# Default blocked canvas; TraversableAreas and BlockedIslands draw their
+		# authored Polygon2D overlays above it in the normal Godot 2D viewport.
+		draw_rect(Rect2(Vector2.ZERO, world_size), Color(0.10, 0.12, 0.13, 0.72), true)
 	if show_chunk_grid:
 		var safe_chunk_size := maxi(chunk_size, 1)
 		var x := 0

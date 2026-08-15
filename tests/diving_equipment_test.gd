@@ -159,7 +159,19 @@ func _initialize() -> void:
 	_assert(LanternMk1.light_outer_radius < LanternMk2.light_outer_radius, "Lantern II must remain the longer-range upgrade.")
 	_assert(lighting.configure(ambient, point_light, LanternMk1, false, DiveLighting, 8.0), "Lantern I should configure the underwater light rig even while switched off.")
 	var mk1_scale := point_light.texture_scale
+	var mk1_energy := point_light.energy
+	var mk1_color := point_light.color
 	_assert(not point_light.enabled and point_light.texture != null, "A configured but switched-off diver light must keep its rig without emitting light.")
+	_assert(is_equal_approx(point_light.height, 96.0), "The diver light should use a visible virtual height for normal-mapped 2D relief.")
+	_assert(point_light.shadow_enabled and point_light.shadow_item_cull_mask == 1, "The diver light should retain terrain-only shadows.")
+	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF13 and is_equal_approx(point_light.shadow_filter_smooth, 1.5), "High quality should use the authored PCF13 shadow profile.")
+	lighting.apply_graphics_quality(point_light, "low")
+	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_NONE and is_zero_approx(point_light.shadow_filter_smooth), "Low quality should disable only shadow filtering.")
+	lighting.apply_graphics_quality(point_light, "medium")
+	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF5 and is_equal_approx(point_light.shadow_filter_smooth, 1.5), "Medium quality should use the PCF5 shadow profile.")
+	lighting.apply_graphics_quality(point_light, "high")
+	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF13 and is_equal_approx(point_light.shadow_filter_smooth, 1.5), "Returning to high quality should restore PCF13 deterministically.")
+	_assert(is_equal_approx(point_light.texture_scale, mk1_scale) and is_equal_approx(point_light.energy, mk1_energy) and point_light.color.is_equal_approx(mk1_color), "Graphics quality must not change lantern range, energy or color.")
 	_assert(ambient.color.is_equal_approx(DiveLighting.shallow_ambient_color), "The first region must remain readable independently of the lantern state.")
 	_assert(lighting.set_light_enabled(point_light, LanternMk1, true) and point_light.enabled, "An equipped Lantern I must be switchable on.")
 	_assert(not lighting.set_light_enabled(point_light, LanternMk1, false) and not point_light.enabled, "An equipped Lantern I must be switchable off.")

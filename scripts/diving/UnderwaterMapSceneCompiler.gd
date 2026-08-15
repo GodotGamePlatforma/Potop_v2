@@ -7,17 +7,21 @@ const MapSceneScript := preload("res://scripts/diving/UnderwaterMapScene.gd")
 const MapObjectScript := preload("res://scripts/diving/DiveMapObject.gd")
 const MapConnectionScript := preload("res://scripts/diving/DiveMapConnection.gd")
 const MapNavigationRasterScript := preload("res://scripts/diving/MapNavigationRaster.gd")
+const TerrainDerivativesScript := preload("res://scripts/diving/DiveTerrainDerivatives.gd")
 
 const MAP_SCENE_PATH := "res://scenes/diving/UnderwaterMap.tscn"
-## Source version 4 establishes the complete scene-authoring contract: baked routes,
-## shared obstacle rasterization, chunk-size identity and the split between
-## gameplay-bearing data and presentation-only prefab metadata. A source-v1
-## blueprint cannot be reinterpreted safely under these rules.
+## Source version 4 remains stable because the Polygon2D cutover reproduces the
+## established semantic cells exactly and changes neither blueprint data nor
+## save meaning. Scene polygons are now the authority; the committed PNG is a
+## validated rendering cache whose unchanged bytes preserve existing signatures.
 const MAP_SOURCE_VERSION := 4
 const STABLE_ID_ALLOWED_CHARS := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-"
 const REQUIRED_AUTHORING_NODES := [
 	"VisualLayers",
 	"Terrain",
+	"Terrain/TerrainNavigation",
+	"Terrain/TerrainNavigation/TraversableAreas",
+	"Terrain/TerrainNavigation/BlockedIslands",
 	"DepthRegions",
 	"Landmarks",
 	"Entries",
@@ -65,6 +69,7 @@ static var _compiled_source_fingerprint: String = ""
 static var _source_dependency_paths := PackedStringArray([MAP_SCENE_PATH])
 static var _visual_layers_template: Node2D
 static var _navigation_texture_cache: Texture2D
+static var _navigation_base_raster_cache: Dictionary = {}
 static var _terrain_render_sdf_texture_cache: Texture2D
 static var _terrain_detail_texture_cache: Texture2D
 static var _terrain_visual_profiles_cache: Array[Resource] = []
@@ -75,6 +80,7 @@ static func clear_runtime_caches() -> void:
 		_visual_layers_template.free()
 	_visual_layers_template = null
 	_navigation_texture_cache = null
+	_navigation_base_raster_cache.clear()
 	_terrain_render_sdf_texture_cache = null
 	_terrain_detail_texture_cache = null
 	_terrain_visual_profiles_cache.clear()
@@ -159,6 +165,9 @@ func _compile_source_map(campaign_seed: int) -> Dictionary:
 	if source_layers != null and _visual_layers_template == null:
 		_visual_layers_template = source_layers.duplicate() as Node2D
 	_navigation_texture_cache = source_root.navigation_grid_texture
+	_navigation_base_raster_cache = (
+		compilation.get("macro_raster", {}) as Dictionary
+	).duplicate(true)
 	_terrain_render_sdf_texture_cache = source_root.terrain_render_sdf_texture
 	_terrain_detail_texture_cache = source_root.terrain_detail_texture
 	_terrain_visual_profiles_cache.assign(source_root.terrain_visual_profiles)
@@ -175,17 +184,18 @@ func _compile_source_map(campaign_seed: int) -> Dictionary:
 static func _source_dependency_fingerprint() -> String:
 	var payload := PackedStringArray()
 	for dependency_path in _source_dependency_paths:
-		var absolute_path := ProjectSettings.globalize_path(dependency_path)
-		payload.append("%s:%d:%d" % [
-			dependency_path,
-			int(FileAccess.get_modified_time(absolute_path)),
-			int(FileAccess.get_size(absolute_path)),
-		])
+		if FileAccess.file_exists(dependency_path):
+			payload.append("%s:%s" % [dependency_path, FileAccess.get_sha256(dependency_path).to_lower()])
+		else:
+			payload.append("%s:missing" % dependency_path)
 	return "|".join(payload)
 
 
 static func _cache_source_dependency_paths(source_root: UnderwaterMapScene) -> void:
 	var dependencies := PackedStringArray([MAP_SCENE_PATH])
+	if OS.has_feature("editor"):
+		dependencies.append(TerrainDerivativesScript.NAVIGATION_MANIFEST_PATH)
+		dependencies.append(TerrainDerivativesScript.SDF_MANIFEST_PATH)
 	_append_resource_path(dependencies, source_root.navigation_grid_texture)
 	_append_resource_path(dependencies, source_root.terrain_render_sdf_texture)
 	_append_resource_path(dependencies, source_root.terrain_detail_texture)
@@ -208,7 +218,11 @@ func compile_map(map_root: UnderwaterMapScene, campaign_seed: int = 1) -> Dictio
 	if map_root.map_id.strip_edges().is_empty():
 		errors.append("Scena mapy wymaga stabilnego Map ID.")
 	if map_root.navigation_grid_texture == null:
-		errors.append("Scena mapy nie wskazuje bazowej tekstury nawigacji.")
+		errors.append("Scena mapy nie wskazuje pochodnego rastra nawigacji.")
+	if not _is_sha256(map_root.navigation_cells_sha256):
+		errors.append("Scena mapy nie zawiera poprawnego skrótu komórek makroterenu.")
+	if not _is_sha256(map_root.navigation_signature_sha256):
+		errors.append("Scena mapy nie zawiera poprawnego skrótu zgodności zapisu mapy.")
 	if map_root.terrain_render_sdf_texture == null:
 		errors.append("Scena mapy nie wskazuje prezentacyjnego SDF konturu terenu.")
 	elif (
@@ -233,6 +247,17 @@ func compile_map(map_root: UnderwaterMapScene, campaign_seed: int = 1) -> Dictio
 	for required_path in REQUIRED_AUTHORING_NODES:
 		if map_root.get_node_or_null(required_path) == null:
 			errors.append("Scena mapy nie zawiera wymaganej grupy %s." % required_path)
+
+	var macro_raster := TerrainDerivativesScript.rasterize_map(map_root)
+	var macro_errors: PackedStringArray = macro_raster.get("errors", PackedStringArray())
+	for macro_error in macro_errors:
+		errors.append(macro_error)
+	if macro_errors.is_empty():
+		if str(macro_raster.get("cells_hash", "")) != map_root.navigation_cells_sha256:
+			errors.append("Makroteren Polygon2D nie odpowiada zapisanemu skrótowi komórek.")
+		if OS.has_feature("editor"):
+			for derivative_error in TerrainDerivativesScript.validate_derivatives(map_root, macro_raster, false):
+				errors.append(derivative_error)
 
 	var objects: Array[DiveMapObject] = []
 	var connections: Array[DiveMapConnection] = []
@@ -342,20 +367,28 @@ func compile_map(map_root: UnderwaterMapScene, campaign_seed: int = 1) -> Dictio
 		return {"errors": PackedStringArray(["Scena mapy potrzebuje landmarku wejściowego lub Entry Point."])}
 	if blueprint.exit_position == Vector2.ZERO:
 		blueprint.exit_position = blueprint.entry_position
-	blueprint.map_gameplay_signature = _gameplay_signature(blueprint, map_root.navigation_grid_texture)
+	blueprint.map_gameplay_signature = _gameplay_signature(
+		blueprint,
+		map_root.navigation_grid_texture,
+		map_root.navigation_signature_sha256
+	)
 
 	var navigation_errors: PackedStringArray
 	if _navigation_validation_by_signature.has(blueprint.map_gameplay_signature):
 		navigation_errors = _navigation_validation_by_signature[blueprint.map_gameplay_signature].duplicate()
 	else:
 		navigation_errors = PackedStringArray()
-		_append_navigation_validation_errors(navigation_errors, blueprint, map_root.navigation_grid_texture)
+		_append_navigation_validation_errors(navigation_errors, blueprint, macro_raster)
 		_navigation_validation_by_signature[blueprint.map_gameplay_signature] = navigation_errors.duplicate()
 	for navigation_error in navigation_errors:
 		errors.append(navigation_error)
 	if not errors.is_empty():
 		return {"errors": errors}
-	return {"errors": PackedStringArray(), "blueprint": blueprint}
+	return {
+		"errors": PackedStringArray(),
+		"blueprint": blueprint,
+		"macro_raster": macro_raster,
+	}
 
 
 func create_visual_layers() -> Node2D:
@@ -388,6 +421,22 @@ func navigation_grid_texture() -> Texture2D:
 	var texture := map_root.navigation_grid_texture
 	map_root.free()
 	return texture
+
+
+func navigation_base_raster() -> Dictionary:
+	if not _navigation_base_raster_cache.is_empty():
+		return _navigation_base_raster_cache.duplicate(true)
+	var scene := ResourceLoader.load(MAP_SCENE_PATH, "", ResourceLoader.CACHE_MODE_REUSE) as PackedScene
+	if scene == null:
+		return {"errors": PackedStringArray(["Nie można załadować scenowego makroterenu."])}
+	var map_root := scene.instantiate() as UnderwaterMapScene
+	if map_root == null:
+		return {"errors": PackedStringArray(["Scena mapy nie udostępnia makroterenu."])}
+	var raster := TerrainDerivativesScript.rasterize_map(map_root)
+	map_root.free()
+	if (raster.get("errors", PackedStringArray()) as PackedStringArray).is_empty():
+		_navigation_base_raster_cache = raster.duplicate(true)
+	return raster
 
 
 func terrain_detail_texture() -> Texture2D:
@@ -685,7 +734,11 @@ func _index_rect(blueprint, rect: Rect2, category: String, object_id: String) ->
 			blueprint.chunk_index[key] = entry
 
 
-func _gameplay_signature(blueprint, navigation_texture: Texture2D) -> String:
+func _gameplay_signature(
+	blueprint,
+	navigation_texture: Texture2D,
+	navigation_signature_sha256: String
+) -> String:
 	var payload: Array[String] = []
 	payload.append("map=%s" % blueprint.map_id)
 	payload.append("world=%s" % var_to_str(blueprint.world_size))
@@ -706,18 +759,16 @@ func _gameplay_signature(blueprint, navigation_texture: Texture2D) -> String:
 	_append_signature_records(payload, "obstacle", blueprint.obstacle_spawns)
 	if navigation_texture != null and not navigation_texture.resource_path.is_empty():
 		payload.append("navigation_path=%s" % navigation_texture.resource_path)
-		if FileAccess.file_exists(navigation_texture.resource_path):
-			var bytes := FileAccess.get_file_as_bytes(navigation_texture.resource_path)
-			if not bytes.is_empty():
-				var navigation_hash := HashingContext.new()
-				navigation_hash.start(HashingContext.HASH_SHA256)
-				navigation_hash.update(bytes)
-				payload.append("navigation_hash=%s" % navigation_hash.finish().hex_encode())
+		payload.append("navigation_hash=%s" % navigation_signature_sha256)
 	payload.sort()
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update("\n".join(payload).to_utf8_buffer())
 	return context.finish().hex_encode()
+
+
+static func _is_sha256(value: String) -> bool:
+	return value.length() == 64 and value.is_valid_hex_number(false)
 
 
 func _append_signature_records(target: Array[String], category: String, records: Array) -> void:
@@ -737,14 +788,18 @@ func _append_signature_records(target: Array[String], category: String, records:
 func _append_navigation_validation_errors(
 	errors: PackedStringArray,
 	blueprint,
-	navigation_texture: Texture2D
+	macro_raster: Dictionary
 ) -> void:
-	if navigation_texture == null:
+	var base_cells: PackedByteArray = macro_raster.get("cells", PackedByteArray())
+	var width := int(macro_raster.get("width", 0))
+	var height := int(macro_raster.get("height", 0))
+	if base_cells.is_empty() or width <= 0 or height <= 0:
 		return
-	var image := navigation_texture.get_image()
-	var raster: Dictionary = MapNavigationRasterScript.build_cached(
+	var raster: Dictionary = MapNavigationRasterScript.build_from_cells_cached(
 		str(blueprint.map_gameplay_signature),
-		image,
+		base_cells,
+		width,
+		height,
 		blueprint.world_size,
 		blueprint.obstacle_spawns,
 		blueprint.chunk_size
@@ -755,8 +810,8 @@ func _append_navigation_validation_errors(
 	if not raster_errors.is_empty():
 		return
 	var cells: PackedByteArray = raster.get("cells", PackedByteArray())
-	var width := int(raster.get("width", 0))
-	var height := int(raster.get("height", 0))
+	width = int(raster.get("width", 0))
+	height = int(raster.get("height", 0))
 	var cell_scale: Vector2 = raster.get("cell_scale", Vector2.ONE)
 
 	var targets: Array[Dictionary] = [

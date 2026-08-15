@@ -20,7 +20,7 @@ func _ready() -> void:
 	add_child(game)
 	await get_tree().process_frame
 	if not game.start_new_campaign("standard", 102, false):
-		push_error("Dive UI snapshot could not create the clean revision-1 campaign fixture.")
+		push_error("Dive UI snapshot could not create the clean revision-2 campaign fixture.")
 		_request_exit(1)
 		return
 	await get_tree().process_frame

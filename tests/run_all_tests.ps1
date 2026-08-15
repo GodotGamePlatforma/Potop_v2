@@ -145,6 +145,8 @@ $quickHeadlessScriptTests = @(
     "expedition_preparation_selection_test.gd"
     "fixed_device_visual_scene_test.gd"
     "interactable_visual_style_test.gd"
+    "macro_terrain_raster_test.gd"
+    "narrative_content_test.gd"
     "profession_talent_system_test.gd"
     "production_system_test.gd"
     "roster_rotation_skeleton_test.gd"
@@ -179,7 +181,9 @@ $fullHeadlessScriptTests = @(
     "expedition_preparation_selection_test.gd"
     "fixed_device_visual_scene_test.gd"
     "interactable_visual_style_test.gd"
+    "macro_terrain_raster_test.gd"
     "mission_system_test.gd"
+    "narrative_content_test.gd"
     "persistent_exploration_test.gd"
     "portrait_catalog_test.gd"
     "production_system_test.gd"
@@ -199,15 +203,18 @@ $fullHeadlessScriptTests = @(
 )
 
 $quickHeadlessFlowScenes = @(
+    "BaseMusicTest.tscn"
     "NarrativeDialogueFlowTest.tscn"
     "WorkerCandidatePickerFlowTest.tscn"
 )
 
 $fullHeadlessFlowScenes = @(
+    "BaseMusicTest.tscn"
     "BaseOptionalPanelsFlowTest.tscn"
     "BasePortraitBindingTest.tscn"
     "BuildingSlotMotionTest.tscn"
     "DiseaseEpidemicFlowTest.tscn"
+    "DiverPresentationTest.tscn"
     "DiveRiskFlowTest.tscn"
     "IntroFlowTest.tscn"
     "MissionJournalFlowTest.tscn"
@@ -227,8 +234,10 @@ $headlessFlowScenes = @(if ($Full) { $fullHeadlessFlowScenes } else { $quickHead
 
 $nativeSnapshotScenes = @(
     "BaseBuildingsSnapshot.tscn"
+    "BaseManagementWorkspaceSnapshot.tscn"
     "BaseUISnapshot.tscn"
     "BaseWeatherSnapshot.tscn"
+    "BuildingOccupancyBadgesSnapshot.tscn"
     "CampaignOutcomesSnapshot.tscn"
     "DiveHudLayoutSnapshot.tscn"
     "DiveUISnapshot.tscn"
@@ -408,7 +417,7 @@ function New-IsolatedTestWorkspace {
 
     try {
         foreach ($entry in Get-ChildItem -LiteralPath $SourceProjectRoot -Force) {
-            if ($entry.Name -ieq ".git") {
+            if ($entry.Name -iin @(".git", ".godot", "tmp")) {
                 continue
             }
             Copy-Item -LiteralPath $entry.FullName -Destination $workspacePath -Recurse -Force
@@ -797,12 +806,33 @@ function Invoke-GodotTest {
     }
 }
 
-if ($quickHeadlessScriptTests.Count -ne 13 -or
-    $quickHeadlessFlowScenes.Count -ne 2 -or
-    $fullHeadlessScriptTests.Count -ne 40 -or
-    $fullHeadlessFlowScenes.Count -ne 16 -or
-    $nativeSnapshotScenes.Count -ne 9) {
-    throw "The explicit test manifest has an invalid group size. Expected quick 13+2, full 40+16 and 9 snapshots."
+if ($quickHeadlessScriptTests.Count -ne 15 -or
+    $quickHeadlessFlowScenes.Count -ne 3 -or
+    $fullHeadlessScriptTests.Count -ne 42 -or
+    $fullHeadlessFlowScenes.Count -ne 18 -or
+    $nativeSnapshotScenes.Count -ne 11) {
+    throw "The explicit test manifest has an invalid group size. Expected quick 15+3, full 42+18 and 11 snapshots."
+}
+
+$manifestGroups = [ordered]@{
+    "quick headless scripts" = $quickHeadlessScriptTests
+    "full headless scripts" = $fullHeadlessScriptTests
+    "quick headless flows" = $quickHeadlessFlowScenes
+    "full headless flows" = $fullHeadlessFlowScenes
+    "native snapshots" = $nativeSnapshotScenes
+}
+foreach ($manifestGroup in $manifestGroups.GetEnumerator()) {
+    $duplicates = @($manifestGroup.Value | Group-Object | Where-Object Count -gt 1 | ForEach-Object Name)
+    if ($duplicates.Count -gt 0) {
+        throw "The $($manifestGroup.Key) manifest contains duplicate targets: $($duplicates -join ', ')"
+    }
+}
+
+$missingQuickScripts = @($quickHeadlessScriptTests | Where-Object { $fullHeadlessScriptTests -notcontains $_ })
+$missingQuickFlows = @($quickHeadlessFlowScenes | Where-Object { $fullHeadlessFlowScenes -notcontains $_ })
+if ($missingQuickScripts.Count -gt 0 -or $missingQuickFlows.Count -gt 0) {
+    $missingQuickTargets = @($missingQuickScripts) + @($missingQuickFlows)
+    throw "Every quick target must also belong to the full manifest. Missing: $($missingQuickTargets -join ', ')"
 }
 
 $hasTarget = -not [string]::IsNullOrWhiteSpace($Target)
@@ -982,6 +1012,10 @@ try {
     Write-Host ("  TOTAL: {0}" -f $results.Count)
 
     if ($blockingFailureCount -gt 0) {
+        Write-Host "  BLOCKING:" -ForegroundColor Red
+        foreach ($blockingResult in @($results | Where-Object { $_.BlockingFailure })) {
+            Write-Host ("    - {0} [{1}]: {2}" -f $blockingResult.Name, $blockingResult.Status, $blockingResult.Reason) -ForegroundColor Red
+        }
         Write-Host ("OVERALL: FAIL ({0} blocking result(s); a required SKIP is blocking)" -f $blockingFailureCount) -ForegroundColor Red
         $exitCode = 1
     }

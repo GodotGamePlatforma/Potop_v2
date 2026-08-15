@@ -1,0 +1,12 @@
+{
+  "asset_id": "r1_submerged_concrete_v2",
+  "role": "repeatable large-slab reinforced-concrete albedo for R1 ArtCells",
+  "source": "Codex image generation, built-in imagegen",
+  "supersedes_for_r1_j7": "r1_wet_concrete_detail_v1",
+  "constraints": [
+    "material-only",
+    "no geometry authority",
+    "masked by canonical terrain SDF in Godot",
+    "broad slab hierarchy"
+  ]
+}

@@ -280,7 +280,7 @@ func _ready() -> void:
 	await _frames(4)
 	_assert(game.current_scene != null and game.current_scene.name == "EndingScene", "A resolved campaign outcome must route to EndingScene.")
 	_assert(panel.is_open() and panel.message_key() == "ending_last_bridge", "EndingScene must present the authored Last Bridge conversation through GameRoot.")
-	_assert(GameFormatScript.CAMPAIGN_FORMAT_REVISION == 1, "The presentation-only conversation system must preserve the clean campaign format revision.")
+	_assert(GameFormatScript.CAMPAIGN_FORMAT_REVISION == 2, "The presentation-only conversation system must preserve the clean campaign format revision.")
 	_assert(panel.line_count() == 6, "The Last Bridge ending must retain its six-beat radio cadence.")
 	_assert_scene_context(panel, "WSPÓLNA LINIA  •  ŚWIT PO CZARNYM FRONCIE", "Last Bridge ending")
 	var ending_types := ["world_event", "dialogue", "dialogue", "world_event", "dialogue", "stage_direction"]

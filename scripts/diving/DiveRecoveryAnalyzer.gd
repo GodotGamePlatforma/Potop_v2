@@ -33,7 +33,6 @@ var _oxygen_system = OxygenSystemScript.new()
 var _temperature_system = TemperatureSystemScript.new()
 var _rescue_system = RescueSystemScript.new()
 var _cached_motion_parameters: Dictionary = {}
-var _routing_signature_by_snapshot: Dictionary = {}
 var _edge_environment_cache: Dictionary = {}
 var _edge_clearance_cache: Dictionary = {}
 var _planned_path_cache: Dictionary = {}
@@ -590,6 +589,7 @@ func _planning_navigation_snapshot(replay_snapshot, policy):
 		replay_snapshot.target_descriptors(),
 		replay_snapshot.threat_descriptors()
 	)
+	result.set_meta(&"recovery_routing_signature", _routing_signature(result))
 	return result
 
 
@@ -640,7 +640,8 @@ func _open_shortcut_in_detached_snapshot(snapshot, shortcut_id: String) -> bool:
 	)
 	if snapshot.has_meta(&"recovery_routing_signature"):
 		snapshot.remove_meta(&"recovery_routing_signature")
-	_routing_signature_by_snapshot.erase(snapshot)
+	if snapshot.is_valid():
+		snapshot.set_meta(&"recovery_routing_signature", _routing_signature(snapshot))
 	return snapshot.is_valid()
 
 
@@ -946,8 +947,6 @@ func _routing_signature(snapshot) -> String:
 		return "invalid"
 	if snapshot.has_meta(&"recovery_routing_signature"):
 		return str(snapshot.get_meta(&"recovery_routing_signature"))
-	if _routing_signature_by_snapshot.has(snapshot):
-		return str(_routing_signature_by_snapshot[snapshot])
 	var current_records: Array[String] = []
 	for zone in snapshot.current_zones:
 		var rect: Rect2 = zone.get("rect", Rect2())
@@ -984,9 +983,7 @@ func _routing_signature(snapshot) -> String:
 	hashing_context.start(HashingContext.HASH_SHA256)
 	hashing_context.update(metadata.to_utf8_buffer())
 	hashing_context.update(snapshot.clear_cells)
-	var signature := hashing_context.finish().hex_encode()
-	_routing_signature_by_snapshot[snapshot] = signature
-	return signature
+	return hashing_context.finish().hex_encode()
 
 
 func _path_cache_key(

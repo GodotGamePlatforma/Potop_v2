@@ -4,6 +4,26 @@ extends Node3D
 const PLATFORM_MODEL_PATH := "res://assets/base_3d/start_platform_ruins.glb"
 const OCEAN_SHADER_PATH := "res://assets/base/environment_3d/ocean_surface_3d.gdshader"
 const RAIN_COLLISION_CARRIER_SHADER_PATH := "res://assets/base/environment_3d/rain_collision_carrier.gdshader"
+const J7_LIGHT_VFX_SHADER_PATH := "res://assets/base/environment_3d/j7_directional_light_vfx.gdshader"
+const AMBER_LAMP_MATERIAL_NAME := "M_AmberLamp"
+const J7_DECK_VFX_COLOR := Color(1.0, 0.82, 0.64)
+const J7_DECK_BEAM_WIDTHS: Array[float] = [2.8, 2.7, 2.5]
+const J7_DECK_BEAM_LENGTH_FACTOR := 0.98
+const J7_DECK_BEAM_OPACITIES: Array[float] = [0.074, 0.074, 0.086]
+const J7_DECK_SOURCE_GLOW_OPACITY := 0.74
+const J7_DECK_SOURCE_GLOW_SIZE := 0.42
+const J7_DECK_SOURCE_CAMERA_OFFSET := 0.09
+const J7_DECK_BEAM_CAMERA_OFFSETS: Array[float] = [0.035, 0.035, 0.180]
+const J7_DECK_LIGHT_ANCHORS: Array[Vector3] = [
+	Vector3(-4.95, 5.30, -8.38),
+	Vector3(-0.32, 5.22, -8.36),
+	Vector3(4.88, 2.41, -8.53),
+]
+const J7_DECK_LIGHT_TARGETS: Array[Vector3] = [
+	Vector3(-5.70, 0.25, 0.90),
+	Vector3(-0.05, 0.25, 0.65),
+	Vector3(6.00, 0.25, 0.85),
+]
 
 const SLOT_IDS: Array[String] = [
 	"top_left",
@@ -115,6 +135,10 @@ var _wet_material_entries: Array[Dictionary] = []
 var _wet_source_records: Dictionary = {}
 var _wet_bindings_by_branch: Dictionary = {}
 var _wet_installed_branches: Dictionary = {}
+var _amber_lamp_records: Dictionary = {}
+var _deck_light_mounts: Array[Marker3D] = []
+var _deck_light_beams: Array[MeshInstance3D] = []
+var _deck_light_source_glows: Array[MeshInstance3D] = []
 var _current_deck_wetness := 0.0
 var _last_applied_wetness := -1.0
 var _graphics_quality := "high"
@@ -128,6 +152,7 @@ var _wave_speed_scale := 0.90
 var _wind_direction := Vector2(0.76, 0.65).normalized()
 var _rain_flow_time := 0.0
 var _sun_angular_distance := 0.70
+var _powered_presentation := false
 var _last_platform_wave_motion := {
 	"heave": 0.0,
 	"horizontal_offset": Vector2.ZERO,
@@ -159,9 +184,12 @@ func build() -> void:
 	_build_platform()
 	_cache_wet_materials_recursive(_platform_asset)
 	_install_active_wet_branches()
+	_cache_amber_lamp_materials_recursive(_platform_asset)
+	_suppress_amber_lamp_emission()
 	_build_rain()
 	_build_spray()
 	_build_camera()
+	_build_powered_deck_vfx()
 	_apply_graphics_quality()
 	_apply_weather()
 
@@ -192,6 +220,13 @@ func set_reduced_motion(enabled: bool) -> void:
 		# active under reduced motion. The flag is kept for shader-compatible
 		# suppression of purely decorative micro-noise only.
 		_ocean_material.set_shader_parameter("reduced_motion", enabled)
+
+
+func set_powered_presentation(enabled: bool) -> void:
+	if _powered_presentation == enabled:
+		return
+	_powered_presentation = enabled
+	_apply_powered_deck_vfx()
 
 
 func set_ocean_scattering_enabled(enabled: bool) -> void:
@@ -514,8 +549,25 @@ func state_for_tests() -> Dictionary:
 	var building_visibility := {}
 	var wet_material_min_roughness := 1.0
 	var wet_material_max_clearcoat := 0.0
+	var amber_lamp_emission_energy := 0.0
+	var amber_lamp_emission_enabled := false
+	var deck_light_mount_parented_count := 0
+	var deck_light_anchor_match_count := 0
+	var deck_light_aim_alignment_min := 1.0
+	var deck_light_local_light_count := 0
+	var deck_light_beam_end_clearance_min := INF
+	var deck_light_beam_end_clearance_max := 0.0
+	var deck_light_beam_visible_count := 0
+	var deck_light_beam_parented_count := 0
+	var deck_light_source_glow_visible_count := 0
+	var deck_light_source_glow_parented_count := 0
+	var deck_light_vfx_shadow_casting_count := 0
+	var deck_light_fixture_geometry_count := 0
+	var deck_light_vfx_geometry_count := 0
 	var light_scope: Node = get_parent() if get_parent() != null else self
 	var light_count := light_scope.find_children("*", "Light3D", true, false).size()
+	var spot_light_count := light_scope.find_children("*", "SpotLight3D", true, false).size()
+	var omni_light_count := light_scope.find_children("*", "OmniLight3D", true, false).size()
 	var directional_light_count := 0
 	var shadow_casting_directional_light_count := 0
 	for light_node in find_children("*", "DirectionalLight3D", true, false):
@@ -541,6 +593,69 @@ func state_for_tests() -> Dictionary:
 		var wet_material: BaseMaterial3D = wet_entry.runtime
 		wet_material_min_roughness = minf(wet_material_min_roughness, wet_material.roughness)
 		wet_material_max_clearcoat = maxf(wet_material_max_clearcoat, wet_material.clearcoat)
+	for amber_entry_value in _amber_lamp_records.values():
+		var amber_entry: Dictionary = amber_entry_value
+		var amber_material := amber_entry.get("runtime") as BaseMaterial3D
+		if amber_material == null:
+			continue
+		amber_lamp_emission_energy = maxf(amber_lamp_emission_energy, amber_material.emission_energy_multiplier)
+		amber_lamp_emission_enabled = amber_lamp_emission_enabled or amber_material.emission_enabled
+	if platform_rig != null:
+		for child in platform_rig.get_children():
+			if str(child.name).begins_with("J7DeckFixture"):
+				if child is GeometryInstance3D:
+					deck_light_fixture_geometry_count += 1
+				deck_light_fixture_geometry_count += child.find_children("*", "GeometryInstance3D", true, false).size()
+			elif str(child.name).begins_with("J7DeckLightMount"):
+				deck_light_vfx_geometry_count += child.find_children("*", "GeometryInstance3D", true, false).size()
+	for index in range(_deck_light_mounts.size()):
+		var deck_light_mount := _deck_light_mounts[index]
+		if deck_light_mount == null:
+			deck_light_aim_alignment_min = -1.0
+			continue
+		if deck_light_mount.get_parent() == platform_rig:
+			deck_light_mount_parented_count += 1
+		deck_light_local_light_count += deck_light_mount.find_children("*", "Light3D", true, false).size()
+		if index >= J7_DECK_LIGHT_ANCHORS.size() or index >= J7_DECK_LIGHT_TARGETS.size():
+			deck_light_aim_alignment_min = -1.0
+			continue
+		var anchor := J7_DECK_LIGHT_ANCHORS[index]
+		if deck_light_mount.position.is_equal_approx(anchor):
+			deck_light_anchor_match_count += 1
+	for index in range(_deck_light_beams.size()):
+		var beam := _deck_light_beams[index]
+		if beam == null:
+			continue
+		if beam.visible:
+			deck_light_beam_visible_count += 1
+		if index < _deck_light_mounts.size() and beam.get_parent() == _deck_light_mounts[index]:
+			deck_light_beam_parented_count += 1
+		if index < J7_DECK_LIGHT_ANCHORS.size() and index < J7_DECK_LIGHT_TARGETS.size():
+			var anchor := J7_DECK_LIGHT_ANCHORS[index]
+			var target := J7_DECK_LIGHT_TARGETS[index]
+			var expected_direction := (target - anchor).normalized()
+			var actual_direction := (beam.basis * Vector3.DOWN).normalized()
+			deck_light_aim_alignment_min = minf(
+				deck_light_aim_alignment_min,
+				actual_direction.dot(expected_direction)
+			)
+			var beam_quad := beam.mesh as QuadMesh
+			if beam_quad != null:
+				var end_clearance := anchor.distance_to(target) - beam_quad.size.y
+				deck_light_beam_end_clearance_min = minf(deck_light_beam_end_clearance_min, end_clearance)
+				deck_light_beam_end_clearance_max = maxf(deck_light_beam_end_clearance_max, end_clearance)
+		if beam.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			deck_light_vfx_shadow_casting_count += 1
+	for index in range(_deck_light_source_glows.size()):
+		var source_glow := _deck_light_source_glows[index]
+		if source_glow == null:
+			continue
+		if source_glow.visible:
+			deck_light_source_glow_visible_count += 1
+		if index < _deck_light_mounts.size() and source_glow.get_parent() == _deck_light_mounts[index]:
+			deck_light_source_glow_parented_count += 1
+		if source_glow.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			deck_light_vfx_shadow_casting_count += 1
 	for slot_id in SLOT_IDS:
 		var ruin: Node3D = _ruin_nodes.get(slot_id)
 		ruin_visibility[slot_id] = ruin != null and ruin.visible
@@ -610,6 +725,8 @@ func state_for_tests() -> Dictionary:
 		"ambient_energy": _environment.ambient_light_energy if _environment != null else 0.0,
 		"ssao_intensity": _environment.ssao_intensity if _environment != null else 0.0,
 		"light_count": light_count,
+		"spot_light_count": spot_light_count,
+		"omni_light_count": omni_light_count,
 		"directional_light_count": directional_light_count,
 		"shadow_casting_directional_light_count": shadow_casting_directional_light_count,
 		"sun_name": _sun.name if _sun != null else "",
@@ -637,6 +754,27 @@ func state_for_tests() -> Dictionary:
 		"wet_material_count": _wet_material_entries.size(),
 		"wet_material_min_roughness": wet_material_min_roughness if not _wet_material_entries.is_empty() else 0.0,
 		"wet_material_max_clearcoat": wet_material_max_clearcoat,
+		"powered_presentation": _powered_presentation,
+		"amber_lamp_material_count": _amber_lamp_records.size(),
+		"amber_lamp_emission_enabled": amber_lamp_emission_enabled,
+		"amber_lamp_emission_energy": amber_lamp_emission_energy,
+		"deck_light_mount_count": _deck_light_mounts.size(),
+		"deck_light_mount_parented_count": deck_light_mount_parented_count,
+		"deck_light_local_light_count": deck_light_local_light_count,
+		"deck_light_anchor_match_count": deck_light_anchor_match_count,
+		"deck_light_aim_alignment_min": deck_light_aim_alignment_min if not _deck_light_beams.is_empty() else 0.0,
+		"deck_light_beam_end_clearance_min": deck_light_beam_end_clearance_min if not _deck_light_beams.is_empty() else 0.0,
+		"deck_light_beam_end_clearance_max": deck_light_beam_end_clearance_max,
+		"deck_light_beam_count": _deck_light_beams.size(),
+		"deck_light_beam_visible_count": deck_light_beam_visible_count,
+		"deck_light_beam_parented_count": deck_light_beam_parented_count,
+		"deck_light_source_glow_count": _deck_light_source_glows.size(),
+		"deck_light_source_glow_visible_count": deck_light_source_glow_visible_count,
+		"deck_light_source_glow_parented_count": deck_light_source_glow_parented_count,
+		"deck_light_vfx_shadow_casting_count": deck_light_vfx_shadow_casting_count,
+		"deck_light_fixture_geometry_count": deck_light_fixture_geometry_count,
+		"deck_light_vfx_geometry_count": deck_light_vfx_geometry_count,
+		"deck_light_geometry_count": deck_light_fixture_geometry_count,
 		"platform_position": platform_rig.position if platform_rig != null else Vector3.ZERO,
 		"platform_rotation": platform_rig.rotation if platform_rig != null else Vector3.ZERO,
 		"platform_contact_energy": float(_last_platform_wave_motion.contact_energy),
@@ -1730,6 +1868,152 @@ func _cache_wet_materials_recursive(node: Node, inherited_branch := "common") ->
 			_wet_bindings_by_branch[branch] = bindings
 	for child in node.get_children():
 		_cache_wet_materials_recursive(child, branch)
+
+
+func _cache_amber_lamp_materials_recursive(node: Node) -> void:
+	if node == null:
+		return
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		var surface_count := mesh_instance.mesh.get_surface_count() if mesh_instance.mesh != null else 0
+		for surface_index in range(surface_count):
+			var active_material := mesh_instance.get_active_material(surface_index)
+			if not active_material is BaseMaterial3D:
+				continue
+			var source_material := active_material as BaseMaterial3D
+			if source_material.resource_name != AMBER_LAMP_MATERIAL_NAME:
+				continue
+			var source_id := source_material.get_instance_id()
+			if not _amber_lamp_records.has(source_id):
+				_amber_lamp_records[source_id] = {
+					"runtime": source_material.duplicate(false) as BaseMaterial3D,
+				}
+			var record: Dictionary = _amber_lamp_records[source_id]
+			mesh_instance.set_surface_override_material(surface_index, record.runtime as BaseMaterial3D)
+	for child in node.get_children():
+		_cache_amber_lamp_materials_recursive(child)
+
+
+func _build_powered_deck_vfx() -> void:
+	# J-7 uses three exact mount points and two inexpensive transparent quads per
+	# mount. The effect communicates origin and direction without a physical lamp
+	# fixture or a Light3D response that would paint a false source on the deck.
+	if platform_rig == null or not _deck_light_mounts.is_empty():
+		return
+	if (
+		J7_DECK_LIGHT_ANCHORS.size() != J7_DECK_LIGHT_TARGETS.size()
+		or J7_DECK_LIGHT_ANCHORS.size() != J7_DECK_BEAM_WIDTHS.size()
+		or J7_DECK_LIGHT_ANCHORS.size() != J7_DECK_BEAM_OPACITIES.size()
+		or J7_DECK_LIGHT_ANCHORS.size() != J7_DECK_BEAM_CAMERA_OFFSETS.size()
+	):
+		push_error("J-7 deck VFX anchors, targets, beam widths, opacities and camera offsets must have matching sizes.")
+		return
+	var vfx_shader := ResourceLoader.load(J7_LIGHT_VFX_SHADER_PATH) as Shader
+	if vfx_shader == null:
+		push_error("J-7 directional light VFX shader is required: %s" % J7_LIGHT_VFX_SHADER_PATH)
+		return
+	var camera_local_position := Vector3(0.0, 31.5, 48.0)
+	if camera != null:
+		# build() is also used before this world enters the SceneTree. In that case
+		# PlatformRig3D and Camera3D are siblings, so the camera's local position is
+		# already expressed in the rig parent's coordinate space.
+		camera_local_position = (
+			platform_rig.to_local(camera.global_position)
+			if camera.is_inside_tree()
+			else camera.position
+		)
+	for index in range(J7_DECK_LIGHT_ANCHORS.size()):
+		var anchor := J7_DECK_LIGHT_ANCHORS[index]
+		var target_offset := J7_DECK_LIGHT_TARGETS[index] - anchor
+		if target_offset.length_squared() <= 0.000001:
+			target_offset = Vector3.DOWN
+		var target_distance := target_offset.length()
+		var direction := target_offset / target_distance
+
+		var mount := Marker3D.new()
+		mount.name = "J7DeckLightMount%02d" % (index + 1)
+		mount.position = anchor
+		platform_rig.add_child(mount)
+		_deck_light_mounts.append(mount)
+
+		var beam := MeshInstance3D.new()
+		beam.name = "J7DeckDirectionalBeam%02d" % (index + 1)
+		var beam_mesh := QuadMesh.new()
+		var beam_length := maxf(target_distance * J7_DECK_BEAM_LENGTH_FACTOR, 0.10)
+		beam_mesh.size = Vector2(J7_DECK_BEAM_WIDTHS[index], beam_length)
+		beam.mesh = beam_mesh
+		beam.material_override = _j7_light_vfx_material(vfx_shader, 0.0, J7_DECK_BEAM_OPACITIES[index], 1)
+		var beam_midpoint := direction * beam_length * 0.50
+		var beam_to_camera := (camera_local_position - anchor - beam_midpoint).normalized()
+		var beam_y := -direction
+		var beam_x := beam_y.cross(beam_to_camera)
+		if beam_x.length_squared() <= 0.000001:
+			beam_x = beam_y.cross(Vector3.RIGHT)
+		beam_x = beam_x.normalized()
+		var beam_z := beam_x.cross(beam_y).normalized()
+		beam.transform = Transform3D(
+			Basis(beam_x, beam_y, beam_z),
+			beam_midpoint + beam_to_camera * J7_DECK_BEAM_CAMERA_OFFSETS[index]
+		)
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		beam.extra_cull_margin = 1.0
+		beam.visible = false
+		mount.add_child(beam)
+		_deck_light_beams.append(beam)
+
+		var source_glow := MeshInstance3D.new()
+		source_glow.name = "J7DeckSourceGlow%02d" % (index + 1)
+		var source_glow_mesh := QuadMesh.new()
+		source_glow_mesh.size = Vector2(J7_DECK_SOURCE_GLOW_SIZE, J7_DECK_SOURCE_GLOW_SIZE)
+		source_glow.mesh = source_glow_mesh
+		source_glow.material_override = _j7_light_vfx_material(vfx_shader, 1.0, J7_DECK_SOURCE_GLOW_OPACITY, 2)
+		var source_to_camera := (camera_local_position - anchor).normalized()
+		var glow_up := Vector3.FORWARD if absf(source_to_camera.dot(Vector3.UP)) > 0.98 else Vector3.UP
+		source_glow.transform = Transform3D(
+			Basis.looking_at(source_to_camera, glow_up),
+			source_to_camera * J7_DECK_SOURCE_CAMERA_OFFSET
+		)
+		source_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		source_glow.extra_cull_margin = 0.5
+		source_glow.visible = false
+		mount.add_child(source_glow)
+		_deck_light_source_glows.append(source_glow)
+	_apply_powered_deck_vfx()
+
+
+func _j7_light_vfx_material(
+	shader: Shader,
+	effect_mode: float,
+	opacity: float,
+	render_priority: int
+) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.render_priority = render_priority
+	material.set_shader_parameter("light_color", J7_DECK_VFX_COLOR)
+	material.set_shader_parameter("opacity", opacity)
+	material.set_shader_parameter("intensity", 1.0)
+	material.set_shader_parameter("effect_mode", effect_mode)
+	return material
+
+
+func _suppress_amber_lamp_emission() -> void:
+	for amber_entry_value in _amber_lamp_records.values():
+		var amber_entry: Dictionary = amber_entry_value
+		var material := amber_entry.get("runtime") as BaseMaterial3D
+		if material == null:
+			continue
+		material.emission_enabled = false
+		material.emission_energy_multiplier = 0.0
+
+
+func _apply_powered_deck_vfx() -> void:
+	for beam in _deck_light_beams:
+		if beam != null:
+			beam.visible = _powered_presentation
+	for source_glow in _deck_light_source_glows:
+		if source_glow != null:
+			source_glow.visible = _powered_presentation
 
 
 func _wet_branch_for_node(node_name: String, inherited_branch: String) -> String:

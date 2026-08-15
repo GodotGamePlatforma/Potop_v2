@@ -101,7 +101,7 @@ func _test_living_diver_stays_assigned_next_day() -> void:
 	_assert(station.assigned_survivor_ids == ["mira"], "A living diver must not replace the persistent Station support roster after returning.")
 	_assert(igor.current_assignment.is_empty() and igor.status == SurvivorStateScript.Status.AVAILABLE, "The returning diver should become available without acquiring a Station assignment.")
 	_assert(mira.current_assignment == station.id and mira.status == SurvivorStateScript.Status.WORKING, "The Station support worker and reverse assignment should persist across the expedition.")
-	_assert(not state.current_day_plan.locked and state.current_day_plan.worker_assignments.get(station.id, []) == ["mira"] and str(state.current_day_plan.selected_diver_id).is_empty(), "The next unlocked day plan should inherit support staffing and require a fresh diver choice.")
+	_assert(not state.current_day_plan.locked and state.current_day_plan.worker_assignments.get(station.id, []) == ["mira"] and state.current_day_plan.selected_diver_id == "igor" and state.preferred_diver_id == "igor", "The next unlocked day plan should keep support staffing independent while restoring the living preferred diver.")
 
 
 func _test_dive_death_is_terminal_before_settlement() -> void:

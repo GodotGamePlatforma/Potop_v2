@@ -256,7 +256,10 @@ func diver_selection_blocker(state, station, definition, survivor_id: String) ->
 func select_diver(state, station, definition, survivor_id: String) -> bool:
 	if not diver_selection_blocker(state, station, definition, survivor_id).is_empty():
 		return false
-	return state.current_day_plan != null and state.current_day_plan.set_selected_diver(survivor_id)
+	if state.current_day_plan == null or not state.current_day_plan.set_selected_diver(survivor_id):
+		return false
+	state.set_preferred_diver(survivor_id)
+	return true
 
 
 func clear_selected_diver(state) -> bool:
@@ -264,7 +267,10 @@ func clear_selected_diver(state) -> bool:
 		return false
 	if state.has_method("day_plan_edit_blocker") and not str(state.day_plan_edit_blocker()).is_empty():
 		return false
-	return state.current_day_plan.clear_selected_diver()
+	if not state.current_day_plan.clear_selected_diver():
+		return false
+	state.clear_preferred_diver()
+	return true
 
 
 func _common_line_expedition_guidance(state) -> Dictionary:

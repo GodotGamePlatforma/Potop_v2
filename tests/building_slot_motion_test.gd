@@ -2,6 +2,7 @@ extends Node
 
 const BuildingSlotScene := preload("res://scenes/base/BuildingSlot.tscn")
 const BaseScene := preload("res://scenes/base/BaseScene.tscn")
+const BuildingSystemScript := preload("res://scripts/base/BuildingSystem.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
@@ -19,11 +20,20 @@ func _ready() -> void:
 
 	slot.configure("test_slot", "workshop", Rect2(0.20, 0.25, 0.55, 0.50))
 	var pad := slot.get_node_or_null("PadVisual") as Panel
+	var rebuild_indicator := slot.get_node_or_null("RebuildIndicator") as BuildingRebuildIndicator
 	_assert(pad != null, "Slot powinien zachować osobny, nieinteraktywny PadVisual.")
+	_assert(rebuild_indicator != null and rebuild_indicator.mouse_filter == Control.MOUSE_FILTER_IGNORE, "Ruina powinna mieć nieinteraktywny wskaźnik odbudowy.")
 	_assert(slot.focus_mode == Control.FOCUS_ALL, "Slot powinien być dostępny z klawiatury i pada.")
 	if pad == null:
 		_finish()
 		return
+	if rebuild_indicator != null:
+		slot.set_rebuild_indicator(true, false)
+		_assert(rebuild_indicator.visible and not rebuild_indicator.is_affordable_for_tests(), "Ruina bez materiałów powinna pokazać przyciemnioną ikonę odbudowy.")
+		slot.set_rebuild_indicator(true, true)
+		_assert(rebuild_indicator.visible and rebuild_indicator.is_affordable_for_tests(), "Ruina z pełnym kosztem powinna rozjaśnić tę samą ikonę odbudowy.")
+		slot.set_rebuild_indicator(false, true)
+		_assert(not rebuild_indicator.visible, "Wybudowany slot nie może zachować ikony odbudowy.")
 
 	var hitbox_rect := Rect2(slot.position, slot.size)
 	var visual_anchors := Rect2(
@@ -194,6 +204,20 @@ func _test_controller_highlight_flow() -> void:
 		await _dispose_base(base)
 		return
 	_assert(not bool(environment.building_highlight_state_for_tests().get("active", true)), "Po wejściu do bazy bez focusu ani hoveru obrys musi być wyłączony.")
+	var rebuild_indicator := top_left.get_node_or_null("RebuildIndicator") as BuildingRebuildIndicator
+	_assert(rebuild_indicator != null, "Rzeczywisty slot ruiny powinien zawierać wskaźnik odbudowy.")
+	if rebuild_indicator != null:
+		state.resources.values.clear()
+		base._render()
+		await _settle()
+		_assert(rebuild_indicator.visible and not rebuild_indicator.is_affordable_for_tests(), "Pusty magazyn powinien przyciemnić ikonę ruiny poprzez rzeczywisty koszt budowy.")
+		var definition = GameDatabase.buildings.get("fishing_hut")
+		var build_cost: Dictionary = BuildingSystemScript.new().get_build_cost(state, definition)
+		for resource_id in build_cost:
+			state.resources.set_amount(str(resource_id), int(build_cost[resource_id]))
+		base._render()
+		await _settle()
+		_assert(rebuild_indicator.visible and rebuild_indicator.is_affordable_for_tests(), "Pełny rzeczywisty koszt Chaty Rybackiej powinien rozjaśnić ikonę ruiny.")
 
 	top_left.grab_focus()
 	await _settle()

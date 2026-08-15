@@ -1,6 +1,6 @@
 shader_type canvas_item;
 
-uniform sampler2D screen_texture : hint_screen_texture, filter_linear;
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
 
 uniform float anim_time = 0.0;
 uniform float depth_ratio : hint_range(0.0, 1.0) = 0.0;
@@ -14,6 +14,9 @@ uniform vec4 accent_color : source_color = vec4(0.18, 0.75, 0.80, 1.0);
 uniform float water_clarity : hint_range(0.0, 1.0) = 0.7;
 uniform float suspended_particle_density : hint_range(0.0, 1.0) = 0.35;
 uniform float caustics_strength : hint_range(0.0, 1.0) = 0.35;
+uniform float quality_level : hint_range(0.0, 2.0) = 2.0;
+uniform float bloom_strength : hint_range(0.0, 0.2) = 0.055;
+uniform float chromatic_aberration : hint_range(0.0, 0.003) = 0.0004;
 
 
 float hash21(vec2 point) {
@@ -49,6 +52,12 @@ void fragment() {
 	wave_offset += normalized_flow * min(flow_length, 1.0) * refraction_strength * 0.75;
 	vec2 refracted_uv = clamp(uv + wave_offset, vec2(0.001), vec2(0.999));
 	vec3 source = texture(screen_texture, refracted_uv).rgb;
+	if (quality_level > 0.5 && chromatic_aberration > 0.0) {
+		vec2 spectral_axis = normalize(vec2(0.86, 0.51) + normalized_flow * 0.18);
+		vec2 spectral_offset = spectral_axis * chromatic_aberration;
+		source.r = texture(screen_texture, clamp(refracted_uv + spectral_offset, vec2(0.001), vec2(0.999))).r;
+		source.b = texture(screen_texture, clamp(refracted_uv - spectral_offset, vec2(0.001), vec2(0.999))).b;
+	}
 
 	vec2 centered = uv * 2.0 - 1.0;
 	float focus_field = 1.0 - smoothstep(0.035, 0.34, dot(centered, centered));
@@ -67,12 +76,14 @@ void fragment() {
 	caustic *= smoothstep(0.42, 0.74, value_noise(caustic_uv * 0.11 + anim_time * 0.009));
 	graded += accent_color.rgb * caustic * mix(0.010, 0.002, depth_ratio) * caustics_strength * effect_intensity;
 
-	float ray_coordinate = uv.x * 8.0 + uv.y * 2.1 + world_anchor.x / 960.0;
-	float ray_noise = value_noise(vec2(ray_coordinate, world_anchor.y / 1700.0 + anim_time * 0.012));
-	float light_shafts = smoothstep(0.66, 0.91, ray_noise);
-	light_shafts *= (1.0 - smoothstep(0.54, 1.02, uv.y)) * pow(1.0 - depth_ratio, 1.45);
-	light_shafts *= mix(0.22, 1.0, water_clarity) * effect_intensity;
-	graded += accent_color.rgb * light_shafts * 0.008;
+	if (quality_level > 0.5 && bloom_strength > 0.0) {
+		float bloom_lod = mix(2.0, 3.1, step(1.5, quality_level));
+		vec3 blurred = textureLod(screen_texture, refracted_uv, bloom_lod).rgb;
+		float blurred_luminance = dot(blurred, vec3(0.2126, 0.7152, 0.0722));
+		float highlight_mask = smoothstep(0.42, 0.84, blurred_luminance);
+		vec3 bloom_color = max(blurred - vec3(0.28), vec3(0.0));
+		graded += bloom_color * highlight_mask * bloom_strength * effect_intensity;
+	}
 
 	float vignette = 1.0 - smoothstep(0.34, 1.18, dot(centered, centered));
 	graded *= mix(0.985, 1.0, vignette);

@@ -25,13 +25,17 @@ func _ready() -> void:
 	await _freeze_base_environment(game.current_scene, 1.7)
 	var base_scene = game.current_scene
 	var resource_bar := base_scene.find_child("ResourceBar", true, false) as Control
+	var resource_summary := base_scene.find_child("ResourceSummary", true, false) as RichTextLabel
+	var weather_badge: Node = base_scene.find_child("WeatherBadge", true, false)
+	var weather_label: Node = base_scene.find_child("WeatherLabel", true, false)
 	var crew_button := base_scene.find_child("CrewButton", true, false) as Button
 	var crew_panel := base_scene.find_child("SurvivorsPanel", true, false) as Control
 	var plan_button := base_scene.find_child("DayPlanButton", true, false) as Button
 	var plan_popover := base_scene.find_child("DayPlanPopover", true, false) as Control
 	var tutorial_panel := base_scene.find_child("TutorialPanel", true, false) as Control
-	if resource_bar == null or resource_bar.size.y > 54.0 or crew_button == null or crew_panel == null or crew_panel.visible or plan_button == null or plan_popover == null or plan_popover.visible:
-		push_error("The world-first base HUD should keep a <=54 px top bar and both detailed flyouts closed by default.")
+	var initial_hud_summary := resource_summary.get_parsed_text().replace(" ", "") if resource_summary != null else ""
+	if resource_bar == null or resource_bar.size.y > 54.0 or resource_summary == null or not initial_hud_summary.contains("POMOST70%│3/3MIESZKAŃCÓW") or weather_badge != null or weather_label != null or crew_button == null or crew_panel == null or crew_panel.visible or plan_button == null or plan_popover == null or plan_popover.visible:
+		push_error("The world-first base HUD should keep a <=54 px top bar, show shelter occupancy after the pier, omit weather, and keep both detailed flyouts closed by default.")
 		get_tree().quit(1)
 		return
 	crew_button.emit_signal("pressed")
@@ -70,6 +74,11 @@ func _ready() -> void:
 	var community = game.game_state.find_building_by_definition("community_house")
 	if community == null or not community.is_active() or game.game_state.tutorial.step != TutorialStateScript.Step.BUILD_DIVING_STATION:
 		push_error("Rebuilding Community House I should activate it immediately and advance the tutorial to the Diving Station.")
+		get_tree().quit(1)
+		return
+	var community_hud_summary := resource_summary.get_parsed_text().replace(" ", "") if resource_summary != null else ""
+	if not community_hud_summary.contains("POMOST70%│3/4MIESZKAŃCÓW"):
+		push_error("Community House I should immediately raise the HUD shelter counter from 3/3 to 3/4 after the pier integrity.")
 		get_tree().quit(1)
 		return
 	base_scene._hide_action_feedback()
@@ -150,6 +159,11 @@ func _ready() -> void:
 	await get_tree().process_frame
 	if community.assigned_survivor_ids != ["mira"] or game.game_state.tutorial.step != TutorialStateScript.Step.SET_RATIONS:
 		push_error("Assigning Mira to Community House I should persist the roster and advance the tutorial to the explicit ration choice.")
+		get_tree().quit(1)
+		return
+	var staffed_community_hud_summary := resource_summary.get_parsed_text().replace(" ", "") if resource_summary != null else ""
+	if not staffed_community_hud_summary.contains("POMOST70%│3/4MIESZKAŃCÓW"):
+		push_error("The HUD shelter counter must count residents, not Community House worker assignments.")
 		get_tree().quit(1)
 		return
 	base_scene._close_building_panel()

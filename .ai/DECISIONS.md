@@ -785,7 +785,7 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 
 - Domena: prezentacja bazy i swiata
 - Status / aktywny zakres: Obowiazuje; D1-D4
-- Zatwierdzenie: 2026-08-09
+- Zatwierdzenie: 2026-08-09; zmienione: 2026-08-15
 - Relacje: Zastepuje: ARD-0006/D4; ARD-0035/D2 | Zastapiona przez: brak
 - D1. Swiat i obiekty bazy moga byc prezentowane przestrzennie w 3D, a interakcja i panele pozostaja warstwa 2D.
 - D2. GameState, systemy domenowe i kontrakty zapisu nie zmieniaja znaczenia wskutek tej prezentacji.
@@ -798,7 +798,7 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 
 - Domena: zapis
 - Status / aktywny zakres: Czesciowo zastapione; D2
-- Zatwierdzenie: 2026-08-09
+- Zatwierdzenie: 2026-08-15
 - Relacje: Zastepuje: brak | Zastapiona przez: ARD-0068/D1
 - D1. Przed pierwszym wydaniem dopuszczono domkniecie niewydanego schematu 10 bez nowego numeru, ale tylko z zachowaniem pelnej migracji 9 -> 10, atomowosci, walidacji i wymaganego pokrycia; pozostanie przy schemacie 10 zostalo zastapione przez ARD-0068.
 - D2. Przedpremierowy wyjatek nie jest precedensem: po ustanowieniu kolejnej granicy dalsza zmiana semantyki zapisu podlega zwyklemu wersjonowaniu ARD-0045.
@@ -851,14 +851,14 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0071 - Jedno wspolne zrodlo swiatla kierunkowego bazy
 
 - Domena: oswietlenie bazy
-- Status / aktywny zakres: Obowiazuje; D1-D4
-- Zatwierdzenie: 2026-08-09
-- Relacje: Zastepuje: brak | Zastapiona przez: brak
-- D1. Aktywny widok bazy korzysta z jednego wspolnego kierunkowego zrodla swiatla i jednego spojnego modelu cienia; nie dodaje drugiego Light3D ani lokalnego fill light dla obiektow.
-- D2. Pogoda moze zmieniac relacje swiatla bezposredniego, otoczenia i cienia, ale zachowuje czytelnosc gameplayowa.
-- D3. Poziom jakosci zmienia koszt renderowania, a nie znaczenie pogody, zasady gry ani stan zapisu.
+- Status / aktywny zakres: Czesciowo zastapione; D2-D4
+- Zatwierdzenie: 2026-08-09; zmienione: 2026-08-15
+- Relacje: Zastepuje: brak | Zastapiona przez: ARD-0094/D1
+- D1. Aktywny widok bazy korzysta z jednego wspolnego kierunkowego zrodla swiatla i jednego spojnego modelu cienia. Wyjatkiem sa dokladnie trzy krotkozasiegowe, bezcieniowe oprawy uslugowe `OmniLight3D`, zamocowane w wyznaczonych punktach gornej konstrukcji; po utrwalonym J-7 oswietlaja wyłącznie poklad i jego aktywne warianty. Nie powstaje drugie slonce, inny lokalny fill light ani lokalne swiatlo przed J-7.
+- D2. Pogoda moze zmieniac relacje swiatla bezposredniego, otoczenia i cienia, ale zachowuje czytelnosc gameplayowa; reflektory J-7 nie zmieniaja jej parametrow ani stanu morza, deszczu i fal.
+- D3. Poziom jakosci zmienia koszt renderowania, a nie znaczenie pogody, zasady gry ani stan zapisu; we wszystkich profilach pozostaje ten sam czytelny sygnal trzech reflektorow J-7.
 - D4. Kontrakt nie zmienia stanu kampanii, zapisu, niezaleznego modulu nurkowania ani prerenderowanego intro.
-- Powod i skutek: oswietlenie bazy nie tworzy konkurencyjnych slonc, lokalnych poprawek ani roznych semantyk miedzy presetami.
+- Powod i skutek: oswietlenie bazy nie tworzy konkurencyjnych slonc ani roznych semantyk miedzy presetami, lecz odzyskane zasilanie ma widoczny, lokalny skutek na platformie zamiast niemal niewidocznej globalnej korekty ambientu.
 - Odwolania: ARD-0024; ARD-0066; ARD-0069; docs/Ostatni_Pomost_architektura_Godot.txt - oswietlenie i jakosc.
 
 ## ARD-0072 - Certyfikat pelnej drogi odzyskania zasobu
@@ -1077,9 +1077,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0085 - Jedna semantyczna maska terenu i pochodna prezentacja
 
 - Domena: swiat nurkowania, authoring terenu, prezentacja, fizyka i kompatybilnosc zapisu
-- Status / aktywny zakres: Czesciowo zastapione; D1-D4, D6-D7
+- Status / aktywny zakres: Czesciowo zastapione; D4, D6-D7
 - Zatwierdzenie: 2026-08-13
-- Relacje: Zastepuje: ARD-0075/D5 | Zastapiona przez: ARD-0092/D5
+- Relacje: Zastepuje: ARD-0075/D5 | Zastapiona przez: ARD-0092/D5; ARD-0098/D1-D4
 - D1. Bazowa maska nawigacji wskazana przez `UnderwaterMap.tscn` jest jedynym semantycznym zrodlem makrogeometrii terenu. Kontur renderowanych skal, segmenty kolizji i reprezentacja aktywnych chunkow sa deterministycznymi pochodnymi tej samej maski, a kazda pozniejsza okluzja swiatla terenu rowniez musi byc jej pochodna.
 - D2. Kanoniczna kolizja runtime ARD-0052 pozostaje wlascicielem przechodniosci. Pochodny material nie moze zmieniac fizyki; scenowe `MapObstacle` nadal sa jawnymi lokalnymi nakladkami wspolnego rastra, a widoczny prefab sam nie ustanawia kolizji.
 - D3. Pochodne sa odswiezane oraz walidowane z produkcyjnej sceny bez osobnego draftu, katalogu publikacyjnego ani recznego etapu wypiekania. Nody i zasoby utworzone dla aktywnego chunka sa cache'em prezentacji/runtime i nie sa zapisywane z powrotem do sceny jako drugie zrodlo.
@@ -1093,18 +1093,18 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0086 - Kanoniczny rdzen wiedzy i repozytoryjne przewodniki wykonawcze
 
 - Domena: dokumentacja, proces pracy i Codex skills
-- Status / aktywny zakres: Obowiazuje; D1-D7
+- Status / aktywny zakres: Czesciowo zastapione; D1-D5, D7
 - Zatwierdzenie: 2026-08-13
-- Relacje: Zastepuje: ARD-0014/calosc; ARD-0070/D4 | Zastapiona przez: brak
+- Relacje: Zastepuje: ARD-0014/calosc; ARD-0070/D4 | Zastapiona przez: ARD-0097/D1-D2
 - D1. Kanoniczny rdzen wiedzy projektu pozostaje w pieciu dokumentach merytorycznych oraz korzeniowym `AGENTS.md`. Kazdy szczegol produktu, runtime, architektury, zapisu, decyzji i onboardingu zachowuje jednego wlasciciela zgodnie z aktywnym zakresem ARD-0070.
 - D2. Repozytorium moze utrzymywac pod `.agents/skills` wyspecjalizowane przewodniki wykonawcze: procedury zadaniowe, checklisty, referencje warsztatowe, skrypty i zasoby wielokrotnego uzycia. Nie sa one dodatkowym kanonicznym opisem gry ani biezacego runtime.
 - D3. Skill musi wskazywac dokumenty kanoniczne i nie moze ustanawiac ani kopiowac regul produktu, aktywnych wartosci balansu, wlascicieli stanu, kontraktow danych, persistence, migracji lub statusu wdrozenia. Konflikt rozstrzyga sie przez aktywne ARD, dokument bedacy wlascicielem szczegolu oraz faktyczny runtime zgodnie z bramka rozbieznosci.
 - D4. Korzeniowy `AGENTS.md` jest wlascicielem globalnej kolejnosci odczytu, bramki rozbieznosci, routingu dokumentacji i wyboru procedury specjalistycznej. Repozytoryjny skill posiada tylko wykonanie zadania w swoim zakresie, a `README.md` pozostaje wejsciem dla czlowieka.
 - D5. Zadanie specjalistyczne jest routowane wedlug intencji opisanej w metadanych skilla albo przez jawne wywolanie `$nazwa-skilla`; zagniezdzony `AGENTS.md` zalezy od sciezki uruchomienia i nie jest semantycznym routerem promptu.
-- D6. Pierwszym przewodnikiem jest `ostatni-pomost-art`, obejmujacy grafike 2D/3D, mape i biomy, postacie i animacje, VFX, shadery, oswietlenie, materialy, portrety, intro oraz wizualne QA. Nie przejmuje fizyki, gameplayu, stanu kampanii ani zapisu od ich wlascicieli.
+- D6. Historyczna klauzula ustanawiajaca repozytoryjny przewodnik zadan prezentacyjnych zostala zastapiona przez ARD-0097/D1-D2.
 - D7. Zmiana wizualna nadal przechodzi zwykla bramke produktu i architektury, inspekcje aktywnego runtime, dowod przed/po, profile jakosci i dostepnosc. Automatyczny test lub snapshot potwierdza tylko swoj kontrakt; akceptacja artystyczna wymaga takze jawnej kontroli wzrokowej.
 - Powod i skutek: rozdzielenie rdzenia prawdy od przewodnikow wykonawczych pozwala automatycznie kierowac zadania do fachowego workflow bez tworzenia drugiej specyfikacji gry.
-- Odwolania: AGENTS.md; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2, 12 i 13; `.agents/skills/ostatni-pomost-art/SKILL.md`.
+- Odwolania: AGENTS.md; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2, 12 i 13.
 
 ## ARD-0087 - Narracja uzywa napisow i diegetycznych znakow dzwiekowych bez voice-overu
 
@@ -1186,14 +1186,14 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0092 - Jeden czysty format i jedna kampania bez importu historii
 
 - Domena: zapis kampanii, kompatybilnosc, mapa i powloka aplikacji
-- Status / aktywny zakres: Obowiazuje; D1-D9
+- Status / aktywny zakres: Obowiazuje; D2-D4, D6-D9
 - Zatwierdzenie: 2026-08-14
-- Relacje: Zastepuje: ARD-0019/D2; ARD-0045/D3; ARD-0059/D2; ARD-0063/D4; ARD-0065/D2-D3; ARD-0068/D5; ARD-0073/D8; ARD-0076/D5; ARD-0082/D7; ARD-0083/D3,D5-D6; ARD-0085/D5; ARD-0088/calosc; ARD-0089/D5 | Zastapiona przez: brak
-- D1. Caly graf `GameState` ma jedna wspolna rewizje formatu kampanii. Biezacy kontrakt zaczyna sie od `GameFormat.CAMPAIGN_FORMAT_REVISION = 1`; zasoby domenowe nie utrzymuja niezaleznych numerow schematu ani lancucha migracji.
+- Relacje: Zastepuje: ARD-0019/D2; ARD-0045/D3; ARD-0059/D2; ARD-0063/D4; ARD-0065/D2-D3; ARD-0068/D5; ARD-0073/D8; ARD-0076/D5; ARD-0082/D7; ARD-0083/D3,D5-D6; ARD-0085/D5; ARD-0088/calosc; ARD-0089/D5 | Zastapiona przez: ARD-0096/D1,D5
+- D1. Zastapiona przez ARD-0096/D1.
 - D2. Powloka udostepnia jedna biezaca kampanie w jednym namespace primary, pending i backup. Nie istnieje aktywny slot, selektor slotow, numerowane przestrzenie kampanii ani ukryty wybor kampanii w `GameState`.
 - D3. Pliki starszych repozytoriow, dawnych schematow 25-27, przestrzeni Wspolnej Linii i dawnych slotow nie sa wejsciem. Gra ich nie importuje, nie migruje, nie usuwa i nie nadpisuje; kandydat o innej rewizji jest odrzucany bez mutacji.
 - D4. Jeden walidator wykonuje preflight oraz pelny postflight kandydata dokladnie biezacej rewizji. Zapis pracuje na odseparowanym kandydacie, ponownie odczytuje pending, zachowuje tylko poprawny primary jako backup i atomowo promuje pending; nie istnieje warstwa reinterpretacji legacy.
-- D5. Source-v4 mapy, pietnascie kompetencji, dwanascie talentow profesji, niezalezny wybor nurka oraz opcjonalna Obsluga Stacji sa od poczatku czescia rewizji 1. Przyszla zmiana semantyki trwalego stanu podnosi wspolna rewizje i domyslnie ustanawia czysta granice; import wymaga osobnej, jawnej decyzji z uwierzytelnialnym mapowaniem.
+- D5. Zastapiona przez ARD-0096/D5.
 - D6. `KONTYNUUJ` jest dostepne tylko dla poprawnego kandydata biezacej kampanii. `NOWA GRA` wymaga potwierdzenia usuniecia jej namespace; powrot do menu odrzuca runtime bez zapisu, lecz nie usuwa kampanii.
 - D7. `UserSettings` pozostaje osobnym stanem urzadzenia i nie nalezy do namespace kampanii ani `GameState`.
 - D8. Czysta granica formatu nie usuwa aktywnych systemow Wspolnej Linii, ciezkiego odzysku ani Kroniki. Kazda przyszla aktywacja nowej domeny, w tym rotacji zalogi, musi od razu wejsc do jednego biezacego grafu i przejsc pelna walidacje oraz roundtrip bez tworzenia pobocznego numeru schematu.
@@ -1213,3 +1213,68 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 - D4. Wlasnosci techniczne pliku i importu sa jednym kontraktem aktywnego assetu utrzymywanym w architekturze; dokument produktu opisuje tylko odczucie gracza.
 - Powod i skutek: przywrocenie istniejacego historycznego utworu zachowuje tozsamosc Przystani bez generatora, drugiej kompozycji i zanieczyszczania trwalego stanu.
 - Odwolania: ARD-0049; ARD-0087; docs/OgolnyZarys.txt - sekcja 3; docs/Ostatni_Pomost_architektura_Godot.txt - sekcja 12.2.
+
+## ARD-0094 - Niewidoczne reflektory J-7 oswietlaja poklad z gornej konstrukcji
+
+- Domena: oswietlenie i prezentacja bazy
+- Status / aktywny zakres: Zastapione; D1
+- Zatwierdzenie: 2026-08-15
+- Relacje: Zastepuje: ARD-0071/D1 | Zastapiona przez: ARD-0095/D1
+- D1. Aktywny widok bazy zachowuje jedno wspolne kierunkowe zrodlo swiatla i jeden model cienia. Jedynym lokalnym wyjatkiem sa dokladnie trzy niewidoczne, bezcieniowe reflektory kierunkowe na dwoch wierzcholkach gornej konstrukcji i przy zurawiu; po utrwalonym J-7 kieruja swiatlo w dol i do srodka pokladu. Przed J-7 nie wnosza energii. Nie powstaje drugie slonce ani osobny ogolny fill light; ograniczone ocieplenie ambientu pozostaje pochodna juz wybranego profilu pogody.
+- Powod i skutek: proceduralne maszty i klosze tworzyly w ciemnym kadrze przypadkowe czarne sylwetki, a swiatlo dookolne rozpraszalo energie poza poklad. Niewidoczne reflektory zachowuja lokalny sygnal odzyskanego zasilania, ale prowadza wzrok po platformie bez dodawania obcych bryl.
+- Odwolania: ARD-0071; docs/OgolnyZarys.txt - sekcja 5; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 12.2 i 13.
+
+## ARD-0095 - Trzy punkty J-7 jednoznacznie rozpoczynaja kierunkowe wiazki
+
+- Domena: oswietlenie i prezentacja bazy
+- Status / aktywny zakres: Obowiazuje; D1
+- Zatwierdzenie: 2026-08-15
+- Relacje: Zastepuje: ARD-0094/D1 | Zastapiona przez: brak
+- D1. Po utrwalonym J-7 dokladnie trzy wskazane punkty na dwoch wierzcholkach gornej konstrukcji i przy mechanizmie zurawia maja czytelny, lecz pozbawiony fizycznej oprawy poczatek swiatla. Z kazdego biegnie bezcieniowa, kierunkowa wiazka odpowiednio na lewa, srodkowa i prawa czesc pokladu. Warstwa J-7 nie dodaje swiatla dookolnego, globalnego bonusu ambientu ani emisji materialow sugerujacej zrodlo na pokladzie; przed J-7 punkty, wiazki i ich lokalny wklad sa niewidoczne oraz pozbawione energii.
+- Powod i skutek: same plamy swiatla na powierzchni nie pokazywaly pochodzenia i wygladaly jak emisja z podlogi, a lokalna poswiata zurawia sugerowala swiatlo dookolne. Czytelny poczatek oraz lagodny kierunek w powietrzu lacza kazda oswietlona strefe z zatwierdzonym punktem konstrukcji bez przywracania modeli lamp.
+- Odwolania: ARD-0071 i ARD-0094; docs/OgolnyZarys.txt - sekcja 5; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 12.2 i 13.
+
+## ARD-0096 - Trwala preferencja nurka i dzienny wybor wyprawy
+
+- Domena: przygotowanie nurkowania i zapis kampanii
+- Status / aktywny zakres: Obowiazuje; D1-D6
+- Zatwierdzenie: 2026-08-15
+- Relacje: Zastepuje: ARD-0092/D1,D5 | Zastapiona przez: brak
+- D1. Caly graf `GameState` ma jedna wspolna rewizje formatu kampanii 2; zasoby domenowe nie utrzymuja niezaleznych numerow schematu ani lancucha migracji.
+- D2. Trwala preferencja nurka nalezy do stanu kampanii, a aktywny wybor nurka nalezy wylacznie do edytowalnego planu dnia. Preferencja nie jest stanowiskiem budynku ani stanem UI.
+- D3. Poprawny jawny wybor nurka aktualizuje jednoczesnie aktywny wybor dnia i trwala preferencje; jawne wyczyszczenie usuwa oba te znaczenia bez mutowania obsady Stacji.
+- D4. Nowy plan dnia wyprowadza aktywny wybor wylacznie z zapisanej preferencji, gdy osoba przechodzi aktualne bramki obecnosci, wolnosci, izolacji i nurkowania. Czasowa blokada pozostawia preferencje, lecz nie tworzy fikcyjnego nurka dnia.
+- D5. Source-v4 mapy, pietnascie kompetencji, dwanascie talentow profesji, niezalezny wybor nurka, trwala preferencja nurka oraz opcjonalna Obsluga Stacji naleza do rewizji 2. Kandydat rewizji 1 nie jest importowany ani reinterpretowany bez osobnej decyzji z uwierzytelnialnym mapowaniem.
+- D6. Smierc albo trwale odejscie preferowanej osoby usuwa preferencje przed utworzeniem kolejnego planu dnia. Obsada Stacji i jej zamrozone wsparcie wyprawy pozostaja niezalezne.
+- Powod i skutek: gracz nie wybiera tej samej osoby codziennie od nowa, a kampania zachowuje jedna jawna intencje bez pomylenia nurka z pracownikiem Stacji lub bez przechowywania drugiej kopii planu w UI.
+- Odwolania: ARD-0001; ARD-0018; ARD-0021; ARD-0092; docs/OgolnyZarys.txt - sekcja 5.1; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 3, 5, 11 i 13.
+
+## ARD-0097 - Bez repozytoryjnego routera zadan prezentacyjnych
+
+- Domena: dokumentacja, proces pracy i Codex skills
+- Status / aktywny zakres: Obowiazuje; D1-D4
+- Zatwierdzenie: 2026-08-15
+- Relacje: Zastepuje: ARD-0086/D6 | Zastapiona przez: brak
+- D1. Repozytorium nie utrzymuje dedykowanego skilla ani metadanych automatycznie kierujacych zadania grafiki, animacji, VFX, shaderow, oswietlenia, map i biomow do osobnego workflow prezentacyjnego.
+- D2. Zadania prezentacyjne sa wykonywane bezposrednio wedlug korzeniowego `AGENTS.md`, aktywnych ARD, dokumentu produktu, mapowania architektonicznego oraz faktycznego runtime. Nie powstaje dodatkowa repozytoryjna warstwa instrukcji miedzy tymi zrodlami a implementacja.
+- D3. Usuniecie routera nie oslabia bramki rozbieznosci, wymagan dostepnosci, profili jakosci, proporcjonalnych testow ani kontroli obrazu w runtime. Ogolne klauzule ARD-0086/D1-D5,D7 pozostaja aktywne.
+- D4. Zmiana procesu nie zmienia `GameState`, gameplayu, mapy semantycznej, zapisu, migracji ani podpisu swiata.
+- Powod i skutek: bezposrednia praca na aktywnym rendererze i dowodzie runtime usuwa niechciana sciezke automatycznego routingu, zachowujac kanoniczne zrodla projektu oraz techniczne bramki jakosci.
+- Odwolania: AGENTS.md; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2 i 13.
+
+## ARD-0098 - Scenowe wielokaty Godot sa zrodlem makroterenu
+
+- Domena: swiat nurkowania, authoring mapy, topologia, fizyka i prezentacja
+- Status / aktywny zakres: Obowiazuje; D1-D8
+- Zatwierdzenie: 2026-08-15
+- Relacje: Zastepuje: ARD-0085/D1-D3 | Zastapiona przez: brak
+- D1. Jedynym semantycznym zrodlem bazowej makrogeometrii terenu jest uporzadkowany podzbior edytowalnych `Polygon2D` zapisanych w `UnderwaterMap.tscn`. Projektant zmienia ich punkty i transformacje zwyklymi uchwytami widoku 2D Godota; nie istnieje osobny edytor mapy ani drugi format authoringu.
+- D2. Wielokaty deklaruja operacje otwartej wody albo pelnego terenu i sa skladane deterministycznie w kolejnosci sceny. Bazowa maska PNG, prezentacyjny SDF, segmenty kolizji, okludery i dane chunkow sa wylacznie pochodnymi tej kompozycji. Reczna edycja pochodnego PNG nie zmienia semantyki mapy, a niezgodna albo nieaktualna pochodna ma zatrzymac walidacje zamiast cicho zmienic fizyke.
+- D3. Kompilator i runtime korzystaja z tego samego rasteryzatora scenowych wielokatow oraz `MapObstacle`. Pochodny raster zachowuje dotychczasowy prog przechodniosci, rozmiar swiata, stabilny podpis gameplayowy i wspolna reprezentacje granic dla fizyki, renderu oraz swiatla.
+- D4. Pierwsze przelaczenie authority wymaga deterministycznego odtworzenia dotychczasowej maski komorka w komorke. Dopoki test parytetu nie potwierdzi identycznej topologii, produkcyjny runtime pozostaje przy dotychczasowej pochodnej; migracja nie moze przesunac landmarkow, tras, stable ID ani znaczenia zapisanych postepow.
+- D5. `MapObstacle` moze uzywac edytowalnego, nieregularnego wielokata zapisanego w scenie; brak wielokata zachowuje prostokatny fallback dla istniejacych instancji. Przeszkoda nadal trafia do wspolnego rastra, a `Visual Scene` pozostaje bezkolizyjna i nie ustanawia fizyki.
+- D6. Bezkolizyjne wizualizacje Wspolnej Linii korzystaja z zapisanych w scenie `Path2D` i `Curve2D`. Punkty koncowe sa walidowane wobec wlascicieli gameplayowych, lecz sama krzywa wizualna nie przejmuje stanu, interakcji ani kolizji.
+- D7. Artystyczne sceny biomow i landmarkow pozostaja nakladajacymi sie prefabami prezentacyjnymi. Moga korzystac z tej samej pochodnej maski/SDF do przyciecia materialu, ale nie sa zrodlem przechodniosci ani zapisu.
+- D8. Zmiana authoringu nie zmienia `WorldDelta`, `DiveResult`, formatu kampanii ani zasad gracza. Kazda przyszla edycja wielokatow podlega walidacji osiagalnosci, niezmiennosci wymaganych punktow, granic chunkow, okluzji i reprezentatywnemu QA obrazu.
+- Powod i skutek: cala mapa moze byc projektowana w jednym widoku 2D Godota, z edytowalnymi tunelami, nieregularnymi przeszkodami, sciezkami kabli i nakladajacymi sie scenami wizualnymi, bez rozdzielenia obrazu i fizyki na dwa recznie utrzymywane kontury.
+- Odwolania: ARD-0052; ARD-0076; ARD-0085; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 9, 11, 12.3 i 13.

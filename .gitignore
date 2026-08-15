@@ -1,9 +1,11 @@
 # Godot Engine artifacts
 .godot/
 *.import
+!assets/base_3d/start_platform_ruins.glb.import
 !assets/audio/base/oddech_przystani.ogg.import
 !assets/audio/narrative/*.wav.import
 !assets/diving/diver/animated_16f_v1/*.png.import
+!assets/ui/portraits/*.png.import
 !assets/diving/world/materials/underwater_rock_detail*.png.import
 /android/
 /tmp/

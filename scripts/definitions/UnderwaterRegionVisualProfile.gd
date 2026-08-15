@@ -25,6 +25,13 @@ extends Resource
 @export_range(0.25, 8.0, 0.05) var edge_width_texels: float = 1.35
 @export_range(0.0, 2.0, 0.01) var edge_highlight_strength: float = 0.65
 
+@export_group("Distant backdrop")
+@export var backdrop_tint: Color = Color(0.12, 0.30, 0.31, 1.0)
+@export var backdrop_accent: Color = Color(0.34, 0.56, 0.54, 1.0)
+@export_range(0.0, 1.0, 0.01) var backdrop_strength: float = 0.6
+@export_range(0.0, 2.0, 0.01) var backdrop_motion_scale: float = 1.0
+@export_range(0.5, 2.0, 0.01) var backdrop_motif_scale: float = 1.0
+
 
 func validation_errors() -> PackedStringArray:
 	var errors := PackedStringArray()
@@ -45,10 +52,18 @@ func validation_errors() -> PackedStringArray:
 		errors.append("Kolor caustics musi być nieprzezroczysty.")
 	if not _is_opaque(rock_base_tint) or not _is_opaque(rock_shadow_tint) or not _is_opaque(rock_edge_color):
 		errors.append("Kolory skały muszą być nieprzezroczyste.")
+	if not _is_opaque(backdrop_tint) or not _is_opaque(backdrop_accent):
+		errors.append("Kolory dalekiego planu muszą być nieprzezroczyste.")
 	if not is_finite(detail_world_scale) or detail_world_scale < 32.0:
 		errors.append("Skala detalu skały musi być skończona i wynosić co najmniej 32 jednostki świata.")
 	if not is_finite(edge_width_texels) or edge_width_texels < 0.25 or edge_width_texels > 8.0:
 		errors.append("Szerokość krawędzi musi mieścić się w zakresie 0,25-8 texeli maski.")
+	if not is_finite(backdrop_strength) or backdrop_strength < 0.0 or backdrop_strength > 1.0:
+		errors.append("Siła dalekiego planu musi mieścić się w zakresie 0-1.")
+	if not is_finite(backdrop_motion_scale) or backdrop_motion_scale < 0.0 or backdrop_motion_scale > 2.0:
+		errors.append("Ruch dalekiego planu musi mieścić się w zakresie 0-2.")
+	if not is_finite(backdrop_motif_scale) or backdrop_motif_scale < 0.5 or backdrop_motif_scale > 2.0:
+		errors.append("Skala motywu dalekiego planu musi mieścić się w zakresie 0,5-2.")
 	return errors
 
 

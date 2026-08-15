@@ -13,6 +13,22 @@ const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd"
 const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
 const SurvivorInfoPresenterScript := preload("res://scripts/ui/SurvivorInfoPresenter.gd")
 
+const UI_WORKSPACE := Color("efe7d7")
+const UI_SURFACE := Color("e4d9c5")
+const UI_SURFACE_RAISED := Color("f7f0e2")
+const UI_BORDER := Color("c7b38e")
+const UI_BORDER_SUBTLE := Color("d8c8ad")
+const UI_TEXT := Color("203b3b")
+const UI_MUTED := Color("607578")
+const UI_TEAL := Color("147b80")
+const UI_TEAL_FOCUS := Color("3d9895")
+const UI_AMBER := Color("f2af36")
+const UI_AMBER_DARK := Color("a66318")
+const UI_GREEN := Color("4f843c")
+const UI_CORAL := Color("a83e36")
+const UI_DISABLED := Color("89928d")
+const UI_DISABLED_SURFACE := Color("d9d2c4")
+
 var _state
 var _definition
 var _building
@@ -90,7 +106,7 @@ func _rebuild() -> void:
 	_detail_stats.clear()
 	_detail_competencies.clear()
 
-	add_theme_stylebox_override("panel", _panel_style(Color("081215fc"), Color("67959a"), 2, 7))
+	add_theme_stylebox_override("panel", _panel_style(UI_WORKSPACE, UI_TEAL, 2, 7))
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 18)
 	margin.add_theme_constant_override("margin_top", 16)
@@ -134,19 +150,20 @@ func _build_header(parent: VBoxContainer) -> void:
 	var eyebrow := Label.new()
 	eyebrow.text = "OBSADA  •  %s" % (str(_definition.display_name).to_upper() if _definition != null else "BUDYNEK")
 	eyebrow.add_theme_font_size_override("font_size", 13)
-	eyebrow.add_theme_color_override("font_color", Color("7fc7c5"))
+	eyebrow.add_theme_color_override("font_color", UI_TEAL)
 	titles.add_child(eyebrow)
 	var title := Label.new()
 	title.name = "WorkerCandidateTitle"
 	title.text = "Wybierz mieszkańca — %s" % _role_name(_slot_index)
 	title.add_theme_font_size_override("font_size", 23)
-	title.add_theme_color_override("font_color", Color("f0d08a"))
+	title.add_theme_color_override("font_color", UI_TEXT)
 	titles.add_child(title)
 	var back := Button.new()
 	back.name = "WorkerCandidateBackButton"
 	back.text = "WRÓĆ"
 	back.tooltip_text = "Wróć do obsady budynku bez wprowadzania zmiany."
 	back.custom_minimum_size = Vector2(92, 40)
+	_apply_secondary_button_style(back)
 	back.pressed.connect(func(): closed.emit())
 	header.add_child(back)
 
@@ -156,7 +173,7 @@ func _build_candidate_details(parent: GridContainer) -> void:
 	panel.name = "WorkerCandidateDetails"
 	panel.custom_minimum_size = Vector2(268, 0)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.add_theme_stylebox_override("panel", _panel_style(Color("101b1eea"), Color("385157"), 1, 4))
+	panel.add_theme_stylebox_override("panel", _panel_style(UI_SURFACE, UI_BORDER, 1, 4))
 	parent.add_child(panel)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 12)
@@ -170,7 +187,7 @@ func _build_candidate_details(parent: GridContainer) -> void:
 	var heading := Label.new()
 	heading.text = "WYBRANY MIESZKANIEC"
 	heading.add_theme_font_size_override("font_size", 12)
-	heading.add_theme_color_override("font_color", Color("8ca9a9"))
+	heading.add_theme_color_override("font_color", UI_MUTED)
 	content.add_child(heading)
 	_detail_portrait = SurvivorPortraitScript.new()
 	_detail_portrait.name = "WorkerCandidateDetailPortrait"
@@ -180,16 +197,16 @@ func _build_candidate_details(parent: GridContainer) -> void:
 	_detail_name = Label.new()
 	_detail_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_detail_name.add_theme_font_size_override("font_size", 20)
-	_detail_name.add_theme_color_override("font_color", Color("f0d08a"))
+	_detail_name.add_theme_color_override("font_color", UI_TEXT)
 	content.add_child(_detail_name)
-	_detail_profession = _detail_label(content, Color("d6e0dc"), 13)
+	_detail_profession = _detail_label(content, UI_TEXT, 13)
 	_detail_profession.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_detail_talents = _detail_label(content, Color("9fd3a9"), 11)
+	_detail_talents = _detail_label(content, UI_GREEN, 11)
 	_detail_talents.name = "WorkerCandidateDetailTalents"
 	_detail_talents.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_detail_state = _detail_label(content, Color("93b9b4"), 12)
+	_detail_state = _detail_label(content, UI_MUTED, 12)
 	_detail_state.name = "WorkerCandidateDetailState"
-	_detail_assignment = _detail_label(content, Color("a8b8b5"), 12)
+	_detail_assignment = _detail_label(content, UI_MUTED, 12)
 	_detail_assignment.name = "WorkerCandidateDetailAssignment"
 	_build_detail_states(content)
 	_build_detail_traits(content)
@@ -206,18 +223,18 @@ func _build_detail_states(content: VBoxContainer) -> void:
 	grid.add_theme_constant_override("v_separation", 4)
 	content.add_child(grid)
 	for stat_id in ["health", "hunger", "fatigue", "morale", "oxygen", "carry"]:
-		var label := _detail_label(grid, Color("b8c9c5"), 10)
+		var label := _detail_label(grid, UI_TEXT, 10)
 		label.name = "WorkerCandidateStat_%s" % stat_id
 		_detail_stats[stat_id] = label
 
 
 func _build_detail_traits(content: VBoxContainer) -> void:
 	_detail_section_heading(content, "CECHY", "traits")
-	_detail_positive_trait = _detail_label(content, Color("8fd7a3"), 10)
+	_detail_positive_trait = _detail_label(content, UI_GREEN, 10)
 	_detail_positive_trait.name = "WorkerCandidatePositiveTrait"
-	_detail_negative_trait = _detail_label(content, Color("d7ae7f"), 10)
+	_detail_negative_trait = _detail_label(content, UI_CORAL, 10)
 	_detail_negative_trait.name = "WorkerCandidateNegativeTrait"
-	_detail_traits = _detail_label(content, Color("79d69b"), 11)
+	_detail_traits = _detail_label(content, UI_TEAL, 11)
 	_detail_traits.name = "WorkerCandidateDetailTraits"
 
 
@@ -230,13 +247,13 @@ func _build_detail_competencies(content: VBoxContainer) -> void:
 	grid.add_theme_constant_override("v_separation", 4)
 	content.add_child(grid)
 	for competency_id in CompetencySystemScript.IDS:
-		var label := _detail_label(grid, Color("9fc7c3"), 10)
+		var label := _detail_label(grid, UI_TEAL, 10)
 		label.name = "WorkerCandidateCompetency_%s" % competency_id
 		_detail_competencies[competency_id] = label
 
 
 func _detail_section_heading(parent: VBoxContainer, title: String, section_id: String) -> Label:
-	var label := _detail_label(parent, Color("e0bd69"), 10)
+	var label := _detail_label(parent, UI_AMBER_DARK, 10)
 	label.text = title
 	label.tooltip_text = SurvivorInfoPresenterScript.section_tooltip(section_id)
 	return label
@@ -247,7 +264,7 @@ func _build_candidate_roster(parent: GridContainer) -> void:
 	panel.name = "WorkerCandidateRoster"
 	panel.custom_minimum_size = Vector2(430 if _wide_layout else 0, 0)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.add_theme_stylebox_override("panel", _panel_style(Color("0b1518e8"), Color("405e63"), 1, 4))
+	panel.add_theme_stylebox_override("panel", _panel_style(UI_SURFACE_RAISED, UI_BORDER, 1, 4))
 	parent.add_child(panel)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
@@ -261,7 +278,7 @@ func _build_candidate_roster(parent: GridContainer) -> void:
 	var heading := Label.new()
 	heading.text = "MIESZKAŃCY PRZYSTANI"
 	heading.add_theme_font_size_override("font_size", 12)
-	heading.add_theme_color_override("font_color", Color("8ca9a9"))
+	heading.add_theme_color_override("font_color", UI_MUTED)
 	content.add_child(heading)
 	var grid := GridContainer.new()
 	grid.name = "WorkerCandidateGrid"
@@ -277,7 +294,7 @@ func _build_candidate_roster(parent: GridContainer) -> void:
 		var empty := Label.new()
 		empty.text = "Brak mieszkańców, których można pokazać dla tego stanowiska."
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		empty.add_theme_color_override("font_color", Color("a6b5b2"))
+		empty.add_theme_color_override("font_color", UI_MUTED)
 		grid.add_child(empty)
 
 
@@ -337,14 +354,14 @@ func _build_candidate_tile(parent: GridContainer, survivor) -> void:
 	name.text = str(survivor.display_name).to_upper()
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name.add_theme_font_size_override("font_size", 14)
-	name.add_theme_color_override("font_color", Color("f0d08a") if not unavailable else Color("7f8a88"))
+	name.add_theme_color_override("font_color", UI_TEXT if not unavailable else UI_DISABLED)
 	text_column.add_child(name)
 	var profession := Label.new()
 	profession.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	profession.text = "POZ. %d  •  %s" % [int(survivor.level), _profession_summary(survivor)]
 	profession.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	profession.add_theme_font_size_override("font_size", 10)
-	profession.add_theme_color_override("font_color", Color("b8c9c5") if not unavailable else Color("697472"))
+	profession.add_theme_color_override("font_color", UI_MUTED if not unavailable else UI_DISABLED)
 	text_column.add_child(profession)
 	var status := Label.new()
 	status.name = "WorkerCandidateStatus_%s" % survivor_id
@@ -352,7 +369,7 @@ func _build_candidate_tile(parent: GridContainer, survivor) -> void:
 	status.text = _candidate_status_text(survivor, blocker, is_current)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.add_theme_font_size_override("font_size", 10)
-	status.add_theme_color_override("font_color", Color("7dd49a") if blocker.is_empty() else Color("d08a7d") if unavailable else Color("d7b96f"))
+	status.add_theme_color_override("font_color", UI_GREEN if blocker.is_empty() else UI_CORAL if unavailable else UI_AMBER_DARK)
 	text_column.add_child(status)
 
 
@@ -361,7 +378,7 @@ func _build_current_slot(parent: GridContainer) -> void:
 	panel.name = "WorkerCurrentSlot"
 	panel.custom_minimum_size = Vector2(224, 0)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.add_theme_stylebox_override("panel", _panel_style(Color("10191bea"), Color("54777b"), 1, 4))
+	panel.add_theme_stylebox_override("panel", _panel_style(UI_SURFACE, UI_BORDER, 1, 4))
 	parent.add_child(panel)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 12)
@@ -376,7 +393,7 @@ func _build_current_slot(parent: GridContainer) -> void:
 	heading.text = "OBSADZONE PRZEZ"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_font_size_override("font_size", 12)
-	heading.add_theme_color_override("font_color", Color("8ca9a9"))
+	heading.add_theme_color_override("font_color", UI_MUTED)
 	content.add_child(heading)
 	var survivor = _assigned_survivor()
 	var occupant := Label.new()
@@ -385,7 +402,7 @@ func _build_current_slot(parent: GridContainer) -> void:
 	occupant.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	occupant.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	occupant.add_theme_font_size_override("font_size", 18)
-	occupant.add_theme_color_override("font_color", Color("f0d08a") if survivor != null else Color("a9b5b2"))
+	occupant.add_theme_color_override("font_color", UI_TEXT if survivor != null else UI_MUTED)
 	content.add_child(occupant)
 	var portrait_holder := CenterContainer.new()
 	portrait_holder.custom_minimum_size = Vector2(0, 118)
@@ -400,13 +417,13 @@ func _build_current_slot(parent: GridContainer) -> void:
 		var empty := Label.new()
 		empty.text = "—"
 		empty.add_theme_font_size_override("font_size", 36)
-		empty.add_theme_color_override("font_color", Color("526165"))
+		empty.add_theme_color_override("font_color", UI_MUTED)
 		portrait_holder.add_child(empty)
 	var role := Label.new()
 	role.text = _role_name(_slot_index).to_upper()
 	role.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	role.add_theme_font_size_override("font_size", 12)
-	role.add_theme_color_override("font_color", Color("d6b96f"))
+	role.add_theme_color_override("font_color", UI_AMBER_DARK)
 	content.add_child(role)
 	var contribution := Label.new()
 	contribution.name = "WorkerCurrentEffectLabel"
@@ -420,12 +437,13 @@ func _build_current_slot(parent: GridContainer) -> void:
 	contribution.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	contribution.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	contribution.add_theme_font_size_override("font_size", 10)
-	contribution.add_theme_color_override("font_color", Color("8fcaa4") if survivor != null else Color("75898c"))
+	contribution.add_theme_color_override("font_color", UI_GREEN if survivor != null else UI_MUTED)
 	content.add_child(contribution)
 	var clear := Button.new()
 	clear.name = "WorkerClearButton"
 	clear.text = "ZWOLNIJ STANOWISKO"
 	clear.custom_minimum_size = Vector2(0, 42)
+	_apply_secondary_button_style(clear)
 	clear.disabled = survivor == null or not _assignments_editable()
 	clear.tooltip_text = (
 		"Usuń bieżący przydział."
@@ -479,7 +497,7 @@ func _update_candidate_details(survivor_id: String) -> void:
 	_detail_talents.text = "TALENTY  •  %s" % " + ".join(talent_names) if not talent_names.is_empty() else "TALENTY  •  BRAK WYBRANYCH"
 	_detail_talents.tooltip_text = _profession_talent_tooltip(survivor) if not talent_names.is_empty() else "Talenty wybiera się wyłącznie w aktywnym Domu Wspólnoty II."
 	_detail_state.text = _candidate_status_text(survivor, blocker, is_current)
-	_detail_state.add_theme_color_override("font_color", Color("7dd49a") if blocker.is_empty() else Color("d7a06f"))
+	_detail_state.add_theme_color_override("font_color", UI_GREEN if blocker.is_empty() else UI_CORAL)
 	_detail_state.tooltip_text = (
 		"Brak blokad — ta osoba będzie wnosiła aktywny wkład na tym stanowisku."
 		if blocker.is_empty()
@@ -714,19 +732,32 @@ func _panel_style(fill: Color, border: Color, width: int, radius: int) -> StyleB
 
 
 func _candidate_style(selected: bool, tutorial_target: bool, emphasized: bool) -> StyleBoxFlat:
-	var fill := Color("263126") if selected else Color("182326")
-	var border := Color("d1a84d") if selected else Color("557277")
+	var fill := Color("f8e5b8") if selected else UI_SURFACE_RAISED
+	var border := UI_AMBER_DARK if selected else UI_BORDER
 	var width := 2 if selected else 1
 	if tutorial_target:
-		fill = Color("4a351c")
-		border = Color("ffd36c")
+		fill = Color("f2d690")
+		border = UI_AMBER
 		width = 3
 	elif emphasized:
-		fill = fill.lightened(0.08)
-		border = border.lightened(0.18)
+		fill = fill.lightened(0.025)
+		border = UI_TEAL_FOCUS
 		width = maxi(width, 2)
 	return _panel_style(fill, border, width, 4)
 
 
 func _candidate_disabled_style() -> StyleBoxFlat:
-	return _panel_style(Color("111719d9"), Color("344144"), 1, 4)
+	return _panel_style(UI_DISABLED_SURFACE, UI_BORDER_SUBTLE, 1, 4)
+
+
+func _apply_secondary_button_style(button: Button) -> void:
+	button.add_theme_color_override("font_color", UI_TEXT)
+	button.add_theme_color_override("font_hover_color", UI_TEXT)
+	button.add_theme_color_override("font_pressed_color", UI_TEXT)
+	button.add_theme_color_override("font_focus_color", UI_TEXT)
+	button.add_theme_color_override("font_disabled_color", UI_DISABLED)
+	button.add_theme_stylebox_override("normal", _panel_style(UI_SURFACE_RAISED, UI_TEAL, 1, 4))
+	button.add_theme_stylebox_override("hover", _panel_style(UI_WORKSPACE, UI_TEAL_FOCUS, 2, 4))
+	button.add_theme_stylebox_override("pressed", _panel_style(UI_SURFACE, UI_AMBER_DARK, 2, 4))
+	button.add_theme_stylebox_override("focus", _panel_style(UI_WORKSPACE, UI_TEAL_FOCUS, 2, 4))
+	button.add_theme_stylebox_override("disabled", _panel_style(UI_DISABLED_SURFACE, UI_BORDER_SUBTLE, 1, 4))

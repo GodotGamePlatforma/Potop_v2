@@ -38,6 +38,7 @@ var _definition
 var _building
 var _building_system
 var _production_system
+var _building_art: Texture2D
 var _career_progression_system = CareerProgressionSystemScript.new()
 var _profession_talent_system = ProfessionTalentSystemScript.new()
 var _building_effect_system = BuildingEffectSystemScript.new()
@@ -48,6 +49,7 @@ var _tutorial_step: int
 var _selected_community_survivor_id: String = ""
 var _selected_community_profession_by_survivor: Dictionary = {}
 var _restore_scroll_after_rebuild: int = -1
+var _reset_scrolls_to_top_after_rebuild: bool = false
 var _focus_community_picker_after_rebuild: bool = false
 var _focus_community_profession_picker_after_rebuild: bool = false
 var _focus_control_after_rebuild: String = ""
@@ -63,21 +65,32 @@ var _right_sidebar_host: VBoxContainer
 
 const WORKSPACE_MIN_WIDTH := 720.0
 const WORKSPACE_MIN_HEIGHT := 520.0
-const RIGHT_SIDEBAR_MIN_WIDTH := 224.0
-const UI_CANVAS := Color("0b1418")
-const UI_PANEL := Color("142126")
-const UI_SURFACE := Color("1b2b30")
-const UI_SURFACE_RAISED := Color("203238")
-const UI_BORDER := Color("4d817d")
-const UI_BORDER_SUBTLE := Color("354f50")
-const UI_TEXT := Color("e7eee8")
-const UI_TEXT_MUTED := Color("a8b8b5")
-const UI_TEAL := Color("69b8af")
-const UI_AMBER := Color("d39b4a")
-const UI_AMBER_HOVER := Color("e8b75e")
-const UI_AMBER_DARK := Color("85511f")
-const UI_GREEN := Color("8ad19b")
-const UI_CORAL := Color("d96c67")
+const RIGHT_SIDEBAR_MIN_WIDTH := 264.0
+
+# Dwie celowe strefy zarządzania bazą: morska rama HUD-u i ciepła,
+# papierowa przestrzeń robocza. Nie mieszamy ich przez dziedziczenie Theme,
+# ponieważ prawa szyna jest niezależnym rodzeństwem centralnego panelu.
+const UI_CANVAS := Color("092f37")
+const UI_HEADER := Color("10464e")
+const UI_SIDEBAR := Color("0b3940")
+const UI_SIDEBAR_RAISED := Color("15545a")
+const UI_SIDEBAR_BORDER := Color("2c7277")
+const UI_PANEL := Color("efe7d7")
+const UI_SURFACE := Color("e4d9c5")
+const UI_SURFACE_RAISED := Color("f7f0e2")
+const UI_BORDER := Color("c7b38e")
+const UI_BORDER_SUBTLE := Color("d8c8ad")
+const UI_TEXT := Color("203b3b")
+const UI_TEXT_MUTED := Color("607578")
+const UI_DARK_TEXT := Color("f2f0e7")
+const UI_DARK_TEXT_MUTED := Color("b6cac6")
+const UI_TEAL := Color("147b80")
+const UI_TEAL_LIGHT := Color("79c4c0")
+const UI_AMBER := Color("f2af36")
+const UI_AMBER_HOVER := Color("ffcb62")
+const UI_AMBER_DARK := Color("a66318")
+const UI_GREEN := Color("9bc85c")
+const UI_CORAL := Color("ce6252")
 
 func _ready() -> void:
 	# Panel wypełnia część dużego workspace'u pozostałą po lewej szynie.
@@ -90,16 +103,31 @@ func _ready() -> void:
 
 
 func _apply_workspace_theme() -> void:
+	theme = _interface_theme(UI_TEXT, UI_TEXT_MUTED)
+
+
+func _interface_theme(ink: Color, muted_ink: Color) -> Theme:
 	var workspace_theme := Theme.new()
-	var ink := UI_TEXT
-	var muted_ink := UI_TEXT_MUTED
 	for type_name in ["Label", "Button", "OptionButton", "CheckButton"]:
 		workspace_theme.set_color("font_color", type_name, ink)
 		workspace_theme.set_color("font_hover_color", type_name, ink)
 		workspace_theme.set_color("font_pressed_color", type_name, ink)
 		workspace_theme.set_color("font_focus_color", type_name, ink)
 		workspace_theme.set_color("font_disabled_color", type_name, Color(muted_ink, 0.58))
-	theme = workspace_theme
+	return workspace_theme
+
+
+func _apply_sidebar_theme(sidebar: Control) -> void:
+	if sidebar != null and is_instance_valid(sidebar):
+		sidebar.theme = _interface_theme(UI_DARK_TEXT, UI_DARK_TEXT_MUTED)
+
+
+func _content_ink(content: Control) -> Color:
+	return UI_DARK_TEXT if bool(content.get_meta("dark_surface", false)) else UI_TEXT
+
+
+func _content_muted_ink(content: Control) -> Color:
+	return UI_DARK_TEXT_MUTED if bool(content.get_meta("dark_surface", false)) else UI_TEXT_MUTED
 
 
 func _process(_delta: float) -> void:
@@ -118,7 +146,7 @@ func set_focus_scope(scope: Control) -> void:
 func set_right_sidebar_host(host: VBoxContainer) -> void:
 	_right_sidebar_host = host
 	if _right_sidebar_host != null and is_instance_valid(_right_sidebar_host):
-		_right_sidebar_host.theme = theme
+		_apply_sidebar_theme(_right_sidebar_host)
 
 
 func set_external_focus_scopes(scopes: Array[Control]) -> void:
@@ -136,7 +164,7 @@ func _focus_owner_is_allowed(focus_owner: Control, focus_root: Control) -> bool:
 			return true
 	return false
 
-func configure(state, slot_id: String, definition, building, building_system, production_system, tutorial_step: int) -> void:
+func configure(state, slot_id: String, definition, building, building_system, production_system, tutorial_step: int, building_art: Texture2D = null) -> void:
 	var previous_tutorial_step := _tutorial_step
 	var next_view_key := "%s:%s" % [slot_id, str(building.id) if building != null else str(definition.id)]
 	if next_view_key != _view_key:
@@ -146,6 +174,7 @@ func configure(state, slot_id: String, definition, building, building_system, pr
 		_station_equipment_details_expanded = false
 		_selected_workshop_recipe_id = ""
 		_restore_scroll_after_rebuild = -1
+		_reset_scrolls_to_top_after_rebuild = true
 	_state = state
 	_slot_id = slot_id
 	_definition = definition
@@ -153,6 +182,7 @@ func configure(state, slot_id: String, definition, building, building_system, pr
 	_building_system = building_system
 	_production_system = production_system
 	_tutorial_step = tutorial_step
+	_building_art = building_art
 	if definition != null and definition.id == "workshop" and tutorial_step == TutorialStateScript.Step.CRAFT_RESCUE_KNIFE:
 		if previous_tutorial_step == TutorialStateScript.Step.STAFF_WORKSHOP:
 			_restore_scroll_after_rebuild = 0
@@ -188,7 +218,7 @@ func _rebuild() -> void:
 
 	var header_panel := PanelContainer.new()
 	header_panel.name = "BuildingWorkspaceHeader"
-	header_panel.custom_minimum_size = Vector2(0, 108)
+	header_panel.custom_minimum_size = Vector2(0, 122)
 	header_panel.add_theme_stylebox_override("panel", _header_style())
 	shell.add_child(header_panel)
 	var header_margin := MarginContainer.new()
@@ -200,6 +230,17 @@ func _rebuild() -> void:
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
 	header_margin.add_child(header)
+	if _building_art != null:
+		var building_art := TextureRect.new()
+		building_art.name = "BuildingHeaderArt"
+		building_art.custom_minimum_size = Vector2(126, 0)
+		building_art.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		building_art.texture = _building_art
+		building_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		building_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		building_art.modulate = Color(1.0, 1.0, 1.0, 0.94)
+		building_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		header.add_child(building_art)
 
 	var heading_column := VBoxContainer.new()
 	heading_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -211,8 +252,8 @@ func _rebuild() -> void:
 	title.text = _definition.display_name
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	title.add_theme_font_size_override("font_size", 21)
-	title.add_theme_color_override("font_color", UI_TEXT)
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", UI_DARK_TEXT)
 	heading_column.add_child(title)
 
 	var status := Label.new()
@@ -230,8 +271,8 @@ func _rebuild() -> void:
 	purpose.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	purpose.max_lines_visible = 3
 	purpose.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	purpose.add_theme_font_size_override("font_size", 11)
-	purpose.add_theme_color_override("font_color", UI_TEXT_MUTED)
+	purpose.add_theme_font_size_override("font_size", 12)
+	purpose.add_theme_color_override("font_color", UI_DARK_TEXT_MUTED)
 	heading_column.add_child(purpose)
 
 	var close_button := Button.new()
@@ -242,12 +283,12 @@ func _rebuild() -> void:
 	close_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	close_button.focus_mode = Control.FOCUS_ALL
 	close_button.add_theme_font_size_override("font_size", 21)
-	close_button.add_theme_color_override("font_color", UI_TEXT)
-	close_button.add_theme_color_override("font_hover_color", UI_TEXT)
-	close_button.add_theme_stylebox_override("normal", _compact_button_style(UI_SURFACE_RAISED, UI_BORDER_SUBTLE, 1))
-	close_button.add_theme_stylebox_override("hover", _compact_button_style(UI_SURFACE, UI_TEAL, 2))
+	close_button.add_theme_color_override("font_color", UI_DARK_TEXT)
+	close_button.add_theme_color_override("font_hover_color", UI_DARK_TEXT)
+	close_button.add_theme_stylebox_override("normal", _compact_button_style(UI_SIDEBAR, UI_SIDEBAR_BORDER, 1))
+	close_button.add_theme_stylebox_override("hover", _compact_button_style(UI_CANVAS, UI_TEAL_LIGHT, 2))
 	close_button.add_theme_stylebox_override("pressed", _compact_button_style(UI_CANVAS, UI_AMBER, 2))
-	close_button.add_theme_stylebox_override("focus", _compact_button_style(UI_SURFACE_RAISED, UI_TEAL, 2))
+	close_button.add_theme_stylebox_override("focus", _compact_button_style(UI_SIDEBAR, UI_TEAL_LIGHT, 2))
 	close_button.pressed.connect(func(): closed.emit())
 	header.add_child(close_button)
 
@@ -255,6 +296,8 @@ func _rebuild() -> void:
 	var has_scroll_restore := _restore_scroll_after_rebuild >= 0
 	var scroll_target := maxi(_restore_scroll_after_rebuild, 0)
 	_restore_scroll_after_rebuild = -1
+	var should_reset_scrolls_to_top := _reset_scrolls_to_top_after_rebuild
+	_reset_scrolls_to_top_after_rebuild = false
 	var panel_scroll := _active_scroll()
 	if has_scroll_restore and panel_scroll != null:
 		panel_scroll.follow_focus = false
@@ -277,6 +320,8 @@ func _rebuild() -> void:
 	call_deferred("_configure_focus_loop")
 	if has_scroll_restore and panel_scroll != null:
 		call_deferred("_finish_scroll_restore", panel_scroll, scroll_target)
+	elif should_reset_scrolls_to_top:
+		call_deferred("_finish_initial_scroll_reset")
 
 func _finish_scroll_restore(panel_scroll: ScrollContainer, scroll_target: int) -> void:
 	if not is_instance_valid(panel_scroll) or not panel_scroll.is_inside_tree():
@@ -287,6 +332,40 @@ func _finish_scroll_restore(panel_scroll: ScrollContainer, scroll_target: int) -
 		return
 	panel_scroll.scroll_vertical = scroll_target
 	panel_scroll.follow_focus = true
+
+
+func _finish_initial_scroll_reset() -> void:
+	# The initial keyboard focus may be a lower action (for example a recipe or
+	# diver candidate). Let that focus settle first, then restore the opening
+	# view to the beginning of every building section.
+	await get_tree().process_frame
+	var scrolls := _managed_scroll_containers()
+	for scroll in scrolls:
+		scroll.follow_focus = false
+		scroll.scroll_vertical = 0
+	await get_tree().process_frame
+	for scroll in scrolls:
+		if not is_instance_valid(scroll) or not scroll.is_inside_tree():
+			continue
+		scroll.scroll_vertical = 0
+		scroll.follow_focus = true
+
+
+func _managed_scroll_containers() -> Array[ScrollContainer]:
+	var scrolls: Array[ScrollContainer] = []
+	_append_scroll_containers(self, scrolls)
+	_append_scroll_containers(_right_sidebar_host, scrolls)
+	return scrolls
+
+
+func _append_scroll_containers(root: Node, scrolls: Array[ScrollContainer]) -> void:
+	if root == null or not is_instance_valid(root):
+		return
+	if root is ScrollContainer and not scrolls.has(root):
+		scrolls.append(root)
+	for scroll in root.find_children("*", "ScrollContainer", true, false):
+		if scroll is ScrollContainer and not scrolls.has(scroll):
+			scrolls.append(scroll)
 
 
 func _clear_right_sidebar_host() -> void:
@@ -412,7 +491,7 @@ func _build_content_split(shell: VBoxContainer) -> void:
 		sidebar = VBoxContainer.new()
 		split.add_child(sidebar)
 	sidebar.name = "BuildingRightSidebar"
-	sidebar.theme = theme
+	_apply_sidebar_theme(sidebar)
 	sidebar.custom_minimum_size = Vector2(RIGHT_SIDEBAR_MIN_WIDTH, 0)
 	sidebar.size_flags_horizontal = Control.SIZE_SHRINK_END
 	sidebar.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -470,6 +549,7 @@ func _build_staffing_sidebar(sidebar: VBoxContainer) -> void:
 	var scroll := _create_scroll_page("StaffingScroll")
 	panel.add_child(scroll)
 	var content := _create_page_content(scroll, RIGHT_SIDEBAR_MIN_WIDTH - 40.0)
+	content.set_meta("dark_surface", true)
 	if _building == null or not _building.is_active():
 		_add_section_title(content, "OBSADA")
 		_add_body(content, "Odbuduj budynek, aby przydzielić do niego mieszkańców.")
@@ -497,6 +577,7 @@ func _build_construction_sidebar(sidebar: VBoxContainer) -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	shell.add_child(scroll)
 	var content := _create_page_content(scroll, RIGHT_SIDEBAR_MIN_WIDTH - 40.0)
+	content.set_meta("dark_surface", true)
 	_build_construction_sidebar_content(content)
 	_build_construction_sidebar_action(shell)
 
@@ -562,8 +643,8 @@ func _build_construction_sidebar_action(shell: VBoxContainer) -> void:
 		upgrade_button.disabled = not upgrade_blocker.is_empty()
 		upgrade_button.tooltip_text = upgrade_blocker if not upgrade_blocker.is_empty() else _cost_tooltip(upgrade_cost, "Koszt następnego poziomu")
 		upgrade_button.pressed.connect(func(): upgrade_requested.emit(_building.id))
-		upgrade_button.add_theme_stylebox_override("normal", _secondary_button_style(false))
-		upgrade_button.add_theme_stylebox_override("hover", _secondary_button_style(true))
+		upgrade_button.add_theme_stylebox_override("normal", _sidebar_secondary_button_style(false))
+		upgrade_button.add_theme_stylebox_override("hover", _sidebar_secondary_button_style(true))
 		shell.add_child(upgrade_button)
 
 func _build_action_overview(content: VBoxContainer) -> void:
@@ -903,7 +984,8 @@ func _add_operational_summary(content: VBoxContainer) -> void:
 func _add_status_callout(content: VBoxContainer, heading_text: String, body_text: String, accent: Color) -> void:
 	var card := PanelContainer.new()
 	card.name = "BuildingOperationalSummary"
-	card.add_theme_stylebox_override("panel", _status_card_style(accent))
+	var dark_surface := bool(content.get_meta("dark_surface", false))
+	card.add_theme_stylebox_override("panel", _status_card_style(accent, dark_surface))
 	content.add_child(card)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 12)
@@ -926,12 +1008,12 @@ func _add_status_callout(content: VBoxContainer, heading_text: String, body_text
 	var heading := Label.new()
 	heading.text = heading_text
 	heading.add_theme_font_size_override("font_size", 13)
-	heading.add_theme_color_override("font_color", UI_TEXT)
+	heading.add_theme_color_override("font_color", _content_ink(content))
 	text_column.add_child(heading)
 	var body := Label.new()
 	body.text = body_text
 	body.add_theme_font_size_override("font_size", 11)
-	body.add_theme_color_override("font_color", UI_TEXT_MUTED)
+	body.add_theme_color_override("font_color", _content_muted_ink(content))
 	text_column.add_child(body)
 
 func _add_operational_effects(content: VBoxContainer) -> void:
@@ -1878,7 +1960,7 @@ func _add_effect_card(content: VBoxContainer, heading_text: String, raw_lines, l
 	body.name = label_name
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 13)
-	body.add_theme_color_override("font_color", UI_TEXT)
+	body.add_theme_color_override("font_color", _content_ink(content))
 	var body_text := ""
 	for line in lines:
 		if not body_text.is_empty():
@@ -1904,14 +1986,14 @@ func _add_section_title(content: VBoxContainer, value: String) -> void:
 	var label := Label.new()
 	label.text = value
 	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", UI_TEAL)
+	label.add_theme_color_override("font_color", UI_TEAL_LIGHT if bool(content.get_meta("dark_surface", false)) else UI_TEAL)
 	content.add_child(label)
 
 func _add_body(content: VBoxContainer, value: String) -> void:
 	var label := Label.new()
 	label.text = value
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_color_override("font_color", UI_TEXT)
+	label.add_theme_color_override("font_color", _content_ink(content))
 	content.add_child(label)
 
 func _add_hint(content: VBoxContainer, value: String, label_name: String = "") -> void:
@@ -1920,7 +2002,7 @@ func _add_hint(content: VBoxContainer, value: String, label_name: String = "") -
 		label.name = label_name
 	label.text = value
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_color_override("font_color", UI_TEXT_MUTED)
+	label.add_theme_color_override("font_color", _content_muted_ink(content))
 	label.add_theme_font_size_override("font_size", 13)
 	content.add_child(label)
 
@@ -1961,7 +2043,7 @@ func _status_text() -> String:
 
 func _status_color() -> Color:
 	if _building == null:
-		return UI_TEXT_MUTED
+		return UI_DARK_TEXT_MUTED
 	if _building.is_under_construction():
 		return UI_AMBER
 	if _building.condition <= 0:
@@ -2026,8 +2108,8 @@ func _panel_style() -> StyleBoxFlat:
 
 func _header_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(UI_SURFACE, 0.98)
-	style.border_color = UI_BORDER_SUBTLE
+	style.bg_color = Color(UI_HEADER, 0.98)
+	style.border_color = UI_SIDEBAR_BORDER
 	style.border_width_bottom = 1
 	style.corner_radius_top_left = 6
 	style.corner_radius_top_right = 6
@@ -2035,8 +2117,8 @@ func _header_style() -> StyleBoxFlat:
 
 func _sidebar_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(UI_SURFACE_RAISED, 0.98)
-	style.border_color = UI_BORDER_SUBTLE
+	style.bg_color = Color(UI_SIDEBAR, 0.98)
+	style.border_color = UI_SIDEBAR_BORDER
 	style.set_border_width_all(1)
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
@@ -2048,7 +2130,7 @@ func _sidebar_style() -> StyleBoxFlat:
 func _staffing_sidebar_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(UI_CANVAS, 0.98)
-	style.border_color = UI_BORDER
+	style.border_color = UI_SIDEBAR_BORDER
 	style.set_border_width_all(2)
 	style.corner_radius_top_left = 2
 	style.corner_radius_top_right = 2
@@ -2069,9 +2151,9 @@ func _station_footer_style() -> StyleBoxFlat:
 	style.corner_radius_bottom_right = 3
 	return style
 
-func _status_card_style(accent: Color) -> StyleBoxFlat:
+func _status_card_style(accent: Color, dark_surface: bool = false) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(UI_SURFACE_RAISED, 0.95)
+	style.bg_color = Color(UI_SIDEBAR_RAISED if dark_surface else UI_SURFACE_RAISED, 0.95)
 	style.border_color = Color(accent.darkened(0.28), 0.78)
 	style.border_width_left = 3
 	style.border_width_top = 1
@@ -2105,6 +2187,18 @@ func _secondary_button_style(hovered: bool) -> StyleBoxFlat:
 	style.corner_radius_bottom_right = 4
 	return style
 
+
+func _sidebar_secondary_button_style(hovered: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = UI_SIDEBAR_RAISED if hovered else UI_SIDEBAR
+	style.border_color = UI_TEAL_LIGHT if hovered else UI_SIDEBAR_BORDER
+	style.set_border_width_all(2 if hovered else 1)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	return style
+
 func _effect_card_style(accent: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(UI_SURFACE, 0.94)
@@ -2119,8 +2213,8 @@ func _effect_card_style(accent: Color) -> StyleBoxFlat:
 
 func _target_button_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = UI_AMBER_DARK
-	style.border_color = UI_AMBER_HOVER
+	style.bg_color = UI_AMBER_HOVER
+	style.border_color = UI_AMBER_DARK
 	style.set_border_width_all(3)
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4

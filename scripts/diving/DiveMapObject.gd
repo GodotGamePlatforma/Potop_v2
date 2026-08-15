@@ -26,6 +26,7 @@ enum Kind {
 
 const PREVIEW_META := &"underwater_map_visual_preview"
 const MAP_CONNECTION_SCRIPT_PATH := "res://scripts/diving/DiveMapConnection.gd"
+const OBSTACLE_POLYGON_NODE_PATH := ^"NavigationPolygon"
 const MIN_VISUAL_SCALE := 0.001
 
 @export_group("Identity")
@@ -128,6 +129,9 @@ var _preview_refresh_queued := false
 
 func _enter_tree() -> void:
 	if Engine.is_editor_hint():
+		var polygon_node := _obstacle_polygon_node()
+		if polygon_node != null and not polygon_node.item_rect_changed.is_connected(_on_obstacle_polygon_changed):
+			polygon_node.item_rect_changed.connect(_on_obstacle_polygon_changed)
 		_queue_preview_refresh()
 
 
@@ -172,6 +176,12 @@ func kind_id() -> String:
 
 
 func authored_world_polygon() -> PackedVector2Array:
+	var authored_polygon := _authored_local_obstacle_polygon()
+	if authored_polygon.size() >= 3:
+		var transformed := PackedVector2Array()
+		for point in authored_polygon:
+			transformed.append(global_transform * point)
+		return transformed
 	var half := bounds_size * 0.5
 	return PackedVector2Array([
 		global_transform * Vector2(-half.x, -half.y),
@@ -365,10 +375,17 @@ func _draw() -> void:
 			draw_rect(Rect2(-bounds_size * 0.5, bounds_size), Color(color.r, color.g, color.b, fill_alpha), true)
 			draw_rect(Rect2(-bounds_size * 0.5, bounds_size), color, false, 3.0)
 		Kind.OBSTACLE:
-			draw_rect(Rect2(-bounds_size * 0.5, bounds_size), Color(color.r, color.g, color.b, maxf(fill_alpha, 0.24)), true)
-			draw_rect(Rect2(-bounds_size * 0.5, bounds_size), color, false, 4.0)
-			draw_line(-bounds_size * 0.5, bounds_size * 0.5, color, 2.0)
-			draw_line(Vector2(bounds_size.x * 0.5, -bounds_size.y * 0.5), Vector2(-bounds_size.x * 0.5, bounds_size.y * 0.5), color, 2.0)
+			var authored_polygon := _authored_local_obstacle_polygon()
+			if authored_polygon.size() >= 3:
+				draw_colored_polygon(authored_polygon, Color(color.r, color.g, color.b, maxf(fill_alpha, 0.24)))
+				var outline := authored_polygon.duplicate()
+				outline.append(authored_polygon[0])
+				draw_polyline(outline, color, 4.0, true)
+			else:
+				draw_rect(Rect2(-bounds_size * 0.5, bounds_size), Color(color.r, color.g, color.b, maxf(fill_alpha, 0.24)), true)
+				draw_rect(Rect2(-bounds_size * 0.5, bounds_size), color, false, 4.0)
+				draw_line(-bounds_size * 0.5, bounds_size * 0.5, color, 2.0)
+				draw_line(Vector2(bounds_size.x * 0.5, -bounds_size.y * 0.5), Vector2(-bounds_size.x * 0.5, bounds_size.y * 0.5), color, 2.0)
 		Kind.ENTRY_POINT:
 			var entry_points := PackedVector2Array([Vector2(0, -38), Vector2(34, 28), Vector2(-34, 28)])
 			draw_colored_polygon(entry_points, Color(color.r, color.g, color.b, 0.28))
@@ -443,3 +460,24 @@ func _safe_visual_scale(value: Vector2) -> Vector2:
 	if absf(result.y) < MIN_VISUAL_SCALE:
 		result.y = MIN_VISUAL_SCALE if result.y >= 0.0 else -MIN_VISUAL_SCALE
 	return result
+
+
+func _authored_local_obstacle_polygon() -> PackedVector2Array:
+	if kind != Kind.OBSTACLE:
+		return PackedVector2Array()
+	var polygon_node := _obstacle_polygon_node()
+	if polygon_node == null or polygon_node.polygon.size() < 3:
+		return PackedVector2Array()
+	var authored_polygon := PackedVector2Array()
+	for point in polygon_node.polygon:
+		authored_polygon.append(polygon_node.transform * point)
+	return authored_polygon
+
+
+func _obstacle_polygon_node() -> Polygon2D:
+	return get_node_or_null(OBSTACLE_POLYGON_NODE_PATH) as Polygon2D
+
+
+func _on_obstacle_polygon_changed() -> void:
+	queue_redraw()
+	update_configuration_warnings()

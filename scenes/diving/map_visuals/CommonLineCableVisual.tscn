@@ -1,6 +1,13 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/diving/DiveCommonLineCableVisual.gd" id="1"]
 
-[node name="CommonLineCableVisual" type="Node2D"]
+[sub_resource type="Curve2D" id="Curve2D_tutorial"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -509.388, 311.77023, 0, 0, 0, 0, -2525.388, 191.77023, 0, 0, 0, 0, -2909.388, 415.77023, 0, 0, 0, 0, -3245.388, 527.77023, 0, 0, 0, 0, -3249.388, 551.77023, 0, 0, 0, 0, -3469.388, 831.77023)
+}
+point_count = 7
+
+[node name="CommonLineCableVisual" type="Path2D"]
+curve = SubResource("Curve2D_tutorial")
 script = ExtResource("1")

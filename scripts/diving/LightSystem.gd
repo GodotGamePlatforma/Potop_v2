@@ -8,6 +8,7 @@ const FALLBACK_DEEP_DARKNESS_MIN_DEPTH := 105.0
 const FALLBACK_SHALLOW_AMBIENT := Color(0.96, 0.98, 1.0, 1.0)
 const FALLBACK_DEEP_AMBIENT := Color(0.32, 0.38, 0.48, 1.0)
 const FALLBACK_TRANSITION_POWER := 1.0
+const NORMAL_MAPPED_LIGHT_HEIGHT := 96.0
 
 var _radial_texture: GradientTexture2D
 
@@ -17,7 +18,8 @@ func configure(
 	gear_definition,
 	light_enabled: bool = true,
 	lighting_definition = null,
-	depth: float = 0.0
+	depth: float = 0.0,
+	graphics_quality: String = "high"
 ) -> bool:
 	update_ambient(ambient, depth, lighting_definition)
 	if point_light == null or gear_definition == null or not gear_definition.is_valid_light():
@@ -30,13 +32,28 @@ func configure(
 	point_light.texture_scale = (float(gear_definition.light_outer_radius) * 2.0) / float(LIGHT_TEXTURE_SIZE)
 	point_light.energy = maxf(float(gear_definition.light_energy), 0.0)
 	point_light.color = gear_definition.light_color
+	point_light.height = NORMAL_MAPPED_LIGHT_HEIGHT
 	point_light.blend_mode = Light2D.BLEND_MODE_ADD
 	point_light.shadow_enabled = true
 	point_light.shadow_item_cull_mask = TerrainOcclusionScript.TERRAIN_LIGHT_MASK
-	point_light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
-	point_light.shadow_filter_smooth = 3.0
+	apply_graphics_quality(point_light, graphics_quality)
 	point_light.enabled = light_enabled
 	return true
+
+
+func apply_graphics_quality(point_light: PointLight2D, quality_id: String) -> void:
+	if point_light == null:
+		return
+	match quality_id:
+		"low":
+			point_light.shadow_filter = Light2D.SHADOW_FILTER_NONE
+			point_light.shadow_filter_smooth = 0.0
+		"medium":
+			point_light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
+			point_light.shadow_filter_smooth = 1.5
+		_:
+			point_light.shadow_filter = Light2D.SHADOW_FILTER_PCF13
+			point_light.shadow_filter_smooth = 1.5
 
 
 func set_light_enabled(point_light: PointLight2D, gear_definition, light_enabled: bool) -> bool:

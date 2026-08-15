@@ -12,8 +12,15 @@ extends Node2D
 		region_id = value
 		queue_redraw()
 
+@export var show_procedural_body := true:
+	set(value):
+		show_procedural_body = value
+		queue_redraw()
+
 
 func _draw() -> void:
+	if not show_procedural_body:
+		return
 	var colors := _palette()
 	_draw_settled_shadow(colors)
 	match device_kind:

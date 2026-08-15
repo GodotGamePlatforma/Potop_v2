@@ -19,6 +19,7 @@ var _failed := false
 func _initialize() -> void:
 	_test_unstaffed_station_and_frozen_setup()
 	_test_selection_guards_and_automatic_clearing()
+	_test_preferred_diver_survives_temporary_blockers_and_death()
 	_test_station_support_uses_the_work_gate()
 	_test_candidate_list_delegates_to_the_domain()
 	if _failed:
@@ -38,7 +39,7 @@ func _test_unstaffed_station_and_frozen_setup() -> void:
 
 	_assert(state.current_day_plan.selected_diver_id.is_empty(), "A new day must begin without an implicit diver selection.")
 	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "A free, present and capable resident should be selectable without staffing the Station.")
-	_assert(state.current_day_plan.selected_diver_id == "igor" and station.assigned_survivor_ids.is_empty(), "Selecting a diver must update only DayPlanState, not the Station roster.")
+	_assert(state.current_day_plan.selected_diver_id == "igor" and state.preferred_diver_id == "igor" and station.assigned_survivor_ids.is_empty(), "Selecting a diver must remember only the diver preference, not alter the Station roster.")
 	var analysis := preparation.analyze(state, station, STATION_DEFINITION)
 	_assert(bool(analysis.ready), "An active Station with a selected capable diver must be ready even when every Station slot is empty.")
 	_assert(not bool(analysis.station_support_assigned) and is_equal_approx(float(analysis.station_staffed_carry_multiplier), 1.0), "An unstaffed Station must preserve the diver's personal carry capacity without an implicit bonus.")
@@ -52,10 +53,10 @@ func _test_unstaffed_station_and_frozen_setup() -> void:
 	_assert(setup.profession_talent_ids == {"nurek": SCOUT_TALENT}, "Changing the survivor after setup creation must not mutate the frozen talent map.")
 
 	_assert(preparation.clear_selected_diver(state), "An editable plan must allow the diver selection to be cleared explicitly.")
-	_assert(state.current_day_plan.selected_diver_id.is_empty(), "Clearing the selection must leave no fallback diver in the plan.")
+	_assert(state.current_day_plan.selected_diver_id.is_empty() and state.preferred_diver_id.is_empty(), "Clearing the selection must also forget the remembered diver.")
 	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "The same valid diver should be selectable again after an explicit clear.")
 	state.begin_new_day_plan()
-	_assert(state.current_day_plan.selected_diver_id.is_empty(), "Beginning a new day must reset the previous day's diver choice.")
+	_assert(state.current_day_plan.selected_diver_id == "igor" and state.preferred_diver_id == "igor", "Beginning a new day must restore the remembered eligible diver.")
 
 
 func _test_selection_guards_and_automatic_clearing() -> void:
@@ -78,11 +79,13 @@ func _test_selection_guards_and_automatic_clearing() -> void:
 	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "Igor must remain selectable while a different resident staffs the Station.")
 	_assert(state.current_day_plan.set_survivor_isolated("igor", true), "The editable plan must accept an isolation intent.")
 	_assert(state.current_day_plan.selected_diver_id.is_empty(), "Planning isolation for the selected diver must clear the choice atomically.")
+	_assert(state.preferred_diver_id == "igor", "A temporary isolation must not forget the preferred diver.")
 	_assert(state.current_day_plan.set_survivor_isolated("igor", false), "The fixture must be able to end the isolation intent before continuing.")
 
 	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "Igor must be selectable again after isolation is removed.")
 	_assert(assignments.assign_worker_to_slot(state, station.id, 0, "igor", 1), "Assigning the selected diver to a building should remain an ordinary valid work command.")
 	_assert(state.current_day_plan.selected_diver_id.is_empty(), "A successful building assignment must synchronize the plan and clear the conflicting diver selection.")
+	_assert(state.preferred_diver_id == "igor", "A temporary work assignment must not forget the preferred diver.")
 
 	_assert(assignments.assign_worker_to_slot(state, station.id, 0, "", 1), "The fixture must release Igor from Station work before the lock test.")
 	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "Igor must be selectable before locking the plan.")
@@ -90,6 +93,25 @@ func _test_selection_guards_and_automatic_clearing() -> void:
 	_assert(not preparation.clear_selected_diver(state), "A locked day plan must reject clearing the selected diver.")
 	_assert(not preparation.select_diver(state, station, STATION_DEFINITION, "anka"), "A locked day plan must reject replacing the selected diver.")
 	_assert(state.current_day_plan.selected_diver_id == "igor", "Rejected locked edits must preserve the frozen selection.")
+
+
+func _test_preferred_diver_survives_temporary_blockers_and_death() -> void:
+	var fixture := _fixture()
+	var state = fixture.state
+	var station = fixture.station
+	var preparation = ExpeditionPreparationSystemScript.new()
+	var igor = state.find_survivor("igor")
+
+	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "The preference fixture must select Igor first.")
+	igor.fatigue = 85
+	state.begin_new_day_plan()
+	_assert(state.current_day_plan.selected_diver_id.is_empty() and state.preferred_diver_id == "igor", "A temporarily exhausted preferred diver must remain remembered without becoming the active daily diver.")
+	igor.fatigue = 0
+	state.begin_new_day_plan()
+	_assert(state.current_day_plan.selected_diver_id == "igor", "A recovered preferred diver must become the active daily diver again.")
+	igor.status = SurvivorStateScript.Status.DEAD
+	state.begin_new_day_plan()
+	_assert(state.current_day_plan.selected_diver_id.is_empty() and state.preferred_diver_id.is_empty(), "A dead preferred diver must be forgotten before the next day plan.")
 
 
 func _test_station_support_uses_the_work_gate() -> void:
@@ -135,7 +157,7 @@ func _test_candidate_list_delegates_to_the_domain() -> void:
 	var clear_button := hud.find_child("DiverSelectionClear", true, false) as Button
 	_assert(igor_button != null and igor_button.text.contains("WYBRANY") and not igor_button.disabled, "The persistent candidate list must visibly bind the current selected diver.")
 	_assert(anka_button != null and anka_button.disabled and anka_button.tooltip_text == state.find_survivor("anka").dive_blocker(), "An incapable candidate tile must expose the exact domain blocker.")
-	_assert(clear_button != null and not clear_button.disabled, "An editable selected diver must expose a clear command.")
+	_assert(clear_button != null and clear_button.text == "ZAPOMNIJ NURKA" and not clear_button.disabled, "An editable selected diver must expose the command that forgets the preference.")
 	var emitted_ids: Array[String] = []
 	hud.diver_selected.connect(func(survivor_id: String) -> void:
 		emitted_ids.append(survivor_id)

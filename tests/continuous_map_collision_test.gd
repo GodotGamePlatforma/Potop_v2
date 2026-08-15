@@ -52,6 +52,9 @@ func _run() -> void:
 		_assert(bool(terrain_state.get("uses_detail_texture", false)), "Renderer powinien uzywac produkcyjnego materialu skal.")
 		_assert(int(terrain_state.get("active_chunk_count", 0)) > 0, "Renderer powinien sledzic aktywny pierscien streamingu swiata.")
 		_assert(bool(terrain_state.get("uses_global_water_layer", false)), "Proceduralna woda powinna byc jedna pelnomapowa warstwa bez szwow miedzy chunkami.")
+		_assert(bool(terrain_state.get("uses_global_backdrop_layer", false)), "Dalekie tlo biomow powinno byc jedna pelnomapowa warstwa prezentacyjna.")
+		_assert(int(terrain_state.get("backdrop_material_count", 0)) == 1, "Dalekie tlo biomow powinno wspoldzielic jeden material globalny.")
+		_assert(int(terrain_state.get("backdrop_z_index", 0)) == -95, "Dalekie tlo biomow powinno lezec miedzy woda a dekoracjami srodowiska.")
 		_assert(bool(terrain_state.get("uses_global_terrain_layer", false)), "Proceduralna skala powinna byc jedna pelnomapowa warstwa bez szwow miedzy chunkami.")
 	var blueprint = dive_map._blueprint
 	var empty_chunk_key := ""
@@ -78,9 +81,16 @@ func _run() -> void:
 	_assert(dive_map.active_chunk_keys.has(empty_chunk_key), "Streaming terenu i kolizji nie moze pomijac pustych chunkow swiata.")
 	if terrain_renderer is UnderwaterTerrainRenderer:
 		_assert(_string_set(terrain_renderer.active_chunk_keys()) == _string_set(dive_map.active_chunk_keys), "Renderer terenu musi otrzymac dokladnie zestaw aktywnych chunkow swiata.")
-		_assert(terrain_renderer.get_node_or_null("WaterBackground") is Polygon2D, "Jedna proceduralna warstwa wody powinna pokrywac caly swiat.")
+		var water_background := terrain_renderer.get_node_or_null("WaterBackground") as Polygon2D
+		var distant_backdrop := terrain_renderer.get_node_or_null("DistantBiomeBackground") as Polygon2D
+		_assert(water_background != null, "Jedna proceduralna warstwa wody powinna pokrywac caly swiat.")
+		_assert(distant_backdrop != null, "Dalekie tlo biomow powinno byc globalnym Polygon2D renderera terenu.")
 		var rock_sprite := terrain_renderer.get_node_or_null("TerrainBackground") as Sprite2D
 		_assert(rock_sprite != null and rock_sprite.texture == terrain_renderer.contour_sdf, "Jedna pelnomapowa warstwa skal musi uzywac prezentacyjnego SDF renderera.")
+		if water_background != null and distant_backdrop != null and rock_sprite != null:
+			_assert(water_background.z_index < distant_backdrop.z_index, "Woda musi pozostac pod dalekim tlem biomow.")
+			_assert(distant_backdrop.z_index < -90, "Dalekie tlo biomow musi pozostac pod dekoracjami srodowiska.")
+			_assert(-90 < rock_sprite.z_index, "Dekoracje srodowiska musza pozostac pod glowna warstwa skal.")
 	var loaded_collision_keys: Array[String] = dive_map.loaded_collision_chunk_keys()
 	for loaded_collision_key in loaded_collision_keys:
 		_assert(dive_map.active_chunk_keys.has(loaded_collision_key), "Zaladowany collider musi nalezec do aktywnego pierscienia chunkow.")
@@ -156,8 +166,14 @@ func _run() -> void:
 		pickup_ids.append(pickup.pickup_id)
 	var r3_boundary_pickup = _find_pickup(dive_map.world_pickups, "pickup_r3_planks_01")
 	_assert(r3_boundary_pickup != null and str(r3_boundary_pickup.get("_region_id")) == "R3", "Jawny region ID znajdźki musi wygrać z nakładającą się granicą R2/R3.")
+	var active_chunks_before_presentation := _string_set(dive_map.active_chunk_keys)
+	var loaded_collision_chunks_before_presentation := _string_set(dive_map.loaded_collision_chunk_keys())
+	var collision_segment_count_before_presentation := dive_map.collision_segment_count()
 	dive_map.set_graphics_quality("low")
 	dive_map.set_reduced_motion(true)
+	_assert(_string_set(dive_map.active_chunk_keys) == active_chunks_before_presentation, "Zmiana prezentacji nie może zmienić aktywnych chunków świata.")
+	_assert(_string_set(dive_map.loaded_collision_chunk_keys()) == loaded_collision_chunks_before_presentation, "Zmiana prezentacji nie może przeładować ani odłączyć aktywnych colliderów.")
+	_assert(dive_map.collision_segment_count() == collision_segment_count_before_presentation, "Zmiana prezentacji nie może zmienić liczby segmentów kanonicznej kolizji.")
 	for pickup in dive_map.world_pickups:
 		_assert(str(pickup.get("_graphics_quality")) == "low", "Profil low musi dotrzeć do każdej znajdźki.")
 		_assert(bool(pickup.get("_reduced_motion")), "Reduced motion musi dotrzeć do każdej znajdźki.")

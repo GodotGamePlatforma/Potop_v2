@@ -1,0 +1,14 @@
+{
+  "asset_id": "r1_j7_panel_v1",
+  "role": "authored presentation for the existing Junction J-7 fixed device",
+  "source": "Codex image generation, built-in imagegen with local chroma-key removal",
+  "alpha_validation": {
+    "transparent_corners": true,
+    "format": "RGBA PNG"
+  },
+  "constraints": [
+    "presentation-only",
+    "existing interaction owner retained",
+    "exactly three indicator lamps"
+  ]
+}

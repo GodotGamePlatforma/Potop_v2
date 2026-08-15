@@ -62,7 +62,9 @@ Filary projektu:
 
 [AKTYWNE] — CZYTELNY I PRZYJAZNY INTERFEJS
 
-Interfejs zachowuje sztormowy charakter świata, lecz powierzchnie służące czytaniu są jaśniejsze, spokojniejsze i cieplejsze niż samo otoczenie. Grafit zastępuje jednolitą czerń, tekst ma wysoki kontrast, a bursztyn wskazuje bieżącą decyzję zamiast ozdabiać wszystkie elementy. Turkus oznacza informację lub bezpieczny stan, a koral i czerwień są zarezerwowane dla realnego zagrożenia.
+Interfejs zachowuje sztormowy charakter świata, lecz rozdziela ciemną ramę nawigacyjną od spokojniejszej powierzchni decyzji. Górny HUD oraz boczne szyny są grafitowo-morskie, a środek otwartego zarządzania budynkiem jest jasną, ciepłą powierzchnią przypominającą czytelną kartę roboczą. Grafit zastępuje jednolitą czerń, tekst zachowuje wysoki kontrast, a bursztyn wskazuje bieżącą decyzję zamiast ozdabiać wszystkie elementy. Turkus oznacza informację lub bezpieczny stan, a koral i czerwień są zarezerwowane dla realnego zagrożenia.
+
+Górny HUD nie prezentuje osobnego stanu morza ani pogody. Bezpośrednio po integralności Pomostu pokazuje liczbę żyjących mieszkańców względem aktualnej pojemności schronienia, zgodnie z zasadą Domu Wspólnoty.
 
 Najczęstszy stan okna pokazuje bez przewijania wszystkie informacje i akcje potrzebne do podjęcia podstawowej decyzji przy bazowym obrazie 1280 × 720. Długie archiwa, rozbudowane listy, katalogi i szczegóły mogą zachować przewijanie jako rezerwę, lecz nagłówek, kontekst, główna decyzja oraz stopka akcji pozostają od razu widoczne. Zwięzłe podsumowanie ma pierwszeństwo przed pełnym opisem, a powiązane dane są grupowane w zakładki, kolumny lub zwarte karty zamiast jednej długiej ściany tekstu.
 
@@ -387,7 +389,7 @@ Poprawne kliknięcie `Buduj` albo `Rozbuduj` atomowo pobiera pełny koszt i naty
 
 Kliknięcie dowolnego miejsca budynku otwiera dużą, lecz mniejszą od ekranu przestrzeń zarządzania. Jej otoczenie jest przezroczyste, dzięki czemu platforma pozostaje widoczna, ale miejsca budynków pod oknem i jego obrzeżami nie przyjmują przypadkowych kliknięć. Okno pozostawia osobny pas dla całego górnego HUD-u oraz wolną przestrzeń dla przycisku `ZAKOŃCZ DZIEŃ`; oba pozostają widoczne i możliwe do użycia bez zamykania budynku. Po lewej stronie okna pozostaje stale widoczna pionowa szyna dokładnie sześciu kafelków, po jednym dla każdego stałego miejsca. Kafelek pokazuje nazwę, poziom lub stan ruiny oraz rozróżnialne bez samego koloru zaznaczenie. Wybranie innego kafelka natychmiast przełącza kontekst bez zamykania okna, dzięki czemu gracz może kolejno porównać i obsłużyć wszystkie budynki.
 
-Panel wybranego budynku zajmuje środek okna: stały nagłówek oraz szeroką przewijaną część `DZIAŁANIE` albo `WYPRAWA`. Po jego prawej stronie, poza jego ramą i analogicznie do lewej szyny budynków, pozostaje osobna wąska szyna z dwoma rozdzielonymi kartami: `OBSADA` — zajętość, osoby na stanowiskach, ich bieżący wkład i przyciski `OBSADŹ`/`ZMIEŃ` — oraz `BUDOWA` lub `ROZBUDOWA` — poziom docelowy, wymagane składniki, aktualnie posiadane ilości, prawdziwy powód blokady i przycisk `ODBUDUJ`/`ROZBUDUJ`. Przy maksymalnym poziomie karta jawnie komunikuje ten stan bez przycisku. Powierzchnie tworzą grafitowo-morską hierarchię z jasnym, kontrastowym tekstem; turkus prowadzi informację i fokus, bursztyn jest zarezerwowany dla głównej decyzji, zieleń potwierdza gotowość, a koral oznacza zagrożenie lub blokadę. Piaskowo-brązowe tła nie stanowią drugiego systemu paneli. Typowa decyzja przy 1280 × 720 pokazuje nagłówek, kluczowe dane i główną akcję bez przewijania; długie katalogi i rozwój mieszkańców zachowują przewijanie wewnątrz treści.
+Panel wybranego budynku zajmuje środek okna: stały, morski nagłówek z istniejącą ilustracją bieżącego budynku oraz szeroką, jasną i ciepłą część `DZIAŁANIE` albo `WYPRAWA`. Po jego prawej stronie, poza jego ramą i analogicznie do lewej szyny budynków, pozostaje osobna wąska szyna z dwoma rozdzielonymi kartami: `OBSADA` — zajętość, osoby na stanowiskach, ich bieżący wkład i przyciski `OBSADŹ`/`ZMIEŃ` — oraz `BUDOWA` lub `ROZBUDOWA` — poziom docelowy, wymagane składniki, aktualnie posiadane ilości, prawdziwy powód blokady i przycisk `ODBUDUJ`/`ROZBUDUJ`. Przy maksymalnym poziomie karta jawnie komunikuje ten stan bez przycisku. Górny HUD, lewa szyna oraz karty po prawej tworzą grafitowo-morską ramę z jasnym tekstem, a centralna powierzchnia robocza oraz jej karty są kremowo-piaskowe z ciemnym, morskim tekstem i delikatnymi separatorami. Turkus prowadzi informację i fokus, bursztyn jest zarezerwowany dla głównej decyzji, zieleń potwierdza gotowość, a koral oznacza zagrożenie lub blokadę. Jasny środek nie rozszerza się na HUD ani szyny, dzięki czemu podział pozostaje czytelnym kontrastem decyzji, a nie drugim niezależnym interfejsem. Typowa decyzja przy 1280 × 720 pokazuje nagłówek, kluczowe dane i główną akcję bez przewijania; długie katalogi i rozwój mieszkańców zachowują przewijanie wewnątrz treści.
 
 Aktywna kapsuła samouczka pozostaje widoczna ponad otwartym oknem zarządzania. Nadal pokazuje pełny bieżący cel i nie przechwytuje kliknięć ani fokusu, dlatego prowadzi gracza przez właściwy kafelek, zakładkę lub akcję bez blokowania menu, górnego HUD-u i `ZAKOŃCZ DZIEŃ`.
 
@@ -408,6 +410,10 @@ Utwór jest długą, bezszwową pętlą bez wyciszenia. Gra wyłącznie wtedy, g
 Odwołania: ARD-0049, ARD-0062, ARD-0066, ARD-0090, ARD-0091, ARD-0093; architektura, sekcje 2, 12.1 i 12.2.
 
 Najechanie lub fokus klawiatury na miejsce budynku otacza miękką turkusową poświatą aktualnie widoczną sylwetkę ruiny albo bieżącego poziomu zamiast rysować niebieskawe prostokątne pole. Wciśnięcie wzmacnia tę samą poświatę ciepłym kolorem, a otwarcie Trybu Zarządzania Bazą usuwa ją na czas pracy w oknie i po zamknięciu przywraca wskazanie fokusowanego miejsca. Prowadzenie tutorialu używa tej samej poświaty rzeczywistej sylwetki w bursztynie zamiast pomarańczowego prostokąta miejsca i utrzymuje ją do wykonania bieżącego kroku. Po udanej komendzie nowy poziom natychmiast zastępuje ruinę albo poprzedni wariant; nie istnieje sylwetka oczekującej budowy ani komunikat zakolejkowania konstrukcji.
+
+[AKTYWNE] — WSKAŹNIK ODBUDOWY RUINY
+
+Każda ruina ma pośrodku okrągły znacznik z młotkiem, więc sam widok planszy odróżnia niewybudowane miejsce od działającego budynku. Ten sam znak jest przyciemniony, dopóki magazyn nie pokrywa pełnego kosztu odbudowy poziomu I, oraz jaśniejszy po zebraniu tych materiałów. Znacznik nie jest przyciskiem ani jedynym nośnikiem informacji: kliknięcie nadal otwiera panel z pełnym kosztem i rzeczywistym powodem ewentualnej blokady.
 
 Sztorm uszkadza globalną integralność platformy, nie pojedyncze budynki. Budynek aktywowany podczas planowania może zostać od razu obsadzony i wejść do później zamrożonej migawki tego samego dnia. Panel slotu pokazuje rzeczywisty efekt danych, prognozę obsady, premię specjalisty i powód efektu zero.
 
@@ -471,6 +477,14 @@ Bazowy rytm tlenu zapewnia Igorowi z Butlą I co najmniej pięć minut ciągłeg
 Tempo Stacji skaluje zasięg Operatora `440 × tempo` oraz ilość naprawy kombinezonu; oba wyniki są zamrażane w przygotowaniu wyprawy. Szansa ratunku, ładunki naprawcze, pojemność plecaka i bierne parametry poziomu pozostają bez zmian.
 
 W przygotowaniu wyprawy lista wszystkich obecnych mieszkańców jest stale widoczna. Gracz wybiera z niej wolną osobę, sprawdza jej profil i wyposażenie, a potem naciska `NURKUJ`. Osoba już obsadzająca budynek nie może równocześnie nurkować. Obsada Stacji pozostaje wspólna z pozostałymi budynkami, lecz tylko tu jest opcjonalna: jej pierwszy, zdolny pracownik dodaje wybranemu nurkowi dokładnie +5% udźwigu, co jest widoczne przed startem i obowiązuje przez całą wyprawę.
+
+[AKTYWNE] — ZAPAMIĘTANY WYBÓR NURKA
+
+Wybór nurka jest osobistą preferencją gracza, niezależną od obsady stanowisk Stacji. Po wybraniu mieszkańca — na przykład Igora — kolejny dzień automatycznie zaznacza tę samą osobę, jeżeli nadal żyje, jest obecna, wolna, nieobjęta izolacją i zdolna do nurkowania. Gracz może w każdej chwili wybrać inną osobę albo wyczyścić wybór.
+
+Jeżeli zapamiętany mieszkaniec jest tylko czasowo niedostępny, bieżący dzień pozostaje bez wybranego nurka, ale preferencja nie znika. Śmierć lub trwałe odejście usuwa ją. Żaden z tych stanów nie przydziela osoby do Obsługi Stacji ani nie zmienia premii wsparcia.
+
+Odwołania: ARD-0096; architektura, sekcje 3.1, 3.3, 5.1 i 11.
 
 5.2. Chata Rybacka
 
@@ -575,6 +589,10 @@ Panel aktywnego Domu pokazuje całą obecną załogę jako wybieralne kafelki z 
 [AKTYWNE] — ŁĄCZNOŚĆ PRZYSTANI
 
 Po załączeniu złącza J-7 podstawowy moduł radiowy w Domu Wspólnoty I zaczyna odbierać i wysyłać krótkie transmisje. To przez niego Przystań po raz pierwszy kontaktuje się z Platformą Północną.
+
+Po bezpiecznym powrocie potwierdzającym załączenie J-7 Przystań otrzymuje stały stan wizualny „zasilona”. Dokładnie trzy niewielkie początki światła są czytelne w wyznaczonych punktach górnej konstrukcji — na dwóch wierzchołkach i przy żurawiu — a z każdego schodzi miękka bursztynowa wiązka skierowana na odpowiednio lewą, środkową i prawą część pokładu. Wiązki optycznie wygasają tuż przed powierzchnią: nie tworzą na platformie plam, odbić ani rozjaśnionych materiałów. Punkty i kierunek światła pozostają jednoznaczne bez fizycznej geometrii opraw, światła dookólnego, globalnego rozjaśnienia ani emisji sugerującej, że świeci sam pokład. Efekt potwierdza odzyskane podstawowe zasilanie, ale nie zmienia pogody, stanu morza, deszczu, dnia, zasobów, integralności ani zasad gry.
+
+Odwołania: ARD-0071, ARD-0094 i ARD-0095; mapowanie techniczne: `docs/Ostatni_Pomost_architektura_Godot.txt`, sekcja 12.2.
 
 Poziom III rzeczywiście uruchamia pełną Radiostację: stabilne połączenie dalekiego zasięgu, ciągłą koordynację podczas Czarnego Frontu oraz możliwość utrzymania Wspólnej Linii. Nie dodaje specjalizacji Radiowca. Do finałowego nadawania potrzebny jest aktywny Dom III i co najmniej jedna zdolna osoba; jej tożsamość zależy od stanu załogi.
 
@@ -783,15 +801,25 @@ Podczas zejścia gracz rozpoznaje region nie tylko po nazwie i głębokości, le
 
 Widoczny skutek i feedback:
 
-Oprawa przyjmuje kierunek „naturalnego realizmu podwodnego”: wiarygodność wynika z absorpcji barw, spadku kontrastu z dystansem, warstw głębi, miękkiego światła rozproszonego oraz naturalnego zaniku poświat. Obraz pozostaje spokojny, przejrzysty i oparty na czytelnych półtonach — głębia nie zmienia eksploracji w horror, nie tworzy agresywnej winiety ani dużych połaci pozbawionej szczegółu czerni. Stylizacja pozostaje tylko tam, gdzie chroni czytelność sylwetki nurka, zagrożeń, interakcji i drogi; nie opiera obrazu na grubym komiksowym konturze, płaskim cieniowaniu ani jednolitym neonowym gradiencie.
+Oprawa przyjmuje kierunek premium, kinowego realizmu 2D/2,5D z kontrolowanym malarskim wykończeniem. Wiarygodność wynika z autorskiej scenografii, zróżnicowanych materiałów, absorpcji barw, spadku kontrastu z dystansem, wielu planów głębi, miękkiego światła objętościowego oraz naturalnego zaniku poświat. Każdy reprezentatywny kadr ma czytelną hierarchię: ciemniejsza rama środowiska prowadzi wzrok do jaśniejszego korytarza ruchu, a jeden duży motyw biomu buduje skalę i tożsamość bez zagłuszania celu. Otwarte pole wokół nurka pozostaje spokojniejsze od obrzeży, dzięki czemu wysoki poziom detalu nie odbiera czytelności drogi, interakcji ani zagrożeń.
 
-Skały otrzymują nieregularną drobną strukturę, osad i kierunkowe modelowanie krawędzi zgodnej z kolizją zamiast równomiernej obwódki. Woda ma subtelne caustics, głębię barwy, zawiesinę, pył i lokalny ruch prądu; plany dalsze są miększe i mniej nasycone, a pełnoekranowa atmosfera zachowuje czytelność sylwetki nurka, punktów interakcji i HUD-u. Unikalne urządzenia, landmarki i dekoracje pozostają autorskimi elementami osadzonymi na wspólnej powierzchni.
+Obraz pozostaje przyjazny, stonowany i oparty na czytelnych półtonach — głębia nie zmienia eksploracji w horror, nie tworzy agresywnej winiety ani dużych połaci pozbawionej szczegółu czerni. Mokra skała, osad, glony, korozja, metal, szkło i przewody różnią się fakturą oraz reakcją na światło; ciepłe lampy użytkowe kontrastują z chłodną wodą, ale nie zamieniają całego kadru w neon. Stylizacja pozostaje tylko tam, gdzie chroni czytelność sylwetki nurka, zagrożeń, interakcji i drogi; nie opiera obrazu na grubym komiksowym konturze, płaskim cieniowaniu ani jednolitym gradiencie.
+
+Skały otrzymują nieregularną, ograniczoną drobną strukturę, osad i kierunkowe modelowanie krawędzi zgodnej z kolizją zamiast równomiernej obwódki. Woda ma subtelne caustics, głębię barwy, zawiesinę, pył, miękkie pola światła i lokalny ruch prądu; plany dalsze są miększe i mniej nasycone. Rzadkie rośliny, rumowiska i ślady osadu wzmacniają charakter regionu przy krawędziach oraz landmarkach, bez budowania gęstej rafy lub zasłaniania trasy. Pełnoekranowa atmosfera zachowuje czytelność sylwetki nurka, punktów interakcji i HUD-u, a unikalne urządzenia, landmarki i dekoracje pozostają autorskimi elementami osadzonymi na wspólnej powierzchni.
 
 Ograniczenia i wyjątki istotne dla gracza:
 
 Profil jakości zmienia koszt i gęstość efektów, nie przechodniość ani zasady widoczności. Tryb ograniczenia ruchu usuwa refrakcję i uspokaja animowaną zawiesinę, zachowując statyczną paletę, kontrast i wszystkie sygnały gameplayowe. Ta warstwa nie ustanawia jeszcze pełnych mechanik biomów opisanych niżej.
 
 Odwołania: ARD-0040, ARD-0049, ARD-0052, ARD-0066, ARD-0085; architektura, sekcje 9.1, 9.3, 12.1 i 12.3.
+
+[AKTYWNE] — WARSTWOWE TŁO BIOMÓW
+
+Za trasą i terenem każdy region otrzymuje kilka nieinteraktywnych planów: dalekie sylwetki, atmosferę z promieniami i mgłą oraz autorski średni plan materiałowy. Dachy pokazują zatopione bryły miasta i odległe okna, Zielone Osiedla — kołyszące się pasma roślin oraz drobną faunę, Rdzawy Pas — konstrukcje, rurociągi, stacje i zawieszony osad przemysłowy, a Czarne Serce — monumentalne pozostałości sieci oraz powoli dryfujące sylwetki dalekiego życia. Formy pozostają zakotwiczone w przestrzeni świata, rozdzielają się łagodnym parallaxem i reagują na wodę, światło oraz prąd bez udawania zagrożenia, kolizji albo celu.
+
+Plan jest widoczny również bez latarni, lecz ma niższy kontrast od nurka, Wspólnej Linii i obiektów interaktywnych. Profil niski upraszcza detal, a ograniczenie ruchu zatrzymuje dryf i falowanie bez usuwania kompozycji ani tożsamości regionu.
+
+Odwołania: ARD-0041, ARD-0049 i ARD-0085; architektura, sekcje 9.1.2 i 13.
 
 [DOCELOWE] — PEŁNA TOŻSAMOŚĆ
 

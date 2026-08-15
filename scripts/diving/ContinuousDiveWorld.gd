@@ -68,19 +68,26 @@ func _ready() -> void:
 		var map_errors := MapSceneCompilerScript.new().generate(default_world, 1)
 		for map_error in map_errors:
 			push_error("Nie udało się załadować sceny mapy: %s" % map_error)
+		if not map_errors.is_empty():
+			return
 		configure(default_world, default_world.entry_sector_id)
 
 func configure(world_state, sector_id: String = "", expedition_setup = null) -> void:
+	var map_errors := PackedStringArray()
 	if world_state == null:
 		world_state = WorldStateScript.new()
 		world_state.setup(1)
-		var map_errors := MapSceneCompilerScript.new().generate(world_state, 1)
+		map_errors = MapSceneCompilerScript.new().generate(world_state, 1)
 		for map_error in map_errors:
 			push_error("Nie udało się załadować sceny mapy: %s" % map_error)
 	else:
-		var map_errors := MapSceneCompilerScript.new().ensure_world_is_current(world_state)
+		map_errors = MapSceneCompilerScript.new().ensure_world_is_current(world_state)
 		for map_error in map_errors:
 			push_error("Kampania nie odpowiada scenie mapy: %s" % map_error)
+	if not map_errors.is_empty() or world_state.blueprint == null:
+		if map_errors.is_empty():
+			push_error("Nie udało się skonfigurować świata: brak WorldBlueprint.")
+		return
 
 	_world_state = world_state
 	_blueprint = world_state.blueprint
@@ -436,6 +443,8 @@ func landmark_id_at(world_position: Vector2) -> String:
 func update_streaming(world_position: Vector2, force: bool = false, visible_half_extent: Vector2 = Vector2.ZERO) -> void:
 	if _blueprint == null:
 		return
+	if _terrain_renderer != null:
+		_terrain_renderer.set_view_center(world_position)
 	var center_chunk: Vector2i = _blueprint.chunk_coord_at(world_position)
 	var safe_chunk_size := maxi(_blueprint.chunk_size, 1)
 	var stream_radius := Vector2i(
@@ -969,15 +978,18 @@ func _build_navigation_from_source() -> void:
 	_grid_height = 0
 	_cell_scale = Vector2.ONE
 	_nav_cells = PackedByteArray()
-	var grid_texture := MapSceneCompilerScript.new().navigation_grid_texture()
-	if grid_texture == null:
-		push_error("Scena mapy nie wskazuje tekstury nawigacji.")
+	var base_raster: Dictionary = MapSceneCompilerScript.new().navigation_base_raster()
+	var base_errors: PackedStringArray = base_raster.get("errors", PackedStringArray())
+	if not base_errors.is_empty():
+		for base_error in base_errors:
+			push_error("Nie udało się odczytać scenowego makroterenu: %s" % base_error)
 		return
-	var image := grid_texture.get_image()
 	var obstacle_spawns: Array = _blueprint.obstacle_spawns if _blueprint != null else []
-	var raster: Dictionary = MapNavigationRasterScript.build_cached(
+	var raster: Dictionary = MapNavigationRasterScript.build_from_cells_cached(
 		str(_blueprint.map_gameplay_signature) if _blueprint != null else "",
-		image,
+		base_raster.get("cells", PackedByteArray()),
+		int(base_raster.get("width", 0)),
+		int(base_raster.get("height", 0)),
 		world_size(),
 		obstacle_spawns,
 		_blueprint.chunk_size if _blueprint != null else 512,

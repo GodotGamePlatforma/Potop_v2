@@ -312,7 +312,7 @@ func disease_case_plan_projection(state, survivor_id: String, disease_case) -> D
 	var ration_id := str(ration_by_survivor.get(survivor_id, "none"))
 	var medical_projection := medical_care_projection(state)
 	var formal_capacity := int(medical_projection.get("formal_isolation_capacity", 0))
-	var adverse := _disease_system.adverse_conditions_active(state, _shelter_capacity_for_state(state))
+	var adverse := _disease_system.adverse_conditions_active(state, shelter_capacity_for_state(state))
 	return _disease_system.case_plan_projection(
 		state,
 		survivor_id,
@@ -1036,7 +1036,7 @@ func _disease_definitions() -> Dictionary:
 	return result
 
 
-func _shelter_capacity_for_state(state) -> int:
+func shelter_capacity_for_state(state) -> int:
 	var community_house = state.find_building_by_definition("community_house") if state != null else null
 	if community_house == null or not community_house.is_active():
 		return 3

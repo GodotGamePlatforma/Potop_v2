@@ -9,19 +9,19 @@ const WorkerAssignmentSystemScript := preload("res://scripts/base/WorkerAssignme
 const SurvivorPortraitScript := preload("res://scripts/ui/SurvivorPortrait.gd")
 const SurvivorInfoPresenterScript := preload("res://scripts/ui/SurvivorInfoPresenter.gd")
 
-const UI_CANVAS := Color("0b1418")
-const UI_PANEL := Color("142126")
-const UI_SURFACE := Color("1b2b30")
-const UI_SURFACE_RAISED := Color("203238")
-const UI_BORDER := Color("4d817d")
-const UI_BORDER_SUBTLE := Color("354f50")
-const UI_TEXT := Color("e7eee8")
-const UI_TEXT_MUTED := Color("a8b8b5")
-const UI_TEAL := Color("69b8af")
-const UI_AMBER := Color("d39b4a")
-const UI_AMBER_HOVER := Color("e8b75e")
-const UI_GREEN := Color("8ad19b")
-const UI_CORAL := Color("d96c67")
+const UI_CANVAS := Color("092f37")
+const UI_PANEL := Color("0b3940")
+const UI_SURFACE := Color("10464e")
+const UI_SURFACE_RAISED := Color("15545a")
+const UI_BORDER := Color("2c7277")
+const UI_BORDER_SUBTLE := Color("1d5a60")
+const UI_TEXT := Color("f2f0e7")
+const UI_TEXT_MUTED := Color("b6cac6")
+const UI_TEAL := Color("79c4c0")
+const UI_AMBER := Color("f2af36")
+const UI_AMBER_HOVER := Color("ffcb62")
+const UI_GREEN := Color("9bc85c")
+const UI_CORAL := Color("ce6252")
 
 var _state
 var _definition
@@ -517,7 +517,7 @@ func _compact_action_style(background: Color, border: Color, border_width: int) 
 
 func _target_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("85511f")
+	style.bg_color = Color("a66318")
 	style.border_color = UI_AMBER_HOVER
 	style.set_border_width_all(3)
 	style.corner_radius_top_left = 4

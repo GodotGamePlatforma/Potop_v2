@@ -38,19 +38,19 @@ Godot 4.7 może uruchamiać projekt w trybie Game Embedding. Ten tryb nie obsłu
 
 Runner domyślnie tworzy jednorazową, pełną kopię projektu z własnym cache `.godot`, wykonuje testy sekwencyjnie i usuwa workspace po zakończeniu. Żadna poniższa komenda nie jest deklaracją wyniku ostatniego przebiegu.
 
-Szybka bramka — 13 testów skryptowych i 2 przepływy sceniczne:
+Szybka bramka — 14 testów skryptowych i 3 przepływy sceniczne:
 
 ```powershell
 .\tests\run_all_tests.ps1
 ```
 
-Pełna regresja — 40 testów skryptowych i 16 przepływów scenicznych, w tym lane wymagający natywnego okna:
+Pełna regresja — 41 testów skryptowych, 18 przepływów scenicznych oraz dodatkowy lane wymagający natywnego okna:
 
 ```powershell
 .\tests\run_all_tests.ps1 -Full
 ```
 
-Pełna regresja oraz 9 celów snapshotowych:
+Pełna regresja oraz 11 celów snapshotowych:
 
 ```powershell
 .\tests\run_all_tests.ps1 -Full -IncludeSnapshots

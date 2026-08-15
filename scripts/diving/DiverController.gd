@@ -15,6 +15,7 @@ const DiverSocketProfileScript := preload("res://scripts/definitions/DiverSocket
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var dive_light: PointLight2D = $DiveLight
+@onready var lantern_cone: Polygon2D = $LanternCone
 @onready var visual_effects: Node2D = $VisualEffects
 @onready var breath_socket: Marker2D = $AnimatedSprite2D/BreathSocket
 @onready var fin_upper_socket: Marker2D = $AnimatedSprite2D/FinUpperSocket
@@ -53,6 +54,7 @@ var _cue_elapsed := 0.0
 var _cue_duration := 0.0
 var _cue_strength := 0.0
 var _cue_direction_local := Vector2.RIGHT
+var _lantern_cone_scale := 1.0
 
 
 func _ready() -> void:
@@ -194,6 +196,27 @@ func set_reduced_motion(enabled: bool) -> void:
 	_update_socket_markers()
 	_update_light_mount()
 	_update_readability_material()
+
+
+func set_lantern_presentation(enabled: bool, color: Color, outer_radius: float, energy: float) -> void:
+	if lantern_cone == null:
+		return
+	_lantern_cone_scale = maxf(outer_radius, 1.0) / 350.0
+	lantern_cone.visible = enabled
+	if lantern_cone.material is ShaderMaterial:
+		var cone_material := lantern_cone.material as ShaderMaterial
+		cone_material.set_shader_parameter("light_color", color)
+		cone_material.set_shader_parameter("intensity", clampf(energy, 0.0, 2.0))
+	_update_light_mount()
+
+
+func lantern_presentation_state() -> Dictionary:
+	return {
+		"visible": lantern_cone != null and lantern_cone.visible,
+		"scale": _lantern_cone_scale,
+		"z_index": lantern_cone.z_index if lantern_cone != null else 0,
+		"z_as_relative": lantern_cone.z_as_relative if lantern_cone != null else true,
+	}
 
 
 ## Receives presentation-only values derived from the canonical dive session.
@@ -439,6 +462,12 @@ func _update_light_mount() -> void:
 		dive_light.global_position = lamp_socket.global_position
 	else:
 		dive_light.position = Vector2(-LIGHT_MOUNT_FORWARD_OFFSET if animated_sprite.flip_h else LIGHT_MOUNT_FORWARD_OFFSET, 0.0)
+	if lantern_cone != null:
+		lantern_cone.position = to_local(dive_light.global_position)
+		lantern_cone.scale = Vector2(
+			-_lantern_cone_scale if animated_sprite.flip_h else _lantern_cone_scale,
+			_lantern_cone_scale
+		)
 
 
 func _update_readability_material() -> void:

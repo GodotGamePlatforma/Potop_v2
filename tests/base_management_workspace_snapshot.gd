@@ -59,6 +59,7 @@ func _run() -> void:
 	var panel := base_scene.find_child("BuildingPanel", true, false) as Control
 	var title := base_scene.find_child("BuildingTitleLabel", true, false) as Label
 	var header := base_scene.find_child("BuildingWorkspaceHeader", true, false) as Control
+	var header_art := base_scene.find_child("BuildingHeaderArt", true, false) as TextureRect
 	var action_scroll := base_scene.find_child("PanelScroll", true, false) as ScrollContainer
 	var sidebar := base_scene.find_child("BuildingRightSidebar", true, false) as Control
 	var staffing_sidebar := base_scene.find_child("BuildingStaffingSidePanel", true, false) as Control
@@ -82,8 +83,8 @@ func _run() -> void:
 	_assert(rail.size.x >= 110.0 and rail.get_global_rect().end.y <= workspace.get_global_rect().end.y + 0.5, "Lewa szyna ma pozostać czytelna i mieścić się w workspace.")
 	_assert(navigation.get_child_count() == EXPECTED_NAVIGATION_ORDER.size(), "Lewa szyna musi zawierać dokładnie sześć kafelków.")
 	_assert(rail_scroll.scroll_vertical == 0, "Przy 1280×720 sześć podstawowych kafelków nie może wymagać przewijania.")
-	_assert(header != null and header.visible and action_scroll != null and sidebar != null and staffing_sidebar != null and construction_sidebar != null, "Panel musi mieć stały nagłówek, szerokie DZIAŁANIE i dwa obszary prawego paska.")
-	_assert(sidebar != null and action_scroll != null and sidebar.size.x >= 210.0 and sidebar.size.x <= 250.0 and action_scroll.size.x > sidebar.size.x * 2.5, "Prawy pasek OBSADA/BUDOWA ma być wąski, a DZIAŁANIE ma otrzymać zdecydowaną większość szerokości.")
+	_assert(header != null and header.visible and header_art != null and header_art.texture != null and action_scroll != null and sidebar != null and staffing_sidebar != null and construction_sidebar != null, "Panel musi mieć stały morski nagłówek z ilustracją budynku, szerokie DZIAŁANIE i dwa obszary prawego paska.")
+	_assert(sidebar != null and action_scroll != null and sidebar.size.x >= 250.0 and sidebar.size.x <= 280.0 and action_scroll.size.x > sidebar.size.x * 2.5, "Prawy pasek OBSADA/BUDOWA ma zachować szerokość referencyjnej karty, a DZIAŁANIE ma otrzymać zdecydowaną większość szerokości.")
 	_assert(sidebar != null and sidebar.get_parent() == workspace and not panel.is_ancestor_of(sidebar), "Prawa szyna ma być niezależnym sąsiadem centralnego Panelu, analogicznie do lewej nawigacji.")
 	_assert(staffing_sidebar != null and construction_sidebar != null and staffing_sidebar.get_global_rect().end.y + 10.0 <= construction_sidebar.get_global_rect().position.y, "OBSADA oraz BUDOWA/ROZBUDOWA muszą pozostać oddzielnymi kartami prawej kolumny.")
 	_assert(base_scene.find_child("BuildingTabs", true, false) == null and base_scene.find_child("BuildingWorkspaceFooter", true, false) == null, "Obsada i rozbudowa nie mogą pozostać zdublowanymi zakładkami ani dolną stopką.")
@@ -94,9 +95,10 @@ func _run() -> void:
 	_assert(campaign_panel != null and not campaign_panel.visible, "Tracker kampanii ma ustąpić przezroczystym obrzeżom, aby nie konkurować z widokiem bazy.")
 	_assert(title != null and title.text.contains("Warsztat"), "Po otwarciu slotu panel musi jednoznacznie nazwać Warsztat.")
 	_assert(_navigation_contract_holds(navigation, "bottom_left"), "Kafelki muszą zachować kanoniczną kolejność, miniatury, stan tekstowy i zaznaczenie Warsztatu.")
+	_assert_building_scrolls_start_at_top(panel, sidebar, "otwarciu Warsztatu")
 	var focus_owner := get_viewport().gui_get_focus_owner()
 	_assert(focus_owner != null and workspace.is_ancestor_of(focus_owner), "Workspace musi rozpocząć pracę z fokusem w wybranym budynku.")
-	_assert(_storm_charcoal_contract_holds(panel, rail, construction_sidebar), "Panel, szyna i BUDOWA muszą stosować wspólną grafitowo-morską paletę z turkusową strukturą.")
+	_assert(_marine_shell_warm_workspace_contract_holds(resource_bar, panel, header, rail, staffing_sidebar, construction_sidebar), "Górny HUD oraz obie szyny muszą tworzyć ciemną morską powłokę, a centralny BuildingPanel — jasną, ciepłą przestrzeń z morskim nagłówkiem.")
 
 	if not await _save_snapshot("base_management_workshop.png"):
 		return
@@ -110,6 +112,7 @@ func _run() -> void:
 	title = base_scene.find_child("BuildingTitleLabel", true, false) as Label
 	_assert(modal.visible and panel.visible and title != null and title.text.contains("Stacja Nurkowa"), "Kafelek ma przełączyć zawartość na Stację bez zamykania workspace.")
 	_assert(bool(station_button.get_meta("selected", false)), "Kafelek Stacji musi potwierdzić wybór nie tylko kolorem.")
+	_assert_building_scrolls_start_at_top(panel, sidebar, "przełączeniu na Stację Nurkową")
 	var workshop_button := base_scene.find_child("BuildingNav_bottom_left", true, false) as Button
 	_assert(workshop_button != null and not bool(workshop_button.get_meta("selected", false)), "Po zmianie kontekstu poprzedni kafelek nie może pozostać zaznaczony.")
 
@@ -161,7 +164,7 @@ func _run() -> void:
 
 	game.queue_free()
 	await get_tree().process_frame
-	print("Base management workspace snapshot passed: transparent inset layout, dominant action column, narrow staffing/build sidebar, active HUD clearance, six-tile navigation, tutorial overlay, storm-charcoal palette, focus and close paths satisfy ARD-0090 and ARD-0091.")
+	print("Base management workspace snapshot passed: transparent inset layout, dominant action column, narrow staffing/build sidebar, active HUD clearance, six-tile navigation, tutorial overlay, marine-shell/warm-workspace palette, focus and close paths satisfy ARD-0090 and ARD-0091.")
 	get_tree().quit(0)
 
 
@@ -204,19 +207,72 @@ func _navigation_contract_holds(navigation: VBoxContainer, selected_slot_id: Str
 	return true
 
 
-func _storm_charcoal_contract_holds(panel: Control, rail: Control, construction_sidebar: Control) -> bool:
+func _assert_building_scrolls_start_at_top(panel: Control, sidebar: Control, context: String) -> void:
+	var scrolls: Array[ScrollContainer] = []
+	for root in [panel, sidebar]:
+		if root == null:
+			continue
+		for node in root.find_children("*", "ScrollContainer", true, false):
+			var scroll := node as ScrollContainer
+			if scroll != null and not scrolls.has(scroll):
+				scrolls.append(scroll)
+	_assert(not scrolls.is_empty(), "Panel budynku musi zawierać przewijane sekcje do kontroli pozycji po %s." % context)
+	for scroll in scrolls:
+		_assert(scroll.scroll_vertical == 0, "Sekcja %s musi rozpocząć się od góry po %s." % [scroll.name, context])
+
+
+func _marine_shell_warm_workspace_contract_holds(
+	resource_bar: Control,
+	panel: Control,
+	header: Control,
+	rail: Control,
+	staffing_sidebar: Control,
+	construction_sidebar: Control,
+) -> bool:
+	var resource_style := resource_bar.get_theme_stylebox("panel") as StyleBoxFlat
 	var panel_style := panel.get_theme_stylebox("panel") as StyleBoxFlat
+	var header_style := header.get_theme_stylebox("panel") as StyleBoxFlat
 	var rail_style := rail.get_theme_stylebox("panel") as StyleBoxFlat
+	var staffing_style := staffing_sidebar.get_theme_stylebox("panel") as StyleBoxFlat if staffing_sidebar != null else null
 	var construction_style := construction_sidebar.get_theme_stylebox("panel") as StyleBoxFlat if construction_sidebar != null else null
-	if panel_style == null or rail_style == null or construction_style == null:
+	if resource_style == null or panel_style == null or header_style == null or rail_style == null or staffing_style == null or construction_style == null:
 		return false
-	for color in [panel_style.bg_color, rail_style.bg_color, construction_style.bg_color]:
-		if color.r > 0.16 or color.g > 0.25 or color.b < color.g:
-			return false
-	for border in [panel_style.border_color, rail_style.border_color, construction_style.border_color]:
-		if border.g <= border.r:
-			return false
-	return true
+	return (
+		_is_dark_marine(resource_style.bg_color)
+		and _is_teal_structure(resource_style.border_color)
+		and _is_dark_marine(header_style.bg_color)
+		and _is_teal_structure(header_style.border_color)
+		and _is_dark_marine(rail_style.bg_color)
+		and _is_teal_structure(rail_style.border_color)
+		and _is_dark_marine(staffing_style.bg_color)
+		and _is_teal_structure(staffing_style.border_color)
+		and _is_dark_marine(construction_style.bg_color)
+		and _is_teal_structure(construction_style.border_color)
+		and _is_warm_bright_surface(panel_style.bg_color)
+		and _is_warm_separator(panel_style.border_color)
+	)
+
+
+func _is_dark_marine(color: Color) -> bool:
+	return (
+		color.r <= 0.16
+		and color.g <= 0.40
+		and color.b <= 0.45
+		and color.g >= color.r + 0.08
+		and color.b >= color.g * 0.85
+	)
+
+
+func _is_teal_structure(color: Color) -> bool:
+	return color.g >= 0.25 and color.g >= color.r * 1.25 and color.b >= color.r * 1.25
+
+
+func _is_warm_bright_surface(color: Color) -> bool:
+	return color.r >= 0.75 and color.g >= 0.70 and color.b >= 0.60 and color.r >= color.b + 0.05
+
+
+func _is_warm_separator(color: Color) -> bool:
+	return color.r >= 0.60 and color.g >= 0.50 and color.b >= 0.36 and color.r >= color.b + 0.10
 
 
 func _staffing_card_contract_holds(sidebar: Control, staffing_rail: Control) -> bool:
@@ -234,10 +290,9 @@ func _staffing_card_contract_holds(sidebar: Control, staffing_rail: Control) -> 
 		if not visible_rect.encloses(control.get_global_rect()):
 			return false
 	var has_dark_teal_shell := (
-		sidebar_style.bg_color.r < 0.12
-		and sidebar_style.bg_color.g < 0.16
-		and sidebar_style.border_color.g > sidebar_style.border_color.r
-		and rail_style.bg_color.r < 0.12
+		_is_dark_marine(sidebar_style.bg_color)
+		and _is_teal_structure(sidebar_style.border_color)
+		and _is_dark_marine(rail_style.bg_color)
 	)
 	return (
 		has_dark_teal_shell

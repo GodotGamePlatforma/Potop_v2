@@ -22,7 +22,7 @@ func begin_for_state(state) -> void:
 	# musi je zachować (np. po zmianie obsady budynku).
 	medical_priority_survivor_ids.clear()
 	isolated_survivor_ids.clear()
-	selected_diver_id = ""
+	selected_diver_id = str(state.preferred_diver_id).strip_edges() if state != null else ""
 	expedition_entry_point = ""
 	expedition_setup = null
 	sync_from_state(state)

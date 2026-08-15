@@ -64,11 +64,78 @@ const STORY_CABLE_ENDPOINTS := {
 	"common_line_cable_archive_r3": [STORY_POSITIONS["archive_terminal"], STORY_POSITIONS["r3_generator"]],
 	"common_line_cable_r3_c4": [STORY_POSITIONS["r3_generator"], C4_POSITIONS["c4_switchboard"]],
 }
+const EXPECTED_CABLE_CONTROL_POINTS := {
+	"res://scenes/diving/map_visuals/CommonLineCableVisual.tscn": [
+		Vector2(0.0, 0.0),
+		Vector2(-509.388, 311.77023),
+		Vector2(-2525.388, 191.77023),
+		Vector2(-2909.388, 415.77023),
+		Vector2(-3245.388, 527.77023),
+		Vector2(-3249.388, 551.77023),
+		Vector2(-3469.388, 831.77023),
+	],
+	"res://scenes/diving/map_visuals/CommonLineArchiveCableVisual.tscn": [
+		Vector2(0.0, 0.0),
+		Vector2(288.0, -312.0),
+		Vector2(296.0, -320.0),
+		Vector2(304.0, -328.0),
+		Vector2(992.0, -656.0),
+		Vector2(2592.0, -664.0),
+		Vector2(4192.0, -664.0),
+		Vector2(5736.0, -120.0),
+	],
+	"res://scenes/diving/map_visuals/CommonLineR3CableVisual.tscn": [
+		Vector2(0.0, 0.0),
+		Vector2(848.0, 312.0),
+		Vector2(2168.0, 688.0),
+		Vector2(2752.0, 688.0),
+		Vector2(2904.0, 696.0),
+		Vector2(2952.0, 712.0),
+		Vector2(2968.0, 728.0),
+		Vector2(3152.0, 1160.0),
+		Vector2(3160.0, 1216.0),
+		Vector2(3200.0, 1544.0),
+		Vector2(3200.0, 1560.0),
+		Vector2(3168.0, 1632.0),
+		Vector2(3080.0, 1712.0),
+		Vector2(2776.0, 1768.0),
+		Vector2(1952.0, 1680.0),
+		Vector2(1780.0, 1600.0),
+		Vector2(2040.0, 1760.0),
+		Vector2(2320.0, 1940.0),
+	],
+	"res://scenes/diving/map_visuals/CommonLineC4CableVisual.tscn": [
+		Vector2(0.0, 0.0),
+		Vector2(-1080.0, 180.0),
+		Vector2(-1128.0, 204.0),
+		Vector2(-1872.0, 644.0),
+		Vector2(-1944.0, 644.0),
+		Vector2(-1976.0, 652.0),
+		Vector2(-2232.0, 932.0),
+		Vector2(-2232.0, 1244.0),
+		Vector2(-2240.0, 1260.0),
+		Vector2(-2424.0, 1428.0),
+		Vector2(-2464.0, 1428.0),
+		Vector2(-2704.0, 1692.0),
+		Vector2(-2704.0, 1724.0),
+		Vector2(-2712.0, 1740.0),
+		Vector2(-2848.0, 1932.0),
+		Vector2(-2928.0, 2004.0),
+		Vector2(-3376.0, 2204.0),
+		Vector2(-3416.0, 2204.0),
+		Vector2(-4600.0, 2760.0),
+	],
+}
 const BLOCKAGE_VISUAL_PATH := "res://scenes/diving/map_visuals/TutorialCableBlockageVisual.tscn"
+const R1_J7_ART_CELL_VISUAL_PATH := "res://scenes/diving/map_visuals/R1J7ArtCell.tscn"
+const R3_POWER_PLANT_MIDGROUND_VISUAL_PATH := "res://scenes/diving/map_visuals/R3PowerPlantMidgroundVisual.tscn"
 
 const REQUIRED_AUTHORING_GROUPS := [
 	"VisualLayers",
 	"Terrain",
+	"Terrain/TerrainNavigation",
+	"Terrain/TerrainNavigation/TraversableAreas",
+	"Terrain/TerrainNavigation/BlockedIslands",
 	"DepthRegions",
 	"Landmarks",
 	"Entries",
@@ -138,7 +205,7 @@ func _initialize() -> void:
 		push_error("Underwater map scene test failed with %d assertion(s)." % _failures)
 		quit(1)
 		return
-	print("Underwater map scene test passed: the Godot scene, prefabs and shared obstacle raster are the only validated map source.")
+	print("Underwater map scene test passed: Godot Polygon2D terrain, scene prefabs, Path2D cables and the shared runtime raster are validated.")
 	quit(0)
 
 
@@ -181,6 +248,14 @@ func _test_compiled_manifest(world) -> void:
 	_assert(blueprint.entry_position != Vector2.ZERO and blueprint.exit_position != Vector2.ZERO, "Scena musi zawierać jawne pozycje wejścia i wyjścia.")
 	_assert(not blueprint.regions.is_empty(), "Mapa musi zawierać co najmniej jeden region.")
 	_assert(not blueprint.landmarks.is_empty(), "Mapa musi zawierać co najmniej jeden landmark.")
+	var r1_j7: Dictionary = _record_by_id(blueprint.landmarks, "R1-04")
+	_assert(str(r1_j7.get("visual_scene_path", "")) == R1_J7_ART_CELL_VISUAL_PATH, "Parking R1-04 musi instancjować zatwierdzony ArtCell Węzła J-7.")
+	_assert(int(r1_j7.get("visual_z_index", 0)) == -60, "Płyta R1/J-7 musi pozostać za terenem i obiektami gameplayowymi.")
+	_assert_visual_scene_collision_free(R1_J7_ART_CELL_VISUAL_PATH, "ArtCell R1-04/J-7")
+	var r3_power_plant: Dictionary = _record_by_id(blueprint.landmarks, "R3-04")
+	_assert(str(r3_power_plant.get("visual_scene_path", "")) == R3_POWER_PLANT_MIDGROUND_VISUAL_PATH, "Elektrownia R3-04 musi instancjować zatwierdzony autorski średni plan.")
+	_assert(int(r3_power_plant.get("visual_z_index", 0)) == -56, "Średni plan R3-04 musi pozostać za terenem i obiektami gameplayowymi.")
+	_assert_visual_scene_collision_free(R3_POWER_PLANT_MIDGROUND_VISUAL_PATH, "Autorski średni plan R3-04")
 	_assert(not blueprint.loot_spawns.is_empty(), "Mapa musi zawierać prefab źródła łupu lub itemu.")
 	for loot_record in blueprint.loot_spawns:
 		_assert(
@@ -282,6 +357,8 @@ func _test_unique_authoring_ids() -> void:
 	var map_root := _instantiate_map()
 	if map_root == null:
 		return
+	_assert(str(map_root.get("navigation_cells_sha256")).length() == 64, "Scena musi przechowywać eksportowalny skrót komórek makroterenu.")
+	_assert(str(map_root.get("navigation_signature_sha256")).length() == 64, "Scena musi przechowywać stabilny skrót zgodności zapisu mapy.")
 	var object_ids: Dictionary = {}
 	var connection_ids: Dictionary = {}
 	for node in map_root.find_children("*", "", true, false):
@@ -322,15 +399,18 @@ func _test_visual_only_change_preserves_signature(compiler) -> void:
 	authored_object.visual_offset += Vector2(17.0, -9.0)
 	authored_object.visual_rotation_degrees += 7.5
 	authored_object.skew += deg_to_rad(3.0)
+	authored_object.visual_scene = ResourceLoader.load(R3_POWER_PLANT_MIDGROUND_VISUAL_PATH) as PackedScene
+	authored_object.visual_z_index -= 56
 	var changed: Dictionary = compiler.compile_map(map_root, 91_003)
 	var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
 	_assert(changed_errors.is_empty(), "Zmiana prezentacyjna nie może zepsuć kompilacji mapy.")
 	if changed_errors.is_empty():
 		var baseline_blueprint = baseline.get("blueprint")
 		var changed_blueprint = changed.get("blueprint")
-		_assert(str(baseline_blueprint.map_gameplay_signature) == str(changed_blueprint.map_gameplay_signature), "Offset, obrót i skew prezentacji nie mogą zmieniać podpisu gameplayowego obiektu punktowego.")
+		_assert(str(baseline_blueprint.map_gameplay_signature) == str(changed_blueprint.map_gameplay_signature), "Scena, warstwa z, offset, obrót i skew prezentacji nie mogą zmieniać podpisu gameplayowego obiektu punktowego.")
 		var changed_record := _record_by_id(changed_blueprint.loot_spawns, authored_object.object_id)
 		_assert(changed_record.get("visual_offset", Vector2.ZERO) == authored_object.visual_offset, "Kompilator musi przekazać offset prefabu do runtime.")
+		_assert(str(changed_record.get("visual_scene_path", "")) == R3_POWER_PLANT_MIDGROUND_VISUAL_PATH and int(changed_record.get("visual_z_index", 0)) == authored_object.visual_z_index, "Kompilator musi przekazać prefab i z-index prezentacji do runtime.")
 	map_root.free()
 
 
@@ -431,6 +511,11 @@ func _test_terrain_presentation_preserves_signature(compiler) -> void:
 		var profile = map_root.terrain_visual_profiles[0]
 		profile = profile.duplicate(true)
 		profile.rock_edge_color = Color(0.91, 0.27, 0.18, 1.0)
+		profile.backdrop_tint = Color(0.18, 0.54, 0.37, 1.0)
+		profile.backdrop_accent = Color(0.84, 0.48, 0.30, 1.0)
+		profile.backdrop_strength = 0.31
+		profile.backdrop_motion_scale = 1.47
+		profile.backdrop_motif_scale = 1.63
 		map_root.terrain_visual_profiles[0] = profile
 		map_root.terrain_detail_texture = GradientTexture2D.new()
 		var changed_sdf_image: Image = map_root.terrain_render_sdf_texture.get_image().duplicate()
@@ -533,8 +618,21 @@ func _test_obstacle_transform_is_compiled(compiler) -> void:
 	if not baseline_errors.is_empty():
 		map_root.free()
 		return
-	var obstacle := MapObjectScript.new()
-	obstacle.kind = MapObjectScript.Kind.OBSTACLE
+	var obstacle_scene := ResourceLoader.load("res://scenes/diving/map_objects/MapObstacle.tscn") as PackedScene
+	_assert(obstacle_scene != null, "Prefab MapObstacle musi dać się załadować do kontroli wielokąta.")
+	if obstacle_scene == null:
+		map_root.free()
+		return
+	var obstacle_node := obstacle_scene.instantiate()
+	var obstacle := obstacle_node as DiveMapObject
+	if obstacle == null:
+		map_root.free()
+		return
+	var obstacle_polygon_node := obstacle.get_node_or_null("NavigationPolygon") as Polygon2D
+	_assert(obstacle_polygon_node != null, "MapObstacle musi udostępniać natywne uchwyty dziecka NavigationPolygon: Polygon2D.")
+	if obstacle_polygon_node == null:
+		map_root.free()
+		return
 	obstacle.object_id = "test_rotated_obstacle"
 	obstacle.display_name = "Testowa obrócona przeszkoda"
 	obstacle.bounds_size = Vector2(180.0, 72.0)
@@ -544,6 +642,32 @@ func _test_obstacle_transform_is_compiled(compiler) -> void:
 	obstacle.skew = 0.11
 	obstacle.blocks_navigation = false
 	map_root.get_node("StaticObstacles").add_child(obstacle)
+	var irregular_obstacle_node := obstacle_scene.instantiate()
+	var irregular_obstacle := irregular_obstacle_node as DiveMapObject
+	if irregular_obstacle == null:
+		map_root.free()
+		return
+	var irregular_polygon_node := irregular_obstacle.get_node_or_null("NavigationPolygon") as Polygon2D
+	_assert(irregular_polygon_node != null, "Druga przeszkoda testowa musi zachować dziecko NavigationPolygon: Polygon2D.")
+	if irregular_polygon_node == null:
+		map_root.free()
+		return
+	irregular_obstacle.object_id = "test_irregular_obstacle"
+	irregular_obstacle.display_name = "Testowa nieregularna przeszkoda"
+	irregular_obstacle.position = Vector2(5_280.0, 3_120.0)
+	irregular_obstacle.rotation = -0.18
+	irregular_obstacle.scale = Vector2(0.9, 1.15)
+	irregular_obstacle.skew = -0.07
+	irregular_obstacle.blocks_navigation = false
+	var irregular_local_polygon := PackedVector2Array([
+		Vector2(-92.0, -34.0),
+		Vector2(18.0, -61.0),
+		Vector2(104.0, -12.0),
+		Vector2(63.0, 58.0),
+		Vector2(-71.0, 49.0),
+	])
+	irregular_polygon_node.polygon = irregular_local_polygon
+	map_root.get_node("StaticObstacles").add_child(irregular_obstacle)
 	var changed: Dictionary = compiler.compile_map(map_root, 91_004)
 	var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
 	_assert(changed_errors.is_empty(), "Poprawna obrócona przeszkoda scenowa musi dać się skompilować: %s" % "; ".join(changed_errors))
@@ -552,7 +676,21 @@ func _test_obstacle_transform_is_compiled(compiler) -> void:
 		var changed_blueprint = changed.get("blueprint")
 		var record := _record_by_id(changed_blueprint.obstacle_spawns, obstacle.object_id)
 		var polygon: PackedVector2Array = record.get("navigation_polygon", PackedVector2Array())
-		_assert(polygon.size() == 4, "Przeszkoda musi przekazać pełny, przetransformowany obrys nawigacyjny.")
+		_assert(polygon.size() == 4, "Pusty Polygon2D musi zachować prostokątny fallback istniejącej przeszkody.")
+		var half := obstacle.bounds_size * 0.5
+		var expected_fallback := PackedVector2Array([
+			obstacle.global_transform * Vector2(-half.x, -half.y),
+			obstacle.global_transform * Vector2(half.x, -half.y),
+			obstacle.global_transform * Vector2(half.x, half.y),
+			obstacle.global_transform * Vector2(-half.x, half.y),
+		])
+		_assert_polygon_matches(polygon, expected_fallback, "Prostokątny fallback MapObstacle musi zachować dotychczasową transformację 1:1.")
+		var irregular_record := _record_by_id(changed_blueprint.obstacle_spawns, irregular_obstacle.object_id)
+		var irregular_polygon: PackedVector2Array = irregular_record.get("navigation_polygon", PackedVector2Array())
+		var expected_irregular := PackedVector2Array()
+		for local_point in irregular_local_polygon:
+			expected_irregular.append(irregular_obstacle.global_transform * local_point)
+		_assert_polygon_matches(irregular_polygon, expected_irregular, "Nieregularny MapObstacle musi przekazać każdy punkt Polygon2D po pełnej transformacji.")
 		_assert(str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature), "Dodanie przeszkody musi zmienić podpis gameplayowy.")
 	map_root.free()
 
@@ -778,13 +916,13 @@ func _assert_tutorial_cable_anchors(cable_record: Dictionary) -> void:
 	_assert(packed != null, "Prefab kabla musi dać się załadować do kontroli zakotwiczeń.")
 	if packed == null:
 		return
-	var cable_visual := packed.instantiate() as Node2D
-	_assert(cable_visual != null, "Prefab kabla musi mieć root Node2D do kontroli zakotwiczeń.")
+	var cable_visual := packed.instantiate() as Path2D
+	_assert(cable_visual != null, "Prefab kabla musi mieć root Path2D do kontroli zakotwiczeń.")
 	if cable_visual == null:
 		return
-	var route_points: Array = CommonLineCableVisualScript.ROUTE_POINTS
+	var route_points := _assert_cable_curve(cable_visual, CABLE_VISUAL_PATH)
 	var tutorial_anchor_indices: Array = CommonLineCableVisualScript.TUTORIAL_ANCHOR_INDICES
-	_assert(route_points.size() >= 7, "Prefab kabla musi publikować pełną trasę od platformy do J-7.")
+	_assert(route_points.size() >= 7, "Scenowa Curve2D kabla musi zachować pełną trasę od platformy do J-7.")
 	_assert(
 		var_to_str(tutorial_anchor_indices) == var_to_str([1, 3, 5, 6]),
 		"Prefab kabla musi jawnie oznaczać kotwy: targ, warsztat, SC-01 i J-7."
@@ -875,14 +1013,12 @@ func _assert_story_cable_endpoints(record: Dictionary, expected_endpoints: Array
 	_assert(packed != null, "Prefab kabla %s musi dać się załadować do kontroli endpointów." % decoration_id)
 	if packed == null:
 		return
-	var cable_visual := packed.instantiate() as Node2D
-	_assert(cable_visual != null, "Prefab kabla %s musi mieć root Node2D." % decoration_id)
+	var cable_visual := packed.instantiate() as Path2D
+	_assert(cable_visual != null, "Prefab kabla %s musi mieć root Path2D." % decoration_id)
 	if cable_visual == null:
 		return
-	var visual_script := cable_visual.get_script() as Script
-	var script_constants: Dictionary = visual_script.get_script_constant_map() if visual_script != null else {}
-	var route_points = script_constants.get("ROUTE_POINTS", [])
-	_assert(route_points.size() >= 2, "Prefab kabla %s musi publikować co najmniej dwa ROUTE_POINTS." % decoration_id)
+	var route_points := _assert_cable_curve(cable_visual, scene_path)
+	_assert(route_points.size() >= 2, "Prefab kabla %s musi publikować co najmniej dwa punkty Curve2D." % decoration_id)
 	_assert(expected_endpoints.size() == 2, "Kontrakt kabla %s musi wskazywać dokładnie początek i koniec." % decoration_id)
 	if route_points.size() < 2 or expected_endpoints.size() != 2:
 		cable_visual.free()
@@ -919,11 +1055,10 @@ func _assert_story_cable_passes_point(record: Dictionary, expected_world_point: 
 	var packed := ResourceLoader.load(str(record.get("visual_scene_path", ""))) as PackedScene
 	if packed == null:
 		return
-	var cable_visual := packed.instantiate() as Node2D
+	var cable_visual := packed.instantiate() as Path2D
 	if cable_visual == null:
 		return
-	var visual_script := cable_visual.get_script() as Script
-	var route_points = visual_script.get_script_constant_map().get("ROUTE_POINTS", []) if visual_script != null else []
+	var route_points := _assert_cable_curve(cable_visual, str(record.get("visual_scene_path", "")))
 	var object_transform := Transform2D(
 		float(record.get("visual_object_rotation", 0.0)),
 		record.get("visual_object_scale", Vector2.ONE),
@@ -944,6 +1079,39 @@ func _assert_story_cable_passes_point(record: Dictionary, expected_world_point: 
 			break
 	_assert(passes_point, "Kabel Archiwum — R-3 musi przechodzić przez panel diagnostyczny przed generatorem.")
 	cable_visual.free()
+
+
+func _assert_cable_curve(cable_visual: Path2D, scene_path: String) -> PackedVector2Array:
+	var route_points := PackedVector2Array()
+	_assert(cable_visual.curve != null, "Prefab kabla %s musi przechowywać scenową Curve2D." % scene_path)
+	if cable_visual.curve == null:
+		return route_points
+	var visual_script := cable_visual.get_script() as Script
+	var script_constants: Dictionary = visual_script.get_script_constant_map() if visual_script != null else {}
+	_assert(not script_constants.has("ROUTE_POINTS"), "Prefab kabla %s nie może utrzymywać drugiej trasy ROUTE_POINTS w skrypcie." % scene_path)
+	for point_index in range(cable_visual.curve.point_count):
+		route_points.append(cable_visual.curve.get_point_position(point_index))
+		_assert(
+			cable_visual.curve.get_point_in(point_index) == Vector2.ZERO
+			and cable_visual.curve.get_point_out(point_index) == Vector2.ZERO,
+			"Migracja kabla %s musi zachować dotychczasowe proste segmenty i wygląd." % scene_path
+		)
+	var expected_points: Array = EXPECTED_CABLE_CONTROL_POINTS.get(scene_path, [])
+	_assert(not expected_points.is_empty(), "Test musi znać zatwierdzoną trasę kabla %s." % scene_path)
+	_assert(route_points.size() == expected_points.size(), "Curve2D kabla %s musi zachować liczbę punktów 1:1." % scene_path)
+	for point_index in range(mini(route_points.size(), expected_points.size())):
+		_assert(
+			_vectors_match(route_points[point_index], expected_points[point_index] as Vector2),
+			"Curve2D kabla %s musi zachować punkt %d 1:1." % [scene_path, point_index]
+		)
+	return route_points
+
+
+func _assert_polygon_matches(actual: PackedVector2Array, expected: PackedVector2Array, message: String) -> void:
+	var matches := actual.size() == expected.size()
+	for point_index in range(mini(actual.size(), expected.size())):
+		matches = matches and _vectors_match(actual[point_index], expected[point_index])
+	_assert(matches, message)
 
 
 func _assert_critical_interactable_separation(blueprint) -> void:

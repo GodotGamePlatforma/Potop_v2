@@ -1,27 +1,42 @@
 @tool
 class_name DiveCommonLineStoryCableVisual
-extends Node2D
+extends Path2D
 
 ## Wspólna, bezkolizyjna prezentacja dalszych odcinków Wspólnej Linii.
-## Konkretne prefaby publikują własne ROUTE_POINTS w lokalnym układzie początku
+## Każdy prefab przechowuje własną Curve2D w lokalnym układzie początku
 ## odcinka; gameplay, kolizja i stan urządzeń pozostają poza tym węzłem.
+
+var _connected_curve: Curve2D
+
+
+func _enter_tree() -> void:
+	_sync_curve_signal()
+	set_process(Engine.is_editor_hint())
 
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_DISABLED
+	_sync_curve_signal()
 	queue_redraw()
 
 
+func _exit_tree() -> void:
+	_disconnect_curve_signal()
+
+
+func _process(_delta: float) -> void:
+	_sync_curve_signal()
+
+
 func _draw() -> void:
-	var route := _story_route_points()
+	var route := _route_points()
 	if route.size() < 2:
 		return
-	# Poczwórna warstwa utrzymuje czytelność przewodu w jasnych dachach,
-	# zielonych osiedlach, rdzy R-3 i prawie czarnym Sercu.
-	draw_polyline(route, Color("241815"), 20.0, true)
-	draw_polyline(route, Color("101d22"), 14.0, true)
-	draw_polyline(route, Color("385157"), 8.0, true)
-	draw_polyline(route, Color(0.45, 0.76, 0.72, 0.62), 2.4, true)
+	# Poczwórna warstwa zachowuje prowadzenie w każdym regionie, ale miękko
+	# osadza przewód w wodzie zamiast rysować ciężką, czarną obwódkę.
+	draw_polyline(route, Color("263034"), 17.0, true)
+	draw_polyline(route, Color("162c32"), 12.0, true)
+	draw_polyline(route, Color("36565a"), 6.5, true)
+	draw_polyline(route, Color(0.40, 0.68, 0.64, 0.52), 1.8, true)
 
 	var total_length := _route_length(route)
 	var marker_distance := 92.0
@@ -46,8 +61,22 @@ func _draw() -> void:
 	_draw_connector(route[route.size() - 1], Color("d19655"))
 
 
-func _story_route_points() -> PackedVector2Array:
-	return PackedVector2Array()
+func authored_route_points() -> PackedVector2Array:
+	var points := PackedVector2Array()
+	if curve == null:
+		return points
+	for point_index in range(curve.point_count):
+		points.append(curve.get_point_position(point_index))
+	return points
+
+
+func _route_points() -> PackedVector2Array:
+	if curve == null:
+		return PackedVector2Array()
+	var baked := curve.get_baked_points()
+	if baked.size() >= 2:
+		return baked
+	return authored_route_points()
 
 
 func _draw_connector(center: Vector2, rim_color: Color) -> void:
@@ -79,3 +108,23 @@ func _sample_route(route: PackedVector2Array, distance_along: float) -> Dictiona
 			}
 		remaining -= segment_length
 	return {"point": route[route.size() - 1], "tangent": Vector2.LEFT}
+
+
+func _sync_curve_signal() -> void:
+	if _connected_curve == curve:
+		return
+	_disconnect_curve_signal()
+	_connected_curve = curve
+	if _connected_curve != null and not _connected_curve.changed.is_connected(_on_curve_changed):
+		_connected_curve.changed.connect(_on_curve_changed)
+	queue_redraw()
+
+
+func _disconnect_curve_signal() -> void:
+	if _connected_curve != null and _connected_curve.changed.is_connected(_on_curve_changed):
+		_connected_curve.changed.disconnect(_on_curve_changed)
+	_connected_curve = null
+
+
+func _on_curve_changed() -> void:
+	queue_redraw()

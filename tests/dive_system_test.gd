@@ -205,6 +205,12 @@ func _run() -> void:
 	await process_frame
 	await physics_frame
 	var visual_effects = diver.get_node("VisualEffects")
+	diver.set_lantern_presentation(true, Color(0.72, 0.9, 1.0, 1.0), 350.0, 1.0)
+	var lantern_state: Dictionary = diver.lantern_presentation_state()
+	_assert(bool(lantern_state.get("visible", false)), "Włączona latarnia musi mieć czytelny, prezentacyjny stożek światła.")
+	_assert(int(lantern_state.get("z_index", 0)) == -21 and not bool(lantern_state.get("z_as_relative", true)), "Stożek latarni ma pozostać nad dalekim tłem, ale pod semantycznym terenem.")
+	diver.set_lantern_presentation(false, Color.WHITE, 350.0, 0.0)
+	_assert(not bool(diver.lantern_presentation_state().get("visible", true)), "Wyłączenie latarni musi natychmiast ukryć jej stożek.")
 	var breath_emitter := visual_effects.get_node_or_null("BreathEmitter") as GPUParticles2D
 	_assert(breath_emitter != null and not breath_emitter.local_coords, "Diver bubbles should use a world-space particle emitter so released bubbles do not rotate or travel with the diver.")
 	diver.velocity = Vector2.ZERO

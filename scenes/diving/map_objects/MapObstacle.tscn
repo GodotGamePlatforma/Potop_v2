@@ -8,3 +8,6 @@ kind = 11
 display_name = "Nowa przeszkoda"
 bounds_size = Vector2(160, 120)
 blocks_navigation = true
+
+[node name="NavigationPolygon" type="Polygon2D" parent="."]
+color = Color(1, 1, 1, 0)

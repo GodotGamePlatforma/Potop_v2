@@ -56,6 +56,7 @@ const TutorialDirectorScript := preload("res://scripts/core/TutorialDirector.gd"
 @export var tutorial: Resource = TutorialStateScript.new()
 @export var diving_equipment: Resource = DivingEquipmentStateScript.new()
 @export var current_day_plan: Resource = DayPlanStateScript.new()
+@export var preferred_diver_id: String = ""
 @export var mission_progress: Resource = MissionProgressStateScript.new()
 @export var disease_campaign: Resource = DiseaseCampaignStateScript.new()
 
@@ -103,6 +104,7 @@ func setup_new_campaign(campaign_seed: int = 0, profile = null) -> void:
 	tutorial = TutorialStateScript.new()
 	diving_equipment = DivingEquipmentStateScript.new()
 	diving_equipment.setup_defaults()
+	preferred_diver_id = ""
 	mission_progress = MissionProgressStateScript.new()
 	disease_campaign = DiseaseCampaignStateScript.new()
 	_setup_starting_survivors()
@@ -184,8 +186,26 @@ func lock_day_plan(setup = null) -> bool:
 	return current_day_plan.lock_for_resolution(self, setup)
 
 func begin_new_day_plan() -> void:
+	_reconcile_preferred_diver()
 	current_day_plan = DayPlanStateScript.new()
 	current_day_plan.begin_for_state(self)
+
+
+func set_preferred_diver(survivor_id: String) -> void:
+	preferred_diver_id = survivor_id.strip_edges()
+
+
+func clear_preferred_diver() -> void:
+	preferred_diver_id = ""
+
+
+func _reconcile_preferred_diver() -> void:
+	preferred_diver_id = preferred_diver_id.strip_edges()
+	if preferred_diver_id.is_empty():
+		return
+	var survivor = find_survivor(preferred_diver_id)
+	if survivor == null or not survivor.is_alive():
+		preferred_diver_id = ""
 
 func prepare_weather_for_day(target_day: int = -1) -> void:
 	var resolved_day := day if target_day < 1 else target_day

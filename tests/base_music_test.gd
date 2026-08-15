@@ -32,6 +32,12 @@ func _run() -> void:
 	var first_player := _assert_single_music_player(game.current_scene)
 	await _frames(2)
 	_assert(first_player != null and first_player.playing, "Base music autoplay should start after the scene enters the tree.")
+	# The restored opening dialogue intentionally owns cancel input. This fixture
+	# isolates Base-scoped music and pause semantics, so remove only its presenter
+	# before opening the production pause menu.
+	if game.narrative_dialogue_panel != null:
+		game.narrative_dialogue_panel.clear()
+		await _frames(2)
 
 	if first_player != null:
 		var position_before_pause := first_player.get_playback_position()
@@ -61,8 +67,17 @@ func _run() -> void:
 	var second_player := _assert_single_music_player(game.current_scene)
 	_assert(second_player != null and second_player.playing, "Returning to Base should create one fresh playing music instance.")
 
+	if second_player != null:
+		second_player.stop()
+	var game_ref: WeakRef = weakref(game)
 	game.queue_free()
-	await _frames(2)
+	game = null
+	first_player = null
+	second_player = null
+	first_player_ref = null
+	await _frames(3)
+	await get_tree().create_timer(0.1).timeout
+	_assert(game_ref.get_ref() == null, "The Base music fixture must release its complete GameRoot tree before exit.")
 	if get_tree().paused:
 		get_tree().paused = false
 	if _failed:

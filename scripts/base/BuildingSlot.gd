@@ -27,6 +27,7 @@ var is_tutorial_target: bool = false
 var is_queued: bool = false
 var _visual_rect_ratio := Rect2(0.0, 0.0, 1.0, 1.0)
 var _pad_visual: Panel
+var _rebuild_indicator: BuildingRebuildIndicator
 var _visual_style: StyleBoxFlat
 var _hovered := false
 var _pointer_down := false
@@ -49,6 +50,9 @@ func _ready() -> void:
 	_pad_visual.name = "PadVisual"
 	_pad_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_pad_visual)
+	_rebuild_indicator = get_node_or_null("RebuildIndicator") as BuildingRebuildIndicator
+	if _rebuild_indicator != null:
+		_rebuild_indicator.present(false, false)
 	_visual_style = _style_box(NORMAL_FILL, NORMAL_BORDER, 1)
 	_pad_visual.add_theme_stylebox_override("panel", _visual_style)
 	_apply_visual_rect()
@@ -83,6 +87,11 @@ func set_state(tutorial_target: bool, queued: bool) -> void:
 	is_tutorial_target = tutorial_target
 	is_queued = queued
 	_refresh_style()
+
+
+func set_rebuild_indicator(is_ruined: bool, is_affordable: bool) -> void:
+	if _rebuild_indicator != null:
+		_rebuild_indicator.present(is_ruined, is_affordable)
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled

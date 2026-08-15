@@ -3,6 +3,7 @@ extends Node2D
 
 const POST_PROCESS_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_post_process.gdshader")
 const CAUSTICS_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_caustics.gdshader")
+const LIGHT_SHAFTS_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_light_shafts.gdshader")
 
 const POST_PROCESS_CANVAS_LAYER := 1
 const VALID_GRAPHICS_QUALITIES := ["low", "medium", "high"]
@@ -29,12 +30,15 @@ var _current_vector := Vector2.ZERO
 var _smoothed_flow := Vector2.ZERO
 var _diver_position := Vector2.ZERO
 var _quality_caustics_intensity := 0.055
+var _quality_light_shafts_intensity := 0.035
 
 var _post_process_layer: CanvasLayer
 var _post_process_rect: ColorRect
 var _post_process_material: ShaderMaterial
 var _caustics: Polygon2D
 var _caustics_material: ShaderMaterial
+var _light_shafts: Polygon2D
+var _light_shafts_material: ShaderMaterial
 var _far_particles: GPUParticles2D
 var _near_particles: GPUParticles2D
 var _far_particle_material: ParticleProcessMaterial
@@ -102,6 +106,7 @@ func update_environment(
 		_smoothed_flow = _smoothed_flow.lerp(normalized_flow, response)
 
 	_caustics.global_position = diver_position
+	_light_shafts.global_position = diver_position
 	_far_particles.global_position = diver_position
 	_near_particles.global_position = diver_position
 	_apply_environment_parameters()
@@ -132,6 +137,7 @@ func environment_state() -> Dictionary:
 		"post_process_layer": POST_PROCESS_CANVAS_LAYER,
 		"refraction_enabled": _graphics_quality != "low" and not _reduced_motion,
 		"caustics_intensity": _quality_caustics_intensity * clampf(_profile_caustics_strength * 1.25, 0.22, 1.0),
+		"light_shafts_intensity": _quality_light_shafts_intensity * lerpf(0.72, 1.0, _water_clarity),
 		"far_particle_count": _far_particles.amount if _far_particles != null else 0,
 		"near_particle_count": _near_particle_budget,
 	}
@@ -141,6 +147,7 @@ func _ensure_effect_nodes() -> void:
 	if _post_process_layer != null:
 		return
 	_build_post_process()
+	_build_light_shafts()
 	_build_caustics()
 	_build_particles()
 
@@ -173,6 +180,19 @@ func _build_caustics() -> void:
 	_caustics.color = Color.WHITE
 	add_child(_caustics)
 	_resize_local_field()
+
+
+func _build_light_shafts() -> void:
+	_light_shafts_material = ShaderMaterial.new()
+	_light_shafts_material.shader = LIGHT_SHAFTS_SHADER
+	_light_shafts = Polygon2D.new()
+	_light_shafts.name = "VolumetricLightShafts"
+	_light_shafts.top_level = true
+	_light_shafts.z_as_relative = false
+	_light_shafts.z_index = -28
+	_light_shafts.material = _light_shafts_material
+	_light_shafts.color = Color.WHITE
+	add_child(_light_shafts)
 
 
 func _build_particles() -> void:
@@ -276,6 +296,9 @@ func _resize_local_field() -> void:
 		Vector2.ONE,
 		Vector2.DOWN,
 	])
+	if _light_shafts != null:
+		_light_shafts.polygon = _caustics.polygon
+		_light_shafts.uv = _caustics.uv
 
 
 func _apply_graphics_quality() -> void:
@@ -285,20 +308,29 @@ func _apply_graphics_quality() -> void:
 	var near_budget := 0
 	var refraction := 0.0
 	var grain := 0.002
+	var bloom := 0.0
+	var chromatic_aberration := 0.0
 	_quality_caustics_intensity = 0.055
+	_quality_light_shafts_intensity = 0.035
 	match _graphics_quality:
 		"medium":
 			far_budget = 56
 			near_budget = 8
 			refraction = 0.00075
 			grain = 0.003
+			bloom = 0.032
+			chromatic_aberration = 0.00022
 			_quality_caustics_intensity = 0.095
+			_quality_light_shafts_intensity = 0.068
 		"high":
 			far_budget = 96
 			near_budget = 16
 			refraction = 0.00115
 			grain = 0.004
+			bloom = 0.058
+			chromatic_aberration = 0.00042
 			_quality_caustics_intensity = 0.14
+			_quality_light_shafts_intensity = 0.105
 
 	_far_particles.amount = far_budget
 	_near_particles.amount = maxi(near_budget, 1)
@@ -307,6 +339,10 @@ func _apply_graphics_quality() -> void:
 	_near_particles.emitting = near_budget > 0
 	_post_process_material.set_shader_parameter("refraction_strength", refraction)
 	_post_process_material.set_shader_parameter("grain_strength", grain)
+	_post_process_material.set_shader_parameter("quality_level", VALID_GRAPHICS_QUALITIES.find(_graphics_quality))
+	_post_process_material.set_shader_parameter("bloom_strength", bloom)
+	_post_process_material.set_shader_parameter("chromatic_aberration", chromatic_aberration)
+	_light_shafts_material.set_shader_parameter("quality_level", VALID_GRAPHICS_QUALITIES.find(_graphics_quality))
 	_apply_environment_parameters()
 	_apply_reduced_motion()
 
@@ -326,6 +362,7 @@ func _apply_reduced_motion() -> void:
 		"refraction_strength",
 		0.0 if _reduced_motion else base_refraction
 	)
+	_light_shafts_material.set_shader_parameter("reduced_motion", _reduced_motion)
 
 
 func _apply_environment_parameters() -> void:
@@ -350,6 +387,17 @@ func _apply_environment_parameters() -> void:
 	_caustics_material.set_shader_parameter(
 		"intensity",
 		_quality_caustics_intensity * clampf(_profile_caustics_strength * 1.25, 0.22, 1.0)
+	)
+
+	_light_shafts_material.set_shader_parameter("anim_time", _visual_time)
+	_light_shafts_material.set_shader_parameter("reduced_motion", _reduced_motion)
+	_light_shafts_material.set_shader_parameter("flow_vector", _smoothed_flow)
+	_light_shafts_material.set_shader_parameter("world_anchor", _diver_position)
+	_light_shafts_material.set_shader_parameter("region_color", _region_color)
+	_light_shafts_material.set_shader_parameter("accent_color", _accent_color)
+	_light_shafts_material.set_shader_parameter(
+		"intensity",
+		_quality_light_shafts_intensity * lerpf(0.72, 1.0, _water_clarity)
 	)
 	_apply_particle_flow_and_color()
 

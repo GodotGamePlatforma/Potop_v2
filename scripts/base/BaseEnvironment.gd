@@ -92,6 +92,7 @@ var _sun_angular_distance := 0.70
 var _sun_shadow_opacity := 0.72
 var _deck_wetness := 0.45
 var _graphics_quality := "high"
+var _powered_presentation := false
 
 
 func build() -> void:
@@ -306,6 +307,13 @@ func configure_weather(weather) -> void:
 	_reset_splash_scheduler(current_time)
 	if _built:
 		_apply_animation(current_time, false)
+
+
+func set_powered_presentation(enabled: bool) -> void:
+	if _powered_presentation == enabled:
+		return
+	_powered_presentation = enabled
+	_apply_weather_to_world()
 
 
 func sync_building_states(game_state) -> void:
@@ -687,6 +695,7 @@ func _apply_weather_to_world() -> void:
 		_sun_shadow_opacity,
 		_deck_wetness
 	)
+	world_3d.set_powered_presentation(_powered_presentation)
 	_apply_far_rain_weather()
 
 

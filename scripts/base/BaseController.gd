@@ -36,8 +36,35 @@ const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const SurvivorPortraitScript := preload("res://scripts/ui/SurvivorPortrait.gd")
 const SurvivorInfoPresenterScript := preload("res://scripts/ui/SurvivorInfoPresenter.gd")
 
-const CREW_AVAILABLE_COLOR := Color("7bdca4")
-const CREW_DEVELOPMENT_COLOR := Color("f0c86b")
+const HUD_BASE := Color("092f37")
+const HUD_RAISED := Color("10464e")
+const HUD_RAISED_HOVER := Color("15545a")
+const HUD_BORDER := Color("2c7277")
+const HUD_TEXT := Color("f2f0e7")
+const HUD_MUTED := Color("b6cac6")
+const HUD_TEAL := Color("79c4c0")
+const HUD_AMBER := Color("f2af36")
+const HUD_AMBER_HOVER := Color("ffcb62")
+const HUD_AMBER_DARK := Color("a66318")
+const HUD_AMBER_PRESSED := Color("d68d20")
+const HUD_GREEN := Color("9bc85c")
+const HUD_CORAL := Color("ce6252")
+const HUD_DARK_TEXT := Color("092f37")
+const WORKSPACE_BASE := Color("efe7d7")
+const WORKSPACE_SURFACE := Color("e4d9c5")
+const WORKSPACE_SURFACE_RAISED := Color("f7f0e2")
+const WORKSPACE_BORDER := Color("c7b38e")
+const WORKSPACE_BORDER_SUBTLE := Color("d8c8ad")
+const WORKSPACE_TEXT := Color("203b3b")
+const WORKSPACE_MUTED := Color("607578")
+const WORKSPACE_TEAL := Color("147b80")
+const WORKSPACE_TEAL_HOVER := Color("3d9895")
+const WORKSPACE_GREEN := Color("4f843c")
+const WORKSPACE_CORAL := Color("a83e36")
+const WORKSPACE_DISABLED := Color("89928d")
+const WORKSPACE_DISABLED_SURFACE := Color("d9d2c4")
+const CREW_AVAILABLE_COLOR := HUD_GREEN
+const CREW_DEVELOPMENT_COLOR := HUD_AMBER
 const NARRATIVE_MUSIC_DUCK_DB := 3.5
 const NARRATIVE_MUSIC_DUCK_SECONDS := 0.18
 const NarrativeContentScript := preload("res://scripts/ui/NarrativeContent.gd")
@@ -85,10 +112,10 @@ const BUILDING_MANAGEMENT_SHORT_NAMES := {
 const BUILDING_WORKSPACE_SIDE_ANCHOR := 0.05
 const BUILDING_WORKSPACE_TOP_OFFSET := 68.0
 const BUILDING_WORKSPACE_BOTTOM_MARGIN := 82.0
-const BUILDING_NAVIGATION_RAIL_WIDTH := 112.0
-const BUILDING_RIGHT_SIDEBAR_WIDTH := 224.0
+const BUILDING_NAVIGATION_RAIL_WIDTH := 144.0
+const BUILDING_RIGHT_SIDEBAR_WIDTH := 264.0
 const BUILDING_WORKSPACE_SEPARATION := 12.0
-const BUILDING_NAVIGATION_TILE_HEIGHT := 86.0
+const BUILDING_NAVIGATION_TILE_HEIGHT := 82.0
 const BUILDING_MODAL_Z_INDEX := 50
 const BUILDING_ACTIVE_HUD_Z_INDEX := 60
 const BUILDING_FLYOUT_DISMISS_Z_INDEX := 61
@@ -176,8 +203,6 @@ var _day_plan_popover: PanelContainer
 var _hud_flyout_dismiss_layer: Control
 var _ration_hint: Label
 var _ration_picker: OptionButton
-var _weather_badge: PanelContainer
-var _weather_label: Label
 var _crew_button: Button
 var _survivors_panel: PanelContainer
 var _survivor_list: VBoxContainer
@@ -421,7 +446,6 @@ func _build_ui() -> void:
 
 	_build_hud_flyout_dismiss_layer()
 	_build_hud()
-	_build_weather_badge()
 	_build_survivor_panel()
 	_build_tutorial_panel()
 	_build_campaign_panel()
@@ -491,7 +515,7 @@ func _build_hud() -> void:
 	_resource_bar.offset_right = -14
 	_resource_bar.offset_bottom = 52
 	_resource_bar.z_index = BUILDING_ACTIVE_HUD_Z_INDEX
-	_resource_bar.add_theme_stylebox_override("panel", _panel_style(Color("091216ed"), Color("40585d"), 1))
+	_resource_bar.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.93), HUD_BORDER, 1))
 	_hud_root.add_child(_resource_bar)
 
 	var margin := MarginContainer.new()
@@ -510,11 +534,11 @@ func _build_hud() -> void:
 	_day_label.custom_minimum_size = Vector2(78, 0)
 	_day_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_day_label.add_theme_font_size_override("font_size", 16)
-	_day_label.add_theme_color_override("font_color", Color("f0d6a4"))
+	_day_label.add_theme_color_override("font_color", HUD_AMBER)
 	_top_status_row.add_child(_day_label)
 
 	var divider := VSeparator.new()
-	divider.add_theme_color_override("separator", Color("526368"))
+	divider.add_theme_color_override("separator", HUD_BORDER)
 	_top_status_row.add_child(divider)
 
 	_resource_label = RichTextLabel.new()
@@ -527,7 +551,7 @@ func _build_hud() -> void:
 	_resource_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	_resource_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_resource_label.add_theme_font_size_override("normal_font_size", 12)
-	_resource_label.add_theme_color_override("default_color", Color("d8e1df"))
+	_resource_label.add_theme_color_override("default_color", HUD_TEXT)
 	_top_status_row.add_child(_resource_label)
 
 	_day_plan_button = Button.new()
@@ -537,10 +561,10 @@ func _build_hud() -> void:
 	_day_plan_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_day_plan_button.tooltip_text = "Sprawdź lub zmień racje na bieżący dzień. Tempo ustawiasz osobno w panelu każdego budynku."
 	_day_plan_button.add_theme_font_size_override("font_size", 11)
-	_day_plan_button.add_theme_stylebox_override("normal", _hud_button_style(Color("142126e8"), Color("465d62"), 1))
-	_day_plan_button.add_theme_stylebox_override("hover", _hud_button_style(Color("1b2d33f0"), Color("79a6a3"), 1))
-	_day_plan_button.add_theme_stylebox_override("pressed", _hud_button_style(Color("101b1f"), Color("d8ae62"), 2))
-	_day_plan_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), Color("e1bb70"), 2))
+	_day_plan_button.add_theme_stylebox_override("normal", _hud_button_style(Color(HUD_RAISED, 0.94), HUD_BORDER, 1))
+	_day_plan_button.add_theme_stylebox_override("hover", _hud_button_style(Color(HUD_RAISED_HOVER, 0.96), HUD_TEAL, 1))
+	_day_plan_button.add_theme_stylebox_override("pressed", _hud_button_style(HUD_BASE, HUD_AMBER, 2))
+	_day_plan_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), HUD_TEAL, 2))
 	_day_plan_button.pressed.connect(_on_day_plan_button_pressed)
 	_top_status_row.add_child(_day_plan_button)
 
@@ -558,7 +582,7 @@ func _build_day_plan_popover() -> void:
 	_day_plan_popover.visible = false
 	_day_plan_popover.z_index = BUILDING_FLYOUT_Z_INDEX
 	_day_plan_popover.mouse_filter = Control.MOUSE_FILTER_STOP
-	_day_plan_popover.add_theme_stylebox_override("panel", _panel_style(Color("0c171bf8"), Color("c69d56"), 2))
+	_day_plan_popover.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.98), HUD_AMBER, 2))
 	_hud_root.add_child(_day_plan_popover)
 
 	var margin := MarginContainer.new()
@@ -577,7 +601,7 @@ func _build_day_plan_popover() -> void:
 	title.text = "PLAN DNIA"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_font_size_override("font_size", 14)
-	title.add_theme_color_override("font_color", Color("f0cf8b"))
+	title.add_theme_color_override("font_color", HUD_AMBER)
 	header.add_child(title)
 	var close := Button.new()
 	close.name = "CloseDayPlanButton"
@@ -590,7 +614,7 @@ func _build_day_plan_popover() -> void:
 	var ration_label := Label.new()
 	ration_label.text = "RACJE ŻYWNOŚCIOWE"
 	ration_label.add_theme_font_size_override("font_size", 11)
-	ration_label.add_theme_color_override("font_color", Color("8fa6a4"))
+	ration_label.add_theme_color_override("font_color", HUD_MUTED)
 	content.add_child(ration_label)
 
 	_ration_picker = OptionButton.new()
@@ -612,7 +636,7 @@ func _build_day_plan_popover() -> void:
 	_ration_hint = Label.new()
 	_ration_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_ration_hint.add_theme_font_size_override("font_size", 11)
-	_ration_hint.add_theme_color_override("font_color", Color("b7c4c1"))
+	_ration_hint.add_theme_color_override("font_color", HUD_TEXT)
 	content.add_child(_ration_hint)
 
 func _build_survivor_panel() -> void:
@@ -622,8 +646,8 @@ func _build_survivor_panel() -> void:
 	_crew_button.z_index = BUILDING_ACTIVE_ACTION_Z_INDEX - BUILDING_ACTIVE_HUD_Z_INDEX
 	_crew_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_crew_button.add_theme_font_size_override("font_size", 11)
-	_crew_button.add_theme_stylebox_override("pressed", _hud_button_style(Color("101b1f"), Color("d8ae62"), 2))
-	_crew_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), Color("e1bb70"), 2))
+	_crew_button.add_theme_stylebox_override("pressed", _hud_button_style(HUD_BASE, HUD_AMBER, 2))
+	_crew_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), HUD_TEAL, 2))
 	_crew_button.pressed.connect(_on_crew_button_pressed)
 	_top_status_row.add_child(_crew_button)
 	_top_status_row.move_child(_crew_button, _day_plan_button.get_index())
@@ -637,7 +661,7 @@ func _build_survivor_panel() -> void:
 	_survivors_panel.visible = false
 	_survivors_panel.z_index = BUILDING_FLYOUT_Z_INDEX
 	_survivors_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_survivors_panel.add_theme_stylebox_override("panel", _panel_style(Color("0b1519f8"), Color("587176"), 1))
+	_survivors_panel.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.98), HUD_BORDER, 1))
 	_hud_root.add_child(_survivors_panel)
 
 	var margin := MarginContainer.new()
@@ -657,7 +681,7 @@ func _build_survivor_panel() -> void:
 	title.text = "ZAŁOGA"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_font_size_override("font_size", 16)
-	title.add_theme_color_override("font_color", Color("e9c779"))
+	title.add_theme_color_override("font_color", HUD_AMBER)
 	header.add_child(title)
 	var close := Button.new()
 	close.name = "CloseCrewButton"
@@ -683,28 +707,6 @@ func _build_survivor_panel() -> void:
 	_survivor_list.add_theme_constant_override("separation", 7)
 	survivor_scroll.add_child(_survivor_list)
 
-func _build_weather_badge() -> void:
-	_weather_badge = PanelContainer.new()
-	_weather_badge.name = "WeatherBadge"
-	_weather_badge.custom_minimum_size = Vector2(166, 30)
-	_weather_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_weather_badge.add_theme_stylebox_override("panel", _panel_style(Color("101c20d9"), Color("40565b")))
-	_top_status_row.add_child(_weather_badge)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 3)
-	margin.add_theme_constant_override("margin_bottom", 3)
-	_weather_badge.add_child(margin)
-
-	_weather_label = Label.new()
-	_weather_label.name = "WeatherLabel"
-	_weather_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_weather_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_weather_label.add_theme_font_size_override("font_size", 11)
-	margin.add_child(_weather_label)
-
 func _build_tutorial_panel() -> void:
 	_tutorial_panel = PanelContainer.new()
 	_tutorial_panel.name = "TutorialPanel"
@@ -714,7 +716,7 @@ func _build_tutorial_panel() -> void:
 	_tutorial_panel.offset_bottom = 156
 	_tutorial_panel.z_index = 65
 	_tutorial_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tutorial_panel.add_theme_stylebox_override("panel", _panel_style(Color("141b1bf7"), Color("e7ad4f"), 2))
+	_tutorial_panel.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.97), HUD_AMBER, 2))
 	_hud_root.add_child(_tutorial_panel)
 
 	var margin := MarginContainer.new()
@@ -734,7 +736,7 @@ func _build_tutorial_panel() -> void:
 	_tutorial_title.name = "TutorialTitle"
 	_tutorial_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tutorial_title.add_theme_font_size_override("font_size", 13)
-	_tutorial_title.add_theme_color_override("font_color", Color("ffd074"))
+	_tutorial_title.add_theme_color_override("font_color", HUD_AMBER_HOVER)
 	content.add_child(_tutorial_title)
 
 	_tutorial_body = Label.new()
@@ -742,7 +744,7 @@ func _build_tutorial_panel() -> void:
 	_tutorial_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tutorial_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tutorial_body.add_theme_font_size_override("font_size", 12)
-	_tutorial_body.add_theme_color_override("font_color", Color("e4e7e3"))
+	_tutorial_body.add_theme_color_override("font_color", HUD_TEXT)
 	content.add_child(_tutorial_body)
 
 func _build_campaign_panel() -> void:
@@ -754,7 +756,7 @@ func _build_campaign_panel() -> void:
 	_campaign_panel.offset_top = -174
 	_campaign_panel.offset_right = 404
 	_campaign_panel.offset_bottom = -16
-	_campaign_panel.add_theme_stylebox_override("panel", _panel_style(Color("0b171bf2"), Color("58a9a6"), 1))
+	_campaign_panel.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.95), HUD_BORDER, 1))
 	_hud_root.add_child(_campaign_panel)
 
 	var margin := MarginContainer.new()
@@ -786,7 +788,7 @@ func _build_campaign_panel() -> void:
 	_campaign_act_label = Label.new()
 	_campaign_act_label.name = "CampaignActLabel"
 	_campaign_act_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_campaign_act_label.add_theme_color_override("font_color", Color("f0ca79"))
+	_campaign_act_label.add_theme_color_override("font_color", HUD_AMBER)
 	_campaign_act_label.add_theme_font_size_override("font_size", 11)
 	header.add_child(_campaign_act_label)
 	_campaign_details_button = Button.new()
@@ -794,9 +796,9 @@ func _build_campaign_panel() -> void:
 	_campaign_details_button.text = "WIĘCEJ"
 	_campaign_details_button.custom_minimum_size = Vector2(70, 25)
 	_campaign_details_button.add_theme_font_size_override("font_size", 10)
-	_campaign_details_button.add_theme_stylebox_override("normal", _hud_button_style(Color("142126d8"), Color("40585d"), 1))
-	_campaign_details_button.add_theme_stylebox_override("hover", _hud_button_style(Color("1b2d33e8"), Color("79a6a3"), 1))
-	_campaign_details_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), Color("e1bb70"), 2))
+	_campaign_details_button.add_theme_stylebox_override("normal", _hud_button_style(Color(HUD_RAISED, 0.90), HUD_BORDER, 1))
+	_campaign_details_button.add_theme_stylebox_override("hover", _hud_button_style(Color(HUD_RAISED_HOVER, 0.95), HUD_TEAL, 1))
+	_campaign_details_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), HUD_TEAL, 2))
 	_campaign_details_button.tooltip_text = "Rozwiń listę celów śledzonego zadania."
 	_campaign_details_button.pressed.connect(_on_campaign_details_pressed)
 	header.add_child(_campaign_details_button)
@@ -804,13 +806,13 @@ func _build_campaign_panel() -> void:
 	_campaign_objective_label.name = "CampaignObjectiveLabel"
 	_campaign_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_campaign_objective_label.add_theme_font_size_override("font_size", 12)
-	_campaign_objective_label.add_theme_color_override("font_color", Color("dbe6e2"))
+	_campaign_objective_label.add_theme_color_override("font_color", HUD_TEXT)
 	content.add_child(_campaign_objective_label)
 	_campaign_artifacts_label = Label.new()
 	_campaign_artifacts_label.name = "CampaignArtifactsLabel"
 	_campaign_artifacts_label.visible = false
 	_campaign_artifacts_label.add_theme_font_size_override("font_size", 11)
-	_campaign_artifacts_label.add_theme_color_override("font_color", Color("9fc4c1"))
+	_campaign_artifacts_label.add_theme_color_override("font_color", HUD_TEAL)
 	_campaign_artifacts_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(_campaign_artifacts_label)
 	_campaign_progress = ProgressBar.new()
@@ -855,13 +857,13 @@ func _build_end_day_button() -> void:
 	_end_day_button.offset_bottom = -16
 	_end_day_button.z_index = BUILDING_ACTIVE_ACTION_Z_INDEX
 	_end_day_button.add_theme_font_size_override("font_size", 12)
-	_end_day_button.add_theme_color_override("font_color", Color("d9e1de"))
-	_end_day_button.add_theme_color_override("font_hover_color", Color("fff0cf"))
-	_end_day_button.add_theme_color_override("font_pressed_color", Color("fff0cf"))
-	_end_day_button.add_theme_color_override("font_focus_color", Color("fff0cf"))
-	_end_day_button.add_theme_color_override("font_disabled_color", Color("899391"))
-	_end_day_button.add_theme_stylebox_override("pressed", _hud_button_style(Color("172226"), Color("d8ae62"), 2))
-	_end_day_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), Color("e1bb70"), 2))
+	_end_day_button.add_theme_color_override("font_color", HUD_DARK_TEXT)
+	_end_day_button.add_theme_color_override("font_hover_color", HUD_DARK_TEXT)
+	_end_day_button.add_theme_color_override("font_pressed_color", HUD_DARK_TEXT)
+	_end_day_button.add_theme_color_override("font_focus_color", HUD_DARK_TEXT)
+	_end_day_button.add_theme_color_override("font_disabled_color", HUD_MUTED)
+	_end_day_button.add_theme_stylebox_override("pressed", _hud_button_style(HUD_AMBER_PRESSED, HUD_AMBER_DARK, 2))
+	_end_day_button.add_theme_stylebox_override("focus", _hud_button_style(Color("00000000"), HUD_TEAL, 2))
 	_end_day_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_end_day_button.pressed.connect(_on_end_day_pressed)
 	_hud_root.add_child(_end_day_button)
@@ -872,7 +874,7 @@ func _build_tooltip() -> void:
 	_tooltip.visible = false
 	_tooltip.z_index = 40
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tooltip.add_theme_stylebox_override("panel", _panel_style(Color("0d1518f2"), Color("5f777a")))
+	_tooltip.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.95), HUD_BORDER))
 	_hud_root.add_child(_tooltip)
 
 	var margin := MarginContainer.new()
@@ -882,7 +884,7 @@ func _build_tooltip() -> void:
 	margin.add_theme_constant_override("margin_bottom", 7)
 	_tooltip.add_child(margin)
 	_tooltip_label = Label.new()
-	_tooltip_label.add_theme_color_override("font_color", Color("edf0e8"))
+	_tooltip_label.add_theme_color_override("font_color", HUD_TEXT)
 	margin.add_child(_tooltip_label)
 
 func _build_action_feedback() -> void:
@@ -1021,7 +1023,7 @@ func _build_modal() -> void:
 	_survivor_development_panel = PanelContainer.new()
 	_survivor_development_panel.name = "SurvivorDevelopmentPanel"
 	_survivor_development_panel.custom_minimum_size = Vector2(650, 540)
-	_survivor_development_panel.add_theme_stylebox_override("panel", _panel_style(Color("10191cfc"), Color("d0a85d"), 2))
+	_survivor_development_panel.add_theme_stylebox_override("panel", _panel_style(WORKSPACE_BASE, WORKSPACE_TEAL, 2))
 	_survivor_development_panel.visible = false
 	_modal_center.add_child(_survivor_development_panel)
 	_raise_management_hud_above_modal()
@@ -1057,7 +1059,7 @@ func _build_building_navigation_rail() -> void:
 			continue
 		var button := Button.new()
 		button.name = "BuildingNav_%s" % slot_id
-		button.custom_minimum_size = Vector2(96, BUILDING_NAVIGATION_TILE_HEIGHT)
+		button.custom_minimum_size = Vector2(128, BUILDING_NAVIGATION_TILE_HEIGHT)
 		button.focus_mode = Control.FOCUS_ALL
 		button.pressed.connect(_on_building_navigation_selected.bind(slot_id))
 		_building_navigation_list.add_child(button)
@@ -1069,14 +1071,14 @@ func _build_building_navigation_rail() -> void:
 		tile_margin.add_theme_constant_override("margin_right", 5)
 		tile_margin.add_theme_constant_override("margin_bottom", 4)
 		button.add_child(tile_margin)
-		var tile_content := VBoxContainer.new()
+		var tile_content := HBoxContainer.new()
 		tile_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tile_content.add_theme_constant_override("separation", 1)
+		tile_content.add_theme_constant_override("separation", 5)
 		tile_margin.add_child(tile_content)
 		var tile_icon := TextureRect.new()
 		tile_icon.name = "BuildingNavIcon"
-		tile_icon.custom_minimum_size = Vector2(0, 54)
-		tile_icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tile_icon.custom_minimum_size = Vector2(54, 0)
+		tile_icon.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		tile_icon.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		tile_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tile_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1084,12 +1086,13 @@ func _build_building_navigation_rail() -> void:
 		tile_content.add_child(tile_icon)
 		var tile_label := Label.new()
 		tile_label.name = "BuildingNavLabel"
-		tile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tile_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		tile_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		tile_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tile_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tile_label.add_theme_font_size_override("font_size", 10)
-		tile_label.add_theme_color_override("font_color", Color("e7eee8"))
+		tile_label.add_theme_color_override("font_color", HUD_TEXT)
 		tile_content.add_child(tile_label)
 		_building_navigation_buttons[slot_id] = button
 
@@ -1113,6 +1116,7 @@ func _render_building_navigation_rail() -> void:
 		var tile_label := button.find_child("BuildingNavLabel", true, false) as Label
 		if tile_label != null:
 			tile_label.text = "%s%s\n%s" % ["▶ " if selected else "", short_name, state_text]
+			tile_label.add_theme_color_override("font_color", HUD_AMBER if selected else HUD_TEXT)
 		button.tooltip_text = "%s\n%s" % [definition.display_name if definition != null else short_name, _slot_tooltip_text(slot_id)]
 		var tile_icon := button.find_child("BuildingNavIcon", true, false) as TextureRect
 		if tile_icon != null:
@@ -1121,10 +1125,10 @@ func _render_building_navigation_rail() -> void:
 		button.add_theme_stylebox_override("hover", _building_navigation_button_style(selected, true, false))
 		button.add_theme_stylebox_override("pressed", _building_navigation_button_style(true, true, false))
 		button.add_theme_stylebox_override("focus", _building_navigation_button_style(selected, false, true))
-		button.add_theme_color_override("font_color", Color("e7eee8"))
-		button.add_theme_color_override("font_hover_color", Color("ffffff"))
-		button.add_theme_color_override("font_pressed_color", Color("ffffff"))
-		button.add_theme_color_override("font_focus_color", Color("ffffff"))
+		button.add_theme_color_override("font_color", HUD_TEXT)
+		button.add_theme_color_override("font_hover_color", HUD_TEXT)
+		button.add_theme_color_override("font_pressed_color", HUD_TEXT)
+		button.add_theme_color_override("font_focus_color", HUD_TEXT)
 		button.add_theme_font_size_override("font_size", 11)
 		button.set_meta("selected", selected)
 		button.set_meta("state_text", state_text)
@@ -1200,7 +1204,6 @@ func _render() -> void:
 	if game_state == null:
 		_day_label.text = "Ładowanie..."
 		_resource_label.text = ""
-		_weather_badge.visible = false
 		_crew_button.visible = false
 		_day_plan_button.disabled = true
 		_day_plan_button.tooltip_text = "Trwa ładowanie stanu kampanii."
@@ -1225,12 +1228,16 @@ func _render() -> void:
 
 	if game_root != null and game_root.has_method("reconcile_missions"):
 		game_root.reconcile_missions()
+	_environment.set_powered_presentation(
+		game_state.story_flags != null and bool(game_state.story_flags.junction_j7_active)
+	)
 	_environment.configure_weather(game_state.weather)
-	_render_weather()
 	_sync_tutorial_state()
 	_layout_building_slots()
 	_day_label.text = "DZIEŃ %d" % game_state.day
-	_resource_label.text = "[color=#94aaa8]ŻYW[/color] [color=#f1f4ef]%d[/color]  [color=#94aaa8]LEKI[/color] [color=#f1f4ef]%d[/color]  [color=#60777b]│[/color]  [color=#94aaa8]DES[/color] [color=#f1f4ef]%d[/color]  [color=#94aaa8]ZŁOM[/color] [color=#f1f4ef]%d[/color]  [color=#94aaa8]TKAN[/color] [color=#f1f4ef]%d[/color]  [color=#94aaa8]TECH[/color] [color=#f1f4ef]%d[/color]  [color=#60777b]│[/color]  [color=#d2ae67]NADZ[/color] [color=#f4cf81]%d[/color]  [color=#75aaa5]POMOST[/color] [color=#bfe2d8]%d%%[/color]" % [
+	var population: int = game_state.get_alive_survivors().size()
+	var shelter_capacity: int = _building_effect_system.shelter_capacity_for_state(game_state)
+	_resource_label.text = "[color=#B6CAC6]ŻYW[/color] [color=#F2F0E7]%d[/color]  [color=#B6CAC6]LEKI[/color] [color=#F2F0E7]%d[/color]  [color=#2C7277]│[/color]  [color=#B6CAC6]DES[/color] [color=#F2F0E7]%d[/color]  [color=#B6CAC6]ZŁOM[/color] [color=#F2F0E7]%d[/color]  [color=#B6CAC6]TKAN[/color] [color=#F2F0E7]%d[/color]  [color=#B6CAC6]TECH[/color] [color=#F2F0E7]%d[/color]  [color=#2C7277]│[/color]  [color=#F2AF36]NADZ[/color] [color=#FFCB62]%d[/color]  [color=#79C4C0]POMOST[/color] [color=#F2F0E7]%d%%[/color]  [color=#2C7277]│[/color]  [color=#F2F0E7]%d/%d[/color] [color=#B6CAC6]MIESZKAŃCÓW[/color]" % [
 		game_state.resources.get_amount(ResourceIdsScript.FOOD),
 		game_state.resources.get_amount(ResourceIdsScript.MEDS_CHEMICALS),
 		game_state.resources.get_amount(ResourceIdsScript.PLANKS),
@@ -1239,8 +1246,10 @@ func _render() -> void:
 		game_state.resources.get_amount(ResourceIdsScript.TECH_PARTS),
 		game_state.resources.get_amount(ResourceIdsScript.HOPE),
 		game_state.resources.get_amount(ResourceIdsScript.PLATFORM_INTEGRITY),
+		population,
+		shelter_capacity,
 	]
-	_resource_label.tooltip_text = "Jedzenie • Chemikalia i leki • Deski • Złom • Tkaniny i guma • Części techniczne • Nadzieja • Integralność platformy"
+	_resource_label.tooltip_text = "Jedzenie • Chemikalia i leki • Deski • Złom • Tkaniny i guma • Części techniczne • Nadzieja • Integralność platformy • Mieszkańcy / miejsca schronienia"
 	_append_disease_resource_summary(_disease_system.campaign_presentation(game_state, GameDatabase.diseases))
 	_ration_picker.disabled = not game_state.can_edit_day_plan()
 	if game_state.tutorial != null and game_state.tutorial.step == TutorialStateScript.Step.SET_RATIONS:
@@ -1276,7 +1285,7 @@ func _append_disease_resource_summary(campaign_view: Dictionary) -> void:
 	var threshold := int(campaign_view.get("outbreak_threshold", 0))
 	var badge := "EPID" if outbreak_active else "CHOR"
 	var badge_color := "#e59a7d" if outbreak_active else "#d9bb75"
-	_resource_label.text += "  [color=#50656a]•[/color]  [color=%s]%s[/color] [color=#eef3ec]%d/%d[/color]" % [
+	_resource_label.text += "  [color=#2C7277]•[/color]  [color=%s]%s[/color] [color=#F2F0E7]%d/%d[/color]" % [
 		badge_color,
 		badge,
 		active_count,
@@ -1341,25 +1350,6 @@ func _render_settlement_event() -> void:
 	if _modal_layer != null and _modal_layer.visible:
 		_close_building_panel(false)
 	_settlement_event_panel.present(event_state, offer_snapshot, game_state)
-
-func _render_weather() -> void:
-	_weather_badge.visible = game_state != null and game_state.weather != null
-	if not _weather_badge.visible:
-		return
-	var weather = game_state.weather
-	var condition_id := str(weather.condition_id()) if weather.has_method("condition_id") else "moderate"
-	var display_name := str(weather.display_name()) if weather.has_method("display_name") else "Umiarkowane fale"
-	_weather_label.text = "MORZE  •  %s" % display_name.to_upper()
-	var color := Color("b9c8c8")
-	match condition_id:
-		"calm":
-			color = Color("a7c8c5")
-		"rough":
-			color = Color("e2bd78")
-		"storm":
-			color = Color("f08c72")
-	_weather_label.add_theme_color_override("font_color", color)
-	_weather_badge.add_theme_stylebox_override("panel", _panel_style(Color("101c20d9"), Color(color.r, color.g, color.b, 0.58), 1))
 
 func _render_survivors() -> void:
 	_crew_button.visible = true
@@ -1525,9 +1515,9 @@ func _render_survivors() -> void:
 		"  %d osób wymaga uwagi." % attention_count if attention_count > 0 else "",
 		"  Epidemia jest aktywna." if outbreak_active else ("  Aktywne przypadki choroby: %d." % active_case_count if active_case_count > 0 else ("  Oczekujące narażenia: %d." % pending_exposure_count if pending_exposure_count > 0 else "")),
 	]
-	var crew_border := Color("d1886b") if attention_count > 0 else Color("5c777a")
-	_crew_button.add_theme_stylebox_override("normal", _hud_button_style(Color("101c20e8"), crew_border, 1))
-	_crew_button.add_theme_stylebox_override("hover", _hud_button_style(Color("19292eef"), crew_border.lightened(0.18), 1))
+	var crew_border := HUD_CORAL if attention_count > 0 else HUD_BORDER
+	_crew_button.add_theme_stylebox_override("normal", _hud_button_style(Color(HUD_RAISED, 0.94), crew_border, 1))
+	_crew_button.add_theme_stylebox_override("hover", _hud_button_style(Color(HUD_RAISED_HOVER, 0.98), crew_border.lightened(0.18), 1))
 	if _survivors_panel != null and _survivors_panel.visible:
 		call_deferred("_refresh_crew_focus_after_render", focused_survivor_button_name)
 
@@ -1684,6 +1674,9 @@ func _render_slots() -> void:
 		var is_target: bool = game_state.tutorial.is_active() and str(slot_data.get("definition_id", "")) == target_definition
 		var queued: bool = building != null and building.is_under_construction()
 		slot.set_state(is_target, queued)
+		var definition = GameDatabase.buildings.get(str(slot_data.get("definition_id", "")))
+		var rebuild_is_affordable := building == null and definition != null and _building_system.can_afford(game_state, _building_system.get_build_cost(game_state, definition))
+		slot.set_rebuild_indicator(building == null, rebuild_is_affordable)
 
 func _render_tutorial() -> void:
 	var tutorial = game_state.tutorial
@@ -1795,9 +1788,9 @@ func _render_campaign() -> void:
 	if _campaign_scroll != null:
 		_campaign_scroll.scroll_vertical = 0
 	if bool(story.crisis_active):
-		_campaign_panel.add_theme_stylebox_override("panel", _panel_style(Color("251516f2"), Color("d07867"), 2))
+		_campaign_panel.add_theme_stylebox_override("panel", _panel_style(Color("3a2425f2"), HUD_CORAL, 2))
 	else:
-		_campaign_panel.add_theme_stylebox_override("panel", _panel_style(Color("0b171bf2"), Color("58a9a6"), 1))
+		_campaign_panel.add_theme_stylebox_override("panel", _panel_style(Color(HUD_BASE, 0.95), HUD_BORDER, 1))
 
 func _next_mission_step(raw_objectives, fallback: String) -> String:
 	if raw_objectives is Array:
@@ -1857,9 +1850,9 @@ func _render_end_day_button() -> void:
 	var blocker := _end_day_blocker()
 	_end_day_button.disabled = not blocker.is_empty()
 	_end_day_button.tooltip_text = blocker if not blocker.is_empty() else "Rozlicz zaplanowane prace, racje i skutki dnia."
-	_end_day_button.add_theme_stylebox_override("normal", _hud_button_style(Color("9b5b20") if is_target else Color("253338e8"), Color("ffd16a") if is_target else Color("56696d"), 3 if is_target else 1))
-	_end_day_button.add_theme_stylebox_override("hover", _hud_button_style(Color("b46d27"), Color("f4c965"), 2))
-	_end_day_button.add_theme_stylebox_override("disabled", _hud_button_style(Color("18212494"), Color("34424670"), 1))
+	_end_day_button.add_theme_stylebox_override("normal", _hud_button_style(HUD_AMBER_HOVER if is_target else HUD_AMBER, HUD_AMBER_DARK, 3 if is_target else 2))
+	_end_day_button.add_theme_stylebox_override("hover", _hud_button_style(HUD_AMBER_HOVER, HUD_AMBER_DARK, 2))
+	_end_day_button.add_theme_stylebox_override("disabled", _hud_button_style(Color(HUD_BASE, 0.68), Color(HUD_BORDER, 0.62), 1))
 	_end_day_button.text = "ZAKOŃCZ DZIEŃ  ›"
 
 func _refresh_open_panel() -> void:
@@ -1871,7 +1864,17 @@ func _refresh_open_panel() -> void:
 		_close_building_panel()
 		return
 	var building = _building_system.get_building_for_slot(game_state, _selected_slot_id)
-	_building_panel.configure(game_state, _selected_slot_id, definition, building, _building_system, _production_system, game_state.tutorial.step)
+	var header_art_level := 1 if building == null else clampi(maxi(int(building.level), int(building.pending_level)), 1, 4)
+	_building_panel.configure(
+		game_state,
+		_selected_slot_id,
+		definition,
+		building,
+		_building_system,
+		_production_system,
+		game_state.tutorial.step,
+		_building_art_texture(str(definition.id), header_art_level)
+	)
 	_building_panel.refresh_layout(_building_panel_available_size(size))
 	_render_building_navigation_rail()
 	if _focus_building_on_next_refresh:
@@ -2132,11 +2135,12 @@ func _on_diver_selected(survivor_id: String) -> void:
 		return
 	var station = game_state.find_building_by_definition("diving_station")
 	var definition = GameDatabase.buildings.get("diving_station")
-	if not _expedition_preparation_system.select_diver(game_state, station, definition, survivor_id):
+	var changed := _expedition_preparation_system.clear_selected_diver(game_state) if survivor_id.is_empty() else _expedition_preparation_system.select_diver(game_state, station, definition, survivor_id)
+	if not changed:
 		return
 	if survivor_id.is_empty():
 		_render()
-		_show_action_feedback("WYBÓR NURKA WYCZYSZCZONY", Color("a7b8b7"))
+		_show_action_feedback("ZAPAMIĘTANY NUREK WYCZYSZCZONY", Color("a7b8b7"))
 		return
 	if survivor_id == "igor":
 		_tutorial_event("igor_assigned")
@@ -2352,19 +2356,23 @@ func _render_plan_controls() -> void:
 		and game_state.tutorial.is_active()
 		and game_state.tutorial.step == TutorialStateScript.Step.SET_RATIONS
 	)
+	var plan_ink := HUD_DARK_TEXT if is_tutorial_target else HUD_TEXT
+	for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		_day_plan_button.add_theme_color_override(color_name, plan_ink)
+	_day_plan_button.add_theme_color_override("font_disabled_color", HUD_MUTED)
 	_day_plan_button.add_theme_stylebox_override(
 		"normal",
 		_hud_button_style(
-			Color("9b5b20") if is_tutorial_target else Color("172429"),
-			Color("ffd16a") if is_tutorial_target else Color("465d62"),
+			HUD_AMBER if is_tutorial_target else HUD_RAISED,
+			HUD_AMBER_DARK if is_tutorial_target else HUD_BORDER,
 			3 if is_tutorial_target else 1
 		)
 	)
 	_day_plan_button.add_theme_stylebox_override(
 		"hover",
 		_hud_button_style(
-			Color("b46d27") if is_tutorial_target else Color("203238"),
-			Color("ffe09a") if is_tutorial_target else Color("7fb0ad"),
+			HUD_AMBER_HOVER if is_tutorial_target else HUD_RAISED_HOVER,
+			HUD_AMBER_DARK if is_tutorial_target else HUD_TEAL,
 			3 if is_tutorial_target else 1
 		)
 	)
@@ -2516,7 +2524,7 @@ func _show_action_feedback(message: String, accent: Color) -> void:
 	_action_feedback_label.add_theme_color_override("font_color", accent.lightened(0.18))
 	_action_feedback.add_theme_stylebox_override(
 		"panel",
-		_panel_style(Color(0.045, 0.075, 0.082, 0.97), Color(accent.r, accent.g, accent.b, 0.92), 2)
+		_panel_style(Color(HUD_BASE, 0.97), Color(accent.r, accent.g, accent.b, 0.92), 2)
 	)
 	_action_feedback.visible = true
 	_action_feedback.modulate = Color.WHITE
@@ -2659,11 +2667,12 @@ func _populate_survivor_panel(survivor) -> void:
 	title.text = "%s  •  %s" % [survivor.display_name.to_upper(), profession_summary]
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_font_size_override("font_size", 23)
-	title.add_theme_color_override("font_color", Color("f0d08a"))
+	title.add_theme_color_override("font_color", WORKSPACE_TEXT)
 	header.add_child(title)
 	var close := Button.new()
 	close.name = "CloseSurvivorDevelopment"
 	close.text = "Zamknij"
+	_apply_workspace_secondary_button_style(close)
 	close.pressed.connect(_close_building_panel)
 	header.add_child(close)
 	var scroll := ScrollContainer.new()
@@ -2679,13 +2688,13 @@ func _populate_survivor_panel(survivor) -> void:
 	var biography := Label.new()
 	biography.text = survivor.biography
 	biography.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	biography.add_theme_color_override("font_color", Color("aebdba"))
+	biography.add_theme_color_override("font_color", WORKSPACE_MUTED)
 	body.add_child(biography)
 	var progress := Label.new()
 	progress.name = "SurvivorDevelopmentProgress"
 	progress.text = "POZIOM %d  •  PD %d / %d  •  PUNKTY ROZWOJU %d" % [survivor.level, survivor.experience, survivor.experience_to_next_level(), survivor.unspent_skill_points]
 	progress.add_theme_font_size_override("font_size", 15)
-	progress.add_theme_color_override("font_color", Color("8fd0ce"))
+	progress.add_theme_color_override("font_color", WORKSPACE_TEAL)
 	body.add_child(progress)
 	var stats := Label.new()
 	stats.name = "SurvivorDevelopmentStats"
@@ -2699,6 +2708,7 @@ func _populate_survivor_panel(survivor) -> void:
 		survivor.morale,
 	]
 	stats.add_theme_font_size_override("font_size", 16)
+	stats.add_theme_color_override("font_color", WORKSPACE_TEXT)
 	stats.tooltip_text = SurvivorInfoPresenterScript.combined_state_tooltip(survivor)
 	body.add_child(stats)
 	var traits := HBoxContainer.new()
@@ -2708,19 +2718,20 @@ func _populate_survivor_panel(survivor) -> void:
 	positive_trait.name = "SurvivorPositiveTrait"
 	positive_trait.text = "ATUT  •  %s" % str(survivor.positive_trait).capitalize()
 	positive_trait.tooltip_text = SurvivorInfoPresenterScript.trait_tooltip(str(survivor.positive_trait), true)
-	positive_trait.add_theme_color_override("font_color", Color("8fd7a3"))
+	positive_trait.add_theme_color_override("font_color", WORKSPACE_GREEN)
 	traits.add_child(positive_trait)
 	var negative_trait := Label.new()
 	negative_trait.name = "SurvivorNegativeTrait"
 	negative_trait.text = "SŁABOŚĆ  •  %s" % str(survivor.negative_trait).capitalize()
 	negative_trait.tooltip_text = SurvivorInfoPresenterScript.trait_tooltip(str(survivor.negative_trait), false)
-	negative_trait.add_theme_color_override("font_color", Color("d7ae7f"))
+	negative_trait.add_theme_color_override("font_color", WORKSPACE_CORAL)
 	traits.add_child(negative_trait)
 	_build_survivor_competency_summary(body, survivor)
 	_build_survivor_profession_progress(body, survivor)
 	_build_survivor_profession_talent_summary(body, survivor)
 	_build_survivor_disease_section(body, survivor)
 	var separator := HSeparator.new()
+	separator.add_theme_stylebox_override("separator", _panel_style(WORKSPACE_BORDER_SUBTLE, WORKSPACE_BORDER_SUBTLE, 0))
 	column.add_child(separator)
 	var footer := VBoxContainer.new()
 	footer.name = "SurvivorDevelopmentActions"
@@ -2731,10 +2742,10 @@ func _populate_survivor_panel(survivor) -> void:
 	var development_blocker := _career_progression_system.development_blocker(game_state, survivor, "health")
 	if development_blocker.is_empty():
 		hint.text = "Aktywny Dom Wspólnoty pozwala wydać punkt na jedno trwałe ulepszenie:"
-		hint.add_theme_color_override("font_color", Color("b9c8c5"))
+		hint.add_theme_color_override("font_color", WORKSPACE_MUTED)
 	else:
 		hint.text = development_blocker
-		hint.add_theme_color_override("font_color", Color("e5aa88"))
+		hint.add_theme_color_override("font_color", WORKSPACE_CORAL)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer.add_child(hint)
 	var buttons := HBoxContainer.new()
@@ -2751,7 +2762,7 @@ func _build_survivor_competency_summary(content: VBoxContainer, survivor) -> voi
 	heading.text = "KOMPETENCJE PASYWNE"
 	heading.tooltip_text = SurvivorInfoPresenterScript.section_tooltip("competencies")
 	heading.add_theme_font_size_override("font_size", 13)
-	heading.add_theme_color_override("font_color", Color("e1b873"))
+	heading.add_theme_color_override("font_color", HUD_AMBER_DARK)
 	content.add_child(heading)
 	var grid := GridContainer.new()
 	grid.name = "SurvivorCompetencySummary"
@@ -2771,7 +2782,7 @@ func _build_survivor_competency_summary(content: VBoxContainer, survivor) -> voi
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.add_theme_font_size_override("font_size", 11)
-		label.add_theme_color_override("font_color", Color("9fc7c3"))
+		label.add_theme_color_override("font_color", WORKSPACE_TEAL)
 		grid.add_child(label)
 
 
@@ -2783,7 +2794,7 @@ func _build_survivor_profession_progress(content: VBoxContainer, survivor) -> vo
 	var heading := Label.new()
 	heading.text = "DOŚWIADCZENIE ZAWODOWE"
 	heading.add_theme_font_size_override("font_size", 14)
-	heading.add_theme_color_override("font_color", Color("e1b873"))
+	heading.add_theme_color_override("font_color", HUD_AMBER_DARK)
 	section.add_child(heading)
 	for profession_id in _career_progression_system.get_profession_ids():
 		var definition = _career_progression_system.get_profession_definition(profession_id)
@@ -2796,7 +2807,7 @@ func _build_survivor_profession_progress(content: VBoxContainer, survivor) -> vo
 		line.name = "ProfessionProgress_%s" % profession_id
 		line.text = "%s  •  %s  •  %d / %d" % [definition.display_name, rank_name, practice, threshold]
 		line.add_theme_font_size_override("font_size", 12)
-		line.add_theme_color_override("font_color", Color("b9c8c5"))
+		line.add_theme_color_override("font_color", WORKSPACE_MUTED)
 		section.add_child(line)
 		var bar := ProgressBar.new()
 		bar.name = "ProfessionProgressBar_%s" % profession_id
@@ -2804,6 +2815,8 @@ func _build_survivor_profession_progress(content: VBoxContainer, survivor) -> vo
 		bar.value = mini(practice, threshold)
 		bar.show_percentage = false
 		bar.custom_minimum_size = Vector2(0, 8)
+		bar.add_theme_stylebox_override("background", _panel_style(WORKSPACE_SURFACE, WORKSPACE_BORDER, 1))
+		bar.add_theme_stylebox_override("fill", _panel_style(WORKSPACE_TEAL, WORKSPACE_TEAL, 0))
 		section.add_child(bar)
 
 
@@ -2832,7 +2845,7 @@ func _build_survivor_profession_talent_summary(content: VBoxContainer, survivor)
 	var heading := Label.new()
 	heading.text = "TALENTY ZAWODOWE"
 	heading.add_theme_font_size_override("font_size", 13)
-	heading.add_theme_color_override("font_color", Color("e1b873"))
+	heading.add_theme_color_override("font_color", HUD_AMBER_DARK)
 	section.add_child(heading)
 	for entry in selected:
 		var talent = entry.talent
@@ -2841,7 +2854,7 @@ func _build_survivor_profession_talent_summary(content: VBoxContainer, survivor)
 		label.text = "%s  •  %s" % [str(entry.profession_name).to_upper(), str(talent.display_name).to_upper()]
 		label.tooltip_text = str(talent.description)
 		label.add_theme_font_size_override("font_size", 11)
-		label.add_theme_color_override("font_color", Color("9fd3a9"))
+		label.add_theme_color_override("font_color", WORKSPACE_GREEN)
 		section.add_child(label)
 
 
@@ -2856,7 +2869,7 @@ func _build_survivor_disease_section(content: VBoxContainer, survivor) -> void:
 	var heading := Label.new()
 	heading.text = "CHOROBY I PLAN OPIEKI"
 	heading.add_theme_font_size_override("font_size", 14)
-	heading.add_theme_color_override("font_color", Color("e1b873"))
+	heading.add_theme_color_override("font_color", HUD_AMBER_DARK)
 	section.add_child(heading)
 	var isolated: bool = (
 		game_state != null
@@ -2877,7 +2890,7 @@ func _build_survivor_disease_section(content: VBoxContainer, survivor) -> void:
 		)
 		var card := PanelContainer.new()
 		card.name = "DiseaseCard_%s" % str(view.get("disease_id", "unknown"))
-		card.add_theme_stylebox_override("panel", _panel_style(Color("181d1df2"), Color("a97a57"), 1))
+		card.add_theme_stylebox_override("panel", _panel_style(WORKSPACE_SURFACE_RAISED, WORKSPACE_CORAL, 1))
 		section.add_child(card)
 		var margin := MarginContainer.new()
 		margin.add_theme_constant_override("margin_left", 12)
@@ -2895,7 +2908,7 @@ func _build_survivor_disease_section(content: VBoxContainer, survivor) -> void:
 			str(view.get("phase_label", "Nieznany etap")).to_upper(),
 		]
 		title.add_theme_font_size_override("font_size", 15)
-		title.add_theme_color_override("font_color", Color("efc17f"))
+		title.add_theme_color_override("font_color", WORKSPACE_CORAL)
 		card_content.add_child(title)
 		var effects := Label.new()
 		effects.name = "DiseaseEffects_%s" % str(view.get("disease_id", "unknown"))
@@ -2905,7 +2918,7 @@ func _build_survivor_disease_section(content: VBoxContainer, survivor) -> void:
 			"DOZWOLONE" if bool(view.get("dive_allowed", false)) else "ZABLOKOWANE",
 		]
 		effects.add_theme_font_size_override("font_size", 13)
-		effects.add_theme_color_override("font_color", Color("d8e0dc"))
+		effects.add_theme_color_override("font_color", WORKSPACE_TEXT)
 		card_content.add_child(effects)
 		var plan := Label.new()
 		plan.name = "DiseasePlan_%s" % str(view.get("disease_id", "unknown"))
@@ -2914,14 +2927,14 @@ func _build_survivor_disease_section(content: VBoxContainer, survivor) -> void:
 			"TAK" if prioritized else "NIE",
 		]
 		plan.add_theme_font_size_override("font_size", 12)
-		plan.add_theme_color_override("font_color", Color("a8b9b5"))
+		plan.add_theme_color_override("font_color", WORKSPACE_MUTED)
 		card_content.add_child(plan)
 		var forecast_label := Label.new()
 		forecast_label.name = "DiseaseForecast_%s" % str(view.get("disease_id", "unknown"))
 		forecast_label.text = _disease_forecast_text(forecast)
 		forecast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		forecast_label.add_theme_font_size_override("font_size", 12)
-		forecast_label.add_theme_color_override("font_color", Color("c8d2ce"))
+		forecast_label.add_theme_color_override("font_color", WORKSPACE_MUTED)
 		card_content.add_child(forecast_label)
 
 	var controls := HBoxContainer.new()
@@ -2932,6 +2945,7 @@ func _build_survivor_disease_section(content: VBoxContainer, survivor) -> void:
 	var isolation_button := Button.new()
 	isolation_button.name = "IsolationIntentButton_%s" % str(survivor.id)
 	isolation_button.text = "Zakończ izolację" if isolated else "Zaplanuj izolację"
+	_apply_workspace_secondary_button_style(isolation_button)
 	isolation_button.disabled = not isolation_blocker.is_empty()
 	isolation_button.tooltip_text = isolation_blocker if not isolation_blocker.is_empty() else (
 		"Izolacja zachowuje trwałe przypisanie, ale blokuje pracę i nurkowanie."
@@ -3161,6 +3175,7 @@ func _add_development_button(parent: HBoxContainer, survivor, stat_id: String, t
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.custom_minimum_size = Vector2(0, 82)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_workspace_primary_button_style(button)
 	var blocker := _survivor_development_blocker(survivor, stat_id)
 	button.disabled = not blocker.is_empty()
 	button.tooltip_text = blocker if not blocker.is_empty() else "Wydaj jeden punkt rozwoju na trwałe ulepszenie."
@@ -3255,8 +3270,8 @@ func _apply_normalized_rect(control: Control, rect: Rect2) -> void:
 
 func _building_navigation_rail_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("0b1418fb")
-	style.border_color = Color("4d817d")
+	style.bg_color = Color(HUD_BASE, 0.98)
+	style.border_color = HUD_BORDER
 	style.set_border_width_all(2)
 	style.corner_radius_top_left = 6
 	style.corner_radius_top_right = 6
@@ -3270,8 +3285,8 @@ func _building_navigation_rail_style() -> StyleBoxFlat:
 
 func _building_navigation_button_style(selected: bool, hovered: bool, focused: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("203238") if selected else Color("1b2b30") if hovered else Color("142126")
-	style.border_color = Color("d39b4a") if selected else Color("69b8af") if focused else Color("354f50")
+	style.bg_color = HUD_RAISED if selected else HUD_RAISED_HOVER if hovered else Color("0b3940")
+	style.border_color = HUD_AMBER if selected else HUD_TEAL if focused else HUD_BORDER
 	style.set_border_width_all(3 if selected or focused else 1)
 	style.corner_radius_top_left = 5
 	style.corner_radius_top_right = 5
@@ -3306,3 +3321,29 @@ func _hud_button_style(fill: Color, border: Color, width: int) -> StyleBoxFlat:
 	style.content_margin_left = 9
 	style.content_margin_right = 9
 	return style
+
+
+func _apply_workspace_secondary_button_style(button: Button) -> void:
+	button.add_theme_color_override("font_color", WORKSPACE_TEXT)
+	button.add_theme_color_override("font_hover_color", WORKSPACE_TEXT)
+	button.add_theme_color_override("font_pressed_color", WORKSPACE_TEXT)
+	button.add_theme_color_override("font_focus_color", WORKSPACE_TEXT)
+	button.add_theme_color_override("font_disabled_color", WORKSPACE_DISABLED)
+	button.add_theme_stylebox_override("normal", _button_style(WORKSPACE_SURFACE_RAISED, WORKSPACE_TEAL, 1))
+	button.add_theme_stylebox_override("hover", _button_style(WORKSPACE_BASE, WORKSPACE_TEAL_HOVER, 2))
+	button.add_theme_stylebox_override("pressed", _button_style(WORKSPACE_SURFACE, HUD_AMBER_DARK, 2))
+	button.add_theme_stylebox_override("focus", _button_style(WORKSPACE_BASE, WORKSPACE_TEAL_HOVER, 2))
+	button.add_theme_stylebox_override("disabled", _button_style(WORKSPACE_DISABLED_SURFACE, WORKSPACE_BORDER_SUBTLE, 1))
+
+
+func _apply_workspace_primary_button_style(button: Button) -> void:
+	button.add_theme_color_override("font_color", HUD_DARK_TEXT)
+	button.add_theme_color_override("font_hover_color", HUD_DARK_TEXT)
+	button.add_theme_color_override("font_pressed_color", HUD_DARK_TEXT)
+	button.add_theme_color_override("font_focus_color", HUD_DARK_TEXT)
+	button.add_theme_color_override("font_disabled_color", WORKSPACE_DISABLED)
+	button.add_theme_stylebox_override("normal", _button_style(HUD_AMBER, HUD_AMBER_DARK, 1))
+	button.add_theme_stylebox_override("hover", _button_style(HUD_AMBER_HOVER, HUD_AMBER_DARK, 2))
+	button.add_theme_stylebox_override("pressed", _button_style(HUD_AMBER_PRESSED, HUD_AMBER_DARK, 2))
+	button.add_theme_stylebox_override("focus", _button_style(HUD_AMBER_HOVER, WORKSPACE_TEAL_HOVER, 2))
+	button.add_theme_stylebox_override("disabled", _button_style(WORKSPACE_DISABLED_SURFACE, WORKSPACE_BORDER_SUBTLE, 1))
