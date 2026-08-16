@@ -1,6 +1,6 @@
 # Instrukcje warsztatu mapy podwodnej
 
-Ten plik obowiązuje dla Codexa uruchomionego z katalogu `underwater_map_workbench/`. Jest lokalnym, bardziej szczegółowym rozszerzeniem korzeniowego `../AGENTS.md`: zawęża pracę do mapy podwodnej, ale nie osłabia globalnej bramki rozbieżności, ochrony zapisu, zasad testów ani zakazu destrukcyjnych operacji.
+Ten plik obowiązuje dla zadań mapy uruchomionych z katalogu `underwater_map_workbench/` oraz semantycznie zrutowanych tutaj przez `../AGENTS.md`. Przed komendami katalog roboczy narzędzi musi wskazywać `underwater_map_workbench/`. Jest lokalnym, bardziej szczegółowym rozszerzeniem korzeniowego `../AGENTS.md`: zawęża pracę do mapy podwodnej, ale nie osłabia globalnej bramki rozbieżności, ochrony zapisu, zasad testów ani zakazu destrukcyjnych operacji.
 
 ## Punkt wejścia i granica projektu
 
@@ -18,7 +18,7 @@ Ten plik obowiązuje dla Codexa uruchomionego z katalogu `underwater_map_workben
 
 ## Proporcjonalny kontekst
 
-Dla zadań uruchomionych w tym katalogu poniższy routing zastępuje ogólny wymóg pełnego odczytu wszystkich dokumentów przy każdej drobnej pracy mapowej. Globalne zasady bezpieczeństwa i właściciele dokumentacji nadal obowiązują.
+Dla zadań mapy zrutowanych do tego pliku poniższy routing zastępuje ogólny wymóg pełnego odczytu wszystkich dokumentów przy każdej drobnej pracy mapowej. Globalne zasady bezpieczeństwa i właściciele dokumentacji nadal obowiązują.
 
 1. Zawsze przeczytaj lokalny `.ai/PROJECT_CONTEXT.md` oraz indeks aktywnych wpisów w lokalnym `.ai/DECISIONS.md`.
 2. Praca wyłącznie wizualna wymaga odpowiednich wpisów lokalnych MAP-ARD, mapowych akapitów `../.ai/PROJECT_CONTEXT.md`, właściwych aktywnych ARD oraz tylko tych sekcji produktu i architektury, których dotyka zmiana; dla szerokiego tła są to co najmniej produkt 7.1 oraz architektura 9.1-9.1.2 i mapowa część 13.

@@ -6,7 +6,7 @@ Jesteś programistą Godot pracującym w tym repozytorium. Stosuj konwencje Godo
 
 ## Kontekst przed pracą
 
-Jeżeli Codex został uruchomiony z `underwater_map_workbench/`, a główny zakres zadania dotyczy mapy podwodnej lub jej grafiki, najpierw przeczytaj bliższy `underwater_map_workbench/AGENTS.md` i zastosuj jego proporcjonalny routing kontekstu. Jest to jedyny zatwierdzony wyjątek od poniższego ogólnego protokołu pełnego odczytu; nie osłabia globalnej bramki rozbieżności, ochrony zapisu, zasad testów ani właścicieli dokumentacji.
+Jeżeli główny zakres zadania dotyczy mapy podwodnej lub jej grafiki, niezależnie od początkowego katalogu roboczego najpierw przeczytaj `underwater_map_workbench/AGENTS.md`, ustaw katalog roboczy narzędzi na `underwater_map_workbench/` i zastosuj jego proporcjonalny routing kontekstu. Jest to jedyny zatwierdzony wyjątek od poniższego ogólnego protokołu pełnego odczytu; nie osłabia globalnej bramki rozbieżności, ochrony zapisu, zasad testów ani właścicieli dokumentacji.
 
 Przed analizą repozytorium, planem zmian lub edycją przeczytaj w całości, w tej kolejności:
 
