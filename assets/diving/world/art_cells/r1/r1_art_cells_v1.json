@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "region_id": "R1",
+  "display_name": "Dachy Umarłego Miasta",
+  "role": "Presentation-only overlapping source ArtCells composed offline into streamed runtime crops",
+  "source": "OpenAI built-in imagegen using supplied visual targets and sequential far-background continuation references",
+  "cell_size": [2730, 1536],
+  "world_size": [11520, 1536],
+  "overlap": 426,
+  "stride": 2304,
+  "runtime_layer": "R1ArtCells",
+  "runtime_z_index": -96,
+  "runtime_light_mode": "unshaded",
+  "constraints": [
+    "background-only",
+    "extreme-distant-background-only",
+    "neutral diffuse source without baked light, glow or emissive windows",
+    "lighting, atmospheric motion and parallax remain Godot runtime effects",
+    "no collision authority",
+    "no gameplay objects",
+    "no map authoring nodes",
+    "canonical terrain remains foreground authority",
+    "constant one source pixel per world unit after normalization"
+  ],
+  "cells": [
+    {
+      "id": "Background_001",
+      "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_001.png",
+      "world_origin": [0, 0],
+      "focus": "western edge of the minute drowned-city skyline",
+      "generation_prompt": "Extreme-distance R1 background several kilometres behind gameplay; tiny low-contrast drowned skyline readable through the middle-lower frame, with its tallest roofs and spires around 45-60 percent of image height; upper 45 percent remains open hazy water; flat dim diffuse blue-teal albedo with no rays, caustics, glow, lit windows or hotspots; no fish or other baked living forms; no foreground, traversal cue, diver, UI, text or gameplay prop; calm low-detail side overlaps."
+    },
+    {
+      "id": "Background_002",
+      "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_002.png",
+      "world_origin": [2304, 0],
+      "focus": "remote observatory and antenna silhouettes",
+      "generation_prompt": "Seamless right continuation of Background_001; match water, haze, diffuse exposure, grain, skyline baseline and extreme apparent distance across the left overlap; keep the upper 45 percent as open murky water; introduce only very small broken domes and thin aerials through the middle-lower frame; no baked light, glow, emissive detail, fish or other living silhouettes; no foreground, traversal cue, diver, UI, text or gameplay prop; calm low-detail side overlaps."
+    },
+    {
+      "id": "Background_003",
+      "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_003.png",
+      "world_origin": [4608, 0],
+      "focus": "remote research-district silhouettes",
+      "generation_prompt": "Seamless right continuation of Background_002 with identical extreme distance, diffuse exposure, haze and skyline baseline; upper 45 percent remains open water; minute research-district roofs, tiny collapsed domes and hair-thin towers remain readable through the middle-lower frame and dissolve into dark water below; no rays, caustics, bloom, lamps, lit windows, hotspots, fish or other living forms; no foreground, collision cue, diver, UI, text or gameplay prop."
+    },
+    {
+      "id": "Background_004",
+      "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_004.png",
+      "world_origin": [6912, 0],
+      "focus": "remote eroded archival skyline",
+      "generation_prompt": "Seamless right continuation of Background_003; same dark blue-teal water, quiet diffuse tone, haze, skyline baseline and extreme scale; tiny eroded blocks, skeletal aerials and very small domes stay several kilometres away through the middle-lower frame; upper 45 percent remains open water; no foreground or sharp texture; zero baked rays, caustics, glow, lamps, emissive windows, hotspots, fish or other living silhouettes; calm low-detail side overlaps."
+    },
+    {
+      "id": "Background_005",
+      "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_005.png",
+      "world_origin": [9216, 0],
+      "focus": "eastern skyline fading into open depth",
+      "generation_prompt": "Final seamless right continuation of Background_004; the upper 45 percent remains open murky water; sparse minute roofs, hair-thin masts and barely visible domes stay several kilometres away through the middle-lower frame, then simplify gently toward the calm map edge without an abrupt skyline drop; neutral dim diffuse albedo with no rays, caustics, glow, lamps, lit windows, hotspots, fish or other living forms; no foreground, traversal cue, diver, UI, text or gameplay prop."
+    }
+  ]
+}

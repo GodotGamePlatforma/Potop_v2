@@ -1,4 +1,5 @@
 {
+  "art_cell_generator": "tools/build_dive_art_cells.py",
   "filter_gutter": 2,
   "generator": "tools/build_dive_visual_chunks.py",
   "grid_chunk_size": 1024,
@@ -416,11 +417,728 @@
       "id": "environment_decoration",
       "rendered_pixel_count": 773371,
       "runtime_parent": "EnvironmentDecoration",
+      "source_archived": true,
       "source_decoded_rgba_bytes": 298598400,
       "source_path": "res://assets/diving/world/map_v2/visuals/duzaMapaEnvironmentDecorationLayer-v3.png",
       "source_sha256": "be51666e1f72711551434e497b00550d8a54ea118a986c4d6aef6fbd443d8d6e",
       "source_size_bytes": 1658961,
       "z_index": -90
+    },
+    {
+      "chunks": [
+        {
+          "coord": [
+            0,
+            0
+          ],
+          "key": "r1_art_cells:0:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_00_00.png",
+          "sha256": "2637282a2b9e9c5831de4c985f911b60594e85c444b37873290c13e7e31d0f9b",
+          "source_rect": [
+            0,
+            0,
+            1026,
+            1026
+          ],
+          "texture_region": [
+            0,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            0,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            1,
+            0
+          ],
+          "key": "r1_art_cells:1:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_01_00.png",
+          "sha256": "dac686476c3c9eabe8f0b5e1ded89e02e14dbbe92d54c396be1e848f78ef5c21",
+          "source_rect": [
+            1022,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            1024,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            2,
+            0
+          ],
+          "key": "r1_art_cells:2:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_02_00.png",
+          "sha256": "7ee8dcdb94858b6f62c921d9c92cbcb07ee7ae2b3db9bca2d30143c5b1d9da9f",
+          "source_rect": [
+            2046,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            2048,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            3,
+            0
+          ],
+          "key": "r1_art_cells:3:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_03_00.png",
+          "sha256": "59feeff0bec92fac18e850d2bbb0dea209b242df79d208b27b0fb9d687c2e8a5",
+          "source_rect": [
+            3070,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            3072,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            4,
+            0
+          ],
+          "key": "r1_art_cells:4:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_04_00.png",
+          "sha256": "75a3d7322cf21e692f2a3eb4705f64a294aa5932d6712a06780f21bf75c4d950",
+          "source_rect": [
+            4094,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            4096,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            5,
+            0
+          ],
+          "key": "r1_art_cells:5:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_05_00.png",
+          "sha256": "911f450b0e321552ad67ac2aa6df6a65b26847ff7a48eda7b6e85d5d79e6be0d",
+          "source_rect": [
+            5118,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            5120,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            6,
+            0
+          ],
+          "key": "r1_art_cells:6:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_06_00.png",
+          "sha256": "17b75a279b4c086ec552faf86da38b3f38d534a643860660d4f1b0b52959a843",
+          "source_rect": [
+            6142,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            6144,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            7,
+            0
+          ],
+          "key": "r1_art_cells:7:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_07_00.png",
+          "sha256": "c8661d4cf8b6dfcf46d04006935d6beafb117a2443af4484700cb7d7a0fa0520",
+          "source_rect": [
+            7166,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            7168,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            8,
+            0
+          ],
+          "key": "r1_art_cells:8:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_08_00.png",
+          "sha256": "2b61ca912515a7eb3a1ea18d3e4c835806df0e9b34f8415245b5aef606a04b5a",
+          "source_rect": [
+            8190,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            8192,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            9,
+            0
+          ],
+          "key": "r1_art_cells:9:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_09_00.png",
+          "sha256": "7c95e4a065f517d7292a82d5787dd731f169f8f1ba0c187f485512b2047c66ab",
+          "source_rect": [
+            9214,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            9216,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            10,
+            0
+          ],
+          "key": "r1_art_cells:10:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_10_00.png",
+          "sha256": "e2ed9efc878436f45affa4c387a27ae6cfae9e45c7d19eb1c61da1367b8bc3c3",
+          "source_rect": [
+            10238,
+            0,
+            1028,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            1024,
+            1024
+          ],
+          "world_rect": [
+            10240,
+            0,
+            1024,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            11,
+            0
+          ],
+          "key": "r1_art_cells:11:0",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_11_00.png",
+          "sha256": "e280a14c9a87b738b973436d938b5119ce0b9b652e65421c0b6f9612052b38e5",
+          "source_rect": [
+            11262,
+            0,
+            258,
+            1026
+          ],
+          "texture_region": [
+            2,
+            0,
+            256,
+            1024
+          ],
+          "world_rect": [
+            11264,
+            0,
+            256,
+            1024
+          ]
+        },
+        {
+          "coord": [
+            0,
+            1
+          ],
+          "key": "r1_art_cells:0:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_00_01.png",
+          "sha256": "c89915a1735bb9e591c3849f0b22ee88b823873e008ae099b533ce982ae5a2c3",
+          "source_rect": [
+            0,
+            1022,
+            1026,
+            514
+          ],
+          "texture_region": [
+            0,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            0,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            1,
+            1
+          ],
+          "key": "r1_art_cells:1:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_01_01.png",
+          "sha256": "af5f63eb6ddd58181fd71b31103fcd802dfe5ac93f9e688343494da500a1bc05",
+          "source_rect": [
+            1022,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            1024,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            2,
+            1
+          ],
+          "key": "r1_art_cells:2:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_02_01.png",
+          "sha256": "6ce104c88fc69cce6ffbc32cb2a9769990859f22f4783de5f2034602a83e162e",
+          "source_rect": [
+            2046,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            2048,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            3,
+            1
+          ],
+          "key": "r1_art_cells:3:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_03_01.png",
+          "sha256": "76ab6ab98ff4e5fa17c350f8e360bad442e47a4887e6f44cc8ad38573851ce33",
+          "source_rect": [
+            3070,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            3072,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            4,
+            1
+          ],
+          "key": "r1_art_cells:4:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_04_01.png",
+          "sha256": "d41c280047a490af095a540341eddf653c73c2f6bca6c7a65e1ce601d9f46d97",
+          "source_rect": [
+            4094,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            4096,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            5,
+            1
+          ],
+          "key": "r1_art_cells:5:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_05_01.png",
+          "sha256": "9248b77d4721a3447d7081542b0944d15f3efad4b687ff9b4d3d1e3d23895df9",
+          "source_rect": [
+            5118,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            5120,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            6,
+            1
+          ],
+          "key": "r1_art_cells:6:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_06_01.png",
+          "sha256": "88e7cb7de47b9ecb88b468410a53bb106a97c071c978235a066c618acdd16ff0",
+          "source_rect": [
+            6142,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            6144,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            7,
+            1
+          ],
+          "key": "r1_art_cells:7:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_07_01.png",
+          "sha256": "f9727a87d9b0f06d96b1298e7057ce0e3d4ee4cecb401bb36d79ab5ef80082be",
+          "source_rect": [
+            7166,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            7168,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            8,
+            1
+          ],
+          "key": "r1_art_cells:8:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_08_01.png",
+          "sha256": "b63af790b8c40d0f8bfa12a503eb5ed4b87f037f1b9dd1fdae7a8577c3c15845",
+          "source_rect": [
+            8190,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            8192,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            9,
+            1
+          ],
+          "key": "r1_art_cells:9:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_09_01.png",
+          "sha256": "ff3caeec1ca0f04b7e536551a902d87663560cc8d3f3a2c37721be8f312bfedc",
+          "source_rect": [
+            9214,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            9216,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            10,
+            1
+          ],
+          "key": "r1_art_cells:10:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_10_01.png",
+          "sha256": "c538f8e5832fa2757a755db151d5f8615e922f4706b7d89dbf4676359de62ad2",
+          "source_rect": [
+            10238,
+            1022,
+            1028,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            1024,
+            512
+          ],
+          "world_rect": [
+            10240,
+            1024,
+            1024,
+            512
+          ]
+        },
+        {
+          "coord": [
+            11,
+            1
+          ],
+          "key": "r1_art_cells:11:1",
+          "path": "res://assets/diving/world/map_v2/visual_chunks/r1_art_cells/chunk_11_01.png",
+          "sha256": "1782db7c62fefbcd4c4697c007ccb01350e4508d2360d1a1b98c180695140fea",
+          "source_rect": [
+            11262,
+            1022,
+            258,
+            514
+          ],
+          "texture_region": [
+            2,
+            2,
+            256,
+            512
+          ],
+          "world_rect": [
+            11264,
+            1024,
+            256,
+            512
+          ]
+        }
+      ],
+      "generated_chunk_count": 24,
+      "generated_decoded_rgba_bytes": 71234240,
+      "id": "r1_art_cells",
+      "light_mode": "unshaded",
+      "rendered_pixel_count": 17694720,
+      "runtime_parent": "R1ArtCells",
+      "source_assets": [
+        {
+          "id": "Background_001",
+          "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_001.png",
+          "sha256": "2962c6c9a9e1dcc8bc556f59ab3fc2e9096c245dc2fa88cc05d124377e66758e",
+          "size_bytes": 2668684,
+          "world_origin": [
+            0,
+            0
+          ]
+        },
+        {
+          "id": "Background_002",
+          "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_002.png",
+          "sha256": "7576bcdb12b269bbd3143052a39093f62f5ea869a5236f50fec63124ff27c4d7",
+          "size_bytes": 2486248,
+          "world_origin": [
+            2304,
+            0
+          ]
+        },
+        {
+          "id": "Background_003",
+          "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_003.png",
+          "sha256": "1131e3e31a8ec31c39cd3e37b976026f89366be85dd3c6e8c5a6f18f80e2adaa",
+          "size_bytes": 2447358,
+          "world_origin": [
+            4608,
+            0
+          ]
+        },
+        {
+          "id": "Background_004",
+          "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_004.png",
+          "sha256": "acf21b52da03a0b26b1a3fc74ee99212841886727d5a9a623ac27f77278088b8",
+          "size_bytes": 2396361,
+          "world_origin": [
+            6912,
+            0
+          ]
+        },
+        {
+          "id": "Background_005",
+          "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_005.png",
+          "sha256": "598deb0c59761a9502000274eca555c9b7c2a467e1db90dd4cc2e622fdfec60d",
+          "size_bytes": 2380285,
+          "world_origin": [
+            9216,
+            0
+          ]
+        }
+      ],
+      "source_assets_size_bytes": 12378936,
+      "source_decoded_rgba_bytes": 83865600,
+      "source_path": "res://assets/diving/world/art_cells/r1/r1_art_cells_v1.json",
+      "source_sha256": "151c5cdd2beb369e5e6eadcb14b8d9645bc0825c9f309009996df800de47c25a",
+      "source_size_bytes": 4511,
+      "z_index": -96
     }
   ],
   "schema_version": 1,

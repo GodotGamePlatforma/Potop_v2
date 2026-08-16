@@ -129,6 +129,40 @@ const EXPECTED_CABLE_CONTROL_POINTS := {
 const BLOCKAGE_VISUAL_PATH := "res://scenes/diving/map_visuals/TutorialCableBlockageVisual.tscn"
 const R1_J7_ART_CELL_VISUAL_PATH := "res://scenes/diving/map_visuals/R1J7ArtCell.tscn"
 const R3_POWER_PLANT_MIDGROUND_VISUAL_PATH := "res://scenes/diving/map_visuals/R3PowerPlantMidgroundVisual.tscn"
+const R1_ART_CELL_LIBRARY_PATH := "res://assets/diving/world/art_cells/r1/r1_art_cells_v1.json"
+const UNDERWATER_MAP_SCENE_PATH := "res://scenes/diving/UnderwaterMap.tscn"
+const R1_ART_CELL_SIZE := Vector2i(2730, 1536)
+const R1_ART_CELL_WORLD_SIZE := Vector2i(11_520, 1536)
+const R1_ART_CELL_OVERLAP := 426
+const R1_ART_CELL_STRIDE := 2304
+const R1_ART_CELL_Z_INDEX := -96
+const EXPECTED_R1_ART_CELLS := [
+	{
+		"id": "Background_001",
+		"path": "res://assets/diving/world/art_cells/r1/r1_art_cell_001.png",
+		"world_origin": Vector2i(0, 0),
+	},
+	{
+		"id": "Background_002",
+		"path": "res://assets/diving/world/art_cells/r1/r1_art_cell_002.png",
+		"world_origin": Vector2i(2304, 0),
+	},
+	{
+		"id": "Background_003",
+		"path": "res://assets/diving/world/art_cells/r1/r1_art_cell_003.png",
+		"world_origin": Vector2i(4608, 0),
+	},
+	{
+		"id": "Background_004",
+		"path": "res://assets/diving/world/art_cells/r1/r1_art_cell_004.png",
+		"world_origin": Vector2i(6912, 0),
+	},
+	{
+		"id": "Background_005",
+		"path": "res://assets/diving/world/art_cells/r1/r1_art_cell_005.png",
+		"world_origin": Vector2i(9216, 0),
+	},
+]
 
 const REQUIRED_AUTHORING_GROUPS := [
 	"VisualLayers",
@@ -184,6 +218,7 @@ func _initialize() -> void:
 	var generation_errors: PackedStringArray = compiler.generate(world, 91_001)
 	_assert(generation_errors.is_empty(), "Scena mapy musi kompilować się bez błędów: %s" % "; ".join(generation_errors))
 	_test_prefab_catalog()
+	_test_r1_art_cell_layer()
 	_test_shared_obstacle_raster()
 	_test_chunked_boundary_segments()
 	if generation_errors.is_empty():
@@ -213,6 +248,83 @@ func _test_prefab_catalog() -> void:
 	for prefab_name in REQUIRED_PREFABS:
 		var prefab_path := "res://scenes/diving/map_objects/%s" % prefab_name
 		_assert(ResourceLoader.exists(prefab_path), "Brakuje prefabu authoringu mapy: %s." % prefab_path)
+
+
+func _test_r1_art_cell_layer() -> void:
+	var packed := ResourceLoader.load(UNDERWATER_MAP_SCENE_PATH) as PackedScene
+	_assert(packed != null, "Scena mapy musi dać się załadować do kontroli warstwy R1 ArtCells.")
+	if packed == null:
+		return
+	var map_root := packed.instantiate()
+	var layer := map_root.get_node_or_null("VisualLayers/R1ArtCells") as Node2D
+	_assert(layer != null, "UnderwaterMap musi publikować prezentacyjny slot VisualLayers/R1ArtCells.")
+	if layer != null:
+		_assert(layer.z_index == R1_ART_CELL_Z_INDEX, "R1 ArtCells muszą leżeć pod dalekim tłem i nie konkurować z kanonicznym terenem.")
+		_assert(layer.get_child_count() == 0, "Scena nie może preloadować pełnych ArtCells; slot wypełnia streamer cropów.")
+	_assert(FileAccess.file_exists(R1_ART_CELL_LIBRARY_PATH), "Biblioteka źródłowych R1 ArtCells musi być wersjonowanym JSON-em.")
+	if FileAccess.file_exists(R1_ART_CELL_LIBRARY_PATH):
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(R1_ART_CELL_LIBRARY_PATH))
+		_assert(parsed is Dictionary, "Biblioteka R1 ArtCells musi mieć poprawny root JSON.")
+		if parsed is Dictionary:
+			var library: Dictionary = parsed
+			var cells: Array = library.get("cells", [])
+			_assert(int(library.get("schema_version", 0)) == 1, "Biblioteka R1 ArtCells musi mieć jawną wersję.")
+			_assert(str(library.get("region_id", "")) == "R1", "Biblioteka ArtCells musi jednoznacznie należeć do R1.")
+			var cell_size: Array = library.get("cell_size", [])
+			_assert(
+				cell_size.size() == 2
+				and int(cell_size[0]) == R1_ART_CELL_SIZE.x
+				and int(cell_size[1]) == R1_ART_CELL_SIZE.y,
+				"Wszystkie R1 ArtCells muszą zachować stałe 2730x1536."
+			)
+			var world_size: Array = library.get("world_size", [])
+			_assert(
+				world_size.size() == 2
+				and int(world_size[0]) == R1_ART_CELL_WORLD_SIZE.x
+				and int(world_size[1]) == R1_ART_CELL_WORLD_SIZE.y,
+				"Biblioteka R1 musi pokrywać dokładnie pas 11520x1536."
+			)
+			_assert(
+				int(library.get("overlap", 0)) == R1_ART_CELL_OVERLAP
+				and int(library.get("stride", 0)) == R1_ART_CELL_STRIDE,
+				"Biblioteka R1 musi zachować zatwierdzony zakład 426 i stride 2304."
+			)
+			_assert(str(library.get("runtime_layer", "")) == "R1ArtCells", "Biblioteka R1 musi wskazywać wyłącznie slot prezentacyjny R1ArtCells.")
+			_assert(int(library.get("runtime_z_index", 0)) == R1_ART_CELL_Z_INDEX, "Biblioteka R1 musi zachować runtime z-index -96.")
+			_assert(str(library.get("runtime_light_mode", "")) == "unshaded", "Biblioteka R1 musi wymuszać unshaded dla ekstremalnie dalekiego planu.")
+			_assert(cells.size() == EXPECTED_R1_ART_CELLS.size(), "Pełny pas R1 musi składać się z pięciu źródłowych ArtCells.")
+			var seen_ids := {}
+			var seen_paths := {}
+			for cell_index in range(mini(cells.size(), EXPECTED_R1_ART_CELLS.size())):
+				var cell_variant = cells[cell_index]
+				_assert(cell_variant is Dictionary, "Każdy wpis biblioteki R1 ArtCells musi być słownikiem.")
+				if not (cell_variant is Dictionary):
+					continue
+				var cell: Dictionary = cell_variant
+				var expected: Dictionary = EXPECTED_R1_ART_CELLS[cell_index]
+				var cell_id := str(cell.get("id", ""))
+				var source_path := str(cell.get("path", ""))
+				var world_origin: Array = cell.get("world_origin", [])
+				var expected_origin: Vector2i = expected.get("world_origin", Vector2i.ZERO)
+				_assert(cell_id == str(expected.get("id", "")), "R1 ArtCell %d musi zachować dokładne ID %s." % [cell_index + 1, expected.get("id", "")])
+				_assert(source_path == str(expected.get("path", "")), "R1 ArtCell %s musi zachować dokładną ścieżkę źródła." % cell_id)
+				_assert(not seen_ids.has(cell_id), "ID R1 ArtCell nie może się powtarzać: %s." % cell_id)
+				_assert(not seen_paths.has(source_path), "Ścieżka źródłowa R1 ArtCell nie może się powtarzać: %s." % source_path)
+				seen_ids[cell_id] = true
+				seen_paths[source_path] = true
+				_assert(
+					world_origin.size() == 2
+					and int(world_origin[0]) == expected_origin.x
+					and int(world_origin[1]) == expected_origin.y,
+					"R1 ArtCell %s musi zachować world_origin %s." % [cell_id, expected_origin]
+				)
+				_assert(FileAccess.file_exists(source_path), "Każdy R1 ArtCell musi wskazywać istniejący PNG: %s." % source_path)
+				if FileAccess.file_exists(source_path):
+					var source_image := Image.load_from_file(ProjectSettings.globalize_path(source_path))
+					_assert(not source_image.is_empty(), "Źródłowy R1 ArtCell musi być poprawnym obrazem: %s." % source_path)
+					if not source_image.is_empty():
+						_assert(source_image.get_size() == R1_ART_CELL_SIZE, "Źródłowy R1 ArtCell musi mieć rzeczywisty rozmiar 2730x1536: %s." % source_path)
+	map_root.free()
 
 
 func _test_compiled_manifest(world) -> void:

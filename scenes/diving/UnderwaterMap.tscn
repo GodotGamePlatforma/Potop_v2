@@ -58,6 +58,9 @@ terrain_visual_profiles = Array[Resource]([ExtResource("28_visual_r1"), ExtResou
 [node name="EnvironmentDecoration" type="Node2D" parent="VisualLayers" unique_id=2144235696]
 z_index = -90
 
+[node name="R1ArtCells" type="Node2D" parent="VisualLayers"]
+z_index = -96
+
 [node name="VisualChunkStreamer" type="Node2D" parent="VisualLayers" unique_id=348195514]
 script = ExtResource("38_visual_streamer")
 

@@ -28,6 +28,10 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
+	# The dummy headless renderer cannot allocate the antialias helper texture
+	# used by wide polylines. Route data is still testable without rasterizing it.
+	if DisplayServer.get_name() == "headless":
+		return
 	var route := _route_points()
 	if route.size() < 2:
 		return
