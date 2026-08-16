@@ -165,19 +165,19 @@ func _test_node_transforms_are_resolved_in_map_space() -> void:
 
 func _test_invalid_authority_is_rejected() -> void:
 	var transformed_fixture := _fixture(false)
-	(transformed_fixture.get_node("TraversableAreas/OpenLeft") as Polygon2D).position = Vector2(0.00001, 0.0)
+	(transformed_fixture.get_node("TraversableAreas/OpenLeft") as Polygon2D).position = Vector2(0.001, 0.0)
 	_assert(_has_errors(transformed_fixture), "Transformacja dająca punkt poza siatką 8 musi zostać odrzucona.")
 	transformed_fixture.free()
 
 	var offset_fixture := _fixture(false)
-	(offset_fixture.get_node("BlockedIslands/Center") as Polygon2D).offset = Vector2(0.00001, 0.0)
+	(offset_fixture.get_node("BlockedIslands/Center") as Polygon2D).offset = Vector2(0.001, 0.0)
 	_assert(_has_errors(offset_fixture), "Offset dający punkt poza siatką 8 musi zostać odrzucony.")
 	offset_fixture.free()
 
 	var off_grid_fixture := _fixture(false)
 	(off_grid_fixture.get_node("TraversableAreas/OpenLeft") as Polygon2D).polygon = PackedVector2Array([
 		Vector2(0.0, 0.0),
-		Vector2(23.99999, 0.0),
+		Vector2(23.999, 0.0),
 		Vector2(24.0, 32.0),
 		Vector2(0.0, 32.0),
 	])

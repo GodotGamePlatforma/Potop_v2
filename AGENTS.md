@@ -6,6 +6,8 @@ Jesteś programistą Godot pracującym w tym repozytorium. Stosuj konwencje Godo
 
 ## Kontekst przed pracą
 
+Jeżeli Codex został uruchomiony z `underwater_map_workbench/`, a główny zakres zadania dotyczy mapy podwodnej lub jej grafiki, najpierw przeczytaj bliższy `underwater_map_workbench/AGENTS.md` i zastosuj jego proporcjonalny routing kontekstu. Jest to jedyny zatwierdzony wyjątek od poniższego ogólnego protokołu pełnego odczytu; nie osłabia globalnej bramki rozbieżności, ochrony zapisu, zasad testów ani właścicieli dokumentacji.
+
 Przed analizą repozytorium, planem zmian lub edycją przeczytaj w całości, w tej kolejności:
 
 1. `.ai/PROJECT_CONTEXT.md`;
@@ -28,6 +30,12 @@ Kolejność dotyczy pierwszego skutecznego, pełnego i widocznego dla modelu odc
 W podsumowaniu zadania wymień dokumenty przeczytane w całości. Nie deklaruj pełnego odczytu, jeżeli wyjście było ucięte lub treść nie trafiła do kontekstu.
 
 `README.md` jest punktem wejścia dla człowieka, ale nie zastępuje dokumentów wymaganych powyżej.
+
+### Routing mapy podwodnej i grafiki
+
+Jeżeli głównym zakresem zadania jest projektowanie `UnderwaterMap`, makroterenu, biomów, landmarków, tła, grafiki, shaderów albo assetów świata nurkowania, przejdź do `underwater_map_workbench/AGENTS.md`. Gdy zadanie rozpoczęto w korzeniu repozytorium, przeczytaj ten lokalny plik przed doborem dalszego kontekstu; gdy Codex uruchomiono bezpośrednio z katalogu warsztatu, jest on już właściwym punktem wejścia.
+
+Lokalny `AGENTS.md` dobiera następnie lokalną migawkę, decyzje, README oraz potrzebne sekcje dokumentów globalnych proporcjonalnie do ryzyka zadania. Do każdego wskazanego tam odczytu stosuj wymagania kompletności i SHA-256. Routing wynika z intencji zadania, nie z fizycznej ścieżki edytowanego pliku. Warsztat jest hubem procesu i wiedzy mapy, ale nie osobnym projektem Godot ani drugą kopią `UnderwaterMap.tscn`; pełny checkout projektu musi być dostępny w katalogu nadrzędnym.
 
 ## Zasady pracy
 
@@ -66,7 +74,7 @@ Polecenie „wdróż”, „nie pytaj” albo równoważne, zawarte w tej samej 
 
 ## Dokumentacja
 
-Projekt utrzymuje pięć dokumentów merytorycznych. Każdy rodzaj szczegółu ma jednego właściciela:
+Projekt utrzymuje pięć globalnych dokumentów merytorycznych. Każdy rodzaj szczegółu ma jednego właściciela:
 
 | Plik | Jest właścicielem | Nie zawiera | Aktualizuj, gdy |
 |---|---|---|---|
@@ -76,7 +84,9 @@ Projekt utrzymuje pięć dokumentów merytorycznych. Każdy rodzaj szczegółu m
 | `docs/Ostatni_Pomost_architektura_Godot.txt` | technicznego mapowania: właścicieli stanu, wejść/wyjść, przepływów, persistence, migracji, walidacji i mapy testów | powtórzonej wizji produktu, roadmapy, uzasadnienia decyzji, datowanego statusu wdrożenia ani pełnych tabel balansu | zmienia się odpowiedzialność systemu, przepływ, model danych, zapis, migracja lub kontrakt testowy |
 | `README.md` | wejścia dla człowieka: wymagań, instalacji, uruchamiania, podstawowego sterowania, runnera testów i nawigacji | szczegółowych mechanik, algorytmów, architektury, migracji, ARD, bieżących luk ani datowanych wyników testów | zmienia się onboarding, wymaganie, komenda, podstawowe sterowanie lub krytyczna pułapka uruchomieniowa |
 
-Przed pierwszą edycją przedstaw użytkownikowi w krótkiej wiadomości roboczej decyzję `aktualizuję / nie aktualizuję` z uzasadnieniem dla każdego z pięciu dokumentów merytorycznych; uwzględnij także `AGENTS.md`, jeżeli zmienia się proces pracy. Nowy komunikat, podgląd, ostrzeżenie, informacja zwrotna albo prezentowana konsekwencja widoczna dla gracza jest zmianą produktu i wymaga oceny `OgolnyZarys.txt`, nawet gdy algorytm domenowy pozostaje bez zmian.
+`underwater_map_workbench/` jest jedynym zatwierdzonym wyjątkiem domenowym. Jego `.ai/PROJECT_CONTEXT.md` posiada szczegółową migawkę produkcji grafiki mapy, luki assetów i wynik odbioru wizualnego; `.ai/DECISIONS.md` posiada trwałe decyzje języka wizualnego i pipeline'u; `README.md` posiada handoff oraz przebieg produkcji; lokalny `AGENTS.md` posiada dodatkowy proces wykonawczy. Nie wolno kopiować tam globalnych reguł gry, architektury stanu, persistence ani drugiej specyfikacji topologii. Korzeniowe dokumenty zachowują przekrojowy kontrakt i zwięzłą konsekwencję dla całego projektu zgodnie z ARD-0099.
+
+Przed pierwszą edycją przedstaw użytkownikowi w krótkiej wiadomości roboczej decyzję `aktualizuję / nie aktualizuję` z uzasadnieniem dla każdego z pięciu globalnych dokumentów merytorycznych; uwzględnij także `AGENTS.md`, jeżeli zmienia się proces pracy. Dla zadania routowanego do mapy oceń w tym samym komunikacie trzy lokalne dokumenty merytoryczne warsztatu oraz lokalny `AGENTS.md`. Nowy komunikat, podgląd, ostrzeżenie, informacja zwrotna albo prezentowana konsekwencja widoczna dla gracza jest zmianą produktu i wymaga oceny `OgolnyZarys.txt`, nawet gdy algorytm domenowy pozostaje bez zmian.
 
 Pełny szczegół zapisuj tylko u właściciela. Inny dokument może podać jedną potrzebną konsekwencję i odwołanie, ale nie drugą specyfikację. Dokładna aktywna wartość strojalna należy do walidowanego `Resource`; dokument produktu może wyjaśniać jej znaczenie dla gracza, a architektura wskazywać pole i konsumenta.
 
@@ -90,6 +100,6 @@ Routing zmiany:
 4. Sam wynik weryfikacji aktualizuje wyłącznie `PROJECT_CONTEXT.md`. Mapę testów zmień w architekturze tylko wtedy, gdy zmienił się zakres pokrycia albo ryzyka.
 5. `README.md` zmień tylko wtedy, gdy użytkownik repozytorium musi inaczej projekt przygotować, uruchomić, przetestować lub obsłużyć na wejściu.
 
-Nie twórz nowych plików dokumentacyjnych. Kod, dane, grafiki, audio i techniczne pliki projektu nie są dokumentacją.
+Nie twórz nowych plików dokumentacyjnych poza pięcioma globalnymi dokumentami oraz zatwierdzonym zestawem `underwater_map_workbench/{AGENTS.md,README.md,.ai/PROJECT_CONTEXT.md,.ai/DECISIONS.md}`. Kod, dane, grafiki, audio i techniczne pliki projektu nie są dokumentacją.
 
 Po zakończeniu zadania krótko podsumuj wynik, wykonaną weryfikację i najbardziej sensowny następny krok.

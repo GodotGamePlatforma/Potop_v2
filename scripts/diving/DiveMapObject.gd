@@ -344,6 +344,7 @@ func _validate_property(property: Dictionary) -> void:
 				Kind.RESCUE,
 				Kind.BUOY,
 				Kind.SHORTCUT_GATE,
+				Kind.FIXED_DEVICE,
 			]
 		"mandatory_order", "difficulty_scaled_contents", "disease_id", "disease_exposure_pressure":
 			visible = kind == Kind.LOOT_CONTAINER

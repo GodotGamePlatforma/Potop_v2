@@ -4,7 +4,7 @@ Rola tego pliku: krótka, datowana migawka produkcji grafiki mapy, potwierdzonyc
 
 ## Stan na 2026-08-16
 
-- Zweryfikowany baseline Git: `a1c33d5` (`Remove rejected R1 ArtCell background`). Aktywny manifest i produkcyjne cropy są czyste względem tego commita. Bieżący worktree zawiera osobne, niezacommitowane zmiany dokumentacji, nowy layout guide oraz zmianę `UnderwaterMap.tscn`; scena jest poza zakresem tej synchronizacji i nie została uznana za potwierdzony stan runtime.
+- Zweryfikowany baseline historii: `a1c33d5` (`Remove rejected R1 ArtCell background`). Bieżąca rewizja dodaje wersjonowany warsztat, pełnomapowy layout guide z generatorem oraz stabilne `unique_id` węzłów makroterenu. Nie zmienia punktów `Polygon2D`, przechodniości ani wymagań narzędzi urządzeń Wspólnej Linii.
 - Jedynym źródłem statycznego świata jest `res://scenes/diving/UnderwaterMap.tscn`. Scenowe `Polygon2D` są authority makroterenu, a PNG, SDF, segmenty kolizji, okludery i chunki są pochodnymi.
 - Mapa ma 11 520 × 6 480 jednostek świata i cztery regiony. Geometria, stable ID, rozmieszczenie gameplayowe, source-v4, `WorldDelta` i podpis mapy nie należą do zwykłej pracy wizualnej warsztatu.
 - Aktywny `map_visual_chunks_v1.json` ma schema 1, siatkę wizualną 1024, gutter 2, jedną warstwę `environment_decoration` oraz 15 cropów. Wszystkie 15 PNG istnieje, a ich SHA-256 odpowiada manifestowi.
@@ -22,14 +22,14 @@ Status techniczny i odbiór artystyczny są rozdzielone zgodnie z MAP-ARD-0003.
 | Szeroka panorama ArtCells R1 rev. 2 | `REMOVED` | `REJECTED` | Nie jest baseline'em, źródłem ani kandydatem do ponownego eksportu. |
 | 15 cropów `environment_decoration` | `PRESENT_VALID` | Nieoceniane ponownie w tym audycie | Runtime może je ładować; brak źródła blokuje bezpieczną przebudowę. |
 | Pion landmarku R3-04 | `PRESENT` | Nieoceniany ponownie w tym audycie | Pozostaje niezależnym prefabem średniego planu. |
-| Pełnomapowy layout guide v1 | `CANDIDATE_UNTRACKED` | Zaakceptowany wcześniej jako czytelny guide, nie jako master artystyczny | Nie jest jeszcze częścią czystego checkoutu ani grafiką runtime. |
+| Pełnomapowy layout guide v1 | `PRESENT_VALID` | Zaakceptowany jako czytelny guide, nie jako master artystyczny | Jest wersjonowaną referencją projektową, nie grafiką runtime ani authority mapy. |
 | Szeroki composition master R1-R4 | `MISSING` | `UNREVIEWED` | Finalne ArtCells i szerokie chunki nie mogą powstać przed akceptacją mastera. |
 
 ## Pełnomapowy layout guide
 
 - Kandydat `assets/diving/world/layout_guides/full_map/underwater_map_layout_guide_v1.png` pokazuje świat na płótnie 4320 × 2430, cztery regiony, 28 landmarków oraz siatkę kamery 11 × 11 przy widoku około 1066,67 × 600 jednostek świata.
 - Skrajne kadry są dociskane do granicy świata i zachowują kontrolowany 20-procentowy overlap z poprzednią kolumną lub wierszem; wartość 1067 nie jest używana do kumulacyjnego pozycjonowania.
-- `tools/build_dive_map_layout_guide.py` ma tryb `--check`, osadzony font bitmapowy i porównanie zdekodowanych pikseli. Generator, PNG i manifest są obecnie zmianami worktree, nie zatwierdzonym baseline'em Git.
+- `tools/build_dive_map_layout_guide.py` ma tryb `--check`, osadzony font bitmapowy i porównanie zdekodowanych pikseli. Generator, PNG i manifest tworzą jeden wersjonowany pakiet pochodny.
 - Guide jest referencją do projektowania composition mastera. Nie ustanawia topologii, kolizji, chunków gameplayowych ani stylu finalnej grafiki.
 
 ## Potwierdzone luki
@@ -41,4 +41,4 @@ Status techniczny i odbiór artystyczny są rozdzielone zgodnie z MAP-ARD-0003.
 
 ## Ostatnia kontrola
 
-Audyt dokumentacyjny i statyczny z 2026-08-16 potwierdził commit `a1c33d5`, brak produkcyjnych źródeł/cropów panoramy R1, jedną aktywną warstwę z 15 istniejącymi cropami i zgodność ich SHA-256 z manifestem. W ramach tej synchronizacji dokumentacji nie uruchamiano Godota, testów ani generatorów. Historyczne wyniki runtime pozostają w globalnym `../../.ai/PROJECT_CONTEXT.md` i nie są ponownie deklarowane tutaj.
+Kontrola z 2026-08-16 potwierdziła brak produkcyjnych źródeł/cropów panoramy R1, jedną aktywną warstwę z 15 istniejącymi cropami i zgodność ich SHA-256 z manifestem. Layout guide przebudowano i potwierdzono przez `--check`; `underwater_map_scene_test.gd`, `macro_terrain_raster_test.gd` i `dive_layout_story_regression_test.gd` przeszły sekwencyjnie w Godot 4.7.1. Historyczne wyniki szerszych testów pozostają w globalnym `../../.ai/PROJECT_CONTEXT.md` i nie są ponownie deklarowane tutaj.

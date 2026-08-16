@@ -24,6 +24,20 @@ W istniejącym klonie pobierz assety:
 git lfs pull
 ```
 
+## Codex mapy i grafiki
+
+Zadania projektowania mapy podwodnej, biomów, landmarków, tła i assetów świata mają własny hub `underwater_map_workbench/`. Codex uruchamiaj z tego katalogu, pozostawiając pełny checkout projektu jako jego rodzica: scena, assety, skrypty integracyjne, testy i `project.godot` pozostają na kanonicznych ścieżkach repozytorium.
+
+Na tej maszynie:
+
+```powershell
+Set-Location D:\Dev\Game\Game\underwater_map_workbench
+Test-Path ..\project.godot
+git -C .. status --short --branch
+```
+
+W Codex Desktop otwórz `underwater_map_workbench/`, nie samodzielną kopię tego podkatalogu. Bliższy `AGENTS.md` zawęża zakres i dobiera proporcjonalny kontekst, a lokalny `README.md` opisuje handoff, pipeline master-first i komendy działające z tego CWD. Osobny pełny Git worktree jest opcjonalną izolacją dla równoległej pracy, a nie wymaganiem ani powodem do kopiowania scen lub pochodnych.
+
 ## Uruchamianie
 
 W katalogu głównym repozytorium:
@@ -105,4 +119,5 @@ Menu pauzy udostępnia `KONTYNUUJ`, `ZAPISZ GRĘ`, `USTAWIENIA`, `POWRÓT DO MEN
 - `.ai/PROJECT_CONTEXT.md` — potwierdzony runtime, luki, pułapki i ostatnia weryfikacja;
 - `.ai/DECISIONS.md` — trwałe decyzje, powody i jawne zastąpienia;
 - `docs/OgolnyZarys.txt` — produkt, zasady, balans, narracja i zakres;
-- `docs/Ostatni_Pomost_architektura_Godot.txt` — mapowanie systemów, danych, persistence i testów.
+- `docs/Ostatni_Pomost_architektura_Godot.txt` — mapowanie systemów, danych, persistence i testów;
+- `underwater_map_workbench/` — wyspecjalizowany onboarding, kontekst produkcji i decyzje dla mapy podwodnej oraz jej grafiki.

@@ -1093,9 +1093,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0086 - Kanoniczny rdzen wiedzy i repozytoryjne przewodniki wykonawcze
 
 - Domena: dokumentacja, proces pracy i Codex skills
-- Status / aktywny zakres: Czesciowo zastapione; D1-D5, D7
+- Status / aktywny zakres: Czesciowo zastapione; D2-D4, D7
 - Zatwierdzenie: 2026-08-13
-- Relacje: Zastepuje: ARD-0014/calosc; ARD-0070/D4 | Zastapiona przez: ARD-0097/D1-D2
+- Relacje: Zastepuje: ARD-0014/calosc; ARD-0070/D4 | Zastapiona przez: ARD-0097/D1-D2; ARD-0099/D1,D3
 - D1. Kanoniczny rdzen wiedzy projektu pozostaje w pieciu dokumentach merytorycznych oraz korzeniowym `AGENTS.md`. Kazdy szczegol produktu, runtime, architektury, zapisu, decyzji i onboardingu zachowuje jednego wlasciciela zgodnie z aktywnym zakresem ARD-0070.
 - D2. Repozytorium moze utrzymywac pod `.agents/skills` wyspecjalizowane przewodniki wykonawcze: procedury zadaniowe, checklisty, referencje warsztatowe, skrypty i zasoby wielokrotnego uzycia. Nie sa one dodatkowym kanonicznym opisem gry ani biezacego runtime.
 - D3. Skill musi wskazywac dokumenty kanoniczne i nie moze ustanawiac ani kopiowac regul produktu, aktywnych wartosci balansu, wlascicieli stanu, kontraktow danych, persistence, migracji lub statusu wdrozenia. Konflikt rozstrzyga sie przez aktywne ARD, dokument bedacy wlascicielem szczegolu oraz faktyczny runtime zgodnie z bramka rozbieznosci.
@@ -1252,9 +1252,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0097 - Bez repozytoryjnego routera zadan prezentacyjnych
 
 - Domena: dokumentacja, proces pracy i Codex skills
-- Status / aktywny zakres: Obowiazuje; D1-D4
+- Status / aktywny zakres: Zastapione; brak
 - Zatwierdzenie: 2026-08-15
-- Relacje: Zastepuje: ARD-0086/D6 | Zastapiona przez: brak
+- Relacje: Zastepuje: ARD-0086/D6 | Zastapiona przez: ARD-0099/calosc
 - D1. Repozytorium nie utrzymuje dedykowanego skilla ani metadanych automatycznie kierujacych zadania grafiki, animacji, VFX, shaderow, oswietlenia, map i biomow do osobnego workflow prezentacyjnego.
 - D2. Zadania prezentacyjne sa wykonywane bezposrednio wedlug korzeniowego `AGENTS.md`, aktywnych ARD, dokumentu produktu, mapowania architektonicznego oraz faktycznego runtime. Nie powstaje dodatkowa repozytoryjna warstwa instrukcji miedzy tymi zrodlami a implementacja.
 - D3. Usuniecie routera nie oslabia bramki rozbieznosci, wymagan dostepnosci, profili jakosci, proporcjonalnych testow ani kontroli obrazu w runtime. Ogolne klauzule ARD-0086/D1-D5,D7 pozostaja aktywne.
@@ -1278,3 +1278,20 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 - D8. Zmiana authoringu nie zmienia `WorldDelta`, `DiveResult`, formatu kampanii ani zasad gracza. Kazda przyszla edycja wielokatow podlega walidacji osiagalnosci, niezmiennosci wymaganych punktow, granic chunkow, okluzji i reprezentatywnemu QA obrazu.
 - Powod i skutek: cala mapa moze byc projektowana w jednym widoku 2D Godota, z edytowalnymi tunelami, nieregularnymi przeszkodami, sciezkami kabli i nakladajacymi sie scenami wizualnymi, bez rozdzielenia obrazu i fizyki na dwa recznie utrzymywane kontury.
 - Odwolania: ARD-0052; ARD-0076; ARD-0085; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 9, 11, 12.3 i 13.
+
+## ARD-0099 - Wydzielony warsztat mapy podwodnej i grafiki
+
+- Domena: authoring mapy podwodnej, grafika swiata, dokumentacja i proces pracy
+- Status / aktywny zakres: Obowiazuje; D1-D8
+- Zatwierdzenie: 2026-08-16
+- Relacje: Zastepuje: ARD-0086/D1,D5; ARD-0097/calosc | Zastapiona przez: brak
+- D1. Repozytorium utrzymuje jeden wyspecjalizowany hub `underwater_map_workbench/` z lokalnymi `AGENTS.md`, `README.md`, `.ai/PROJECT_CONTEXT.md` i `.ai/DECISIONS.md`. Piec dokumentow korzeniowych pozostaje kanoniczne dla calego produktu, runtime, architektury, zapisu i onboardingu, a dokumenty warsztatu sa jedynym wlascicielem szczegolowego procesu produkcji grafiki mapy, lokalnego jezyka wizualnego, stanu assetow oraz akceptacji artystycznej.
+- D2. Warsztat nie jest osobnym projektem Godot ani drugim formatem mapy. Nie przechowuje kopii `UnderwaterMap.tscn`, makroterenu, blueprintu, maski kolizji, `WorldDelta` ani produkcyjnych assetow; kanoniczne pliki pozostaja na istniejacych sciezkach `res://`, a warsztat kieruje praca nad nimi.
+- D3. Zadania projektowania mapy, biomow, landmarkow, tla, grafiki i assetow swiata sa semantycznie routowane do `underwater_map_workbench/AGENTS.md`. Codex uruchomiony z katalogu warsztatu czyta ten blizszy plik jako punkt wejscia, a on dobiera lokalny i globalny kontekst proporcjonalnie do ryzyka; routing obowiazuje takze wtedy, gdy edytowany plik lezy poza samym katalogiem warsztatu.
+- D4. Codex mapy pracuje z katalogu `underwater_map_workbench/`, majac pelny checkout projektu dostepny jako rodzica; nie dostaje samego wycietego katalogu warsztatu. Osobny pelny Git worktree i branch sa opcjonalna izolacja pracy rownoleglej, nie wymaganiem kontraktu. Integracja odbywa sie przez Git, a nie przez kopiowanie scen, pochodnych lub katalogow importu miedzy workspace'ami.
+- D5. Kazde nowe albo przebudowywane szerokie tlo regionu zaczyna sie od jednej zatwierdzonej kompozycji master calego pasa. ArtCells, okna edycyjne i chunki runtime sa wylacznie deterministycznymi pochodnymi tego mastera; zestaw niezaleznie promptowanych finalnych obrazow nie moze zostac zrodlem panoramy.
+- D6. Prezentacja mapy pozostaje warstwowa: dalekie sylwety i plyty, sredni plan landmarkow, skory terenu i prefaby oraz atmosfera runtime maja odrebne odpowiedzialnosci. Raster generowany lub malowany nie ustanawia przechodniosci, kolizji, stable ID ani zapisu i nie wypieka globalnej mgly, caustics, oswietlenia gameplayowego, HUD-u lub postaci.
+- D7. Akceptacja panoramy wymaga jednoczesnie integralnosci technicznej, przegladu calej kompozycji, kontroli powtorzen, perspektywy, skali, palety i pustych stref oraz reprezentatywnych kadrow w runtime. Zgodny overlap, SHA, snapshot albo metryka wkładu nie sa samodzielna akceptacja artystyczna; jawne odrzucenie przez wlasciciela produktu cofa status wizualnego baseline'u bez falszowania historycznego wyniku testu.
+- D8. Wydzielenie procesu nie zmienia `GameState`, `WorldDelta`, `DiveResult`, source-v4, semantycznej authority `UnderwaterMap.tscn`, formatu kampanii ani podpisu gameplayowego. Jawnie zlecona zmiana topologii lub rozmieszczenia przechodzi globalna bramke rozbieznosci, walidacje osiagalnosci i testy mapy tak samo jak praca w glownym katalogu.
+- Powod i skutek: osobny Codex otrzymuje wyspecjalizowany kontekst i rygor produkcji wizualnej bez odcinania go od pelnego projektu i bez tworzenia drugiej mapy. Master-first oraz warstwowy authoring rozwiazuja problem technicznie bezszwowych, lecz kompozycyjnie niespojnych obrazow.
+- Odwolania: AGENTS.md; underwater_map_workbench/AGENTS.md; underwater_map_workbench/.ai/DECISIONS.md; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2, 9.1.2 i 13.

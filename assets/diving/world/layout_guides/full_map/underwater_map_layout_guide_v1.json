@@ -1,0 +1,3695 @@
+{
+  "asset_id": "underwater_map_layout_guide_v1",
+  "authority": {
+    "contract": "presentation_only_derived_authoring_guide",
+    "map_scene": {
+      "path": "res://scenes/diving/UnderwaterMap.tscn",
+      "sha256": "3ad4dd3e60c7657007bab4f7e3c35e1eb8143fcdde50b25bddeb921705271adc",
+      "size_bytes": 199935
+    },
+    "map_script": {
+      "path": "res://scripts/diving/UnderwaterMapScene.gd",
+      "sha256": "dc21d9a9b2679b9347bbae9871c7e1ebb96996e934f76a7aea2518f7192d43b3",
+      "size_bytes": 8653
+    },
+    "note": "UnderwaterMap.tscn remains the sole authority for topology, regions and landmarks."
+  },
+  "camera_grid": {
+    "base_viewport": [
+      1280,
+      720
+    ],
+    "camera_center_limits": {
+      "maximum": [
+        10986.666667,
+        6180.0
+      ],
+      "minimum": [
+        533.333333,
+        300.0
+      ]
+    },
+    "cells": [
+      {
+        "bounds": [
+          0.0,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          0,
+          400,
+          225
+        ],
+        "id": "C01-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          1066.666667,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          0,
+          400,
+          225
+        ],
+        "id": "C02-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          2133.333333,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          0,
+          400,
+          225
+        ],
+        "id": "C03-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          3200.0,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          0,
+          400,
+          225
+        ],
+        "id": "C04-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          4266.666667,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          0,
+          400,
+          225
+        ],
+        "id": "C05-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          5333.333333,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          0,
+          400,
+          225
+        ],
+        "id": "C06-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          6400.0,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          0,
+          400,
+          225
+        ],
+        "id": "C07-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          7466.666667,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          0,
+          400,
+          225
+        ],
+        "id": "C08-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          8533.333333,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          0,
+          400,
+          225
+        ],
+        "id": "C09-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          9600.0,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          0,
+          400,
+          225
+        ],
+        "id": "C10-R01",
+        "new_world_coverage_fraction": 1.0,
+        "row": 1
+      },
+      {
+        "bounds": [
+          10453.333333,
+          0.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          0,
+          400,
+          225
+        ],
+        "id": "C11-R01",
+        "new_world_coverage_fraction": 0.8,
+        "row": 1
+      },
+      {
+        "bounds": [
+          0.0,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          225,
+          400,
+          225
+        ],
+        "id": "C01-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          1066.666667,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          225,
+          400,
+          225
+        ],
+        "id": "C02-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          2133.333333,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          225,
+          400,
+          225
+        ],
+        "id": "C03-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          3200.0,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          225,
+          400,
+          225
+        ],
+        "id": "C04-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          4266.666667,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          225,
+          400,
+          225
+        ],
+        "id": "C05-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          5333.333333,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          225,
+          400,
+          225
+        ],
+        "id": "C06-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          6400.0,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          225,
+          400,
+          225
+        ],
+        "id": "C07-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          7466.666667,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          225,
+          400,
+          225
+        ],
+        "id": "C08-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          8533.333333,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          225,
+          400,
+          225
+        ],
+        "id": "C09-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          9600.0,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          225,
+          400,
+          225
+        ],
+        "id": "C10-R02",
+        "new_world_coverage_fraction": 1.0,
+        "row": 2
+      },
+      {
+        "bounds": [
+          10453.333333,
+          600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          225,
+          400,
+          225
+        ],
+        "id": "C11-R02",
+        "new_world_coverage_fraction": 0.8,
+        "row": 2
+      },
+      {
+        "bounds": [
+          0.0,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          450,
+          400,
+          225
+        ],
+        "id": "C01-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          1066.666667,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          450,
+          400,
+          225
+        ],
+        "id": "C02-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          2133.333333,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          450,
+          400,
+          225
+        ],
+        "id": "C03-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          3200.0,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          450,
+          400,
+          225
+        ],
+        "id": "C04-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          4266.666667,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          450,
+          400,
+          225
+        ],
+        "id": "C05-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          5333.333333,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          450,
+          400,
+          225
+        ],
+        "id": "C06-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          6400.0,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          450,
+          400,
+          225
+        ],
+        "id": "C07-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          7466.666667,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          450,
+          400,
+          225
+        ],
+        "id": "C08-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          8533.333333,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          450,
+          400,
+          225
+        ],
+        "id": "C09-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          9600.0,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          450,
+          400,
+          225
+        ],
+        "id": "C10-R03",
+        "new_world_coverage_fraction": 1.0,
+        "row": 3
+      },
+      {
+        "bounds": [
+          10453.333333,
+          1200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          450,
+          400,
+          225
+        ],
+        "id": "C11-R03",
+        "new_world_coverage_fraction": 0.8,
+        "row": 3
+      },
+      {
+        "bounds": [
+          0.0,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          675,
+          400,
+          225
+        ],
+        "id": "C01-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          1066.666667,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          675,
+          400,
+          225
+        ],
+        "id": "C02-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          2133.333333,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          675,
+          400,
+          225
+        ],
+        "id": "C03-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          3200.0,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          675,
+          400,
+          225
+        ],
+        "id": "C04-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          4266.666667,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          675,
+          400,
+          225
+        ],
+        "id": "C05-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          5333.333333,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          675,
+          400,
+          225
+        ],
+        "id": "C06-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          6400.0,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          675,
+          400,
+          225
+        ],
+        "id": "C07-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          7466.666667,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          675,
+          400,
+          225
+        ],
+        "id": "C08-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          8533.333333,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          675,
+          400,
+          225
+        ],
+        "id": "C09-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          9600.0,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          675,
+          400,
+          225
+        ],
+        "id": "C10-R04",
+        "new_world_coverage_fraction": 1.0,
+        "row": 4
+      },
+      {
+        "bounds": [
+          10453.333333,
+          1800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          675,
+          400,
+          225
+        ],
+        "id": "C11-R04",
+        "new_world_coverage_fraction": 0.8,
+        "row": 4
+      },
+      {
+        "bounds": [
+          0.0,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          900,
+          400,
+          225
+        ],
+        "id": "C01-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          1066.666667,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          900,
+          400,
+          225
+        ],
+        "id": "C02-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          2133.333333,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          900,
+          400,
+          225
+        ],
+        "id": "C03-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          3200.0,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          900,
+          400,
+          225
+        ],
+        "id": "C04-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          4266.666667,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          900,
+          400,
+          225
+        ],
+        "id": "C05-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          5333.333333,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          900,
+          400,
+          225
+        ],
+        "id": "C06-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          6400.0,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          900,
+          400,
+          225
+        ],
+        "id": "C07-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          7466.666667,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          900,
+          400,
+          225
+        ],
+        "id": "C08-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          8533.333333,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          900,
+          400,
+          225
+        ],
+        "id": "C09-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          9600.0,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          900,
+          400,
+          225
+        ],
+        "id": "C10-R05",
+        "new_world_coverage_fraction": 1.0,
+        "row": 5
+      },
+      {
+        "bounds": [
+          10453.333333,
+          2400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          900,
+          400,
+          225
+        ],
+        "id": "C11-R05",
+        "new_world_coverage_fraction": 0.8,
+        "row": 5
+      },
+      {
+        "bounds": [
+          0.0,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          1125,
+          400,
+          225
+        ],
+        "id": "C01-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          1066.666667,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          1125,
+          400,
+          225
+        ],
+        "id": "C02-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          2133.333333,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          1125,
+          400,
+          225
+        ],
+        "id": "C03-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          3200.0,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          1125,
+          400,
+          225
+        ],
+        "id": "C04-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          4266.666667,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          1125,
+          400,
+          225
+        ],
+        "id": "C05-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          5333.333333,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          1125,
+          400,
+          225
+        ],
+        "id": "C06-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          6400.0,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          1125,
+          400,
+          225
+        ],
+        "id": "C07-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          7466.666667,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          1125,
+          400,
+          225
+        ],
+        "id": "C08-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          8533.333333,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          1125,
+          400,
+          225
+        ],
+        "id": "C09-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          9600.0,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          1125,
+          400,
+          225
+        ],
+        "id": "C10-R06",
+        "new_world_coverage_fraction": 1.0,
+        "row": 6
+      },
+      {
+        "bounds": [
+          10453.333333,
+          3000.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          1125,
+          400,
+          225
+        ],
+        "id": "C11-R06",
+        "new_world_coverage_fraction": 0.8,
+        "row": 6
+      },
+      {
+        "bounds": [
+          0.0,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          1350,
+          400,
+          225
+        ],
+        "id": "C01-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          1066.666667,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          1350,
+          400,
+          225
+        ],
+        "id": "C02-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          2133.333333,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          1350,
+          400,
+          225
+        ],
+        "id": "C03-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          3200.0,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          1350,
+          400,
+          225
+        ],
+        "id": "C04-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          4266.666667,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          1350,
+          400,
+          225
+        ],
+        "id": "C05-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          5333.333333,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          1350,
+          400,
+          225
+        ],
+        "id": "C06-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          6400.0,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          1350,
+          400,
+          225
+        ],
+        "id": "C07-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          7466.666667,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          1350,
+          400,
+          225
+        ],
+        "id": "C08-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          8533.333333,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          1350,
+          400,
+          225
+        ],
+        "id": "C09-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          9600.0,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          1350,
+          400,
+          225
+        ],
+        "id": "C10-R07",
+        "new_world_coverage_fraction": 1.0,
+        "row": 7
+      },
+      {
+        "bounds": [
+          10453.333333,
+          3600.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          1350,
+          400,
+          225
+        ],
+        "id": "C11-R07",
+        "new_world_coverage_fraction": 0.8,
+        "row": 7
+      },
+      {
+        "bounds": [
+          0.0,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          1575,
+          400,
+          225
+        ],
+        "id": "C01-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          1066.666667,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          1575,
+          400,
+          225
+        ],
+        "id": "C02-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          2133.333333,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          1575,
+          400,
+          225
+        ],
+        "id": "C03-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          3200.0,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          1575,
+          400,
+          225
+        ],
+        "id": "C04-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          4266.666667,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          1575,
+          400,
+          225
+        ],
+        "id": "C05-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          5333.333333,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          1575,
+          400,
+          225
+        ],
+        "id": "C06-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          6400.0,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          1575,
+          400,
+          225
+        ],
+        "id": "C07-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          7466.666667,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          1575,
+          400,
+          225
+        ],
+        "id": "C08-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          8533.333333,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          1575,
+          400,
+          225
+        ],
+        "id": "C09-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          9600.0,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          1575,
+          400,
+          225
+        ],
+        "id": "C10-R08",
+        "new_world_coverage_fraction": 1.0,
+        "row": 8
+      },
+      {
+        "bounds": [
+          10453.333333,
+          4200.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          1575,
+          400,
+          225
+        ],
+        "id": "C11-R08",
+        "new_world_coverage_fraction": 0.8,
+        "row": 8
+      },
+      {
+        "bounds": [
+          0.0,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          1800,
+          400,
+          225
+        ],
+        "id": "C01-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          1066.666667,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          1800,
+          400,
+          225
+        ],
+        "id": "C02-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          2133.333333,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          1800,
+          400,
+          225
+        ],
+        "id": "C03-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          3200.0,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          1800,
+          400,
+          225
+        ],
+        "id": "C04-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          4266.666667,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          1800,
+          400,
+          225
+        ],
+        "id": "C05-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          5333.333333,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          1800,
+          400,
+          225
+        ],
+        "id": "C06-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          6400.0,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          1800,
+          400,
+          225
+        ],
+        "id": "C07-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          7466.666667,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          1800,
+          400,
+          225
+        ],
+        "id": "C08-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          8533.333333,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          1800,
+          400,
+          225
+        ],
+        "id": "C09-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          9600.0,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          1800,
+          400,
+          225
+        ],
+        "id": "C10-R09",
+        "new_world_coverage_fraction": 1.0,
+        "row": 9
+      },
+      {
+        "bounds": [
+          10453.333333,
+          4800.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          1800,
+          400,
+          225
+        ],
+        "id": "C11-R09",
+        "new_world_coverage_fraction": 0.8,
+        "row": 9
+      },
+      {
+        "bounds": [
+          0.0,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          2025,
+          400,
+          225
+        ],
+        "id": "C01-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          1066.666667,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          2025,
+          400,
+          225
+        ],
+        "id": "C02-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          2133.333333,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          2025,
+          400,
+          225
+        ],
+        "id": "C03-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          3200.0,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          2025,
+          400,
+          225
+        ],
+        "id": "C04-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          4266.666667,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          2025,
+          400,
+          225
+        ],
+        "id": "C05-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          5333.333333,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          2025,
+          400,
+          225
+        ],
+        "id": "C06-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          6400.0,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          2025,
+          400,
+          225
+        ],
+        "id": "C07-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          7466.666667,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          2025,
+          400,
+          225
+        ],
+        "id": "C08-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          8533.333333,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          2025,
+          400,
+          225
+        ],
+        "id": "C09-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          9600.0,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          2025,
+          400,
+          225
+        ],
+        "id": "C10-R10",
+        "new_world_coverage_fraction": 1.0,
+        "row": 10
+      },
+      {
+        "bounds": [
+          10453.333333,
+          5400.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          2025,
+          400,
+          225
+        ],
+        "id": "C11-R10",
+        "new_world_coverage_fraction": 0.8,
+        "row": 10
+      },
+      {
+        "bounds": [
+          0.0,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 1,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          0,
+          2205,
+          400,
+          225
+        ],
+        "id": "C01-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          1066.666667,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 2,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          400,
+          2205,
+          400,
+          225
+        ],
+        "id": "C02-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          2133.333333,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 3,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          800,
+          2205,
+          400,
+          225
+        ],
+        "id": "C03-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          3200.0,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 4,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1200,
+          2205,
+          400,
+          225
+        ],
+        "id": "C04-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          4266.666667,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 5,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          1600,
+          2205,
+          400,
+          225
+        ],
+        "id": "C05-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          5333.333333,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 6,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2000,
+          2205,
+          400,
+          225
+        ],
+        "id": "C06-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          6400.0,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 7,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2400,
+          2205,
+          400,
+          225
+        ],
+        "id": "C07-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          7466.666667,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 8,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          2800,
+          2205,
+          400,
+          225
+        ],
+        "id": "C08-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          8533.333333,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 9,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3200,
+          2205,
+          400,
+          225
+        ],
+        "id": "C09-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          9600.0,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 10,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3600,
+          2205,
+          400,
+          225
+        ],
+        "id": "C10-R11",
+        "new_world_coverage_fraction": 0.8,
+        "row": 11
+      },
+      {
+        "bounds": [
+          10453.333333,
+          5880.0,
+          1066.666667,
+          600.0
+        ],
+        "column": 11,
+        "frame_fraction": 1.0,
+        "guide_bounds": [
+          3920,
+          2205,
+          400,
+          225
+        ],
+        "id": "C11-R11",
+        "new_world_coverage_fraction": 0.64,
+        "row": 11
+      }
+    ],
+    "column_frames": [
+      {
+        "column": 1,
+        "guide_bounds": [
+          0,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          0.0,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 2,
+        "guide_bounds": [
+          400,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          1066.666667,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 3,
+        "guide_bounds": [
+          800,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          2133.333333,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 4,
+        "guide_bounds": [
+          1200,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          3200.0,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 5,
+        "guide_bounds": [
+          1600,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          4266.666667,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 6,
+        "guide_bounds": [
+          2000,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          5333.333333,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 7,
+        "guide_bounds": [
+          2400,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          6400.0,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 8,
+        "guide_bounds": [
+          2800,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          7466.666667,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 9,
+        "guide_bounds": [
+          3200,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          8533.333333,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 10,
+        "guide_bounds": [
+          3600,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          9600.0,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      },
+      {
+        "column": 11,
+        "guide_bounds": [
+          3920,
+          0,
+          400,
+          2430
+        ],
+        "world_bounds": [
+          10453.333333,
+          0.0,
+          1066.666667,
+          6480.0
+        ]
+      }
+    ],
+    "columns": 11,
+    "coverage_mode": "full_camera_frames_edge_clamped_with_final_overlap",
+    "full_guide_frame_size": [
+      400,
+      225
+    ],
+    "full_screen_area_equivalent": 116.64,
+    "last_column": {
+      "frame_fraction": 1.0,
+      "guide_start_x": 3920,
+      "new_world_coverage_fraction": 0.8,
+      "overlap_fraction": 0.2,
+      "overlap_guide_width": 80,
+      "overlap_world_width": 213.333333,
+      "world_start_x": 10453.333333
+    },
+    "last_row": {
+      "frame_fraction": 1.0,
+      "guide_start_y": 2205,
+      "new_world_coverage_fraction": 0.8,
+      "overlap_fraction": 0.2,
+      "overlap_guide_height": 45,
+      "overlap_world_height": 120.0,
+      "world_start_y": 5880.0
+    },
+    "raw_full_hd_reference_grid": [
+      6,
+      6
+    ],
+    "row_frames": [
+      {
+        "guide_bounds": [
+          0,
+          0,
+          4320,
+          225
+        ],
+        "row": 1,
+        "world_bounds": [
+          0.0,
+          0.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          225,
+          4320,
+          225
+        ],
+        "row": 2,
+        "world_bounds": [
+          0.0,
+          600.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          450,
+          4320,
+          225
+        ],
+        "row": 3,
+        "world_bounds": [
+          0.0,
+          1200.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          675,
+          4320,
+          225
+        ],
+        "row": 4,
+        "world_bounds": [
+          0.0,
+          1800.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          900,
+          4320,
+          225
+        ],
+        "row": 5,
+        "world_bounds": [
+          0.0,
+          2400.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          1125,
+          4320,
+          225
+        ],
+        "row": 6,
+        "world_bounds": [
+          0.0,
+          3000.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          1350,
+          4320,
+          225
+        ],
+        "row": 7,
+        "world_bounds": [
+          0.0,
+          3600.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          1575,
+          4320,
+          225
+        ],
+        "row": 8,
+        "world_bounds": [
+          0.0,
+          4200.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          1800,
+          4320,
+          225
+        ],
+        "row": 9,
+        "world_bounds": [
+          0.0,
+          4800.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          2025,
+          4320,
+          225
+        ],
+        "row": 10,
+        "world_bounds": [
+          0.0,
+          5400.0,
+          11520.0,
+          600.0
+        ]
+      },
+      {
+        "guide_bounds": [
+          0,
+          2205,
+          4320,
+          225
+        ],
+        "row": 11,
+        "world_bounds": [
+          0.0,
+          5880.0,
+          11520.0,
+          600.0
+        ]
+      }
+    ],
+    "rows": 11,
+    "visible_world_size": [
+      1066.666667,
+      600.0
+    ],
+    "zoom": [
+      1.2,
+      1.2
+    ]
+  },
+  "generator": {
+    "font": {
+      "family": "Ostatni Pomost embedded 5x9 pixel font",
+      "glyph_sha256": "dae8f9e05c0ad6a2bbfc5564aed73b555234330ad6b4cd267677dff49e0f0fe9",
+      "provenance": "glyphs_embedded_in_generator",
+      "version": 1
+    },
+    "model": "not_applicable",
+    "path": "res://tools/build_dive_map_layout_guide.py",
+    "seed": "not_applicable",
+    "sha256": "e53742daa9da981535a8131933874aeb51d3bb7aebb8c056a038bd4302179646",
+    "version": 2
+  },
+  "guide_size": [
+    4320,
+    2430
+  ],
+  "landmark_count": 28,
+  "landmarks": [
+    {
+      "bounds": [
+        4923.5837,
+        198.78937,
+        1779.6086,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          6,
+          1
+        ]
+      ],
+      "id": "R1-00",
+      "kind": "dive_station",
+      "name": "Stacja Nurkowa",
+      "position": [
+        5813.388,
+        372.22977
+      ],
+      "region_id": "R1",
+      "role": "entry",
+      "size": [
+        1779.6086,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R1_00_StacjaNurkowa"
+    },
+    {
+      "bounds": [
+        968.898,
+        67.37492,
+        1502.7806,
+        313.52686
+      ],
+      "camera_cells": [
+        [
+          2,
+          1
+        ]
+      ],
+      "id": "R1-01",
+      "kind": "pharmacy",
+      "name": "Apteka",
+      "position": [
+        1720.2883,
+        224.13835
+      ],
+      "region_id": "R1",
+      "role": "medicine",
+      "size": [
+        1502.7806,
+        313.52686
+      ],
+      "source_node_path": "Landmarks/R1_01_Apteka"
+    },
+    {
+      "bounds": [
+        1668.87745,
+        581.69244,
+        1621.4213,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          3,
+          2
+        ]
+      ],
+      "id": "R1-02",
+      "kind": "tenement",
+      "name": "Zalana Kamienica",
+      "position": [
+        2479.5881,
+        748.46204
+      ],
+      "region_id": "R1",
+      "role": "tutorial_salvage",
+      "size": [
+        1621.4213,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R1_02_ZalanaKamienica"
+    },
+    {
+      "bounds": [
+        7581.133,
+        553.6751,
+        1660.968,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          8,
+          2
+        ]
+      ],
+      "id": "R1-03",
+      "kind": "hotel",
+      "name": "Zatopiony Hotel",
+      "position": [
+        8411.617,
+        720.4447
+      ],
+      "region_id": "R1",
+      "role": "survivor",
+      "size": [
+        1660.968,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R1_03_ZatopionyHotel"
+    },
+    {
+      "bounds": [
+        1364.36655,
+        1016.62747,
+        1542.3275,
+        320.19766
+      ],
+      "camera_cells": [
+        [
+          3,
+          2
+        ]
+      ],
+      "id": "R1-04",
+      "kind": "parking",
+      "name": "Parking",
+      "position": [
+        2135.5303,
+        1176.7263
+      ],
+      "region_id": "R1",
+      "role": "current_risk",
+      "size": [
+        1542.3275,
+        320.19766
+      ],
+      "source_node_path": "Landmarks/R1_04_Parking"
+    },
+    {
+      "bounds": [
+        4931.49335,
+        677.7517,
+        1621.4213,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          6,
+          2
+        ]
+      ],
+      "id": "R1-05",
+      "kind": "grocery",
+      "name": "Sklep Spożywczy",
+      "position": [
+        5742.204,
+        844.5213
+      ],
+      "region_id": "R1",
+      "role": "tutorial_food",
+      "size": [
+        1621.4213,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R1_05_SklepSpozywczy"
+    },
+    {
+      "bounds": [
+        9321.1947,
+        1108.68437,
+        1502.7806,
+        320.19766
+      ],
+      "camera_cells": [
+        [
+          10,
+          3
+        ]
+      ],
+      "id": "R1-06",
+      "kind": "hospital",
+      "name": "Szpital",
+      "position": [
+        10072.585,
+        1268.7832
+      ],
+      "region_id": "R1",
+      "role": "medicine",
+      "size": [
+        1502.7806,
+        320.19766
+      ],
+      "source_node_path": "Landmarks/R1_06_Szpital"
+    },
+    {
+      "bounds": [
+        8245.5197,
+        186.78195,
+        1779.6086,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          9,
+          1
+        ]
+      ],
+      "id": "R1-07",
+      "kind": "ship",
+      "name": "Statek w Ulicy",
+      "position": [
+        9135.324,
+        360.22235
+      ],
+      "region_id": "R1",
+      "role": "heavy_salvage",
+      "size": [
+        1779.6086,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R1_07_StatekWUlicy"
+    },
+    {
+      "bounds": [
+        3037.19875,
+        1025.9666,
+        1542.3275,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          4,
+          2
+        ]
+      ],
+      "id": "R1-08",
+      "kind": "museum",
+      "name": "Muzeum",
+      "position": [
+        3808.3625,
+        1192.7362
+      ],
+      "region_id": "R1",
+      "role": "landmark",
+      "size": [
+        1542.3275,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R1_08_Muzeum"
+    },
+    {
+      "bounds": [
+        7007.70335,
+        997.9494,
+        1621.4213,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          8,
+          2
+        ]
+      ],
+      "id": "R1-09",
+      "kind": "archive",
+      "name": "Zalane Archiwum",
+      "position": [
+        7818.414,
+        1164.719
+      ],
+      "region_id": "R1",
+      "role": "story",
+      "size": [
+        1621.4213,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R1_09_ZalaneArchiwum"
+    },
+    {
+      "bounds": [
+        553.6561,
+        1394.1939,
+        1502.7806,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          2,
+          3
+        ]
+      ],
+      "id": "R2-01",
+      "kind": "greenhouse",
+      "name": "Szklarnia",
+      "position": [
+        1305.0464,
+        1560.9635
+      ],
+      "region_id": "R2",
+      "role": "landmark",
+      "size": [
+        1502.7806,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R2_01_Szklarnia"
+    },
+    {
+      "bounds": [
+        2511.22535,
+        1467.5726,
+        1621.4213,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          4,
+          3
+        ]
+      ],
+      "id": "R2-02",
+      "kind": "park",
+      "name": "Park",
+      "position": [
+        3321.936,
+        1641.013
+      ],
+      "region_id": "R2",
+      "role": "buoy",
+      "size": [
+        1621.4213,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R2_02_Park"
+    },
+    {
+      "bounds": [
+        5338.826,
+        1507.5973,
+        1660.968,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          6,
+          3
+        ]
+      ],
+      "id": "R2-03",
+      "kind": "garden_center",
+      "name": "Centrum Ogrodnicze",
+      "position": [
+        6169.31,
+        1681.0377
+      ],
+      "region_id": "R2",
+      "role": "salvage",
+      "size": [
+        1660.968,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R2_03_CentrumOgrodnicze"
+    },
+    {
+      "bounds": [
+        7652.31625,
+        1474.2434,
+        1542.3275,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          8,
+          3
+        ]
+      ],
+      "id": "R2-04",
+      "kind": "seed_bank",
+      "name": "Bank Nasion",
+      "position": [
+        8423.48,
+        1641.013
+      ],
+      "region_id": "R2",
+      "role": "critical_food",
+      "size": [
+        1542.3275,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R2_04_BankNasion"
+    },
+    {
+      "bounds": [
+        9095.7777,
+        1946.5348,
+        1502.7806,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          10,
+          4
+        ]
+      ],
+      "id": "R2-05",
+      "kind": "suburbs",
+      "name": "Przedmieścia",
+      "position": [
+        9847.168,
+        2113.3044
+      ],
+      "region_id": "R2",
+      "role": "survivor",
+      "size": [
+        1502.7806,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R2_05_Przedmiescia"
+    },
+    {
+      "bounds": [
+        1198.28935,
+        2209.5596,
+        1621.4213,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          2,
+          4
+        ]
+      ],
+      "id": "R2-06",
+      "kind": "tangled",
+      "name": "Splątane Korytarze",
+      "position": [
+        2009.0,
+        2383.0
+      ],
+      "region_id": "R2",
+      "role": "hazard",
+      "size": [
+        1621.4213,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R2_06_SplataneKorytarze"
+    },
+    {
+      "bounds": [
+        1161.516,
+        2433.5596,
+        1660.968,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          2,
+          5
+        ]
+      ],
+      "id": "R3-01",
+      "kind": "port",
+      "name": "Magazyny Portowe",
+      "position": [
+        1992.0,
+        2607.0
+      ],
+      "region_id": "R3",
+      "role": "buoy",
+      "size": [
+        1660.968,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R3_01_MagazynyPortowe"
+    },
+    {
+      "bounds": [
+        3191.4315,
+        2165.336625,
+        1779.6086,
+        360.22235
+      ],
+      "camera_cells": [
+        [
+          4,
+          4
+        ]
+      ],
+      "id": "R3-02",
+      "kind": "shipyard",
+      "name": "Stara Stocznia",
+      "position": [
+        4081.2358,
+        2345.4478
+      ],
+      "region_id": "R3",
+      "role": "heavy_salvage",
+      "size": [
+        1779.6086,
+        360.22235
+      ],
+      "source_node_path": "Landmarks/R3_02_StaraStocznia"
+    },
+    {
+      "bounds": [
+        6086.2617,
+        2389.475025,
+        1779.6086,
+        360.22235
+      ],
+      "camera_cells": [
+        [
+          7,
+          5
+        ]
+      ],
+      "id": "R3-03",
+      "kind": "factory",
+      "name": "Fabryka",
+      "position": [
+        6976.066,
+        2569.5862
+      ],
+      "region_id": "R3",
+      "role": "tech",
+      "size": [
+        1779.6086,
+        360.22235
+      ],
+      "source_node_path": "Landmarks/R3_03_Fabryka"
+    },
+    {
+      "bounds": [
+        9439.83535,
+        2572.2544,
+        1621.4213,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          10,
+          5
+        ]
+      ],
+      "id": "R3-04",
+      "kind": "power_plant",
+      "name": "Elektrownia",
+      "position": [
+        10250.546,
+        2745.6948
+      ],
+      "region_id": "R3",
+      "role": "hazard",
+      "size": [
+        1621.4213,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R3_04_Elektrownia"
+    },
+    {
+      "bounds": [
+        7086.79725,
+        3192.6376,
+        1700.5149,
+        346.8808
+      ],
+      "camera_cells": [
+        [
+          8,
+          6
+        ]
+      ],
+      "id": "R3-05",
+      "kind": "chemical_storage",
+      "name": "Skład Chemikaliów",
+      "position": [
+        7937.0547,
+        3366.078
+      ],
+      "region_id": "R3",
+      "role": "medicine",
+      "size": [
+        1700.5149,
+        346.8808
+      ],
+      "source_node_path": "Landmarks/R3_05_SkladChemikaliow"
+    },
+    {
+      "bounds": [
+        2266.0351,
+        3133.934525,
+        1779.6086,
+        360.22235
+      ],
+      "camera_cells": [
+        [
+          3,
+          6
+        ]
+      ],
+      "id": "R3-06",
+      "kind": "scrapyard",
+      "name": "Złomowisko",
+      "position": [
+        3155.8394,
+        3314.0457
+      ],
+      "region_id": "R3",
+      "role": "heavy_salvage",
+      "size": [
+        1779.6086,
+        360.22235
+      ],
+      "source_node_path": "Landmarks/R3_06_Zlomowisko"
+    },
+    {
+      "bounds": [
+        1127.0855,
+        4202.594425,
+        1779.6086,
+        360.22235
+      ],
+      "camera_cells": [
+        [
+          2,
+          8
+        ]
+      ],
+      "id": "R4-01",
+      "kind": "metro",
+      "name": "Dworzec Metra",
+      "position": [
+        2016.8898,
+        4382.7056
+      ],
+      "region_id": "R4",
+      "role": "buoy",
+      "size": [
+        1779.6086,
+        360.22235
+      ],
+      "source_node_path": "Landmarks/R4_01_DworzecMetra"
+    },
+    {
+      "bounds": [
+        4243.37775,
+        3991.7974,
+        1621.4213,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          5,
+          7
+        ]
+      ],
+      "id": "R4-02",
+      "kind": "bunker",
+      "name": "Bunkier",
+      "position": [
+        5054.0884,
+        4158.567
+      ],
+      "region_id": "R4",
+      "role": "safe_room",
+      "size": [
+        1621.4213,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R4_02_Bunkier"
+    },
+    {
+      "bounds": [
+        7296.3954,
+        4182.581825,
+        1779.6086,
+        360.22235
+      ],
+      "camera_cells": [
+        [
+          8,
+          8
+        ]
+      ],
+      "id": "R4-03",
+      "kind": "laboratory",
+      "name": "Laboratoria",
+      "position": [
+        8186.1997,
+        4362.693
+      ],
+      "region_id": "R4",
+      "role": "tech",
+      "size": [
+        1779.6086,
+        360.22235
+      ],
+      "source_node_path": "Landmarks/R4_03_Laboratoria"
+    },
+    {
+      "bounds": [
+        9621.75025,
+        4448.079,
+        1542.3275,
+        333.5392
+      ],
+      "camera_cells": [
+        [
+          10,
+          8
+        ]
+      ],
+      "id": "R4-04",
+      "kind": "sealed_gate",
+      "name": "Zamknięte Grodzie",
+      "position": [
+        10392.914,
+        4614.8486
+      ],
+      "region_id": "R4",
+      "role": "story_gate",
+      "size": [
+        1542.3275,
+        333.5392
+      ],
+      "source_node_path": "Landmarks/R4_04_ZamknieteGrodzie"
+    },
+    {
+      "bounds": [
+        4994.76835,
+        4913.69955,
+        1898.2493,
+        386.9055
+      ],
+      "camera_cells": [
+        [
+          6,
+          9
+        ]
+      ],
+      "id": "R4-05",
+      "kind": "city_center",
+      "name": "Centrum Miasta",
+      "position": [
+        5943.893,
+        5107.1523
+      ],
+      "region_id": "R4",
+      "role": "deep_bell",
+      "size": [
+        1898.2493,
+        386.9055
+      ],
+      "source_node_path": "Landmarks/R4_05_CentrumMiasta"
+    },
+    {
+      "bounds": [
+        4844.49045,
+        5736.87433,
+        2175.0771,
+        453.61334
+      ],
+      "camera_cells": [
+        [
+          6,
+          10
+        ],
+        [
+          6,
+          11
+        ]
+      ],
+      "id": "R4-06",
+      "kind": "heart",
+      "name": "Serce",
+      "position": [
+        5932.029,
+        5963.681
+      ],
+      "region_id": "R4",
+      "role": "finale",
+      "size": [
+        2175.0771,
+        453.61334
+      ],
+      "source_node_path": "Landmarks/R4_06_Serce"
+    }
+  ],
+  "map_gameplay_identity": {
+    "map_gameplay_signature": {
+      "availability": "runtime_compiled_not_serialized_in_authority_scene",
+      "value": null
+    },
+    "navigation_cells_sha256": "7c6ce97c39e58d5008032ca9dc16ad2464be5518b8cf9960adfad9f6df5a8c02",
+    "navigation_signature_sha256": "40798e139fcb909aa136190f1142c0b6150fdb242263b87cc1c3fe7bf89b2050"
+  },
+  "operations": [
+    "parse current authored region and landmark nodes from UnderwaterMap.tscn",
+    "nearest-neighbor scale the 8-unit terrain grid by 3x",
+    "overlay authored region bounds including overlaps",
+    "overlay full production-camera frames with the final row and column clamped to world edges",
+    "overlay 28 semantic landmark positions and authored bounds",
+    "draw labels with the generator-embedded bitmap font",
+    "encode RGBA PNG with Pillow compress_level=9 optimize=false"
+  ],
+  "output": {
+    "format": "RGBA PNG",
+    "path": "res://assets/diving/world/layout_guides/full_map/underwater_map_layout_guide_v1.png",
+    "pixel_sha256": "7ef01d470cb61163625c9757c140c5135ca9f4c8b1f7ce2f55c248d557d77e01",
+    "sha256": "23879bc81001ca9a71d799a0b72f81810c4d88797722e1314d60d3dedfe5079c",
+    "size_bytes": 112180
+  },
+  "pixels_per_world_unit": 0.375,
+  "region_count": 4,
+  "regions": [
+    {
+      "accent_color_rgba": [
+        0.243137,
+        0.776471,
+        0.839216,
+        1.0
+      ],
+      "bounds": [
+        0.0,
+        0.0,
+        11520.0,
+        1534.2804
+      ],
+      "center": [
+        5760.0,
+        767.1402
+      ],
+      "depth_range": [
+        8.0,
+        35.0
+      ],
+      "id": "R1",
+      "name": "Dachy Umarłego Miasta",
+      "size": [
+        11520.0,
+        1534.2804
+      ],
+      "source_node_path": "DepthRegions/R1_DachyUmarlegoMiasta"
+    },
+    {
+      "accent_color_rgba": [
+        0.466667,
+        0.827451,
+        0.435294,
+        1.0
+      ],
+      "bounds": [
+        0.0,
+        1367.51075,
+        11520.0,
+        1234.0951
+      ],
+      "center": [
+        5760.0,
+        1984.5583
+      ],
+      "depth_range": [
+        30.0,
+        70.0
+      ],
+      "id": "R2",
+      "name": "Zielone Osiedla",
+      "size": [
+        11520.0,
+        1234.0951
+      ],
+      "source_node_path": "DepthRegions/R2_ZieloneOsiedla"
+    },
+    {
+      "accent_color_rgba": [
+        0.87451,
+        0.529412,
+        0.239216,
+        1.0
+      ],
+      "bounds": [
+        0.0,
+        2401.4824,
+        11520.0,
+        1534.2804
+      ],
+      "center": [
+        5760.0,
+        3168.6226
+      ],
+      "depth_range": [
+        65.0,
+        115.0
+      ],
+      "id": "R3",
+      "name": "Rdzawy Pas",
+      "size": [
+        11520.0,
+        1534.2804
+      ],
+      "source_node_path": "DepthRegions/R3_RdzawyPas"
+    },
+    {
+      "accent_color_rgba": [
+        0.352941,
+        0.568627,
+        0.901961,
+        1.0
+      ],
+      "bounds": [
+        0.0,
+        3735.6397,
+        11520.0,
+        2744.3606
+      ],
+      "center": [
+        5760.0,
+        5107.82
+      ],
+      "depth_range": [
+        105.0,
+        160.0
+      ],
+      "id": "R4",
+      "name": "Czarne Serce",
+      "size": [
+        11520.0,
+        2744.3606
+      ],
+      "source_node_path": "DepthRegions/R4_CzarneSerce"
+    }
+  ],
+  "role": "presentation_only_derived_authoring_guide",
+  "schema_version": 2,
+  "sources": {
+    "camera_scene": {
+      "path": "res://scenes/diving/Diver.tscn",
+      "sha256": "f51f4090a8a72a5f3271d25d38b7ac85a1868fc966540564d3d7fbef327a2894",
+      "size_bytes": 3352
+    },
+    "project_config": {
+      "path": "res://project.godot",
+      "sha256": "bef2861aa8323ef4e5f827603bb3f045ece37b9a1687e89f40e155261bd49845",
+      "size_bytes": 7602
+    },
+    "region_scene": {
+      "path": "res://scenes/diving/map_objects/MapRegion.tscn",
+      "sha256": "85ed75d2c488be18e209deb31d2464fb0abc1bab79c23f863e940e12c0c64f6b",
+      "size_bytes": 281
+    },
+    "terrain_grid": {
+      "path": "res://assets/diving/world/map_v2/world_collision_grid.png",
+      "sha256": "40798e139fcb909aa136190f1142c0b6150fdb242263b87cc1c3fe7bf89b2050",
+      "size_bytes": 13999
+    },
+    "terrain_manifest": {
+      "cells_sha256": "7c6ce97c39e58d5008032ca9dc16ad2464be5518b8cf9960adfad9f6df5a8c02",
+      "geometry_sha256": "cf030739b7d322f84633b100be268a9b6f409f8b3d6bf4d2223c8b97b204de0e",
+      "grid_step": 8.0,
+      "output_sha256": "40798e139fcb909aa136190f1142c0b6150fdb242263b87cc1c3fe7bf89b2050",
+      "path": "res://assets/diving/world/map_v2/world_collision_grid.json",
+      "sha256": "ab3e5579b93af773029cdcc922d8eba82fbad5e94de92f5ca1853a3f16ade6d7",
+      "size_bytes": 724
+    }
+  },
+  "world_size": [
+    11520.0,
+    6480.0
+  ]
+}

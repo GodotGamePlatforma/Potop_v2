@@ -52,7 +52,7 @@ Nie przenoś tych plików do warsztatu. Produkcyjne ścieżki, UID-y i import Go
 - Commit odniesienia `a1c33d5` usunął odrzuconą szeroką panoramę R1, pięć jej źródeł, 24 cropy i generator `build_dive_art_cells.py`.
 - Aktywny manifest zawiera jedną warstwę `environment_decoration` i 15 cropów. Jej źródłowy master jest zarchiwizowany i nie istnieje w repozytorium.
 - `build_dive_visual_chunks.py` nie ma `--check` i nie potrafi odbudować warstwy bez brakującego źródła. Nie używaj go jako aktywnego buildera, dopóki pipeline nie zostanie jawnie naprawiony albo zastąpiony.
-- Pełnomapowy layout guide v1 i jego generator są obecnie kandydatami w worktree, nie częścią czystego checkoutu.
+- Pełnomapowy layout guide v1, manifest i generator są wersjonowanym pakietem referencyjnym z deterministycznym `--check`.
 - Nie istnieje zaakceptowany szeroki composition master R1-R4.
 
 Dokładny stan i rozdzielone statusy techniczny/artystyczny są w `.ai/PROJECT_CONTEXT.md`.
@@ -105,7 +105,7 @@ git -C .. diff --name-only
 git -C .. diff --check
 ```
 
-Ponieważ cały katalog warsztatu jest obecnie untracked, zwykły `git diff` nie pokaże treści jego nowych plików. Do odbioru przed commitem użyj również `git -C .. status --short --untracked-files=all`.
+Zwykły `git diff` nie pokazuje treści nowych plików untracked. Do odbioru przed commitem zawsze użyj również `git -C .. status --short --untracked-files=all`.
 
 ## Źródła, pochodne i cache
 
