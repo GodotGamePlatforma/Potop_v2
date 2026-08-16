@@ -126,18 +126,13 @@ func _run() -> void:
 	_assert(environment_layer is Node2D and not (environment_layer is Sprite2D), "Pierwszy slot powinien grupowac tylko streamowane, rzadkie fragmenty srodowiska.")
 	if environment_layer is Node2D:
 		_assert(environment_layer.z_index == -90, "Warstwa srodowiska powinna pozostac za glowna geometria i nurkiem.")
-	var r1_art_cells = dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/R1ArtCells")
-	_assert(r1_art_cells is Node2D and not (r1_art_cells is Sprite2D), "R1 ArtCells powinny miec osobny slot wypelniany tylko przez streamer cropow.")
-	if r1_art_cells is Node2D:
-		_assert(r1_art_cells.z_index == -96, "R1 ArtCells musza lezec za proceduralnym dalekim planem i rzadka dekoracja, ale przed tlem wody.")
 	var visual_streamer = dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/VisualChunkStreamer")
 	_assert(visual_streamer is DiveVisualChunkStreamer, "Warstwy authored powinien obslugiwac prezentacyjny streamer chunkow.")
 	if visual_streamer is DiveVisualChunkStreamer:
 		var visual_stream_state: Dictionary = visual_streamer.presentation_state()
 		_assert(bool(visual_stream_state.get("manifest_loaded", false)), "Streamer powinien zaladowac pochodny manifest bez ladowania pelnych tekstur.")
-		_assert(int(visual_stream_state.get("entry_count", 0)) == 39, "Manifest powinien zawierac 15 rzadkich dekoracji i 24 cropy pelnego pasa R1.")
-		_assert(int(visual_stream_state.get("all_chunks_decoded_rgba_bytes", 0)) < 75 * 1024 * 1024, "Komplet cropow dekoracji i R1 powinien pozostac pod budzetem 75 MiB decoded RGBA.")
-		_assert(int(visual_stream_state.get("loaded_decoded_rgba_bytes", 0)) < 48 * 1024 * 1024, "Pojedynczy widok z buforem nie powinien materializowac wiecej niz 48 MiB cropow.")
+		_assert(int(visual_stream_state.get("entry_count", 0)) == 15, "Manifest powinien zawierac tylko 15 rzadkich cropow dekoracji srodowiska.")
+		_assert(int(visual_stream_state.get("all_chunks_decoded_rgba_bytes", 0)) < 4 * 1024 * 1024, "Komplet cropow dekoracji powinien zajmowac mniej niz 4 MiB decoded RGBA.")
 		_assert(int(visual_stream_state.get("loaded_count", 0)) < int(visual_stream_state.get("entry_count", 0)), "Runtime nie powinien jednoczesnie materializowac wszystkich cropow.")
 	_assert(not ResourceLoader.has_cached("res://assets/diving/world/map_v2/visuals/duzaMapaEnvironmentDecorationLayer-v3.png"), "Runtime nie powinien ladowac pelnej warstwy dekoracji.")
 	_assert(dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/ColliderVisual") == null, "Monolityczny PNG collidera nie powinien pozostac drugim zrodlem widocznej geometrii.")

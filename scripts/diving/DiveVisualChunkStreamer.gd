@@ -10,8 +10,6 @@ const DEFAULT_VISIBLE_HALF_EXTENT := Vector2(960.0, 540.0)
 const PREFETCH_RING_CHUNKS := 1
 const UNLOAD_HYSTERESIS_CHUNKS := 1
 const MAX_ATTACHES_PER_FRAME := 2
-const LIGHT_MODE_LIT := "lit"
-const LIGHT_MODE_UNSHADED := "unshaded"
 
 @export_file("*.json") var manifest_path := DEFAULT_MANIFEST_PATH
 
@@ -28,8 +26,6 @@ var _retained_keys: Dictionary = {}
 var _layer_roots: Dictionary = {}
 var _last_center_chunk := Vector2i(-9999, -9999)
 var _last_visible_half_extent := Vector2(-1.0, -1.0)
-var _unshaded_material: CanvasItemMaterial
-var _allow_headless_texture_materialization_for_tests := false
 
 
 func _ready() -> void:
@@ -138,13 +134,6 @@ func _process(_delta: float) -> void:
 
 
 func _request_entry(entry: Dictionary) -> void:
-	# Most headless tests validate the manifest and culling contract without a
-	# renderer. Only the dedicated streamer test opts into dummy texture objects.
-	if (
-		DisplayServer.get_name() == "headless"
-		and not _allow_headless_texture_materialization_for_tests
-	):
-		return
 	var key := str(entry.get("key", ""))
 	var path := str(entry.get("path", ""))
 	if key.is_empty() or path.is_empty():
@@ -159,10 +148,6 @@ func _request_entry(entry: Dictionary) -> void:
 		push_error("Nie udało się zlecić wczytania wizualnego chunka %s (%d)." % [path, request_error])
 		return
 	_pending_entries[key] = entry
-
-
-func enable_headless_texture_materialization_for_tests() -> void:
-	_allow_headless_texture_materialization_for_tests = true
 
 
 func _attach_entry(entry: Dictionary, texture: Texture2D) -> void:
@@ -186,8 +171,6 @@ func _attach_entry(entry: Dictionary, texture: Texture2D) -> void:
 	sprite.region_enabled = true
 	sprite.region_rect = texture_region
 	sprite.region_filter_clip_enabled = false
-	if str(entry.get("_light_mode", LIGHT_MODE_LIT)) == LIGHT_MODE_UNSHADED:
-		sprite.material = _unshaded_chunk_material()
 	sprite.set_meta(&"visual_chunk_key", key)
 	layer_root.add_child(sprite)
 	_loaded_nodes[key] = sprite
@@ -224,11 +207,6 @@ func _load_manifest() -> void:
 			continue
 		var layer: Dictionary = layer_variant
 		var runtime_parent := str(layer.get("runtime_parent", ""))
-		var light_mode := str(layer.get("light_mode", LIGHT_MODE_LIT))
-		if light_mode not in [LIGHT_MODE_LIT, LIGHT_MODE_UNSHADED]:
-			_manifest_error = "Manifest zawiera nieobsługiwany light_mode warstwy %s: %s." % [runtime_parent, light_mode]
-			push_error(_manifest_error)
-			return
 		var chunks = layer.get("chunks", [])
 		if not (chunks is Array):
 			continue
@@ -242,7 +220,6 @@ func _load_manifest() -> void:
 				push_error(_manifest_error)
 				return
 			entry["runtime_parent"] = runtime_parent
-			entry["_light_mode"] = light_mode
 			entry["_world_rect"] = _rect2_from_array(entry.get("world_rect", []))
 			entry["_texture_region"] = _rect2_from_array(entry.get("texture_region", []))
 			entry["_source_rect"] = _rect2_from_array(entry.get("source_rect", []))
@@ -253,13 +230,6 @@ func _load_manifest() -> void:
 		push_error(_manifest_error)
 		return
 	_resolve_layer_roots()
-
-
-func _unshaded_chunk_material() -> CanvasItemMaterial:
-	if _unshaded_material == null:
-		_unshaded_material = CanvasItemMaterial.new()
-		_unshaded_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
-	return _unshaded_material
 
 
 func _resolve_layer_roots() -> void:

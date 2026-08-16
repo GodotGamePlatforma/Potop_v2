@@ -25,16 +25,6 @@ func _run() -> void:
 		_assert(profile != null, "Każdy z czterech regionów musi mieć wczytywalny profil prezentacyjny.")
 		if profile != null:
 			profiles.append(profile)
-	if profiles.size() == PROFILE_PATHS.size():
-		_assert(
-			is_zero_approx(float(profiles[0].backdrop_strength)),
-			"R1 musi wyłączać proceduralne placeholderowe budynki nad autorskimi ArtCells."
-		)
-		for profile_index in range(1, profiles.size()):
-			_assert(
-				float(profiles[profile_index].backdrop_strength) > 0.0,
-				"Pozostałe regiony muszą zachować własny proceduralny motyw dalekiego planu."
-			)
 
 	var environment := EnvironmentScript.new()
 	root.add_child(environment)

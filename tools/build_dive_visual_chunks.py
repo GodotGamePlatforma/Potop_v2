@@ -184,49 +184,18 @@ def _build_layer(layer: Layer, expected_size: tuple[int, int]) -> dict:
     }
 
 
-def _load_retained_layers(owned_layer_ids: set[str]) -> tuple[dict, list[dict]]:
-    if not MANIFEST_PATH.is_file():
-        return {}, []
-    parsed = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    if not isinstance(parsed, dict):
-        raise RuntimeError(f"Existing visual manifest is not an object: {MANIFEST_PATH}")
-    existing_layers = parsed.get("layers", [])
-    if not isinstance(existing_layers, list):
-        raise RuntimeError(
-            f"Existing visual manifest has no layers array: {MANIFEST_PATH}"
-        )
-    retained_layers: list[dict] = []
-    for layer in existing_layers:
-        if not isinstance(layer, dict):
-            raise RuntimeError(
-                f"Existing visual manifest contains a non-object layer: {MANIFEST_PATH}"
-            )
-        layer_id = str(layer.get("id", ""))
-        if not layer_id:
-            raise RuntimeError(
-                f"Existing visual manifest contains a layer without id: {MANIFEST_PATH}"
-            )
-        if layer_id not in owned_layer_ids:
-            retained_layers.append(layer)
-    return parsed, retained_layers
-
-
 def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     expected_size = (11_520, 6_480)
     layers = [_build_layer(layer, expected_size) for layer in LAYERS]
-    owned_layer_ids = {layer.layer_id for layer in LAYERS}
-    manifest, retained_layers = _load_retained_layers(owned_layer_ids)
-    manifest.update(
-        {
-            "schema_version": 1,
-            "generator": "tools/build_dive_visual_chunks.py",
-            "world_size": list(expected_size),
-            "grid_chunk_size": CHUNK_SIZE,
-            "filter_gutter": GUTTER,
-            "layers": layers + retained_layers,
-        }
-    )
+    manifest = {
+        "schema_version": 1,
+        "generator": "tools/build_dive_visual_chunks.py",
+        "world_size": list(expected_size),
+        "grid_chunk_size": CHUNK_SIZE,
+        "filter_gutter": GUTTER,
+        "layers": layers,
+    }
     MANIFEST_PATH.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
