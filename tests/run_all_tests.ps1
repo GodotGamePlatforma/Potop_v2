@@ -14,6 +14,17 @@ param(
 
     [string]$NativeTarget,
 
+    [string[]]$TargetUserArgument = @(),
+
+    [string]$TargetUserArgumentsJson,
+
+    [string]$TargetUserArgumentsBase64,
+
+    [string]$NativeMovieOutputPath,
+
+    [ValidateRange(1, 240)]
+    [int]$NativeMovieFps = 30,
+
     [switch]$KeepWorkspace,
 
     [switch]$InPlace,
@@ -488,6 +499,7 @@ function New-TestCase {
         [string]$Name,
         [string]$Group,
         [string[]]$Arguments,
+        [string[]]$UserArguments = @(),
         [bool]$NativeWindow = $false
     )
 
@@ -495,6 +507,7 @@ function New-TestCase {
         Name = $Name
         Group = $Group
         Arguments = $Arguments
+        UserArguments = $UserArguments
         NativeWindow = $NativeWindow
         TimeoutSeconds = if (-not $testTimeoutWasExplicit -and $testSpecificDefaultTimeoutSeconds.ContainsKey($Name)) {
             [int]$testSpecificDefaultTimeoutSeconds[$Name]
@@ -687,7 +700,12 @@ function Invoke-GodotTest {
     try {
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = $GodotExecutable
+        # Engine options, the scene/script target and the runner-owned log must
+        # stay before `--`. Everything after it belongs to the target harness.
         $processArguments = @($TestCase.Arguments) + @("--log-file", $logPath)
+        if (@($TestCase.UserArguments).Count -gt 0) {
+            $processArguments += @("--") + @($TestCase.UserArguments)
+        }
         $startInfo.Arguments = (@($processArguments) | ForEach-Object {
             ConvertTo-ProcessArgument -Argument ([string]$_)
         }) -join " "
@@ -835,8 +853,46 @@ if ($missingQuickScripts.Count -gt 0 -or $missingQuickFlows.Count -gt 0) {
     throw "Every quick target must also belong to the full manifest. Missing: $($missingQuickTargets -join ', ')"
 }
 
+$resolvedTargetUserArguments = @($TargetUserArgument)
+$targetUserArgumentsPayload = $TargetUserArgumentsJson
+$targetUserArgumentsPayloadParameter = "-TargetUserArgumentsJson"
+if (-not [string]::IsNullOrWhiteSpace($TargetUserArgumentsBase64)) {
+    if (-not [string]::IsNullOrWhiteSpace($TargetUserArgumentsJson)) {
+        throw "-TargetUserArgumentsJson and -TargetUserArgumentsBase64 are mutually exclusive."
+    }
+    try {
+        $payloadBytes = [Convert]::FromBase64String($TargetUserArgumentsBase64.Trim())
+        $targetUserArgumentsPayload = [Text.Encoding]::UTF8.GetString($payloadBytes)
+    }
+    catch {
+        throw "-TargetUserArgumentsBase64 must contain Base64-encoded UTF-8 JSON: $($_.Exception.Message)"
+    }
+    $targetUserArgumentsPayloadParameter = "-TargetUserArgumentsBase64"
+}
+if (-not [string]::IsNullOrWhiteSpace($targetUserArgumentsPayload)) {
+    if ($resolvedTargetUserArguments.Count -gt 0) {
+        throw "-TargetUserArgument and $targetUserArgumentsPayloadParameter are mutually exclusive."
+    }
+    if (-not $targetUserArgumentsPayload.TrimStart().StartsWith("[")) {
+        throw "$targetUserArgumentsPayloadParameter must represent a JSON array of strings."
+    }
+    try {
+        $decodedTargetUserArguments = $targetUserArgumentsPayload | ConvertFrom-Json -ErrorAction Stop
+        $decodedTargetUserArguments = @($decodedTargetUserArguments)
+    }
+    catch {
+        throw "$targetUserArgumentsPayloadParameter must represent a JSON array of strings: $($_.Exception.Message)"
+    }
+    if ($decodedTargetUserArguments.Count -eq 0 -or @($decodedTargetUserArguments | Where-Object { $_ -isnot [string] }).Count -gt 0) {
+        throw "$targetUserArgumentsPayloadParameter must represent a non-empty JSON array containing only strings."
+    }
+    $resolvedTargetUserArguments = @($decodedTargetUserArguments | ForEach-Object { [string]$_ })
+}
+
 $hasTarget = -not [string]::IsNullOrWhiteSpace($Target)
 $hasNativeTarget = -not [string]::IsNullOrWhiteSpace($NativeTarget)
+$hasTargetUserArguments = $resolvedTargetUserArguments.Count -gt 0
+$hasNativeMovieOutput = -not [string]::IsNullOrWhiteSpace($NativeMovieOutputPath)
 if ($hasTarget -and $hasNativeTarget) {
     throw "-Target and -NativeTarget are mutually exclusive."
 }
@@ -845,6 +901,38 @@ if (($hasTarget -or $hasNativeTarget) -and ($Full -or $IncludeSnapshots)) {
 }
 if ($InPlace -and $KeepWorkspace) {
     throw "-KeepWorkspace applies only to the default isolated workspace mode and cannot be combined with -InPlace."
+}
+if ($hasTargetUserArguments -and -not ($hasTarget -or $hasNativeTarget)) {
+    throw "Target user arguments require -Target or -NativeTarget."
+}
+if ($hasNativeMovieOutput -and -not $hasNativeTarget) {
+    throw "-NativeMovieOutputPath requires -NativeTarget."
+}
+
+$resolvedNativeMovieOutputPath = $null
+if ($hasNativeMovieOutput) {
+    $expandedMoviePath = [Environment]::ExpandEnvironmentVariables($NativeMovieOutputPath.Trim())
+    if (-not [System.IO.Path]::IsPathRooted($expandedMoviePath)) {
+        throw "-NativeMovieOutputPath must be an absolute path outside the project: '$NativeMovieOutputPath'."
+    }
+    $resolvedNativeMovieOutputPath = [System.IO.Path]::GetFullPath($expandedMoviePath)
+    $movieExtension = [System.IO.Path]::GetExtension($resolvedNativeMovieOutputPath).ToLowerInvariant()
+    if ($movieExtension -notin @(".avi", ".ogv", ".png")) {
+        throw "-NativeMovieOutputPath must use a Godot Movie Maker extension: .avi, .ogv or .png."
+    }
+    $sourcePrefix = $sourceProjectRoot.TrimEnd([char[]]"\/") + [System.IO.Path]::DirectorySeparatorChar
+    if ($resolvedNativeMovieOutputPath.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "-NativeMovieOutputPath must stay outside the source project: '$resolvedNativeMovieOutputPath'."
+    }
+    $workspacePrefix = (Get-TestWorkspaceRoot).TrimEnd([char[]]"\/") + [System.IO.Path]::DirectorySeparatorChar
+    if ($resolvedNativeMovieOutputPath.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "-NativeMovieOutputPath must stay outside disposable test workspaces: '$resolvedNativeMovieOutputPath'."
+    }
+    $movieDirectory = [System.IO.Path]::GetDirectoryName($resolvedNativeMovieOutputPath)
+    if ([string]::IsNullOrWhiteSpace($movieDirectory)) {
+        throw "-NativeMovieOutputPath has no parent directory: '$resolvedNativeMovieOutputPath'."
+    }
+    [void](New-Item -ItemType Directory -Path $movieDirectory -Force)
 }
 
 $resolvedTarget = $null
@@ -878,6 +966,9 @@ $missingTargets = @($manifestTargets | Where-Object {
 })
 if ($missingTargets.Count -gt 0) {
     throw "The test manifest references missing files: $($missingTargets -join ', ')"
+}
+if ($hasNativeMovieOutput -and [System.IO.Path]::GetExtension($resolvedTarget).ToLowerInvariant() -ne ".tscn") {
+    throw "-NativeMovieOutputPath requires a native .tscn target so the production renderer is preserved."
 }
 
 $godotExecutable = Find-GodotConsole -RequestedPath $GodotConsolePath
@@ -918,7 +1009,15 @@ try {
         }
         else {
             $targetArguments = if ($isNativeTarget) {
-                @("--path", $projectRoot, $targetResourcePath)
+                $nativeSceneArguments = @("--path", $projectRoot)
+                if ($null -ne $resolvedNativeMovieOutputPath) {
+                    $nativeSceneArguments += @(
+                        "--write-movie", $resolvedNativeMovieOutputPath,
+                        "--fixed-fps", [string]$NativeMovieFps,
+                        "--disable-vsync"
+                    )
+                }
+                $nativeSceneArguments + @($targetResourcePath)
             }
             else {
                 @("--headless", "--path", $projectRoot, $targetResourcePath)
@@ -929,6 +1028,7 @@ try {
             -Name $resolvedTarget `
             -Group $targetGroup `
             -NativeWindow $isNativeTarget `
+            -UserArguments @($resolvedTargetUserArguments) `
             -Arguments $targetArguments))
     }
     else {

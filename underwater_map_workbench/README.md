@@ -64,8 +64,8 @@ Dokładny stan i rozdzielone statusy techniczny/artystyczny są w `.ai/PROJECT_C
 3. Przed edycją nazwij dokładne pliki oraz ich kategorię: źródło, pochodna, cache albo ścieżka chroniona.
 4. Edytuj źródło, nigdy ręcznie pochodny crop, raster kolizji lub SDF.
 5. Dla szerokiej grafiki przejdź bramkę master-first z MAP-ARD-0001; dla lokalnego propu, materiału lub prefabu stosuj proporcjonalny zakres.
-6. Po zmianie uruchom build, `--check`, celowane testy i właściwy snapshot tylko wtedy, gdy zadanie zezwala na zapis i wykonanie.
-7. Obejrzyj wynik oraz sprawdź końcowy diff całego projektu przez `git -C ..`.
+6. Po zmianie uruchom build, `--check`, celowane testy, właściwy snapshot i — dla szerokiej zmiany wizualnej — pełnomapowy survey tylko wtedy, gdy zadanie zezwala na zapis i wykonanie.
+7. Otwórz wynik survey, oceń kontaktówkę, pełne kadry i ruch, a następnie sprawdź końcowy diff całego projektu przez `git -C ..`.
 
 ## Komendy z katalogu warsztatu
 
@@ -96,6 +96,36 @@ Natywny snapshot świata:
 ```
 
 Runner sam rozwiązuje korzeń projektu przez własny `$PSScriptRoot`, tworzy izolowaną kopię i wykonuje cele sekwencyjnie. `ERROR`, `SCRIPT ERROR`, timeout lub niezerowy kod oznaczają porażkę. W trybie `TYLKO ANALIZA` tych komend nie uruchamiaj.
+
+### Automatyczny pełnomapowy survey runtime
+
+Domyślny odbiór `high`, pełny ruch, 1280×720, 30 FPS, `600 u/s` i automatyczna trasa po całej mapie:
+
+```powershell
+..\tools\run_dive_map_visual_survey.ps1
+```
+
+Przykładowe warianty:
+
+```powershell
+..\tools\run_dive_map_visual_survey.ps1 -Quality medium -ReducedMotion
+..\tools\run_dive_map_visual_survey.ps1 -CameraSpeed 1200 -MovieFps 20
+..\tools\run_dive_map_visual_survey.ps1 -OutputDirectory D:\VisualSurveys
+```
+
+Launcher otwiera prawdziwe `GameRoot -> DiveScene`, ukrywa nurka i HUD, zatrzymuje stan sesji, a kamerę prowadzi poziomą serpentyną po 11×11 punktach pokrywających cały świat: pierwszy wiersz od lewej do prawej, krok w dół, drugi od prawej do lewej i tak dalej. Domyślny przejazd trwa około 3,5 minuty. Nie trzeba sterować postacią. To odbiór wizualny działającej mapy, nie test kolizji, osiągalności ani wejścia gracza.
+
+Dla ochrony limitu 4 GB surowego AVI launcher wymaga `MovieFps / CameraSpeed <= 0.1`; komunikat błędu podaje bezpieczny maksymalny FPS dla wybranej prędkości.
+
+Każdy przebieg powstaje w izolowanej pełnej kopii projektu. Domyślny katalog wyników to `%LOCALAPPDATA%\OstatniPomost\VisualSurveys\run_<timestamp>_<id>`; dokładną ścieżkę podaje linia `SURVEY_ARTIFACT_DIR=...`. `-OutputDirectory` wskazuje wyłącznie zewnętrzny katalog nadrzędny — launcher także pod nim zawsze tworzy nowy, unikalny `run_<timestamp>_<id>` i nigdy nie używa wskazanego katalogu jako miejsca do nadpisania poprzedniego przebiegu. Wynik zawiera:
+
+- `full_map_scan.mp4` — przycięty film do oglądania, tworzony przez `ffmpeg`;
+- `full_map_scan_raw.avi` — deterministyczny zapis Godot Movie Maker w MJPEG, walidowany przed konwersją;
+- `contact_sheet_11x11.png` — całą mapę złożoną z 121 kadrów;
+- `frames/frame_000.png` ... `frame_120.png` oraz metadane każdego kadru;
+- `telemetry.jsonl` i `run_manifest.json` — trasę, streaming, renderer, profil i inwarianty.
+
+Pełny przebieg może potrwać kilka minut, zwłaszcza przy pierwszym imporcie. Do kompletnego wyniku potrzebne są `ffmpeg` i `ffprobe` dostępne w `PATH`; gdy ich brakuje, launcher zachowuje surowy AVI, 121 PNG, telemetrię i manifest, ale zwraca `TECHNICAL_FAIL`, ponieważ nie może utworzyć albo zweryfikować MP4 i kontaktówki. `PASS` techniczny wymaga braku `ERROR`/`SCRIPT ERROR`, dokładnie 121 kadrów oraz surowego filmu i MP4 o zgodnym czasie, FPS, liczbie dekodowalnych klatek; MP4 musi także przejść pełne dekodowanie. Codex musi jeszcze naprawdę otworzyć artefakty i ocenić kompozycję; sama zielona komenda nie jest odbiorem artystycznym. W trybie `TYLKO ANALIZA` survey pozostaje zabroniony.
 
 ### Kontrola zakresu
 
