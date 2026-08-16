@@ -1,0 +1,1553 @@
+{
+  "schema_version": 1,
+  "record_id": "landmarks_v1_six_layer_r3_rust_belt",
+  "created_utc": "2026-08-16T20:07:32.259Z",
+  "asset_type": "six_layer_landmark_art_reference_package",
+  "scope": {
+    "region_id": "R3",
+    "region_slug": "r3_rust_belt",
+    "package_root": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/",
+    "intent": "source_and_reference_art_only",
+    "runtime_wired": false,
+    "protected_underwater_map_modified": false,
+    "bottomless_region_rule": "No continuous seabed, floor, shelf, platform, bottom pile, bottom border, or lower frame."
+  },
+  "generation": {
+    "tool": "OpenAI built-in ImageGen",
+    "tool_call": "image_gen.imagegen",
+    "mode": "one independent generation call per landmark",
+    "generator_metadata_from_embedded_c2pa": {
+      "software_agent": "gpt-image",
+      "software_version": "2.0"
+    },
+    "parameters_not_exposed": [
+      "exact backend model identifier",
+      "seed",
+      "steps",
+      "sampler",
+      "guidance",
+      "quality parameter",
+      "size parameter"
+    ],
+    "input_images_per_call": 1,
+    "input_reference_restriction": "Only the accepted R3 Rust Belt biome composite preview was supplied, and only as material/style reference."
+  },
+  "style_reference": {
+    "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+    "absolute_path": "D:/Dev/Game/Game/assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+    "width": 1672,
+    "height": 941,
+    "channels": "srgba 4.0",
+    "colorspace": "sRGB",
+    "bytes": 1692501,
+    "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329"
+  },
+  "source_sheet_contract": {
+    "requested_aspect_ratio": "16:9",
+    "actual_dimensions": "1672x941",
+    "layout": "exact 2-column by 3-row registration sheet",
+    "chroma_key_background": "#FF00FF",
+    "registration": "same strict orthographic side elevation, cell-center origin, scale, and overall footprint across all six cells",
+    "no_labels_text_lighting_or_atmosphere": true
+  },
+  "layer_contract": [
+    {
+      "index": 0,
+      "id": "L00",
+      "role": "rear_silhouette",
+      "suffix": "l00_rear_silhouette",
+      "crop_geometry": "824x299+6+6"
+    },
+    {
+      "index": 1,
+      "id": "L01",
+      "role": "structural_shell",
+      "suffix": "l01_structural_shell",
+      "crop_geometry": "824x299+843+6"
+    },
+    {
+      "index": 2,
+      "id": "L02",
+      "role": "identity_core",
+      "suffix": "l02_identity_core",
+      "crop_geometry": "824x299+6+321"
+    },
+    {
+      "index": 3,
+      "id": "L03",
+      "role": "detail_props",
+      "suffix": "l03_detail_props",
+      "crop_geometry": "824x299+843+321"
+    },
+    {
+      "index": 4,
+      "id": "L04",
+      "role": "terrain_integration",
+      "suffix": "l04_terrain_integration",
+      "crop_geometry": "824x299+6+634"
+    },
+    {
+      "index": 5,
+      "id": "L05",
+      "role": "foreground_occluder",
+      "suffix": "l05_foreground_occluder",
+      "crop_geometry": "824x299+843+634"
+    }
+  ],
+  "postprocess": {
+    "source_copy": {
+      "operation": "Copy-Item",
+      "command_template": "Copy-Item -LiteralPath <raw_cache_path> -Destination <pack>/<slug>_source_sheet.png",
+      "preserves_raw_bytes": true
+    },
+    "crop": {
+      "tool": "ImageMagick",
+      "command_template": "magick <source_sheet> -crop \"<geometry>\" +repage <temporary_crop.png>",
+      "source_dimensions_expected_and_observed": "1672x941",
+      "crop_geometry_reading_order": [
+        "824x299+6+6",
+        "824x299+843+6",
+        "824x299+6+321",
+        "824x299+843+321",
+        "824x299+6+634",
+        "824x299+843+634"
+      ],
+      "adaptation_for_different_source_size": "not needed; every source sheet was exactly 1672x941",
+      "separator_cleanup": "A uniform six-pixel interior inset from each real panel origin excludes the white separators and their antialias fringe."
+    },
+    "key_removal": {
+      "helper_path": "C:/Users/Piotr/.codex/skills/.system/imagegen/scripts/remove_chroma_key.py",
+      "helper_sha256": "7E51236919203B61D07DDFFDC6E0B5F501A28661003F5851F26FFBB64BDEC1EA",
+      "helper_bytes": 14276,
+      "command_template": "python <helper> --input <temporary_crop.png> --out <temporary_alpha.png> --key-color #FF00FF --soft-matte --transparent-threshold 12 --opaque-threshold 72 --edge-contract 0 --edge-feather 0 --spill-cleanup --force",
+      "key_color": "#FF00FF",
+      "soft_matte": true,
+      "transparent_threshold": 12,
+      "opaque_threshold": 72,
+      "edge_contract": 0,
+      "edge_feather": 0,
+      "spill_cleanup": true,
+      "force": true
+    },
+    "final_canvas": {
+      "tool": "ImageMagick",
+      "command_template": "magick <temporary_alpha.png> -background none -gravity center -extent 1024x512 PNG32:<final_layer.png>",
+      "operation": "center-pad without resize",
+      "width": 1024,
+      "height": 512,
+      "output": "PNG32 sRGBA"
+    },
+    "preview": {
+      "tool": "ImageMagick",
+      "command_template": "magick -size 1024x512 xc:#0B475F <L00> -compose over -composite <L01> -compose over -composite <L02> -compose over -composite <L03> -compose over -composite <L04> -compose over -composite <L05> -compose over -composite PNG24:<preview.png>",
+      "background": "#0B475F",
+      "operator": "Over",
+      "order": [
+        "L00",
+        "L01",
+        "L02",
+        "L03",
+        "L04",
+        "L05"
+      ],
+      "output": "opaque PNG24 sRGB"
+    },
+    "imagemagick_version": "Version: ImageMagick 7.1.2-29 Q16-HDRI x64 360eda5:20260727 https://imagemagick.org"
+  },
+  "packs": [
+    {
+      "object_id": "R3-01",
+      "display_name": "Port Warehouses",
+      "slug": "r3_01_port_warehouses",
+      "generation_input": {
+        "full_prompt": "Use case: stylized-concept\nAsset type: R3 Rust Belt landmark six-source-layer technical source sheet for a strongly 2D underwater side-scrolling game\nInput images: Image 1 is a material, palette, edge treatment, and strict flat-2D style reference only. Do not edit it. Do not copy its object layout, individual props, or composite framing.\nPrimary request: create ONE exact 16:9 technical source sheet for the landmark \"R3-01 Port Warehouses\", divided into an exact invisible 2-column by 3-row registration grid. The full canvas background and all gutters must be perfectly uniform solid #FF00FF. There must be exactly six isolated complementary source layers, one in each cell, all describing the same landmark and designed to composite in reading order.\nGrid geometry: top-left cell L00, top-right L01, middle-left L02, middle-right L03, bottom-left L04, bottom-right L05. Keep a clean uninterrupted #FF00FF outer margin and clean #FF00FF gutters between cells. No borders, divider lines, labels, numbers, captions, or text. Keep every subject at least 28 pixels inside its cell.\nRegistration: every cell uses the same strict orthographic side elevation, the same landmark origin at the exact cell center, the same scale, the same overall footprint, and the same silhouette registration. Each cell contains only its assigned depth/content class; no component may be duplicated in another cell. When source-over composited L00 through L05, they form one coherent drowned port-warehouse landmark.\nCell contents:\nL00 rear silhouette: only sparse dark distant warehouse block silhouettes and thin remote cargo-gantry shapes; quiet, low detail, incomplete open forms.\nL01 structural shell: only the main drowned brick-and-steel dock warehouse shells, roof trusses, open hoist bays, broken wall frames, and cargo gantry frames; no identity machinery or loose props.\nL02 identity core: only the defining large loading-door frames, dock hoist mechanisms, warehouse crane rail, and one distinctive suspended cargo-handling assembly; no repeated shell.\nL03 detail props: only a few isolated complementary warehouse details such as detached hooks, short chain bundles, small cargo frame fragments, bent vents, and compact pallet-frame debris; widely separated and not a route.\nL04 terrain integration: only discontinuous short broken masonry and corroded steel attachment fragments near the far left and far right of the registered footprint; never a continuous floor, dock, platform, shelf, seabed, lower frame, or traversable surface.\nL05 foreground occluder: only sparse near-black cropped chain, torn corrugated sheet, bent beam, and cable fragments near side and upper edges; do not form a frame and do not cross the bottom.\nSubject identity: drowned brick-and-steel dock warehouses with cargo gantries and hoist bays, unmistakably a port warehouse landmark but not a complete navigable level.\nStyle/medium: premium hand-painted tactile materials translated into extremely flat orthographic 2D game cutouts; crisp readable silhouette; controlled painterly realism; no thick comic outline, no cel shading, no 3D render.\nLighting/mood: completely neutral unlit material reference. Godot will provide all lighting and underwater effects.\nColor palette: graphite steel, charcoal, oxidized rust brown, restrained dark teal patina, dull brass accents; never use magenta within the subjects.\nMaterials/textures: wet-looking corrosion and material wear may be painted as local albedo texture only, without highlights, light direction, shadows, glow, haze, or reflections.\nConstraints: exactly six cells and exactly the listed layer classes; fully isolated opaque subjects on flat #FF00FF; crisp edges; generous internal padding; no readable signs; no watermark.\nAvoid: perspective, three-quarter view, isometric view, foreshortening, vanishing point, volumetric rendering; continuous ground, floor, dock surface, platform, road, shelf, seabed, horizon, bottom pile, bottom border or lower frame; diver, person, creature, vehicle as a complete hero, gameplay pickup, marker, HUD, UI; active lamp, emissive pixels, bloom, flashlight, god rays, caustics, fog, haze, suspended particles, bubbles, refraction, motion blur, grading, vignette, cast shadow, contact shadow, reflection.",
+        "reference_image": {
+          "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+          "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329",
+          "role": "material_palette_edge_treatment_and_strict_flat_2d_style_only"
+        }
+      },
+      "raw_result": {
+        "cache_path": "C:/Users/Piotr/.codex/generated_images/01a00bf9-ce45-7c20-bfdf-9198901cc45e/exec-7934c7ac-6182-4df4-b9d1-87d3e4f5c853.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1473604,
+        "sha256": "75B9A6D1D46839D5431D374E7C7C39A1F7F8971A961EBC0FDD39B7EC4FBCA98F",
+        "generated_utc": "2026-08-16T19:32:07.6729931Z"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_source_sheet.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1473604,
+        "sha256": "75B9A6D1D46839D5431D374E7C7C39A1F7F8971A961EBC0FDD39B7EC4FBCA98F",
+        "byte_identical_to_raw_result": true
+      },
+      "layers": [
+        {
+          "index": 0,
+          "id": "L00",
+          "role": "rear_silhouette",
+          "crop_geometry": "824x299+6+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_l00_rear_silhouette.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 76814,
+          "sha256": "3DC3E08CA9419611EEFFE4E3B6594902E0EB536C91F0B75833F28692A77C8B92",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0554223,
+            "visible_coverage_ratio": 0.0653648,
+            "near_opaque_ratio": 0.0440502,
+            "nonzero_alpha_bbox": "622x163+197+218",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "id": "L01",
+          "role": "structural_shell",
+          "crop_geometry": "824x299+843+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_l01_structural_shell.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 232358,
+          "sha256": "C5BBC8D158CEE6C87E10EA5A764FC798B43AC6C658CD82B6AE9F980158BC89BE",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.130602,
+            "visible_coverage_ratio": 0.154074,
+            "near_opaque_ratio": 0.10601,
+            "nonzero_alpha_bbox": "738x238+143+144",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "id": "L02",
+          "role": "identity_core",
+          "crop_geometry": "824x299+6+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_l02_identity_core.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 207380,
+          "sha256": "2C5D52AAE2D29574E698FF62A4973D47E8970572F89C2E0C978E4838CE8B29E0",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.136253,
+            "visible_coverage_ratio": 0.15061,
+            "near_opaque_ratio": 0.119705,
+            "nonzero_alpha_bbox": "624x224+192+168",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "id": "L03",
+          "role": "detail_props",
+          "crop_geometry": "824x299+843+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_l03_detail_props.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 76352,
+          "sha256": "DDED852C5F499907CD761B2796949DBED569316B55A816184036F6817420C62A",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0341912,
+            "visible_coverage_ratio": 0.0425186,
+            "near_opaque_ratio": 0.0251236,
+            "nonzero_alpha_bbox": "653x203+162+189",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "id": "L04",
+          "role": "terrain_integration",
+          "crop_geometry": "824x299+6+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_l04_terrain_integration.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 67071,
+          "sha256": "E66F21F88F7142F465542AEC7ACD1C636D087664D868EFE1FFA7F4D9E1690AC9",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0349272,
+            "visible_coverage_ratio": 0.0408592,
+            "near_opaque_ratio": 0.0290031,
+            "nonzero_alpha_bbox": "665x192+185+147",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "id": "L05",
+          "role": "foreground_occluder",
+          "crop_geometry": "824x299+843+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/r3_01_port_warehouses_l05_foreground_occluder.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 86877,
+          "sha256": "2D635D6868E225329A6410CCA9AB037C19392BB9545D6EE0FF8163FD73D91B98",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0416548,
+            "visible_coverage_ratio": 0.0502968,
+            "near_opaque_ratio": 0.0319386,
+            "nonzero_alpha_bbox": "714x180+142+158",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "composite_preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_01_port_warehouses/derived/r3_01_port_warehouses_composite_preview.png",
+        "width": 1024,
+        "height": 512,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 302358,
+        "sha256": "A7D2FFCD3F48B70A554699C698D4DD3DC46A3D1AA3027D952C44C50C93763629",
+        "background": "#0B475F",
+        "composite_operator": "Over",
+        "order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "recomposition_absolute_error_pixels": 0
+      },
+      "qa": {
+        "technical": "pass",
+        "source_sheet_visually_inspected": true,
+        "six_layer_contact_sheet_visually_inspected": true,
+        "composite_preview_visually_inspected": true,
+        "visual_recommendation": "accept",
+        "visual_note": "Drowned brick-and-steel warehouse shells, cargo gantries, loading bays, and suspended hoist identity remain clearly separated across six registered planes.",
+        "bottomless_no_continuous_floor_or_platform": true,
+        "neutral_unlit_no_baked_godot_effects": true,
+        "regeneration_required": false,
+        "user_acceptance": "pending"
+      }
+    },
+    {
+      "object_id": "R3-02",
+      "display_name": "Old Shipyard",
+      "slug": "r3_02_old_shipyard",
+      "generation_input": {
+        "full_prompt": "Use case: stylized-concept\nAsset type: R3 Rust Belt landmark six-source-layer technical source sheet for a strongly 2D underwater side-scrolling game\nInput images: Image 1 is a material, palette, edge treatment, and strict flat-2D style reference only. Do not edit it. Do not copy its object layout, individual props, or composite framing.\nPrimary request: create ONE exact 16:9 technical source sheet for the landmark \"R3-02 Old Shipyard\", divided into an exact invisible 2-column by 3-row registration grid. The full canvas background and all gutters must be perfectly uniform solid #FF00FF. There must be exactly six isolated complementary source layers, one in each cell, all describing the same landmark and designed to composite in reading order.\nGrid geometry: top-left cell L00, top-right L01, middle-left L02, middle-right L03, bottom-left L04, bottom-right L05. Keep a clean uninterrupted #FF00FF outer margin and clean #FF00FF gutters between cells. No borders, divider lines, labels, numbers, captions, or text. Keep every subject at least 28 pixels inside its cell.\nRegistration: every cell uses the same strict orthographic side elevation, the same landmark origin at the exact cell center, the same scale, the same overall footprint, and the same silhouette registration. Each cell contains only its assigned depth/content class; no component may be duplicated in another cell. When source-over composited L00 through L05, they form one coherent landmark.\nCell contents:\nL00 rear silhouette: only sparse distant silhouettes of tall slipway cranes, remote gantry towers, and faint incomplete hull ribs; low-detail open frames with large gaps.\nL01 structural shell: only the principal orthographic crane-frame shells, broken drydock side ribs, overhead truss spans, and skeletal service towers; no hull identity core and no loose details.\nL02 identity core: only the defining incomplete ship hull skeleton with exposed transverse ribs, one massive suspended shipyard hook assembly, and a compact winch identity cluster; no repeated crane shell.\nL03 detail props: only a few isolated shipyard details: detached chain loops, short welding-frame pieces, small pulley blocks, bent ladders, and separated plate fragments; widely spaced.\nL04 terrain integration: only discontinuous short rib-foot, broken concrete anchor, and corroded steel attachment fragments at far left and far right; every fragment separated; never a slipway plane or drydock bottom.\nL05 foreground occluder: only sparse near-black cropped crane cables, hanging chain ends, torn hull plate lips, and angular beam fragments near side and upper edges; no complete frame and nothing across the bottom.\nSubject identity: a large drowned old shipyard made from monumental slipway crane frames, exposed drydock ribs, and one incomplete hull skeleton suspended in open water, unmistakable but never a usable floor\nStyle/medium: premium hand-painted tactile materials translated into extremely flat orthographic 2D game cutouts; crisp readable silhouette; controlled painterly realism; no thick comic outline, no cel shading, no 3D render.\nLighting/mood: completely neutral unlit material reference. Godot will provide all lighting and underwater effects.\nColor palette: graphite steel, charcoal, oxidized rust brown, restrained dark teal patina, dull brass accents; never use magenta within the subjects.\nMaterials/textures: wet-looking corrosion and material wear may be painted as local albedo texture only, without highlights, light direction, shadows, glow, haze, or reflections.\nConstraints: exactly six cells and exactly the listed layer classes; fully isolated opaque subjects on flat #FF00FF; crisp edges; generous internal padding; no readable signs; no watermark.\nAvoid: perspective, three-quarter view, isometric view, foreshortening, vanishing point, volumetric rendering; continuous ground, floor, dock surface, slipway surface, drydock floor, platform, road, shelf, seabed, horizon, bottom pile, bottom border or lower frame; diver, person, creature, gameplay pickup, marker, HUD, UI; active lamp, emissive pixels, bloom, flashlight, god rays, caustics, fog, haze, suspended particles, bubbles, refraction, motion blur, grading, vignette, cast shadow, contact shadow, reflection; complete ship, intact vessel, water surface, functional dock",
+        "reference_image": {
+          "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+          "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329",
+          "role": "material_palette_edge_treatment_and_strict_flat_2d_style_only"
+        }
+      },
+      "raw_result": {
+        "cache_path": "C:/Users/Piotr/.codex/generated_images/01a00bf9-ce45-7c20-bfdf-9198901cc45e/exec-83f2bc43-31fa-4364-b480-2a9048dd5e67.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1638453,
+        "sha256": "BD21B760637FD1FC21A6D672CF75493FC3A38E6FB076D23FE16123960622C458",
+        "generated_utc": "2026-08-16T19:33:43.5288999Z"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_source_sheet.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1638453,
+        "sha256": "BD21B760637FD1FC21A6D672CF75493FC3A38E6FB076D23FE16123960622C458",
+        "byte_identical_to_raw_result": true
+      },
+      "layers": [
+        {
+          "index": 0,
+          "id": "L00",
+          "role": "rear_silhouette",
+          "crop_geometry": "824x299+6+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_l00_rear_silhouette.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 92174,
+          "sha256": "1FCC2DD956C4ADF09C2D67B26F1A16109541793A2323F8EE769FA8449F3385DD",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0235219,
+            "visible_coverage_ratio": 0.0559425,
+            "near_opaque_ratio": 0.0000362396,
+            "nonzero_alpha_bbox": "579x265+209+130",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "id": "L01",
+          "role": "structural_shell",
+          "crop_geometry": "824x299+843+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_l01_structural_shell.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 234551,
+          "sha256": "B716DF7A73F4D98D2781BD6978A40B32AC36AA923AD605DE9DEDF7A7C455ECDD",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0960569,
+            "visible_coverage_ratio": 0.139788,
+            "near_opaque_ratio": 0.0532188,
+            "nonzero_alpha_bbox": "757x276+126+129",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "id": "L02",
+          "role": "identity_core",
+          "crop_geometry": "824x299+6+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_l02_identity_core.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 214884,
+          "sha256": "F7F14F7C9EE6F8949C96D16CEC89A93AD3BAE98C23C6F00563A4C8FCEB45A344",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.11981,
+            "visible_coverage_ratio": 0.144453,
+            "near_opaque_ratio": 0.0918941,
+            "nonzero_alpha_bbox": "669x259+189+143",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "id": "L03",
+          "role": "detail_props",
+          "crop_geometry": "824x299+843+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_l03_detail_props.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 108928,
+          "sha256": "AC97E039AC727A92842F71993AF7C7B9B7EBA06F97C086F9187A91A84F7C052A",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0480674,
+            "visible_coverage_ratio": 0.0637169,
+            "near_opaque_ratio": 0.0338211,
+            "nonzero_alpha_bbox": "754x291+127+106",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "id": "L04",
+          "role": "terrain_integration",
+          "crop_geometry": "824x299+6+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_l04_terrain_integration.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 95143,
+          "sha256": "F42F1F3EE060B32210DF8BC43AF0D2EC692818206EADE3300D86E5C77DA128FA",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0517407,
+            "visible_coverage_ratio": 0.0613651,
+            "near_opaque_ratio": 0.0426006,
+            "nonzero_alpha_bbox": "660x219+180+153",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "id": "L05",
+          "role": "foreground_occluder",
+          "crop_geometry": "824x299+843+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/r3_02_old_shipyard_l05_foreground_occluder.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 163318,
+          "sha256": "1EC1B37BC69DC544B3918BEA1ECC35D7572FEB2B4D6DABF14F42891993322EEF",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0913449,
+            "visible_coverage_ratio": 0.11039,
+            "near_opaque_ratio": 0.0728359,
+            "nonzero_alpha_bbox": "755x251+125+129",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "composite_preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_02_old_shipyard/derived/r3_02_old_shipyard_composite_preview.png",
+        "width": 1024,
+        "height": 512,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 360315,
+        "sha256": "2A3E04957D2AE4BF07A66876BF587E1339FD5B104564477DB1B9736CCBB234EE",
+        "background": "#0B475F",
+        "composite_operator": "Over",
+        "order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "recomposition_absolute_error_pixels": 0
+      },
+      "qa": {
+        "technical": "pass",
+        "source_sheet_visually_inspected": true,
+        "six_layer_contact_sheet_visually_inspected": true,
+        "composite_preview_visually_inspected": true,
+        "visual_recommendation": "accept",
+        "visual_note": "Slipway crane frames, drydock ribs, and the incomplete hull skeleton read as a bottomless shipyard without a usable floor.",
+        "bottomless_no_continuous_floor_or_platform": true,
+        "neutral_unlit_no_baked_godot_effects": true,
+        "regeneration_required": false,
+        "user_acceptance": "pending"
+      }
+    },
+    {
+      "object_id": "R3-03",
+      "display_name": "Factory",
+      "slug": "r3_03_factory",
+      "generation_input": {
+        "full_prompt": "Use case: stylized-concept\nAsset type: R3 Rust Belt landmark six-source-layer technical source sheet for a strongly 2D underwater side-scrolling game\nInput images: Image 1 is a material, palette, edge treatment, and strict flat-2D style reference only. Do not edit it. Do not copy its object layout, individual props, or composite framing.\nPrimary request: create ONE exact 16:9 technical source sheet for the landmark \"R3-03 Factory\", divided into an exact invisible 2-column by 3-row registration grid. The full canvas background and all gutters must be perfectly uniform solid #FF00FF. There must be exactly six isolated complementary source layers, one in each cell, all describing the same landmark and designed to composite in reading order.\nGrid geometry: top-left cell L00, top-right L01, middle-left L02, middle-right L03, bottom-left L04, bottom-right L05. Keep a clean uninterrupted #FF00FF outer margin and clean #FF00FF gutters between cells. No borders, divider lines, labels, numbers, captions, or text. Keep every subject at least 28 pixels inside its cell.\nRegistration: every cell uses the same strict orthographic side elevation, the same landmark origin at the exact cell center, the same scale, the same overall footprint, and the same silhouette registration. Each cell contains only its assigned depth/content class; no component may be duplicated in another cell. When source-over composited L00 through L05, they form one coherent landmark.\nCell contents:\nL00 rear silhouette: only sparse distant silhouettes of sawtooth roof peaks, remote chimney-frame remnants, and thin factory support grids; low-detail and quiet.\nL01 structural shell: only the main orthographic factory-hall shell, sawtooth roof trusses, broken wall columns, overhead conveyor support frames, and open maintenance bays; no press core or loose props.\nL02 identity core: only the defining massive stamping-press frame, one flat side-elevation conveyor run, large flywheel housing, and compact industrial control housing with no text or active display; no repeated hall shell.\nL03 detail props: only a few isolated complementary factory details: detached rollers, short belt-frame sections, gear housings, bent guard panels, and small tool-rack fragments; widely separated.\nL04 terrain integration: only discontinuous short fractured concrete plinth fragments, embedded mesh, and corroded column attachment pieces near far left and far right; no continuous foundation, floor, walkway, or shelf.\nL05 foreground occluder: only sparse near-black cropped hanging belts, torn sheet-metal lips, short cable bundles, and angular roof-beam fragments near side and upper edges; do not form a frame and do not cross the bottom.\nSubject identity: a drowned heavy factory hall with a sawtooth roof skeleton, exposed industrial conveyors, and a massive press identity, clearly distinct from warehouse and power-plant architecture\nStyle/medium: premium hand-painted tactile materials translated into extremely flat orthographic 2D game cutouts; crisp readable silhouette; controlled painterly realism; no thick comic outline, no cel shading, no 3D render.\nLighting/mood: completely neutral unlit material reference. Godot will provide all lighting and underwater effects.\nColor palette: graphite steel, charcoal, oxidized rust brown, restrained dark teal patina, dull brass accents; never use magenta within the subjects.\nMaterials/textures: wet-looking corrosion and material wear may be painted as local albedo texture only, without highlights, light direction, shadows, glow, haze, or reflections.\nConstraints: exactly six cells and exactly the listed layer classes; fully isolated opaque subjects on flat #FF00FF; crisp edges; generous internal padding; no readable signs; no watermark.\nAvoid: perspective, three-quarter view, isometric view, foreshortening, vanishing point, volumetric rendering; continuous ground, floor, dock surface, slipway surface, drydock floor, platform, road, shelf, seabed, horizon, bottom pile, bottom border or lower frame; diver, person, creature, gameplay pickup, marker, HUD, UI; active lamp, emissive pixels, bloom, flashlight, god rays, caustics, fog, haze, suspended particles, bubbles, refraction, motion blur, grading, vignette, cast shadow, contact shadow, reflection; warehouse cargo identity, turbine hall identity, active machinery, readable control labels",
+        "reference_image": {
+          "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+          "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329",
+          "role": "material_palette_edge_treatment_and_strict_flat_2d_style_only"
+        }
+      },
+      "raw_result": {
+        "cache_path": "C:/Users/Piotr/.codex/generated_images/01a00bf9-ce45-7c20-bfdf-9198901cc45e/exec-da85ac17-cd85-4101-8e37-3eaf71ab794d.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1618200,
+        "sha256": "FA321BD3ABD91EEC55A50EBA5B27E5B0AD86BD33B18D89083A44683B96EBC9F1",
+        "generated_utc": "2026-08-16T19:34:31.3792480Z"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_source_sheet.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1618200,
+        "sha256": "FA321BD3ABD91EEC55A50EBA5B27E5B0AD86BD33B18D89083A44683B96EBC9F1",
+        "byte_identical_to_raw_result": true
+      },
+      "layers": [
+        {
+          "index": 0,
+          "id": "L00",
+          "role": "rear_silhouette",
+          "crop_geometry": "824x299+6+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_l00_rear_silhouette.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 106921,
+          "sha256": "254261FA7C68F46192C9A99873992C24D9881F35E039801B03931ED0C1ADBF42",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.039874,
+            "visible_coverage_ratio": 0.0790863,
+            "near_opaque_ratio": 0.0019722,
+            "nonzero_alpha_bbox": "673x210+184+195",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "id": "L01",
+          "role": "structural_shell",
+          "crop_geometry": "824x299+843+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_l01_structural_shell.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 275672,
+          "sha256": "B8507EAAAD4CB49020A5876F0BD595E1C2C0D839EC83E20EFE9F7BBD4DB3A458",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.134568,
+            "visible_coverage_ratio": 0.172121,
+            "near_opaque_ratio": 0.0952282,
+            "nonzero_alpha_bbox": "671x238+141+167",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "id": "L02",
+          "role": "identity_core",
+          "crop_geometry": "824x299+6+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_l02_identity_core.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 206713,
+          "sha256": "D71BD30BFBD6050719208B1B33E0496C4DAF1C54819B60A33197722C0BA7E4C7",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.137251,
+            "visible_coverage_ratio": 0.144749,
+            "near_opaque_ratio": 0.13052,
+            "nonzero_alpha_bbox": "597x267+198+128",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "id": "L03",
+          "role": "detail_props",
+          "crop_geometry": "824x299+843+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_l03_detail_props.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 112823,
+          "sha256": "5E23BB801023304426206EACF2BF7C9FB448A8EC776F60D9685D4F2D852C0A1A",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0564497,
+            "visible_coverage_ratio": 0.0690308,
+            "near_opaque_ratio": 0.0447426,
+            "nonzero_alpha_bbox": "581x202+180+188",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "id": "L04",
+          "role": "terrain_integration",
+          "crop_geometry": "824x299+6+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_l04_terrain_integration.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 111657,
+          "sha256": "BECB58043865A995CD634CAC4AA5D9CE4B2E24361B0AA2C4E4658B55192ECABC",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.058561,
+            "visible_coverage_ratio": 0.0684319,
+            "near_opaque_ratio": 0.0478001,
+            "nonzero_alpha_bbox": "613x185+187+157",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "id": "L05",
+          "role": "foreground_occluder",
+          "crop_geometry": "824x299+843+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/r3_03_factory_l05_foreground_occluder.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 96712,
+          "sha256": "5A5A1C2A5DF698D8298D09563190BE787CE84E64E961DFF8C3363315C3B31E36",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0507248,
+            "visible_coverage_ratio": 0.0594215,
+            "near_opaque_ratio": 0.0416279,
+            "nonzero_alpha_bbox": "656x172+160+178",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "composite_preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_03_factory/derived/r3_03_factory_composite_preview.png",
+        "width": 1024,
+        "height": 512,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 338103,
+        "sha256": "45475F61B8AD5A53E8C6A0A9FA5F6DCE03A7E61E873979464212814CC27DC947",
+        "background": "#0B475F",
+        "composite_operator": "Over",
+        "order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "recomposition_absolute_error_pixels": 0
+      },
+      "qa": {
+        "technical": "pass",
+        "source_sheet_visually_inspected": true,
+        "six_layer_contact_sheet_visually_inspected": true,
+        "composite_preview_visually_inspected": true,
+        "visual_recommendation": "accept",
+        "visual_note": "Sawtooth-roof factory structure, conveyor language, and press core read distinctly from the neighboring warehouse and power-plant identities.",
+        "bottomless_no_continuous_floor_or_platform": true,
+        "neutral_unlit_no_baked_godot_effects": true,
+        "regeneration_required": false,
+        "user_acceptance": "pending"
+      }
+    },
+    {
+      "object_id": "R3-04",
+      "display_name": "Power Plant",
+      "slug": "r3_04_power_plant",
+      "generation_input": {
+        "full_prompt": "Use case: stylized-concept\nAsset type: R3 Rust Belt landmark six-source-layer technical source sheet for a strongly 2D underwater side-scrolling game\nInput images: Image 1 is a material, palette, edge treatment, and strict flat-2D style reference only. Do not edit it. Do not copy its object layout, individual props, or composite framing.\nPrimary request: create ONE exact 16:9 technical source sheet for the landmark \"R3-04 Power Plant\", divided into an exact invisible 2-column by 3-row registration grid. The full canvas background and all gutters must be perfectly uniform solid #FF00FF. There must be exactly six isolated complementary source layers, one in each cell, all describing the same landmark and designed to composite in reading order.\nGrid geometry: top-left cell L00, top-right L01, middle-left L02, middle-right L03, bottom-left L04, bottom-right L05. Keep a clean uninterrupted #FF00FF outer margin and clean #FF00FF gutters between cells. No borders, divider lines, labels, numbers, captions, or text. Keep every subject at least 28 pixels inside its cell.\nRegistration: every cell uses the same strict orthographic side elevation, the same landmark origin at the exact cell center, the same scale, the same overall footprint, and the same silhouette registration. Each cell contains only its assigned depth/content class; no component may be duplicated in another cell. When source-over composited L00 through L05, they form one coherent landmark.\nCell contents:\nL00 rear silhouette: only sparse distant silhouettes of remote turbine support frames, thin pipe bridges, and quiet generator-bay outlines; low-detail open forms.\nL01 structural shell: only the principal orthographic turbine-hall shell, broken vertical support frames, massive static pipe headers, open service bays, and passive conduit racks; no turbine identity core or loose props.\nL02 identity core: only the defining tidal generator assembly: one large circular turbine housing in direct side elevation, a compact generator casing, thick inlet and outlet pipe junctions, and one passive switchgear bank with blank faces; no repeated hall shell.\nL03 detail props: only a few isolated complementary power-plant details: detached valve wheels, short busbar housings, small insulator brackets, pipe elbows, and blank corroded panel covers; widely separated.\nL04 terrain integration: only discontinuous short concrete-anchor fragments, embedded cable trays, and corroded pipe-support attachment pieces near far left and far right; no continuous foundation, platform, catwalk, or terrain shelf.\nL05 foreground occluder: only sparse near-black cropped heavy cable loops, torn turbine-casing lips, short pipe silhouettes, and angular beam fragments near side and upper edges; do not form a frame and do not cross the bottom.\nSubject identity: a completely new flat-2D tidal power plant landmark: a drowned turbine hall with massive pipe headers, generator housings, and passive switchgear, distinct from the old deleted cinematic plate and without any active light\nStyle/medium: premium hand-painted tactile materials translated into extremely flat orthographic 2D game cutouts; crisp readable silhouette; controlled painterly realism; no thick comic outline, no cel shading, no 3D render.\nLighting/mood: completely neutral unlit material reference. Godot will provide all lighting and underwater effects.\nColor palette: graphite steel, charcoal, oxidized rust brown, restrained dark teal patina, dull brass accents; never use magenta within the subjects.\nMaterials/textures: wet-looking corrosion and material wear may be painted as local albedo texture only, without highlights, light direction, shadows, glow, haze, or reflections.\nConstraints: exactly six cells and exactly the listed layer classes; fully isolated opaque subjects on flat #FF00FF; crisp edges; generous internal padding; no readable signs; no watermark.\nAvoid: perspective, three-quarter view, isometric view, foreshortening, vanishing point, volumetric rendering; continuous ground, floor, dock surface, platform, road, shelf, seabed, horizon, bottom pile, bottom border or lower frame; diver, person, creature, gameplay pickup, marker, HUD, UI; active lamp, emissive pixels, bloom, flashlight, god rays, caustics, fog, haze, suspended particles, bubbles, refraction, motion blur, grading, vignette, cast shadow, contact shadow, reflection; old deleted power-plant composition, cavern scene, cinematic background, warm practical lights, active switchgear, readable gauges",
+        "reference_image": {
+          "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+          "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329",
+          "role": "material_palette_edge_treatment_and_strict_flat_2d_style_only"
+        }
+      },
+      "raw_result": {
+        "cache_path": "C:/Users/Piotr/.codex/generated_images/01a00bf9-ce45-7c20-bfdf-9198901cc45e/exec-a8f73b92-f7b6-48a6-a3d9-7d31d986a7ce.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1706687,
+        "sha256": "B0F61BDB8D9C7D449E490936EA1BD9C01C84A5F9EFC80D9DF2F891F9F0EFE44B",
+        "generated_utc": "2026-08-16T19:35:58.9979801Z"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_source_sheet.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1706687,
+        "sha256": "B0F61BDB8D9C7D449E490936EA1BD9C01C84A5F9EFC80D9DF2F891F9F0EFE44B",
+        "byte_identical_to_raw_result": true
+      },
+      "layers": [
+        {
+          "index": 0,
+          "id": "L00",
+          "role": "rear_silhouette",
+          "crop_geometry": "824x299+6+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_l00_rear_silhouette.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 104657,
+          "sha256": "43F1626E96C5C99A3D431D482DF4447D95243867F7620D0A5325C9E0E5E719BD",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0323881,
+            "visible_coverage_ratio": 0.0698509,
+            "near_opaque_ratio": 0.00160217,
+            "nonzero_alpha_bbox": "702x221+157+184",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "id": "L01",
+          "role": "structural_shell",
+          "crop_geometry": "824x299+843+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_l01_structural_shell.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 337787,
+          "sha256": "E4F55146B8E3A7DC5BDC113D2FA7FFF9CC3AED641CF4A62A6D11758C855C91C1",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.23318,
+            "visible_coverage_ratio": 0.253279,
+            "near_opaque_ratio": 0.207605,
+            "nonzero_alpha_bbox": "713x275+149+130",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "id": "L02",
+          "role": "identity_core",
+          "crop_geometry": "824x299+6+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_l02_identity_core.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 276553,
+          "sha256": "6D1B1EFBEC2A2F6F37474EAE399A05283F07B21534A6E7B15A8C95A8D0898597",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.212699,
+            "visible_coverage_ratio": 0.217583,
+            "near_opaque_ratio": 0.207987,
+            "nonzero_alpha_bbox": "712x238+153+167",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "id": "L03",
+          "role": "detail_props",
+          "crop_geometry": "824x299+843+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_l03_detail_props.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 110002,
+          "sha256": "F6DE1283D05C770D0F17E3865CA5C6360E6DB7EC2F2B30E7EA51E40349ED5625",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0658727,
+            "visible_coverage_ratio": 0.073452,
+            "near_opaque_ratio": 0.0591297,
+            "nonzero_alpha_bbox": "682x224+152+169",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "id": "L04",
+          "role": "terrain_integration",
+          "crop_geometry": "824x299+6+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_l04_terrain_integration.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 86377,
+          "sha256": "4B2CBB321B308C2EE767FD446189F04EB1757338C9D418C705201D12DBD04BDE",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0528819,
+            "visible_coverage_ratio": 0.0587597,
+            "near_opaque_ratio": 0.047142,
+            "nonzero_alpha_bbox": "720x142+149+214",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "id": "L05",
+          "role": "foreground_occluder",
+          "crop_geometry": "824x299+843+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/r3_04_power_plant_l05_foreground_occluder.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 145809,
+          "sha256": "87303F9E09CEB600F9CAD46E36AFFC4D1A97CCBB90E1A73911B2C37A4BC5EAA8",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0897824,
+            "visible_coverage_ratio": 0.0994968,
+            "near_opaque_ratio": 0.0793381,
+            "nonzero_alpha_bbox": "717x200+141+160",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "composite_preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_04_power_plant/derived/r3_04_power_plant_composite_preview.png",
+        "width": 1024,
+        "height": 512,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 353350,
+        "sha256": "0F1CA37DDD906A79892E047E4608698E7539390474A421D93BD0598B62012F13",
+        "background": "#0B475F",
+        "composite_operator": "Over",
+        "order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "recomposition_absolute_error_pixels": 0
+      },
+      "qa": {
+        "technical": "pass",
+        "source_sheet_visually_inspected": true,
+        "six_layer_contact_sheet_visually_inspected": true,
+        "composite_preview_visually_inspected": true,
+        "visual_recommendation": "accept",
+        "visual_note": "Tidal turbine housing, massive passive pipe headers, generator casing, and blank switchgear form a new flat-2D identity distinct from the deleted cinematic plate.",
+        "bottomless_no_continuous_floor_or_platform": true,
+        "neutral_unlit_no_baked_godot_effects": true,
+        "regeneration_required": false,
+        "user_acceptance": "pending"
+      }
+    },
+    {
+      "object_id": "R3-05",
+      "display_name": "Chemical Storage",
+      "slug": "r3_05_chemical_storage",
+      "generation_input": {
+        "full_prompt": "Use case: stylized-concept\nAsset type: R3 Rust Belt landmark six-source-layer technical source sheet for a strongly 2D underwater side-scrolling game\nInput images: Image 1 is a material, palette, edge treatment, and strict flat-2D style reference only. Do not edit it. Do not copy its object layout, individual props, or composite framing.\nPrimary request: create ONE exact 16:9 technical source sheet for the landmark \"R3-05 Chemical Storage\", divided into an exact invisible 2-column by 3-row registration grid. The full canvas background and all gutters must be perfectly uniform solid #FF00FF. There must be exactly six isolated complementary source layers, one in each cell, all describing the same landmark and designed to composite in reading order.\nGrid geometry: top-left cell L00, top-right L01, middle-left L02, middle-right L03, bottom-left L04, bottom-right L05. Keep a clean uninterrupted #FF00FF outer margin and clean #FF00FF gutters between cells. No borders, divider lines, labels, numbers, captions, or text. Keep every subject at least 28 pixels inside its cell.\nRegistration: every cell uses the same strict orthographic side elevation, the same landmark origin at the exact cell center, the same scale, the same overall footprint, and the same silhouette registration. Each cell contains only its assigned depth/content class; no component may be duplicated in another cell. When source-over composited L00 through L05, they form one coherent landmark.\nCell contents:\nL00 rear silhouette: only sparse distant silhouettes of remote cylindrical tanks, thin pipe-rack towers, and open containment-frame grids; low-detail and quiet.\nL01 structural shell: only the principal orthographic tank-support shells, containment frames, broken pipe-rack structure, and open drum-rack frames; no manifold identity core and no loose props.\nL02 identity core: only the defining cluster of two or three cylindrical storage tanks in direct side elevation, a dense flat pipe manifold with valve bodies, and a compact drum-rack identity cluster; no repeated support shell.\nL03 detail props: only a few isolated complementary storage details: detached blank drums, short hose coils, valve wheels, sealed flange covers, and small rack fragments; widely separated and without leakage.\nL04 terrain integration: only discontinuous short cracked containment-wall fragments, corroded tank-foot brackets, and embedded pipe anchors near far left and far right; every fragment separated; never a continuous bund, basin floor, platform, or shelf.\nL05 foreground occluder: only sparse near-black cropped pipe tangles, torn tank straps, short chain fragments, and angular rack pieces near side and upper edges; do not form a frame and do not cross the bottom.\nSubject identity: a drowned chemical storage landmark made from corroded cylindrical tanks, open containment frames, a dense pipe manifold, and drum racks, with no hazard text, labels, liquid, or active equipment\nStyle/medium: premium hand-painted tactile materials translated into extremely flat orthographic 2D game cutouts; crisp readable silhouette; controlled painterly realism; no thick comic outline, no cel shading, no 3D render.\nLighting/mood: completely neutral unlit material reference. Godot will provide all lighting and underwater effects.\nColor palette: graphite steel, charcoal, oxidized rust brown, restrained dark teal patina, dull brass accents; never use magenta within the subjects.\nMaterials/textures: wet-looking corrosion and material wear may be painted as local albedo texture only, without highlights, light direction, shadows, glow, haze, or reflections.\nConstraints: exactly six cells and exactly the listed layer classes; fully isolated opaque subjects on flat #FF00FF; crisp edges; generous internal padding; no readable signs; no watermark.\nAvoid: perspective, three-quarter view, isometric view, foreshortening, vanishing point, volumetric rendering; continuous ground, floor, dock surface, platform, road, shelf, seabed, horizon, bottom pile, bottom border or lower frame; diver, person, creature, gameplay pickup, marker, HUD, UI; active lamp, emissive pixels, bloom, flashlight, god rays, caustics, fog, haze, suspended particles, bubbles, refraction, motion blur, grading, vignette, cast shadow, contact shadow, reflection; hazard symbols, warning text, labels, readable numbers, toxic glow, leaking liquid, transparent glass, smoke, vapor",
+        "reference_image": {
+          "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+          "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329",
+          "role": "material_palette_edge_treatment_and_strict_flat_2d_style_only"
+        }
+      },
+      "raw_result": {
+        "cache_path": "C:/Users/Piotr/.codex/generated_images/01a00bf9-ce45-7c20-bfdf-9198901cc45e/exec-e55b2a20-4b12-40ba-9144-038f410ec649.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1601102,
+        "sha256": "2871C91A50541A6F15D7B8CE4A793E6F7354D522D3377A6EF4657D996279EBD4",
+        "generated_utc": "2026-08-16T19:36:34.6189171Z"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_source_sheet.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1601102,
+        "sha256": "2871C91A50541A6F15D7B8CE4A793E6F7354D522D3377A6EF4657D996279EBD4",
+        "byte_identical_to_raw_result": true
+      },
+      "layers": [
+        {
+          "index": 0,
+          "id": "L00",
+          "role": "rear_silhouette",
+          "crop_geometry": "824x299+6+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_l00_rear_silhouette.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 109599,
+          "sha256": "27485E6B073E750DA3B0F28E88D07090F06B87C7645FC99583BC33E2E137C264",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0587218,
+            "visible_coverage_ratio": 0.0810413,
+            "near_opaque_ratio": 0.0446186,
+            "nonzero_alpha_bbox": "665x189+209+211",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "id": "L01",
+          "role": "structural_shell",
+          "crop_geometry": "824x299+843+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_l01_structural_shell.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 227160,
+          "sha256": "A7898DD51E42DB6E9E2FA4E584DC1DF9BFDD4542FB576EE550ACBA3D31236EFE",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.110604,
+            "visible_coverage_ratio": 0.142784,
+            "near_opaque_ratio": 0.0768986,
+            "nonzero_alpha_bbox": "622x289+147+116",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "id": "L02",
+          "role": "identity_core",
+          "crop_geometry": "824x299+6+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_l02_identity_core.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 271809,
+          "sha256": "826290E5ACEDBC94662F66D9430C17D0F09970C97EAB509FFB2B94F7CE7C424D",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.194775,
+            "visible_coverage_ratio": 0.207027,
+            "near_opaque_ratio": 0.181814,
+            "nonzero_alpha_bbox": "625x275+218+118",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "id": "L03",
+          "role": "detail_props",
+          "crop_geometry": "824x299+843+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_l03_detail_props.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 81466,
+          "sha256": "45A96F8264910878A15C4EEA1BDA717549D122474A7766E432C8D52A1BF1ED20",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.042503,
+            "visible_coverage_ratio": 0.0483685,
+            "near_opaque_ratio": 0.0362225,
+            "nonzero_alpha_bbox": "593x151+149+212",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "id": "L04",
+          "role": "terrain_integration",
+          "crop_geometry": "824x299+6+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_l04_terrain_integration.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 102796,
+          "sha256": "884A430DEC769DD5869C8B76E271745CF6E9C44415C6360EE197479D82C12065",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0671885,
+            "visible_coverage_ratio": 0.0716496,
+            "near_opaque_ratio": 0.0626087,
+            "nonzero_alpha_bbox": "649x176+202+169",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "id": "L05",
+          "role": "foreground_occluder",
+          "crop_geometry": "824x299+843+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/r3_05_chemical_storage_l05_foreground_occluder.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 101916,
+          "sha256": "B8F421F601EC2F58EDE95198D497DA9CA872744106196B086CC3F156797CC3F0",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0509261,
+            "visible_coverage_ratio": 0.0615902,
+            "near_opaque_ratio": 0.0383739,
+            "nonzero_alpha_bbox": "680x210+138+138",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "composite_preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_05_chemical_storage/derived/r3_05_chemical_storage_composite_preview.png",
+        "width": 1024,
+        "height": 512,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 336100,
+        "sha256": "E39D8F4BDC057FD0F716BD85F42C87A84F9E9E440CC1D83EF556F864AEB7B828",
+        "background": "#0B475F",
+        "composite_operator": "Over",
+        "order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "recomposition_absolute_error_pixels": 0
+      },
+      "qa": {
+        "technical": "pass",
+        "source_sheet_visually_inspected": true,
+        "six_layer_contact_sheet_visually_inspected": true,
+        "composite_preview_visually_inspected": true,
+        "visual_recommendation": "accept",
+        "visual_note": "Cylindrical tanks, containment frames, manifold, and drum racks are recognizable without hazard text, leakage, active light, or a continuous bund floor.",
+        "bottomless_no_continuous_floor_or_platform": true,
+        "neutral_unlit_no_baked_godot_effects": true,
+        "regeneration_required": false,
+        "user_acceptance": "pending"
+      }
+    },
+    {
+      "object_id": "R3-06",
+      "display_name": "Scrapyard",
+      "slug": "r3_06_scrapyard",
+      "generation_input": {
+        "full_prompt": "Use case: stylized-concept\nAsset type: R3 Rust Belt landmark six-source-layer technical source sheet for a strongly 2D underwater side-scrolling game\nInput images: Image 1 is a material, palette, edge treatment, and strict flat-2D style reference only. Do not edit it. Do not copy its object layout, individual props, or composite framing.\nPrimary request: create ONE exact 16:9 technical source sheet for the landmark \"R3-06 Scrapyard\", divided into an exact invisible 2-column by 3-row registration grid. The full canvas background and all gutters must be perfectly uniform solid #FF00FF. There must be exactly six isolated complementary source layers, one in each cell, all describing the same landmark and designed to composite in reading order.\nGrid geometry: top-left cell L00, top-right L01, middle-left L02, middle-right L03, bottom-left L04, bottom-right L05. Keep a clean uninterrupted #FF00FF outer margin and clean #FF00FF gutters between cells. No borders, divider lines, labels, numbers, captions, or text. Keep every subject at least 28 pixels inside its cell.\nRegistration: every cell uses the same strict orthographic side elevation, the same landmark origin at the exact cell center, the same scale, the same overall footprint, and the same silhouette registration. Each cell contains only its assigned depth/content class; no component may be duplicated in another cell. When source-over composited L00 through L05, they form one coherent suspended scrapyard landmark.\nCell contents:\nL00 rear silhouette: only sparse dark silhouettes of distant suspended scrap clusters, remote crane-frame outlines, and thin hanging metal fragments; low-detail, separated, never accumulated along the bottom.\nL01 structural shell: only the main orthographic scrapyard crane frames, broken sorting-rig supports, suspended cage frames, and open hanging support trusses; no claw identity core and no loose detail fragments.\nL02 identity core: only one defining large crane claw assembly shown open in direct side elevation, one suspended compacted-metal bale frame, and a distinctive crushed-vehicle shell cluster held in open water; no repeated crane shell.\nL03 detail props: only a few isolated complementary scrap details: flattened vehicle-door fragments, bent wheel rims, small crushed sheet bundles, detached hooks, and short chain pieces; all separated and floating, never a pile.\nL04 terrain integration: only discontinuous short broken concrete anchors, corroded crane-foot brackets, and embedded mesh fragments near far left and far right; every piece separated; never a continuous scrap heap, floor, platform, shelf, seabed, or lower frame.\nL05 foreground occluder: only sparse near-black cropped chain tangles, torn sheet-metal lips, short claw-cable silhouettes, and angular beam fragments near side and upper edges; do not form a frame and do not cross the bottom.\nSubject identity: a bottomless underwater scrapyard of suspended heap silhouettes, crane-claw frames, crushed vehicle shells, and metal fragments, with no ground pile and no usable platform.\nStyle/medium: premium hand-painted tactile materials translated into extremely flat orthographic 2D game cutouts; crisp readable silhouette; controlled painterly realism; no thick comic outline, no cel shading, no 3D render.\nLighting/mood: completely neutral unlit material reference. Godot will provide all lighting and underwater effects.\nColor palette: graphite steel, charcoal, oxidized rust brown, restrained dark teal patina, dull brass accents; never use magenta within the subjects.\nMaterials/textures: wet-looking corrosion and material wear may be painted as local albedo texture only, without highlights, light direction, shadows, glow, haze, or reflections.\nConstraints: exactly six cells and exactly the listed layer classes; fully isolated opaque subjects on flat #FF00FF; crisp edges; generous internal padding; no readable signs; no watermark.\nAvoid: perspective, three-quarter view, isometric view, foreshortening, vanishing point, volumetric rendering; continuous ground, floor, road, platform, shelf, seabed, horizon, bottom scrap pile, bottom border or lower frame; intact driveable vehicle, diver, person, creature, gameplay pickup, marker, HUD, UI; active lamp, emissive pixels, bloom, flashlight, god rays, caustics, fog, haze, suspended particles, bubbles, refraction, motion blur, grading, vignette, cast shadow, contact shadow, reflection.",
+        "reference_image": {
+          "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r3_rust_belt/derived/r3_rust_belt_composite_preview.png",
+          "sha256": "CD86D561EFC220897E7E67D2D4DB188BC7FFCCD704F1A635D41DB2B811F40329",
+          "role": "material_palette_edge_treatment_and_strict_flat_2d_style_only"
+        }
+      },
+      "raw_result": {
+        "cache_path": "C:/Users/Piotr/.codex/generated_images/01a00bf9-ce45-7c20-bfdf-9198901cc45e/exec-b14b4d57-20b2-4a82-9a3b-c701eb9e838d.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1519619,
+        "sha256": "F05A63809802B287CF2D3E03F2FBCB3CF8EB8CE5F4ADA603C441FFD8A83EBDCD",
+        "generated_utc": "2026-08-16T19:38:03.8299236Z"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_source_sheet.png",
+        "width": 1672,
+        "height": 941,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 1519619,
+        "sha256": "F05A63809802B287CF2D3E03F2FBCB3CF8EB8CE5F4ADA603C441FFD8A83EBDCD",
+        "byte_identical_to_raw_result": true
+      },
+      "layers": [
+        {
+          "index": 0,
+          "id": "L00",
+          "role": "rear_silhouette",
+          "crop_geometry": "824x299+6+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_l00_rear_silhouette.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 73468,
+          "sha256": "EC98E38B558549DDAA52861B3BE4EBF1E6A5D91E37BE168FEC4DC977B12007C9",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0239108,
+            "visible_coverage_ratio": 0.0391998,
+            "near_opaque_ratio": 0.010273,
+            "nonzero_alpha_bbox": "668x267+180+131",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "id": "L01",
+          "role": "structural_shell",
+          "crop_geometry": "824x299+843+6",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_l01_structural_shell.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 183336,
+          "sha256": "C3629922FC84659016AB35CF1953D05AA6EBFDD9F0027BC86AE1ABDA5248C237",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0628339,
+            "visible_coverage_ratio": 0.105558,
+            "near_opaque_ratio": 0.0299854,
+            "nonzero_alpha_bbox": "689x251+178+138",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "id": "L02",
+          "role": "identity_core",
+          "crop_geometry": "824x299+6+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_l02_identity_core.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 160487,
+          "sha256": "4D841AFAF02D0D0C257A699B3A11921863EA24E52AA6BE278A19CE65AC0F6B85",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0943823,
+            "visible_coverage_ratio": 0.101707,
+            "near_opaque_ratio": 0.0873756,
+            "nonzero_alpha_bbox": "659x240+199+127",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "id": "L03",
+          "role": "detail_props",
+          "crop_geometry": "824x299+843+321",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_l03_detail_props.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 102681,
+          "sha256": "7B765C527E624F3005EFD4E2E1A8CAE0B4BE99093DDB660CB7B834D3A67332C7",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0593852,
+            "visible_coverage_ratio": 0.0645542,
+            "near_opaque_ratio": 0.0549164,
+            "nonzero_alpha_bbox": "667x202+199+149",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "id": "L04",
+          "role": "terrain_integration",
+          "crop_geometry": "824x299+6+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_l04_terrain_integration.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 100268,
+          "sha256": "DE77A8FF4D70B3BF344A2E639D2E4D9DD065085D643D2B93A206A1588DBA1DBE",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0510558,
+            "visible_coverage_ratio": 0.0600681,
+            "near_opaque_ratio": 0.0433006,
+            "nonzero_alpha_bbox": "676x190+164+156",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "id": "L05",
+          "role": "foreground_occluder",
+          "crop_geometry": "824x299+843+634",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/r3_06_scrapyard_l05_foreground_occluder.png",
+          "width": 1024,
+          "height": 512,
+          "channels": "srgba 4.0",
+          "colorspace": "sRGB",
+          "bytes": 107803,
+          "sha256": "2FB8401B4DE05BE286D4ECA7CB98DD1BB15B124211E98F33C990C4C67DED3CD8",
+          "alpha_metrics": {
+            "minimum": 0,
+            "maximum": 1,
+            "mean": 0.0534693,
+            "visible_coverage_ratio": 0.0653419,
+            "near_opaque_ratio": 0.0429592,
+            "nonzero_alpha_bbox": "733x235+142+121",
+            "corner_alpha_clockwise_from_top_left": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "composite_preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_06_scrapyard/derived/r3_06_scrapyard_composite_preview.png",
+        "width": 1024,
+        "height": 512,
+        "channels": "srgb 3.0",
+        "colorspace": "sRGB",
+        "bytes": 314546,
+        "sha256": "5D74610D833816289891DB659FD4A028110C66349DA5A7DCF56B10CA964497EC",
+        "background": "#0B475F",
+        "composite_operator": "Over",
+        "order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "recomposition_absolute_error_pixels": 0
+      },
+      "qa": {
+        "technical": "pass",
+        "source_sheet_visually_inspected": true,
+        "six_layer_contact_sheet_visually_inspected": true,
+        "composite_preview_visually_inspected": true,
+        "visual_recommendation": "accept",
+        "visual_note": "Suspended crane-claw frames, compacted-metal and vehicle-shell fragments remain discontinuous and never form a bottom pile or platform.",
+        "bottomless_no_continuous_floor_or_platform": true,
+        "neutral_unlit_no_baked_godot_effects": true,
+        "regeneration_required": false,
+        "user_acceptance": "pending"
+      }
+    }
+  ],
+  "qa_summary": {
+    "technical": "pass",
+    "source_sheets": 6,
+    "rgba_layers": 36,
+    "composite_previews": 6,
+    "authored_png_files": 48,
+    "all_raw_results_match_copied_source_sheets_by_sha256_and_bytes": true,
+    "all_source_sheets_1672x941_rgb": true,
+    "all_layers_1024x512_srgba": true,
+    "all_layers_have_alpha_min_0_and_max_1": true,
+    "all_layer_corner_alpha_zero": true,
+    "all_previews_1024x512_opaque_rgb": true,
+    "maximum_preview_recomposition_absolute_error_pixels": 0,
+    "visual_recommendation": "accept",
+    "user_acceptance": "pending",
+    "godot_run": false,
+    "runtime_tested": false,
+    "runtime_wired": false,
+    "documentation_updated_by_this_generation_batch": false
+  }
+}

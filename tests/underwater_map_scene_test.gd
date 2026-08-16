@@ -5,6 +5,7 @@ const MapSceneScript := preload("res://scripts/diving/UnderwaterMapScene.gd")
 const MapObjectScript := preload("res://scripts/diving/DiveMapObject.gd")
 const MapConnectionScript := preload("res://scripts/diving/DiveMapConnection.gd")
 const MapNavigationRasterScript := preload("res://scripts/diving/MapNavigationRaster.gd")
+const NavigationSnapshotScript := preload("res://scripts/diving/DiveNavigationSnapshot.gd")
 const RuntimeMapScript := preload("res://scripts/diving/UnderwaterMapRuntime.gd")
 const WorldStateScript := preload("res://scripts/data/UnderwaterWorldState.gd")
 const CommonLineCableVisualScript := preload("res://scripts/diving/DiveCommonLineCableVisual.gd")
@@ -128,7 +129,13 @@ const EXPECTED_CABLE_CONTROL_POINTS := {
 }
 const BLOCKAGE_VISUAL_PATH := "res://scenes/diving/map_visuals/TutorialCableBlockageVisual.tscn"
 const R1_J7_ART_CELL_VISUAL_PATH := "res://scenes/diving/map_visuals/R1J7ArtCell.tscn"
-const R3_POWER_PLANT_MIDGROUND_VISUAL_PATH := "res://scenes/diving/map_visuals/R3PowerPlantMidgroundVisual.tscn"
+const LANDMARK_GAMEPLAY_MARGIN := 8.0
+const IMPLICIT_LANDMARK_LINKS := {
+	"rescue_hotel_leon": "R1-03",
+	"ship_engine_r1": "R1-07",
+	"shipyard_winch_r3": "R3-02",
+	"scrapyard_generator_r3": "R3-06",
+}
 
 const REQUIRED_AUTHORING_GROUPS := [
 	"VisualLayers",
@@ -187,11 +194,13 @@ func _initialize() -> void:
 	_test_shared_obstacle_raster()
 	_test_chunked_boundary_segments()
 	if generation_errors.is_empty():
-		_test_compiled_manifest(world)
+		_test_compiled_manifest(compiler, world)
 		_test_stale_source_version_is_rejected(compiler, world)
+		_test_stale_gameplay_signature_is_rejected(compiler, world)
 		_test_unique_authoring_ids()
 		_test_visual_only_change_preserves_signature(compiler)
 		_test_gameplay_position_change_updates_signature(compiler)
+		_test_landmark_position_change_updates_signature(compiler)
 		_test_cable_transform_preserves_signature(compiler)
 		_test_loot_content_change_updates_signature(compiler)
 		_test_terrain_presentation_preserves_signature(compiler)
@@ -215,7 +224,7 @@ func _test_prefab_catalog() -> void:
 		_assert(ResourceLoader.exists(prefab_path), "Brakuje prefabu authoringu mapy: %s." % prefab_path)
 
 
-func _test_compiled_manifest(world) -> void:
+func _test_compiled_manifest(compiler, world) -> void:
 	var blueprint = world.blueprint
 	_assert(int(blueprint.map_source_version) == int(MapCompilerScript.MAP_SOURCE_VERSION), "Migawka musi wskazywać aktualną wersję sceny.")
 	_assert(not str(blueprint.map_gameplay_signature).is_empty(), "Migawka musi wskazywać bieżącą tożsamość gameplayową mapy.")
@@ -248,14 +257,16 @@ func _test_compiled_manifest(world) -> void:
 	_assert(blueprint.entry_position != Vector2.ZERO and blueprint.exit_position != Vector2.ZERO, "Scena musi zawierać jawne pozycje wejścia i wyjścia.")
 	_assert(not blueprint.regions.is_empty(), "Mapa musi zawierać co najmniej jeden region.")
 	_assert(not blueprint.landmarks.is_empty(), "Mapa musi zawierać co najmniej jeden landmark.")
+	_assert_landmark_centers_are_diver_clear(compiler, blueprint)
+	_assert_linked_gameplay_stays_with_landmark(blueprint)
 	var r1_j7: Dictionary = _record_by_id(blueprint.landmarks, "R1-04")
 	_assert(str(r1_j7.get("visual_scene_path", "")) == R1_J7_ART_CELL_VISUAL_PATH, "Parking R1-04 musi instancjować zatwierdzony ArtCell Węzła J-7.")
-	_assert(int(r1_j7.get("visual_z_index", 0)) == -60, "Płyta R1/J-7 musi pozostać za terenem i obiektami gameplayowymi.")
+	_assert(int(r1_j7.get("visual_z_index", 0)) == -60, "Lokalna skóra terenu R1/J-7 musi pozostać za terenem i obiektami gameplayowymi.")
 	_assert_visual_scene_collision_free(R1_J7_ART_CELL_VISUAL_PATH, "ArtCell R1-04/J-7")
+	_assert_r1_j7_terrain_skin_contract()
 	var r3_power_plant: Dictionary = _record_by_id(blueprint.landmarks, "R3-04")
-	_assert(str(r3_power_plant.get("visual_scene_path", "")) == R3_POWER_PLANT_MIDGROUND_VISUAL_PATH, "Elektrownia R3-04 musi instancjować zatwierdzony autorski średni plan.")
-	_assert(int(r3_power_plant.get("visual_z_index", 0)) == -56, "Średni plan R3-04 musi pozostać za terenem i obiektami gameplayowymi.")
-	_assert_visual_scene_collision_free(R3_POWER_PLANT_MIDGROUND_VISUAL_PATH, "Autorski średni plan R3-04")
+	_assert(str(r3_power_plant.get("visual_scene_path", "")).is_empty(), "Elektrownia R3-04 nie może mieć lokalnej Visual Scene po usunięciu odrzuconego tła.")
+	_assert(int(r3_power_plant.get("visual_z_index", 0)) == 0, "R3-04 na wspólnym tle regionu nie może zachowywać lokalnego z-indexu usuniętego tła.")
 	_assert(not blueprint.loot_spawns.is_empty(), "Mapa musi zawierać prefab źródła łupu lub itemu.")
 	for loot_record in blueprint.loot_spawns:
 		_assert(
@@ -353,6 +364,234 @@ func _test_compiled_manifest(world) -> void:
 	_assert_unique_static_gameplay_positions(blueprint)
 
 
+func _assert_landmark_centers_are_diver_clear(compiler, blueprint) -> void:
+	var base_raster: Dictionary = compiler.navigation_base_raster()
+	var base_errors: PackedStringArray = base_raster.get("errors", PackedStringArray())
+	_assert(base_errors.is_empty(), "Scenowy makroteren musi dać się zrasteryzować dla walidacji landmarków: %s" % "; ".join(base_errors))
+	if not base_errors.is_empty():
+		return
+	var width := int(base_raster.get("width", 0))
+	var height := int(base_raster.get("height", 0))
+	var raster: Dictionary = MapNavigationRasterScript.build_from_cells(
+		base_raster.get("cells", PackedByteArray()),
+		width,
+		height,
+		blueprint.world_size,
+		blueprint.obstacle_spawns,
+		0,
+		false
+	)
+	var raster_errors: PackedStringArray = raster.get("errors", PackedStringArray())
+	_assert(raster_errors.is_empty(), "Statyczny raster mapy musi uwzględnić MapObstacle dla walidacji landmarków: %s" % "; ".join(raster_errors))
+	if not raster_errors.is_empty():
+		return
+	width = int(raster.get("width", 0))
+	height = int(raster.get("height", 0))
+	var cells: PackedByteArray = raster.get("cells", PackedByteArray())
+	var cell_scale: Vector2 = raster.get("cell_scale", Vector2.ONE)
+	var snapshot = NavigationSnapshotScript.new()
+	snapshot.configure(
+		blueprint.world_size,
+		Vector2i(width, height),
+		cell_scale,
+		cells,
+		NavigationSnapshotScript.DEFAULT_DIVER_CLEARANCE,
+		blueprint.entry_position,
+		blueprint.exit_position,
+		blueprint.current_zones,
+		blueprint.regions,
+		[],
+		[]
+	)
+	_assert(snapshot.is_valid(), "Statyczny snapshot C35 landmarków musi być kompletny.")
+	if not snapshot.is_valid():
+		return
+	var entry_cell: Vector2i = snapshot.world_to_cell(blueprint.entry_position)
+	var reachable: PackedByteArray = MapNavigationRasterScript.reachable_cells(
+		snapshot.clear_cells,
+		width,
+		height,
+		entry_cell
+	)
+	var entry_component_size := _count_marked_cells(reachable)
+	var largest_component_size := _largest_open_component_size(snapshot.clear_cells, width, height)
+	_assert(
+		entry_component_size == largest_component_size and entry_component_size > 0,
+		"EntryStation musi należeć do głównej 4-spójnej składowej statycznej maski C35."
+	)
+	var region_lookup: Dictionary = {}
+	for region in blueprint.regions:
+		region_lookup[str(region.get("id", ""))] = region
+	for landmark in blueprint.landmarks:
+		var landmark_id := str(landmark.get("id", ""))
+		var position_value = landmark.get("position", null)
+		_assert(position_value is Vector2, "Landmark %s musi publikować pozycję Vector2." % landmark_id)
+		if not (position_value is Vector2):
+			continue
+		var position := position_value as Vector2
+		var cell: Vector2i = snapshot.world_to_cell(position)
+		var cell_index := cell.y * width + cell.x
+		_assert(
+			snapshot.is_position_open(position),
+			"Środek landmarku %s na %s (komórka %s) nie może leżeć na zablokowanym terenie."
+			% [landmark_id, position, cell]
+		)
+		_assert(
+			snapshot.is_position_clear(position),
+			"Środek landmarku %s na %s (komórka %s) musi zachować C35 dla kapsuły nurka."
+			% [landmark_id, position, cell]
+		)
+		_assert(
+			cell_index >= 0 and cell_index < reachable.size() and reachable[cell_index] == 1,
+			"Środek landmarku %s na %s (komórka %s) musi należeć do głównej osiągalnej składowej C35."
+			% [landmark_id, position, cell]
+		)
+		var region_id := str(landmark.get("region_id", ""))
+		var region: Dictionary = region_lookup.get(region_id, {})
+		var region_bounds: Rect2 = region.get("bounds", Rect2())
+		_assert(
+			not region.is_empty() and region_bounds.has_point(position),
+			"Środek landmarku %s musi pozostać w zadeklarowanym regionie %s." % [landmark_id, region_id]
+		)
+
+
+func _count_marked_cells(cells: PackedByteArray) -> int:
+	var count := 0
+	for value in cells:
+		if value == 1:
+			count += 1
+	return count
+
+
+func _largest_open_component_size(cells: PackedByteArray, width: int, height: int) -> int:
+	if width <= 0 or height <= 0 or cells.size() != width * height:
+		return 0
+	var visited := PackedByteArray()
+	visited.resize(cells.size())
+	var largest_size := 0
+	for start_index in range(cells.size()):
+		if cells[start_index] != 1 or visited[start_index] == 1:
+			continue
+		var queue := PackedInt32Array([start_index])
+		visited[start_index] = 1
+		var read_index := 0
+		while read_index < queue.size():
+			var index := queue[read_index]
+			read_index += 1
+			var x := index % width
+			var y := floori(float(index) / float(width))
+			if x > 0:
+				var left := index - 1
+				if visited[left] == 0 and cells[left] == 1:
+					visited[left] = 1
+					queue.append(left)
+			if x + 1 < width:
+				var right := index + 1
+				if visited[right] == 0 and cells[right] == 1:
+					visited[right] = 1
+					queue.append(right)
+			if y > 0:
+				var above := index - width
+				if visited[above] == 0 and cells[above] == 1:
+					visited[above] = 1
+					queue.append(above)
+			if y + 1 < height:
+				var below := index + width
+				if visited[below] == 0 and cells[below] == 1:
+					visited[below] = 1
+					queue.append(below)
+		largest_size = maxi(largest_size, queue.size())
+	return largest_size
+
+
+func _assert_linked_gameplay_stays_with_landmark(blueprint) -> void:
+	var relocated_landmark_ids := {
+		"R1-01": true,
+		"R1-03": true,
+		"R1-05": true,
+		"R1-06": true,
+		"R1-07": true,
+		"R2-01": true,
+		"R2-02": true,
+		"R2-03": true,
+		"R2-04": true,
+		"R2-05": true,
+		"R2-06": true,
+		"R3-02": true,
+		"R3-06": true,
+		"R4-01": true,
+		"R4-04": true,
+		"R4-05": true,
+	}
+	var linked_groups := [
+		{"name": "loot", "records": blueprint.loot_spawns, "link_field": "landmark_id"},
+		{"name": "buoy", "records": blueprint.buoy_spawns, "link_field": "entry_landmark_id"},
+		{"name": "fixed_device", "records": blueprint.fixed_device_spawns, "link_field": "landmark_id"},
+	]
+	for group in linked_groups:
+		var category := str(group.get("name", "unknown"))
+		var link_field := str(group.get("link_field", ""))
+		var records: Array = group.get("records", [])
+		for record in records:
+			var record_id := str(record.get("id", ""))
+			var landmark_id := str(record.get(link_field, ""))
+			if landmark_id.is_empty():
+				continue
+			_assert_gameplay_record_landmark_contract(
+				blueprint,
+				category,
+				record,
+				landmark_id,
+				relocated_landmark_ids.has(landmark_id)
+			)
+	var implicitly_linked_groups := [
+		{"name": "rescue", "records": blueprint.rescue_spawns},
+		{"name": "heavy_object", "records": blueprint.heavy_object_spawns},
+	]
+	for group in implicitly_linked_groups:
+		var category := str(group.get("name", "unknown"))
+		var records: Array = group.get("records", [])
+		for record in records:
+			var record_id := str(record.get("id", ""))
+			var landmark_id := str(IMPLICIT_LANDMARK_LINKS.get(record_id, ""))
+			if landmark_id.is_empty():
+				continue
+			_assert_gameplay_record_landmark_contract(blueprint, category, record, landmark_id, true)
+
+
+func _assert_gameplay_record_landmark_contract(
+	blueprint,
+	category: String,
+	record: Dictionary,
+	landmark_id: String,
+	require_containment: bool
+) -> void:
+	var record_id := str(record.get("id", ""))
+	var landmark: Dictionary = blueprint.get_landmark(landmark_id)
+	_assert(not landmark.is_empty(), "Powiązany cel %s/%s wskazuje brakujący landmark %s." % [category, record_id, landmark_id])
+	if landmark.is_empty():
+		return
+	var position_value = record.get("position", null)
+	_assert(position_value is Vector2, "Powiązany cel %s/%s musi publikować pozycję Vector2." % [category, record_id])
+	if not (position_value is Vector2):
+		return
+	if require_containment:
+		var landmark_position: Vector2 = landmark.get("position", Vector2.ZERO)
+		var landmark_size: Vector2 = landmark.get("size", Vector2.ZERO)
+		var landmark_bounds := Rect2(landmark_position - landmark_size * 0.5, landmark_size)
+		var safe_bounds := landmark_bounds.grow(-LANDMARK_GAMEPLAY_MARGIN)
+		_assert(
+			_rect_inclusive_has_point(safe_bounds, position_value as Vector2),
+			"Powiązany cel %s/%s na %s musi mieścić się w bounds landmarku %s z marginesem %.0f jednostek."
+			% [category, record_id, position_value, landmark_id, LANDMARK_GAMEPLAY_MARGIN]
+		)
+	_assert(
+		_nearest_landmark_id(blueprint, record) == landmark_id,
+		"Powiązany cel %s/%s musi zachować landmark %s jako najbliższy."
+		% [category, record_id, landmark_id]
+	)
+
+
 func _test_unique_authoring_ids() -> void:
 	var map_root := _instantiate_map()
 	if map_root == null:
@@ -399,7 +638,7 @@ func _test_visual_only_change_preserves_signature(compiler) -> void:
 	authored_object.visual_offset += Vector2(17.0, -9.0)
 	authored_object.visual_rotation_degrees += 7.5
 	authored_object.skew += deg_to_rad(3.0)
-	authored_object.visual_scene = ResourceLoader.load(R3_POWER_PLANT_MIDGROUND_VISUAL_PATH) as PackedScene
+	authored_object.visual_scene = ResourceLoader.load(BLOCKAGE_VISUAL_PATH) as PackedScene
 	authored_object.visual_z_index -= 56
 	var changed: Dictionary = compiler.compile_map(map_root, 91_003)
 	var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
@@ -410,7 +649,7 @@ func _test_visual_only_change_preserves_signature(compiler) -> void:
 		_assert(str(baseline_blueprint.map_gameplay_signature) == str(changed_blueprint.map_gameplay_signature), "Scena, warstwa z, offset, obrót i skew prezentacji nie mogą zmieniać podpisu gameplayowego obiektu punktowego.")
 		var changed_record := _record_by_id(changed_blueprint.loot_spawns, authored_object.object_id)
 		_assert(changed_record.get("visual_offset", Vector2.ZERO) == authored_object.visual_offset, "Kompilator musi przekazać offset prefabu do runtime.")
-		_assert(str(changed_record.get("visual_scene_path", "")) == R3_POWER_PLANT_MIDGROUND_VISUAL_PATH and int(changed_record.get("visual_z_index", 0)) == authored_object.visual_z_index, "Kompilator musi przekazać prefab i z-index prezentacji do runtime.")
+		_assert(str(changed_record.get("visual_scene_path", "")) == BLOCKAGE_VISUAL_PATH and int(changed_record.get("visual_z_index", 0)) == authored_object.visual_z_index, "Kompilator musi przekazać prefab i z-index prezentacji do runtime.")
 	map_root.free()
 
 
@@ -435,6 +674,35 @@ func _test_gameplay_position_change_updates_signature(compiler) -> void:
 				_assert(
 					str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature),
 					"Zmiana pozycji statycznego interaktywnego przedmiotu musi zmieniać podpis gameplayowy mapy."
+				)
+	map_root.free()
+
+
+func _test_landmark_position_change_updates_signature(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_017)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem pozycji landmarku.")
+	if baseline_errors.is_empty():
+		var authored_landmark := _authored_object_by_id(map_root, "R3-03")
+		_assert(authored_landmark != null, "Test podpisu landmarku wymaga R3-03.")
+		if authored_landmark != null:
+			authored_landmark.position += Vector2(8.0, 0.0)
+			var changed: Dictionary = compiler.compile_map(map_root, 91_017)
+			var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+			_assert(changed_errors.is_empty(), "Niewielkie przesunięcie landmarku nie może zepsuć kompilacji mapy.")
+			if changed_errors.is_empty():
+				var baseline_blueprint = baseline.get("blueprint")
+				var changed_blueprint = changed.get("blueprint")
+				var baseline_landmark: Dictionary = baseline_blueprint.get_landmark("R3-03")
+				var changed_landmark: Dictionary = changed_blueprint.get_landmark("R3-03")
+				_assert(str(changed_landmark.get("id", "")) == str(baseline_landmark.get("id", "")), "Przesunięcie landmarku musi zachować jego stable ID.")
+				_assert(changed_landmark.get("position", Vector2.ZERO) != baseline_landmark.get("position", Vector2.ZERO), "Przesunięcie landmarku musi zmienić publikowaną pozycję.")
+				_assert(
+					str(baseline_blueprint.map_gameplay_signature) != str(changed_blueprint.map_gameplay_signature),
+					"Zmiana pozycji landmarku musi zmieniać podpis gameplayowy mapy."
 				)
 	map_root.free()
 
@@ -983,6 +1251,24 @@ func _assert_visual_scene_collision_free(scene_path: String, context: String) ->
 	candidate.free()
 
 
+func _assert_r1_j7_terrain_skin_contract() -> void:
+	var packed := ResourceLoader.load(R1_J7_ART_CELL_VISUAL_PATH) as PackedScene
+	_assert(packed != null, "ArtCell R1-04/J-7 musi dać się załadować do kontroli kompozycji.")
+	if packed == null:
+		return
+	var candidate := packed.instantiate() as Node2D
+	_assert(candidate != null, "ArtCell R1-04/J-7 musi mieć root Node2D.")
+	if candidate == null:
+		return
+	_assert(candidate.get_node_or_null("FarPlate") == null, "ArtCell R1-04/J-7 nie może zachowywać usuniętego FarPlate.")
+	_assert(candidate.find_child("EnvironmentPlate", true, false) == null, "ArtCell R1-04/J-7 nie może zachowywać usuniętego EnvironmentPlate.")
+	var terrain_skin := candidate.get_node_or_null("TerrainIntegration/AuthoredTerrainSkin")
+	_assert(terrain_skin is Polygon2D, "ArtCell R1-04/J-7 musi zachować SDF-clipped AuthoredTerrainSkin.")
+	if terrain_skin is Polygon2D:
+		_assert((terrain_skin as Polygon2D).material != null, "AuthoredTerrainSkin R1-04/J-7 musi zachować materiał terenu.")
+	candidate.free()
+
+
 func _assert_story_cables_are_non_blocking(blueprint) -> void:
 	for decoration_id_value in STORY_CABLE_ENDPOINTS.keys():
 		var decoration_id := str(decoration_id_value)
@@ -1216,6 +1502,30 @@ func _test_stale_source_version_is_rejected(compiler, world) -> void:
 	)
 
 
+func _test_stale_gameplay_signature_is_rejected(compiler, world) -> void:
+	var stale_world = WorldStateScript.new()
+	stale_world.blueprint = world.blueprint.duplicate(true)
+	stale_world.delta = world.delta.duplicate(true)
+	var stale_blueprint = stale_world.blueprint
+	var original_delta = stale_world.delta
+	var original_active_landmark_id := str(original_delta.active_landmark_id)
+	var original_discovered_landmarks: Array[String] = original_delta.discovered_landmarks.duplicate()
+	var replacement_signature := "0".repeat(64)
+	if replacement_signature == str(stale_blueprint.map_gameplay_signature):
+		replacement_signature = "f".repeat(64)
+	stale_blueprint.map_gameplay_signature = replacement_signature
+
+	var errors: PackedStringArray = compiler.ensure_world_is_current(stale_world)
+	_assert(errors.has("Zapis kampanii nie odpowiada bieżącej scenie mapy."), "Zapis z nieaktualnym podpisem gameplayowym musi zostać jawnie odrzucony.")
+	_assert(stale_world.blueprint == stale_blueprint, "Clean break podpisu nie może po cichu zastąpić blueprintu niezgodnego zapisu.")
+	_assert(
+		stale_world.delta == original_delta
+		and str(stale_world.delta.active_landmark_id) == original_active_landmark_id
+		and stale_world.delta.discovered_landmarks == original_discovered_landmarks,
+		"Odrzucenie nieaktualnego podpisu nie może mutować WorldDelta."
+	)
+
+
 func _assert_unique_static_gameplay_positions(blueprint) -> void:
 	var static_record_groups := [
 		{"name": "loot", "records": blueprint.loot_spawns},
@@ -1253,6 +1563,15 @@ func _record_position_matches(record: Dictionary, expected: Vector2) -> bool:
 
 func _vectors_match(actual: Vector2, expected: Vector2) -> bool:
 	return actual.is_equal_approx(expected)
+
+
+func _rect_inclusive_has_point(rect: Rect2, point: Vector2) -> bool:
+	return (
+		point.x + 0.001 >= rect.position.x
+		and point.y + 0.001 >= rect.position.y
+		and point.x - 0.001 <= rect.end.x
+		and point.y - 0.001 <= rect.end.y
+	)
 
 
 func _has_authoring_kind(records: Array, authoring_kind: String) -> bool:

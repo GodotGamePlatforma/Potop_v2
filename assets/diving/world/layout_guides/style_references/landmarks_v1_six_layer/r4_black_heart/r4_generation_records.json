@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "region_id": "R4",
+  "region_slug": "r4_black_heart",
+  "asset_type": "six_layer_landmark_source_record",
+  "tool": "image_gen",
+  "model": "built_in_imagegen_backend_not_exposed",
+  "parameters_not_exposed": [
+    "seed",
+    "steps",
+    "sampler",
+    "guidance",
+    "exact_model_version"
+  ],
+  "style_reference": {
+    "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r4_black_heart/derived/r4_black_heart_composite_preview.png",
+    "sha256": "474bf7e7e111c635d7abfc43df75f5a32a3f3c28701a0a462deb827b8c330d00",
+    "use": "material_and_2d_style_only"
+  },
+  "prompt_reconstruction": {
+    "method": "join prefix, landmark identity, and suffix with two LF characters",
+    "prefix": "Use case: stylized-concept\nAsset type: six-layer registered technical source sheet for a 2D underwater game landmark, {object_id} \"{display_name}\".\n\nInput image: use only as the approved R4 Black Heart material/style reference: cold black-blue drowned infrastructure, dense cable and ribbed metal language, restrained premium painterly realism, strong orthographic 2D silhouette. Do not copy its composition, background, lighting, drifting props, or terrain.\n\nPRIMARY REQUEST\nCreate one wide 16:9 technical source sheet divided into EXACTLY 2 equal columns by 3 equal rows, six clean cells total. Every cell has a perfectly flat uniform pure magenta #FF00FF background. No labels, numbers, text, borders, frames, shadows, gradients, water, floor, atmosphere, or checkerboard. The six cells are six independently extractable depth layers of ONE AND THE SAME landmark. All cells use identical strict orthographic side-elevation camera, identical scale, identical center registration, and identical overall landmark footprint. Cropped and composited in reading order, they form one coherent landmark.\n\nLANDMARK IDENTITY",
+    "suffix": "SIX CELLS, READING ORDER\nTop-left L00 rear silhouette: only quiet rear mass and deepest internal voids, low contrast, complete within cell.\nTop-right L01 structural shell: only the main load-bearing shell, ribs, frames, conduits and architectural skeleton; no rear mass or props.\nMiddle-left L02 hero identity: only the distinctive central identity-defining machinery/architecture; no duplicate shell.\nMiddle-right L03 detail props: only small attached or detached landmark-specific props at their registered positions, no architecture.\nBottom-left L04 terrain-adjacent integration: only small discontinuous broken masonry/metal lips, roots, rebar and pipe stubs at far attachment zones; no floor, no platform, no route.\nBottom-right L05 foreground occluder: only sparse near-black cables, grille/railing fragments and torn near material at extreme edges; center open.\n\nSTYLE\nPremium tactile painterly 2D game art, strict side elevation, flat orthographic, no perspective or vanishing point, crisp anti-aliased cutout edges. Cold desaturated steel, graphite, wet dark concrete, restrained blue-grey oxidation. Strongly 2D, not a 3D render, not isometric.\n\nREGISTRATION AND COMPOSITION\nEach cell keeps all components centered on the same invisible origin. Wide horizontal footprint with generous magenta clearance. No component crosses cells. Do not duplicate the same piece across layers. Assembled silhouette has open holes and broken gaps. R4 continues into a bottomless abyss: absolutely no continuous bottom edge, ground, seabed, floor, shelf, road, platform, lower frame, or implied traversal surface.\n\nLIGHTING AND RUNTIME OWNERSHIP\nNeutral unlit diffuse material reference only. No baked global light, directional key, lamp glow, emission, bloom, caustics, fog, haze, rays, particles, bubbles, refraction, depth grading, vignette, cast/contact shadows, or water color. Godot provides lighting and underwater atmosphere.\n\nCONSTRAINTS\nNo diver, character, creature, HUD, UI, objective marker, readable text, logo, watermark, collision diagram, arrows, captions, terrain implying new traversability, or full background. Exactly six cells and one registered landmark layer class per cell."
+  },
+  "postprocess": {
+    "source_sheet": "1672x941 RGB",
+    "crop_geometry_reading_order": [
+      "824x299+6+6",
+      "824x299+843+6",
+      "824x299+6+321",
+      "824x299+843+321",
+      "824x299+6+634",
+      "824x299+843+634"
+    ],
+    "key_removal": "remove_chroma_key.py --key-color #FF00FF --soft-matte --transparent-threshold 12 --opaque-threshold 72 --edge-contract 0 --edge-feather 0 --spill-cleanup",
+    "final_canvas": "centered without resize on transparent 1024x512 sRGBA8",
+    "preview": "L00 through L05 composited Over on opaque #103E5B",
+    "separator_cleanup": "six-pixel interior inset excludes white grid divider and its antialias"
+  },
+  "layer_roles": [
+    "l00_rear_silhouette",
+    "l01_structural_shell",
+    "l02_identity_core",
+    "l03_detail_props",
+    "l04_terrain_integration",
+    "l05_foreground_occluder"
+  ],
+  "landmarks": [
+    {
+      "object_id": "R4-01",
+      "display_name": "Dworzec Metra",
+      "slug": "r4_01_metro_station",
+      "identity_prompt": "A monumental drowned underground metro station cross-section: fractured vaulted platform hall suspended in open water, heavy cast-iron ribs, tiled arch fragments, bent track gantry, stair/escalator cage and a central station clock housing with no readable text. It must read as metro architecture, but it does not draw a usable platform or floor.",
+      "raw_cache_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-5e32004d-e0d7-4d54-921b-655e8d5a50a3.png",
+      "source_sheet_sha256": "ac2e30c3421864261b258cf5ab52312c92f79eeebdbae1f1f8318c5f953405ff",
+      "layer_sha256": [
+        "0e07d3423e40c83751d993f78c473e40a18570af2bcd4c5d190b53617e78e352",
+        "af6591a5623326963466e31b5c7a402ad67f75bacde07956ab78e3ae5a057d81",
+        "b8ad8ee4f1a1e140161fae47bfb505c69a5cad3c4e4be1ae943ee37caaa040cd",
+        "717d2b105a816383399aea06fa5932419819839b4be63164c5a73f524147ad77",
+        "edc8e496c214e8afcdaae7313e7489dcb13b29991bb415484654d26969a1ec94",
+        "6c7c4f1389dc8cce20e0bd782c7f8c292b3d4d8cb83d86f1b81da1281a5680a9"
+      ],
+      "preview_sha256": "27df2cfb48d2f72f5b13dc318f04f787433a19477b6bf1e2bf14313b27bff663"
+    },
+    {
+      "object_id": "R4-02",
+      "display_name": "Bunkier",
+      "slug": "r4_02_bunker",
+      "identity_prompt": "A severe submerged civil-defense bunker facade and exposed section: massive ribbed blast-door frame, pressure vestibule, ventilation trunks, armored observation slit, emergency valve manifold and reinforced concrete shell. No readable markings, no active lights, no usable ground.",
+      "raw_cache_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-21d64d1d-9f66-4105-9b55-d2d4d383571e.png",
+      "source_sheet_sha256": "f517081a48fda9fabd944ba095e6f4909b06b93950b836aec29a8c207d08f968",
+      "layer_sha256": [
+        "1fd4dcec60df8c39c4db88afeb6c54196aacd7f036bd73ccc050b7942f98733a",
+        "c65405d1a89169e12ce6397edd211c91d0287432696700150e9f064782b0066c",
+        "73d797380d5852ef4a94e9daf81476b21b3fbc179a512e431c386481b1847d02",
+        "e5cf3c14acae49699a9971d9ee9e63051bf131a16d97880de76bddb59d06287d",
+        "46778e3f60b1797c20fed0ef5d68059e48ea8cb0af93aa79e18af51a92066701",
+        "a1ee4217a9a3eef827bd6385ee8d6783b94df2ede7f817c63595fdcc9bb06b4a"
+      ],
+      "preview_sha256": "4f3c108998cb7a58a3c2508ad4204122673854d564467a0d70380b8a6be82a69"
+    },
+    {
+      "object_id": "R4-03",
+      "display_name": "Laboratoria",
+      "slug": "r4_03_laboratories",
+      "identity_prompt": "A drowned high-security research laboratory complex seen in side section: repeating sealed glass experiment bays, thick pressure-frame ribs, cable umbilicals, specimen chamber housings, decontamination airlock silhouette and modular instrument racks. No specimens, no readable text, no active screens or lights, and no usable floor.",
+      "raw_cache_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-e77b2ffc-7f0b-4276-b0f2-9641f1bcae74.png",
+      "source_sheet_sha256": "d468d7ece2b786c8afe949b56537bc825b672636c5c262a71812657ded38bc05",
+      "layer_sha256": [
+        "37f53f431bdcca868a8f0a1e5efc871f4853f40163f789a3a421b11c45f16c95",
+        "f44f46df9c19d6786fc33635928d73b74acc7ada89b2fa1263a479ef132cc895",
+        "96801feacdf3a919f4bb8cd81a8fb12b333b6e6c629cf789c2a3d85b8272e566",
+        "38d67d3fd45f9348b593ea6d5248fb30a4d7afd6a14ca8456c20a274dba7d3cc",
+        "1a7e43136e98c35a51247ee8d1c4be5f39918bd5f5ad2f3d0f2745a8fa72531f",
+        "057dd59a93f9e2ed77f8abf443243a0783b4be5b55fd0b332807f94a2e7b1b97"
+      ],
+      "preview_sha256": "6a680a110a414272c2508e44264d06a3d639eede54433bf760e6a3bc71c37da3"
+    },
+    {
+      "object_id": "R4-04",
+      "display_name": "Zamknięte Grodzie",
+      "slug": "r4_04_sealed_bulkheads",
+      "identity_prompt": "A monumental sequence of sealed industrial bulkheads crossing a ruined network chamber: three overlapping circular and rectangular pressure-door frames, locking dog mechanisms, hydraulic rams, heavy ribbed wall collars and severed service conduits. The identity is an impassable sealed gate visually, but the art itself adds no collision or new route. No warning text or active lamps.",
+      "raw_cache_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-a9daaa6c-257d-4f13-8f11-95a5625475ff.png",
+      "source_sheet_sha256": "e8cd488a3c264b993736f799a8e76b4a42ff1120dd0b2d1bdee076e5e2a81e7d",
+      "layer_sha256": [
+        "7c9b5e53249f34866c88b02a382bf5accfdfa163fc763f62939f7a345495c257",
+        "525b6f982a0d1cdbb5507a47a50fb3fff4761e1cbe4365f8f7d305ddf7901433",
+        "001e8f5558823eb57a75f428d10d46c634698cad0d6d5e8d8720d55e3fb9d3b0",
+        "deba7a3d74c6871f1e7b790ffdd933622b46b7abf5809f01126e488cb3059f32",
+        "bfa885d241a9670534ac6e0bd81caa81715fdb8acb82bbe44da75a64bc2e3301",
+        "9692fe52ce5ade13414c5cbd73b607642d344bda388be483af9838e33c7bbcc9"
+      ],
+      "preview_sha256": "84af15c6cc839ed0edb7228ded59a52cf473aa6d3d26014e3a592e32c26c2398"
+    },
+    {
+      "object_id": "R4-05",
+      "display_name": "Centrum Miasta",
+      "slug": "r4_05_city_center",
+      "identity_prompt": "A monumental drowned civic center fused with the old network: fragmented grand concourse facade, tall central clock/bell housing, radial cable galleries, arched municipal colonnade remnants and huge suspended service ring. It must read as the lost heart of a city, not a generic factory. No readable civic signs, no active clock light, no ground.",
+      "raw_cache_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-8c2dbc80-788f-4bf0-965a-92f5cd75c166.png",
+      "source_sheet_sha256": "461544b60e79426daa000a9971f8bbda2211b529fdd6bfc501ce40adcb4f32df",
+      "layer_sha256": [
+        "e7f6d978b461254edcdea62003c4e914efa9e3dc73cb3bffb96b4a775dd1f4ac",
+        "0657f7ba4a5989bf1fad81fe1c1c318debe0a217252b74daacdbc958ce4a67a1",
+        "c0ee6d708e0a2d28e1a23171bce93abb60d7ace4803b0cd3cb37a08ba73a39fe",
+        "c1cba561360f3369fab8ab283bab3aa054cf2639880e95df5ae55d066f0be75c",
+        "1aeca527b9ee3b454341f998b3feaf97c301be243e16819e8993d50515cc46b9",
+        "eb7370ebfe91568f10038df6312706c793167582344b453bee436fbd3adfd331"
+      ],
+      "preview_sha256": "bb65ff1d84d3691c0167b4f4bc26f7f6cb171319a3d8065e21bc42617ae95158"
+    },
+    {
+      "object_id": "R4-06",
+      "display_name": "Serce",
+      "slug": "r4_06_heart",
+      "identity_prompt": "The final central energy-distribution heart of the abyss: an enormous symmetrical mechanical core chamber seen in side elevation, concentric turbine/transformer rings, branching busbars and cable arteries, three massive insulated pylons, pressure-vessel ribs and a central inactive rotor aperture. Monumental but entirely unlit, no mystical glow, no literal organic heart, no usable floor or platform.",
+      "raw_cache_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-1573d576-5b7b-4d07-98f6-a820b84aa01c.png",
+      "source_sheet_sha256": "bfbe8816db3de8237b75dbc756a54fc22a812a0b840d8e954b8ba7a3ca160960",
+      "layer_sha256": [
+        "b3129fe2b725a9529d6f39ba3dfdaabb5db9868b529a74135660a23a1be25811",
+        "145d17da44241f6fb0ece4978d29a9c9db08956e0c2c942963bc6600e545f7ee",
+        "4e8c7f1d0b0664b5393dda1742cf7f13bd13f60a4ff396e17fb6d371bf0815ed",
+        "aa40993ada60a2d61b679df3ff00a4e4ca59796d4d901314a7b37f266fcbee98",
+        "776e734b57c6a35712e1567a7037eaf5e31026b05cb3f7e6cd75263cf4fc96a4",
+        "d3e0622772207271332af2ccb16c2f2b7647882115d966159ae19b0e944ba5f4"
+      ],
+      "preview_sha256": "3c1905d18131ebc25269342f76db16fa2710636aa57975a5ca9e47631c287717"
+    }
+  ],
+  "qa": {
+    "technical": "pass",
+    "source_sheets": 6,
+    "rgba_layers": 36,
+    "previews": 6,
+    "all_layers_1024x512_srgba_with_alpha_0_and_1": true,
+    "all_corner_alpha_zero": true,
+    "preview_recomposition_max_difference": 0,
+    "visual_review": "accept",
+    "runtime_tested": false,
+    "runtime_wired": false
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "id": "landmark_six_layer_reference_set_v1",
+  "created_utc": "2026-08-16",
+  "asset_type": "six_layer_landmark_style_reference_set",
+  "authority": {
+    "static_world": "res://scenes/diving/UnderwaterMap.tscn",
+    "landmark_placement_and_stable_ids": "existing landmark nodes in the static world scene",
+    "these_images": "reference_and_source_only",
+    "production_master": false,
+    "runtime_asset": false,
+    "runtime_wired": false,
+    "forbidden_authority": [
+      "topology",
+      "collision",
+      "SDF",
+      "routes",
+      "stable IDs",
+      "landmark placement",
+      "gameplay objects",
+      "persistence"
+    ]
+  },
+  "status": {
+    "technical": "present_valid",
+    "artistic": "pending_user_review",
+    "runtime": "unwired",
+    "codex_visual_recommendation": "accept_as_2d_layered_landmark_reference_pack"
+  },
+  "accepted_style_reference": {
+    "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/biome_six_layer_reference_set_v3.json",
+    "sha256": "5129337B151ECD51B5E81B2A13FD084BEDEC0F301772D6A4FC732BC8CC8966CD",
+    "acceptance_scope": "strongly 2D six-layer construction language; not a runtime or production-master acceptance"
+  },
+  "source_sheet_contract": {
+    "width": 1672,
+    "height": 941,
+    "format": "PNG",
+    "layout": "two columns by three rows, one registered source panel per output layer",
+    "technical_matte": "pure magenta chroma key",
+    "role": "versioned ImageGen source; never loaded by runtime"
+  },
+  "layer_canvas": {
+    "width": 1024,
+    "height": 512,
+    "format": "PNG",
+    "colorspace": "sRGB",
+    "alpha": "straight RGBA",
+    "origin": "0,0 NorthWest",
+    "trim": "none",
+    "co_registration": "all six layers of one landmark share the same canvas and origin"
+  },
+  "layer_contract": [
+    {
+      "id": "L00",
+      "role": "rear_silhouette",
+      "local_order": 0,
+      "purpose": "farthest landmark-only silhouette"
+    },
+    {
+      "id": "L01",
+      "role": "structural_shell",
+      "local_order": 1,
+      "purpose": "main flat architectural mass"
+    },
+    {
+      "id": "L02",
+      "role": "identity_core",
+      "local_order": 2,
+      "purpose": "shape language that identifies the landmark"
+    },
+    {
+      "id": "L03",
+      "role": "detail_props",
+      "local_order": 3,
+      "purpose": "detached decorative landmark details"
+    },
+    {
+      "id": "L04",
+      "role": "terrain_integration",
+      "local_order": 4,
+      "purpose": "presentation-only contact with canonical terrain; never collision authority"
+    },
+    {
+      "id": "L05",
+      "role": "foreground_occluder",
+      "local_order": 5,
+      "purpose": "nearest landmark-only framing and occlusion"
+    }
+  ],
+  "runtime_usage_contract": {
+    "future_container": "collisionless Node2D prefab under res://scenes/diving/map_visuals/",
+    "future_assignment": "the existing landmark node Visual Scene property; assignment is a separate protected runtime task",
+    "composition": "six separate Sprite2D children in L00 through L05 local z-order",
+    "anchor": "all six layers remain registered to the landmark and move with its visual prefab",
+    "broad_parallax_owner": "biome background planes",
+    "differential_camera_parallax": "not provided by the generic landmark Visual Scene contract; adding it requires a dedicated presentation implementation and runtime verification",
+    "effects_owned_by_godot": [
+      "gameplay lighting",
+      "global water field",
+      "fog",
+      "caustics",
+      "refraction",
+      "particles",
+      "bubbles",
+      "current motion",
+      "color grading",
+      "quality profiles",
+      "reduced_motion behavior"
+    ]
+  },
+  "counts": {
+    "regions": 4,
+    "landmarks": 28,
+    "versioned_source_sheets": 28,
+    "versioned_layer_pngs": 168,
+    "derived_composite_previews": 28,
+    "layers_per_landmark": 6
+  },
+  "region_records": [
+    {
+      "region_id": "R1",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_generation_records.json",
+      "sha256": "D3701E4FF6DF4AE6B914E3014DA7626EBAF53F41BC0EB244734DA0EBDC7AE1DF"
+    },
+    {
+      "region_id": "R2",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r2_green_estates/r2_generation_records.json",
+      "sha256": "441BA5B4960EF7FE1B21100EC8641086F79B3F484E333B69E66CB427392178E5"
+    },
+    {
+      "region_id": "R3",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r3_rust_belt/r3_generation_records.json",
+      "sha256": "571DC89AAA9CAA9920AF2BA290F2930FBB5219A9EA8BAB833FE5A5C52A4B52C8"
+    },
+    {
+      "region_id": "R4",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r4_black_heart/r4_generation_records.json",
+      "sha256": "FEDF788BA9D9FB29BFAC9EC095B0318D74B3A4270AF7792C2424E1048CB37C07"
+    }
+  ],
+  "landmarks": [
+    { "id": "R1-00", "slug": "r1_00_dive_station" },
+    { "id": "R1-01", "slug": "r1_01_pharmacy" },
+    { "id": "R1-02", "slug": "r1_02_flooded_tenement" },
+    { "id": "R1-03", "slug": "r1_03_sunken_hotel" },
+    { "id": "R1-04", "slug": "r1_04_parking" },
+    { "id": "R1-05", "slug": "r1_05_grocery" },
+    { "id": "R1-06", "slug": "r1_06_hospital" },
+    { "id": "R1-07", "slug": "r1_07_ship_in_street" },
+    { "id": "R1-08", "slug": "r1_08_museum" },
+    { "id": "R1-09", "slug": "r1_09_flooded_archive" },
+    { "id": "R2-01", "slug": "r2_01_greenhouse" },
+    { "id": "R2-02", "slug": "r2_02_park" },
+    { "id": "R2-03", "slug": "r2_03_garden_center" },
+    { "id": "R2-04", "slug": "r2_04_seed_bank" },
+    { "id": "R2-05", "slug": "r2_05_suburbs" },
+    { "id": "R2-06", "slug": "r2_06_tangled_corridors" },
+    { "id": "R3-01", "slug": "r3_01_port_warehouses" },
+    { "id": "R3-02", "slug": "r3_02_old_shipyard" },
+    { "id": "R3-03", "slug": "r3_03_factory" },
+    { "id": "R3-04", "slug": "r3_04_power_plant" },
+    { "id": "R3-05", "slug": "r3_05_chemical_storage" },
+    { "id": "R3-06", "slug": "r3_06_scrapyard" },
+    { "id": "R4-01", "slug": "r4_01_metro_station" },
+    { "id": "R4-02", "slug": "r4_02_bunker" },
+    { "id": "R4-03", "slug": "r4_03_laboratories" },
+    { "id": "R4-04", "slug": "r4_04_sealed_bulkheads" },
+    { "id": "R4-05", "slug": "r4_05_city_center" },
+    { "id": "R4-06", "slug": "r4_06_heart" }
+  ],
+  "naming": {
+    "source_sheet": "<slug>/<slug>_source_sheet.png",
+    "layer": "<slug>/<slug>_lNN_<role>.png",
+    "preview": "<slug>/derived/<slug>_composite_preview.png",
+    "preview_role": "opaque derived display composite over the matching biome base color; not a seventh layer"
+  },
+  "provenance": "full prompts, ImageGen operation metadata, deterministic crop and chroma-key postprocess, per-file hashes and exceptional cleanup are recorded in the four region records",
+  "qa": {
+    "technical": "pass",
+    "decoded_dimensions": "28 sources at 1672x941; 168 RGBA layers and 28 previews at 1024x512",
+    "alpha": "every layer is nonempty RGBA with transparent four corners",
+    "separator_and_key_cleanup": "no visible source-sheet separator seams or magenta chroma-key spill",
+    "recomposition": "after source-over composition of L00 through L05 onto the matching biome base color, all 28 results are pixel-identical to their stored previews",
+    "contact_sheet": {
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/derived/landmarks_v1_six_layer_contact_sheet.png",
+      "width": 1344,
+      "height": 1603,
+      "sha256": "2220A3FD2802F74601541BE9AAD23C09B3E1ABC1F09ECE5523CFE8A42AB523AC"
+    },
+    "godot": "not_run_reference_assets_only",
+    "user_acceptance": "pending"
+  }
+}

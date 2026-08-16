@@ -1,0 +1,2301 @@
+{
+  "schema_version": 1,
+  "pack_id": "landmarks_v1_six_layer_r1_rooftops",
+  "generated_on": "2026-08-16",
+  "region": {
+    "object_id": "R1",
+    "display_name": "Dachy Umarłego Miasta",
+    "landmark_count": 10,
+    "topology_note": "upper map region; discontinuous roof and upper-city attachment fragments allowed; no continuous seabed"
+  },
+  "asset_role": "registered 2D presentation-layer sources for map landmark visual prefabs; no topology, collision, gameplay state or persistence authority",
+  "runtime_status": "SOURCE_REFERENCE_NOT_WIRED_BY_THIS_TASK",
+  "tool": {
+    "name": "image_gen",
+    "mode": "built-in",
+    "model_identifier": "not exposed by built-in tool"
+  },
+  "style_reference": {
+    "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+    "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+  },
+  "layer_contract": [
+    {
+      "layer": "L00",
+      "semantic": "rear_silhouette"
+    },
+    {
+      "layer": "L01",
+      "semantic": "structural_shell"
+    },
+    {
+      "layer": "L02",
+      "semantic": "identity_core"
+    },
+    {
+      "layer": "L03",
+      "semantic": "detail_props"
+    },
+    {
+      "layer": "L04",
+      "semantic": "terrain_integration",
+      "constraint": "discontinuous attachment fragments only; never floor/platform"
+    },
+    {
+      "layer": "L05",
+      "semantic": "foreground_occluder",
+      "constraint": "sparse; center remains readable"
+    }
+  ],
+  "postprocess": {
+    "source_dimensions": "1672x941",
+    "grid_detection": "For each source sheet, sample the full-height line at x=10 and the full-width line at y=10; separator candidates have green channel > 50; ignore candidate spans within 20 px of the outer image edge; require exactly one vertical and two horizontal separator spans.",
+    "crop_rule": "Derive actual 2x3 panel bounds from detected separator spans; inset every panel by exactly 6 px on all four sides. Crop dimensions may vary because ImageGen did not always place horizontal dividers at equal thirds. Per-layer source_crop_geometry records the exact result.",
+    "superseded_fixed_crop_note": "The preliminary fixed 824x299 crop was rejected because several R1 sheets placed separators at different y coordinates and leaked white seams into L05. All shipped layers and previews use the detected-grid recrop.",
+    "chroma_key_command": "python C:\\Users\\Piotr\\.codex\\skills\\.system\\imagegen\\scripts\\remove_chroma_key.py --input <crop.png> --out <alpha.png> --key-color #FF00FF --soft-matte --transparent-threshold 12 --opaque-threshold 72 --edge-contract 0 --edge-feather 0 --spill-cleanup --force",
+    "output_canvas": "ImageMagick center-pad to transparent RGBA 1024x512; no resize",
+    "preview": "ImageMagick source-over L00 -> L01 -> L02 -> L03 -> L04 -> L05 on opaque #0E3646 at 1024x512",
+    "temp_files": "explicit crop and alpha intermediates removed after each final layer"
+  },
+  "discarded_candidates": [
+    {
+      "slug": "r1_04_parking",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a ruined multi-storey concrete parking structure with stacked curved ramps, open decks, heavy columns, bent barriers and a few wreck silhouettes.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear deck mass and distant wreck silhouettes only; L01 structural shell = main concrete columns, open floor slabs and stacked ramp structure only; L02 identity core = distinctive paired curved ramps, toll-booth shell and barrier mechanism only; L03 detail props = sparse barrier arms, wheel stops, hanging signs with no text, rail fragments and detached wreck parts only; L04 terrain integration = discontinuous broken concrete attachment ledges, exposed rebar roots and drain pipes at far edges only, never a continuous deck or floor; L05 foreground occluder = sparse close barrier mesh, dark cable loops and cropped wreck fragments at extreme edges only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "raw_cache_path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-d4d85063-42c9-49ac-86d3-a8788c4ec22e.png",
+      "sha256": "F306FF9976B49A1B38E64ADC88ADBF1CA342823590E62CBDB3EBD965EB6B656E",
+      "rejection_reason": "L05 foreground cars touched and were clipped by outer cell boundaries; regenerated once with explicit >=28 px magenta margin."
+    }
+  ],
+  "assets": [
+    {
+      "slug": "r1_00_dive_station",
+      "object_id": "R1-00",
+      "display_name": "Stacja Nurkowa",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry and corroded steel textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a suspended steel access gantry with a compact dive-bell docking frame, pressure lockers and heavy service framework. It must read immediately as a diving station.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = distant docking/gantry silhouette only; L01 structural shell = main steel access frame and dive-bell docking architecture only; L02 identity core = pressure lockers, bell cradle, hatch and station-specific core forms only; L03 detail props = sparse hoses, valves, cages and service accessories only; L04 terrain integration = discontinuous roof/upper-city attachment fragments, brackets and broken ledges only, never a continuous floor or platform; L05 foreground occluder = sparse dark cables, hanging frame fragments and edge occluders only.\nRegistration: all six cells use the exact same orthographic camera, origin, scale and landmark footprint. Components must occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. When the six cropped cells are overlaid L00 through L05 they must form one complete station. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, glow, shadows, fog, haze, caustics, refraction, particles, bloom or atmospheric beams; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast/contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-8db3f4c8-418c-45c3-9437-90336ab465c2.png",
+        "sha256": "2AA4D18BA5AE5D0C123845BDE5C6F474F3D7E9D53DCB50C744AD9525A53CB4EA"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_source_sheet.png",
+        "sha256": "2AA4D18BA5AE5D0C123845BDE5C6F474F3D7E9D53DCB50C744AD9525A53CB4EA",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          834,
+          837
+        ],
+        "horizontal_separators": [
+          [
+            337,
+            341
+          ],
+          [
+            647,
+            650
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_l00_rear_silhouette.png",
+          "sha256": "58AEB6F497169691154A2704A543DE43B5CDFABB2BB70B0A5E2468DA62E31FE9",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 450668,
+            "partially_transparent_pixels": 13698,
+            "fully_opaque_pixels": 59922,
+            "nonzero_fraction": 0.14041901,
+            "mean": 0.12511713,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x325+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_l01_structural_shell.png",
+          "sha256": "BC1E1C0C346614604DAEBB8AA29EC84E8F311AC14218E562C089365B968FCDC2",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 462677,
+            "partially_transparent_pixels": 20238,
+            "fully_opaque_pixels": 41373,
+            "nonzero_fraction": 0.11751366,
+            "mean": 0.09752987,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x325+844+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_l02_identity_core.png",
+          "sha256": "C30E9B9AF897500CC43F6AC3B5C5F679CF9B50D87C1B912FD024C3AFC221DFC7",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 478043,
+            "partially_transparent_pixels": 6650,
+            "fully_opaque_pixels": 39595,
+            "nonzero_fraction": 0.08820534,
+            "mean": 0.08188517,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x293+6+348",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_l03_detail_props.png",
+          "sha256": "D6F86E25B14CF6300587CC665156FF51EC59CD7406E7C23EF60C96F8499424AE",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 501300,
+            "partially_transparent_pixels": 11034,
+            "fully_opaque_pixels": 11954,
+            "nonzero_fraction": 0.04384613,
+            "mean": 0.03343083,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x293+844+348",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_l04_terrain_integration.png",
+          "sha256": "88C727F27F9131E90C558EBA3DB1553C61C85E95D71AB12400AAC159D3A204BB",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 486924,
+            "partially_transparent_pixels": 8461,
+            "fully_opaque_pixels": 28903,
+            "nonzero_fraction": 0.07126617,
+            "mean": 0.06310895,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x278+6+657",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/r1_00_dive_station_l05_foreground_occluder.png",
+          "sha256": "54B3427DC0FBF7C7C9686EE29F17F7E513739D769E703FC498FFFEF0739D8D1D",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 501014,
+            "partially_transparent_pixels": 6731,
+            "fully_opaque_pixels": 16543,
+            "nonzero_fraction": 0.04439163,
+            "mean": 0.03817175,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x278+844+657",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_00_dive_station/derived/r1_00_dive_station_composite_preview.png",
+        "sha256": "FA84F5F11DBA990D9A348FE8A25C5353FC53D3D31E8E7609CB399EC71800C276",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_01_pharmacy",
+      "object_id": "R1-01",
+      "display_name": "Apteka",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a ruined pre-war corner pharmacy facade with a clipped corner entrance, tall display windows, apothecary cabinets and bottle-shelving silhouettes, but absolutely no readable lettering.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear wall mass and faint neighboring roofline voids only; L01 structural shell = corner facade frame, masonry piers, window bays and damaged roof cornice only; L02 identity core = distinctive clipped-corner doorway, arched pharmacy window and built-in apothecary cabinet wall only; L03 detail props = sparse bottle-shelf shapes, drawer banks, glassless cabinet frames and a small counter silhouette only; L04 terrain integration = discontinuous broken roof lips, masonry brackets, rebar and pipe stubs at the far attachment edges only, never a floor; L05 foreground occluder = sparse dark hanging awning strips, bent railing fragments and edge cables only, with the center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-1a5e329a-270d-4d08-b8bc-ca8b4213c0a8.png",
+        "sha256": "6F323EB0D9E54798F23AF6E6D9AE07FC64D726F6F36D5FC6375244FCBC2AC7AF"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_source_sheet.png",
+        "sha256": "6F323EB0D9E54798F23AF6E6D9AE07FC64D726F6F36D5FC6375244FCBC2AC7AF",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          830,
+          834
+        ],
+        "horizontal_separators": [
+          [
+            328,
+            333
+          ],
+          [
+            619,
+            624
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_l00_rear_silhouette.png",
+          "sha256": "787E146962767380A274EE1753B990E6B1E2CB3EF1F119965499CF0F9EFB941E",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 410057,
+            "partially_transparent_pixels": 6192,
+            "fully_opaque_pixels": 108039,
+            "nonzero_fraction": 0.21787834,
+            "mean": 0.2117222,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "818x316+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_l01_structural_shell.png",
+          "sha256": "7CD043EC910F440B2006E4BA3CF1483A3DF8974B362A6807DA95539E6E0319D0",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 428772,
+            "partially_transparent_pixels": 9952,
+            "fully_opaque_pixels": 85564,
+            "nonzero_fraction": 0.18218231,
+            "mean": 0.1729338,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "825x316+841+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_l02_identity_core.png",
+          "sha256": "7811AE9A27BF7B0A036243C22BDD8DA143C8F0939BC29B7EE0070A257ED166C3",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 405741,
+            "partially_transparent_pixels": 4793,
+            "fully_opaque_pixels": 113754,
+            "nonzero_fraction": 0.22611046,
+            "mean": 0.22145019,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "818x273+6+340",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_l03_detail_props.png",
+          "sha256": "BBE74D6BE25C4592DD6B64E72AC39CAA7F6B7D1118D7AE22ADFC7C221A27DB50",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 469552,
+            "partially_transparent_pixels": 8332,
+            "fully_opaque_pixels": 46404,
+            "nonzero_fraction": 0.10440063,
+            "mean": 0.09646108,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "825x273+841+340",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_l04_terrain_integration.png",
+          "sha256": "53AD0EEEAEA60584ED5F570393C5AADB283C60DCAAEBF8B293DF9D3E5DEA1C84",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 482535,
+            "partially_transparent_pixels": 8127,
+            "fully_opaque_pixels": 33626,
+            "nonzero_fraction": 0.07963753,
+            "mean": 0.07213554,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "818x304+6+631",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/r1_01_pharmacy_l05_foreground_occluder.png",
+          "sha256": "53557DC064F13C220DF24A2041923F61AAB0983B6F20F7D6B48B6A840619996B",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 484243,
+            "partially_transparent_pixels": 27056,
+            "fully_opaque_pixels": 12989,
+            "nonzero_fraction": 0.07637978,
+            "mean": 0.04985497,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "825x304+841+631",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_01_pharmacy/derived/r1_01_pharmacy_composite_preview.png",
+        "sha256": "D4E1EEA9C2461F1EFA65646C3A0D7315F0800FE7E5333D08E1585AF190788B60",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_02_flooded_tenement",
+      "object_id": "R1-02",
+      "display_name": "Zalana Kamienica",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a damaged Warsaw-style pre-war tenement and courtyard facade, four storeys, tall windows, balconies, a broken passage arch and exposed stairwell rhythm.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear courtyard wall and distant roof/chimney silhouette only; L01 structural shell = main tenement facade frame, party walls, floor slabs, window rhythm and exposed stair cage only; L02 identity core = distinctive carriage-passage arch, one damaged bay window and broken balcony stack only; L03 detail props = sparse doors, shutters, drainpipes, balcony rails and detached courtyard fittings only; L04 terrain integration = discontinuous party-wall bites, broken roof attachment lips, rebar and gutter stubs at far edges only, never a floor; L05 foreground occluder = sparse dark hanging plaster strips, close balcony fragments and edge cables only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-573a4c27-fc0b-4e17-aad1-b03ded519ac6.png",
+        "sha256": "F379E756351913230DB214194ED3A04092DC5E1F92A92B35915BCBC2C20703E5"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_source_sheet.png",
+        "sha256": "F379E756351913230DB214194ED3A04092DC5E1F92A92B35915BCBC2C20703E5",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          833,
+          837
+        ],
+        "horizontal_separators": [
+          [
+            311,
+            315
+          ],
+          [
+            625,
+            629
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_l00_rear_silhouette.png",
+          "sha256": "A035C40BDDE1077DB77DC8AE2496E2EBFB5E0CC99951D7D5CD7EDB0B147A84CC",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 398260,
+            "partially_transparent_pixels": 4379,
+            "fully_opaque_pixels": 121649,
+            "nonzero_fraction": 0.24037933,
+            "mean": 0.23540504,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x299+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_l01_structural_shell.png",
+          "sha256": "4839D6697C7DFEA22F2225C82D90987BC850048E165964643F0B4A9CCC1F1C98",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 391976,
+            "partially_transparent_pixels": 15108,
+            "fully_opaque_pixels": 117204,
+            "nonzero_fraction": 0.25236511,
+            "mean": 0.23661272,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_l02_identity_core.png",
+          "sha256": "CFCD1D0BAC6242D2F055D20346AC077E21AD4070432F984D9F23032651175A2F",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 466545,
+            "partially_transparent_pixels": 15805,
+            "fully_opaque_pixels": 41938,
+            "nonzero_fraction": 0.11013603,
+            "mean": 0.09432681,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x297+6+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_l03_detail_props.png",
+          "sha256": "0FDC55079CE9B4CCFA54554AEC6D7C95AC0917C56552738CB570ED2725C936F1",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 474563,
+            "partially_transparent_pixels": 15891,
+            "fully_opaque_pixels": 33834,
+            "nonzero_fraction": 0.09484291,
+            "mean": 0.07842809,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x297+844+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_l04_terrain_integration.png",
+          "sha256": "496F797BB9EA9B6C047878DE981F11C0DF9642F8E9CA9274B6EE8564749228F1",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 467717,
+            "partially_transparent_pixels": 9819,
+            "fully_opaque_pixels": 46752,
+            "nonzero_fraction": 0.10790062,
+            "mean": 0.09768676,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x299+6+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/r1_02_flooded_tenement_l05_foreground_occluder.png",
+          "sha256": "658AE3F44AC195761B88B04D4ADCD96AF349FE5C5253DD058F421A7799453B9C",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 475236,
+            "partially_transparent_pixels": 19838,
+            "fully_opaque_pixels": 29214,
+            "nonzero_fraction": 0.09355927,
+            "mean": 0.07280868,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_02_flooded_tenement/derived/r1_02_flooded_tenement_composite_preview.png",
+        "sha256": "2BB3E7F8852D402BC66B6C09791A93A77971D16F6CC6C8DB13958635F975D4DA",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_03_sunken_hotel",
+      "object_id": "R1-03",
+      "display_name": "Zatopiony Hotel",
+      "prompt": "Use case: stylized-concept\nAsset type: six-layer registered technical source sheet for a 2D underwater game landmark, R1-03 \"Zatopiony Hotel\" (Sunken Hotel).\n\nInput image: use only as the approved R1 material/style reference: muted blue-green drowned-city masonry, roof tile, oxidized metal, restrained painterly realism, strong orthographic 2D silhouette. Do not copy its composition, background, lighting, floating props, or terrain.\n\nPRIMARY REQUEST\nCreate one wide 16:9 technical source sheet divided into EXACTLY 2 equal columns by 3 equal rows, six clean cells total. Every cell must have a perfectly flat, uniform pure magenta #FF00FF background. No labels, numbers, text, borders, frames, shadows, gradients, water, floor, atmosphere, or checkerboard. The six cells are six independently extractable depth layers of ONE AND THE SAME landmark. All cells use identical orthographic side-elevation camera, identical scale, identical center registration, and identical overall landmark footprint. When the six cell images are cropped, placed at the same origin, and composited in reading order, they must form one coherent Sunken Hotel landmark.\n\nLANDMARK IDENTITY\nA broad pre-war European waterfront hotel ruin seen strictly from the side: broken five-storey facade, elegant but weathered balcony rhythm, partially collapsed mansard roof, exposed lobby arch, elevator/stair cage, bent entrance canopy, oxidized railings, cracked stone and old ceramic roof tiles. Strong readable hotel identity without any readable sign or lettering. It is suspended in open water / embedded behind canonical terrain, never standing on a drawn seabed.\n\nSIX CELLS, READING ORDER\nTop-left L00 rear silhouette: only the quiet rear mass and faint internal room voids, low contrast, complete within cell.\nTop-right L01 structural shell: only main facade frame, columns, balcony slabs, roof skeleton and elevator/stair cage; no rear mass or props.\nMiddle-left L02 hero identity: only the distinctive entrance arch, bent canopy, grand window bay and one damaged corner tower; no duplicate shell.\nMiddle-right L03 detail props: only attached/detached hotel-specific details at their registered positions—luggage cart, chandelier fragment, two chairs, picture-frame fragments, railing pieces; no architecture.\nBottom-left L04 terrain-adjacent integration: only small broken masonry lips, rebar roots and pipe stubs at far left/right attachment zones; discontinuous, no floor, no platform, no route.\nBottom-right L05 foreground occluder: only sparse dark curtain strips, one near balcony railing fragment and hanging cable shapes at extreme edges; center remains open.\n\nSTYLE\nPremium tactile painterly 2D game art, strict side elevation, flat orthographic, no perspective and no vanishing point. Crisp anti-aliased cutout edges. Muted charcoal, wet stone, faded warm tile and dull oxidized brass/iron. Strongly 2D, not a 3D render, not isometric, not concept art in perspective.\n\nREGISTRATION AND COMPOSITION\nEach cell keeps all components centered on the same invisible landmark origin. Preserve a wide horizontal footprint with generous magenta clearance on every edge. No component may cross into another cell. Do not repeat the same architectural piece across cells. The assembled silhouette must remain broad and readable, with open holes and broken gaps. No continuous bottom edge or ground line.\n\nLIGHTING AND RUNTIME OWNERSHIP\nNeutral unlit diffuse material reference only. No baked global light, directional key light, lamp glow, emissive windows, bloom, caustics, fog, haze, rays, particles, bubbles, refraction, depth grading, vignette, cast/contact shadows, or water color. Godot will provide all lighting and underwater atmosphere.\n\nCONSTRAINTS\nNo diver, character, creature, HUD, UI, objective marker, readable text, logo, watermark, collision diagram, arrows, panel captions, floor, seabed, road, path, platform, terrain that suggests traversability, or full background. Exactly six cells and exactly one registered landmark layer class per cell.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00b36-93ce-71f3-9565-b56fdbf5d120\\exec-9f231741-1ff0-4c5e-a283-b3470d7c9bc3.png",
+        "sha256": "7B9CFA0116D32EABC619F5982D7EDE43ACE2274CC4032F64138F60CE80E3BF03"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_source_sheet.png",
+        "sha256": "7B9CFA0116D32EABC619F5982D7EDE43ACE2274CC4032F64138F60CE80E3BF03",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": true
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          834,
+          836
+        ],
+        "horizontal_separators": [
+          [
+            312,
+            315
+          ],
+          [
+            625,
+            628
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_l00_rear_silhouette.png",
+          "sha256": "175703B321A2425844D18634506CCB65992197707D886B668650635FC264CDA3",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 405244,
+            "partially_transparent_pixels": 7161,
+            "fully_opaque_pixels": 111883,
+            "nonzero_fraction": 0.22705841,
+            "mean": 0.21946574,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x300+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_l01_structural_shell.png",
+          "sha256": "14B0CDB1940D40BAD899577BF673AF51AA1F23686EC1680CDA0A4D0966EC8969",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 436778,
+            "partially_transparent_pixels": 37050,
+            "fully_opaque_pixels": 50460,
+            "nonzero_fraction": 0.16691208,
+            "mean": 0.13030991,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "823x300+843+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_l02_identity_core.png",
+          "sha256": "6456701EAB626517FA156E5D588BE9E9E9B340DD0DB2D2C86F7E02DC8B30F118",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 447506,
+            "partially_transparent_pixels": 12295,
+            "fully_opaque_pixels": 64487,
+            "nonzero_fraction": 0.14645004,
+            "mean": 0.13485785,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x297+6+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_l03_detail_props.png",
+          "sha256": "A3007F4F7037746C7536044E69545E425DF6E21925F8D985B39C882C46F38642",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 495581,
+            "partially_transparent_pixels": 21944,
+            "fully_opaque_pixels": 6763,
+            "nonzero_fraction": 0.05475426,
+            "mean": 0.0314089,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "823x297+843+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_l04_terrain_integration.png",
+          "sha256": "4C979BAB8963929A580A77A98459FF2C636911B5E0F83BC837F8151DB6C8A33F",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 502868,
+            "partially_transparent_pixels": 7235,
+            "fully_opaque_pixels": 14185,
+            "nonzero_fraction": 0.04085541,
+            "mean": 0.03283911,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x300+6+635",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/r1_03_sunken_hotel_l05_foreground_occluder.png",
+          "sha256": "5E563C1C52E4A0BC1966A42F75F1B361147DE30CD93EE011DB0126A0C46F8E12",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 511959,
+            "partially_transparent_pixels": 5325,
+            "fully_opaque_pixels": 7004,
+            "nonzero_fraction": 0.0235157,
+            "mean": 0.01796654,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "823x300+843+635",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_03_sunken_hotel/derived/r1_03_sunken_hotel_composite_preview.png",
+        "sha256": "A614460BCB1FC790997555D4CE1205005B42580E9D1C2CD3167076856FB649EA",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_04_parking",
+      "object_id": "R1-04",
+      "display_name": "Parking",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a ruined multi-storey concrete parking structure with stacked curved ramps, open decks, heavy columns, bent barriers and a few wreck silhouettes.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear deck mass and distant wreck silhouettes only; L01 structural shell = main concrete columns, open floor slabs and stacked ramp structure only; L02 identity core = distinctive paired curved ramps, toll-booth shell and barrier mechanism only; L03 detail props = sparse barrier arms, wheel stops, hanging signs with no text, rail fragments and detached wreck parts only; L04 terrain integration = discontinuous broken concrete attachment ledges, exposed rebar roots and drain pipes at far edges only, never a continuous deck or floor; L05 foreground occluder = sparse close barrier mesh, dark cable loops and cropped wreck fragments at extreme edges only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.\n\nCRITICAL MARGIN CORRECTION FOR THIS REGENERATION\nEvery object in every cell, including L05 foreground cars, fence and cables, must be fully visible and surrounded by a clearly visible band of pure #FF00FF. No subject pixel may touch or be clipped by the outer image boundary or any white grid divider. Keep at least 28 pixels of magenta clearance from all four edges of every cell. Foreground occluders may sit near the left and right sides but must remain complete, not cropped.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-bcaaea85-a03d-4ea9-b09b-61420aadf64a.png",
+        "sha256": "77DD873C967F89D9C4B89A849C8E078941562B9DC7082CD1D3CE2A51FECC2A97"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_source_sheet.png",
+        "sha256": "77DD873C967F89D9C4B89A849C8E078941562B9DC7082CD1D3CE2A51FECC2A97",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": true,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          833,
+          835
+        ],
+        "horizontal_separators": [
+          [
+            344,
+            346
+          ],
+          [
+            644,
+            646
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_l00_rear_silhouette.png",
+          "sha256": "5A0F5D3A0F1883454A5DEF04650D42F1C3629C11F18374353E3F8D53ECB73BD5",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 470691,
+            "partially_transparent_pixels": 9795,
+            "fully_opaque_pixels": 43802,
+            "nonzero_fraction": 0.10222816,
+            "mean": 0.09234849,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x332+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_l01_structural_shell.png",
+          "sha256": "7CA7D5CAFCE2FCA0C2AE8634B6A6A567231EC2C92D3E941EEB97F987F52FD44B",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 417962,
+            "partially_transparent_pixels": 10975,
+            "fully_opaque_pixels": 95351,
+            "nonzero_fraction": 0.20280075,
+            "mean": 0.19124003,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "824x332+842+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_l02_identity_core.png",
+          "sha256": "64F6364483E9CE5BC663B63BE8B5354F8AC7625C80E527354234F89C995E2A8D",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 454160,
+            "partially_transparent_pixels": 8255,
+            "fully_opaque_pixels": 61873,
+            "nonzero_fraction": 0.13375854,
+            "mean": 0.1254821,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x285+6+353",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_l03_detail_props.png",
+          "sha256": "79C8BC69CA50DD30354BD10D8B24FFDAEAFD005D90E43EFAA6155D342FA0203E",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 476995,
+            "partially_transparent_pixels": 18143,
+            "fully_opaque_pixels": 29150,
+            "nonzero_fraction": 0.09020424,
+            "mean": 0.07230501,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "824x285+842+353",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_l04_terrain_integration.png",
+          "sha256": "122FB97E9EFE2DF8951FBB900022CFFB2DDB39B3307D63A70B60AECF79410C3E",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 473115,
+            "partially_transparent_pixels": 11322,
+            "fully_opaque_pixels": 39851,
+            "nonzero_fraction": 0.09760475,
+            "mean": 0.08689184,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x282+6+653",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/r1_04_parking_l05_foreground_occluder.png",
+          "sha256": "C2DA74A753F46C79FE3237A1E4319FE5EDBE4F010D9F84FCC76B6A6D0E4AA41A",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 455736,
+            "partially_transparent_pixels": 37972,
+            "fully_opaque_pixels": 30580,
+            "nonzero_fraction": 0.13075256,
+            "mean": 0.08615691,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "824x282+842+653",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_04_parking/derived/r1_04_parking_composite_preview.png",
+        "sha256": "84E2225715F07C9FB07AC7D5C2D1CD9B3496D64696C027AE568E21E265E65D4F",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_05_grocery",
+      "object_id": "R1-05",
+      "display_name": "Sklep Spożywczy",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a modest ruined neighborhood grocery facade with a shallow shopfront, rear stock room, simple shelving and produce-crate silhouettes, but absolutely no readable labels or branding.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear stock-room wall and neighboring roof silhouette only; L01 structural shell = main masonry shopfront frame, shallow roof, window bays and stock-room shell only; L02 identity core = distinctive recessed entrance, large shop windows and central shelving wall only; L03 detail props = sparse empty shelf units, produce crates, wire baskets and a small checkout counter only; L04 terrain integration = discontinuous broken pavement brackets, roof attachment lips, drainpipe and rebar stubs at far edges only, never a floor; L05 foreground occluder = sparse dark torn awning strips, close wire rack fragments and edge cables only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-f56cd742-87f1-4afd-956d-5e34142d19e3.png",
+        "sha256": "8510CD9779E2D4C8880EB67B87F6AF23AF5BF8722523BEFD68BCD68234C66274"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_source_sheet.png",
+        "sha256": "8510CD9779E2D4C8880EB67B87F6AF23AF5BF8722523BEFD68BCD68234C66274",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          834,
+          837
+        ],
+        "horizontal_separators": [
+          [
+            335,
+            338
+          ],
+          [
+            636,
+            640
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_l00_rear_silhouette.png",
+          "sha256": "82A4643417AE88E54C1ECE9B997CACAD1C1A900DB15431480EBAF8A01D021CC7",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 463061,
+            "partially_transparent_pixels": 3508,
+            "fully_opaque_pixels": 57719,
+            "nonzero_fraction": 0.11678123,
+            "mean": 0.11314835,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x323+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_l01_structural_shell.png",
+          "sha256": "C3894541B389DBDE7A4CB7448B16FACC8C90DD57B63E3885D42B2CF08070A418",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 431259,
+            "partially_transparent_pixels": 8333,
+            "fully_opaque_pixels": 84696,
+            "nonzero_fraction": 0.17743874,
+            "mean": 0.16903376,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x323+844+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_l02_identity_core.png",
+          "sha256": "4FCE03C548760E6DECBF04D1CE2A1CDEB245F3ED7546457E2260555CB0D86EEE",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 444666,
+            "partially_transparent_pixels": 6502,
+            "fully_opaque_pixels": 73120,
+            "nonzero_fraction": 0.15186691,
+            "mean": 0.14521484,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x285+6+345",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_l03_detail_props.png",
+          "sha256": "DDDA65662AB22A2F072EC9D10A3F2D836CB7A63A662A58F19CD0918F2B49ED99",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 451072,
+            "partially_transparent_pixels": 9254,
+            "fully_opaque_pixels": 63962,
+            "nonzero_fraction": 0.13964844,
+            "mean": 0.13125972,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x285+844+345",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_l04_terrain_integration.png",
+          "sha256": "004256A0F5718E0F8E798F91BC8CE1BFA26AB7EF5D6EB4B94964FEC5D942D7BC",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 495518,
+            "partially_transparent_pixels": 6136,
+            "fully_opaque_pixels": 22634,
+            "nonzero_fraction": 0.05487442,
+            "mean": 0.04871377,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x288+6+647",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/r1_05_grocery_l05_foreground_occluder.png",
+          "sha256": "0668DAF77A46D42BABD35F63D391B3478384BA237D706DCCBED82084EAEAE60C",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 497471,
+            "partially_transparent_pixels": 13172,
+            "fully_opaque_pixels": 13645,
+            "nonzero_fraction": 0.05114937,
+            "mean": 0.0373852,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x288+844+647",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_05_grocery/derived/r1_05_grocery_composite_preview.png",
+        "sha256": "62EED12A22AFF67AD213B3E2DCEB0B4CCEAB02C444DA273D4879F934AD08A393",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_06_hospital",
+      "object_id": "R1-06",
+      "display_name": "Szpital",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a ruined institutional hospital wing with a disciplined window rhythm, exposed ward floors, a damaged ambulance canopy and a compact stair/elevator tower.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear ward mass and distant service-wing silhouette only; L01 structural shell = main hospital concrete frame, regular window bays, floor slabs and stair/elevator tower only; L02 identity core = distinctive ambulance canopy, emergency entrance shell and one projecting ward bay only; L03 detail props = sparse stretcher frames, medicine trolleys, privacy-screen frames and service cabinets only, no lettering; L04 terrain integration = discontinuous broken roof/bridge attachment lips, concrete brackets, rebar and utility pipe stubs at far edges only, never a floor; L05 foreground occluder = sparse dark hanging canopy strips, close railing fragments and bundled edge cables only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-76db1ede-a67f-4b34-9837-05ecce67b950.png",
+        "sha256": "227C4CCD0DA79872D3D6C89B6915ACC9302A753934E07EEB5CA9E4044A20BD56"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_source_sheet.png",
+        "sha256": "227C4CCD0DA79872D3D6C89B6915ACC9302A753934E07EEB5CA9E4044A20BD56",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          833,
+          837
+        ],
+        "horizontal_separators": [
+          [
+            311,
+            314
+          ],
+          [
+            625,
+            629
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_l00_rear_silhouette.png",
+          "sha256": "A44B1EFB31E360AEDD69816D64CF648FB3422C8204FED070E14F623FD9098D98",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 475951,
+            "partially_transparent_pixels": 6600,
+            "fully_opaque_pixels": 41737,
+            "nonzero_fraction": 0.09219551,
+            "mean": 0.08529027,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x299+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_l01_structural_shell.png",
+          "sha256": "A4DE8E0340132D1F917354CBB9A1CF14AC23175BE645FE9488F6FD251CFAFEC1",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 425693,
+            "partially_transparent_pixels": 20028,
+            "fully_opaque_pixels": 78567,
+            "nonzero_fraction": 0.18805504,
+            "mean": 0.16696424,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_l02_identity_core.png",
+          "sha256": "4D50BE8024F81172E445D03D28FDE549A829D88C4321FAA17EF6D2D92317158D",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 479735,
+            "partially_transparent_pixels": 3950,
+            "fully_opaque_pixels": 40603,
+            "nonzero_fraction": 0.0849781,
+            "mean": 0.0808625,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x298+6+321",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_l03_detail_props.png",
+          "sha256": "466D985A2D874D1AAB6F928AA74EB90920C326FF981C64BF55AF0D4DD23ED16E",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 497653,
+            "partially_transparent_pixels": 10946,
+            "fully_opaque_pixels": 15689,
+            "nonzero_fraction": 0.05080223,
+            "mean": 0.03929381,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x298+844+321",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_l04_terrain_integration.png",
+          "sha256": "4B7266E8B223010D7D2B51F47D3016B127943A631CDD17723B7C0CA50DB8795B",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 499227,
+            "partially_transparent_pixels": 7659,
+            "fully_opaque_pixels": 17402,
+            "nonzero_fraction": 0.04780006,
+            "mean": 0.03962583,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x299+6+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/r1_06_hospital_l05_foreground_occluder.png",
+          "sha256": "398E943878E1EA2160983DE1CE6AA7A8F91CBA330AC4DDB368384F231EA84A16",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 482374,
+            "partially_transparent_pixels": 23641,
+            "fully_opaque_pixels": 18273,
+            "nonzero_fraction": 0.07994461,
+            "mean": 0.0549647,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_06_hospital/derived/r1_06_hospital_composite_preview.png",
+        "sha256": "4B6AB1C45190C0B450C98A902B73749E76900B4727788EEA144FA95EB9B99EE0",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_07_ship_in_street",
+      "object_id": "R1-07",
+      "display_name": "Statek w Ulicy",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: the immense bow and forward hull of a large old steel ship wedged through broken upper-city facades, unmistakably a ship trapped among rooftops and walls.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear silhouette of distant superstructure, masts and pierced city-wall voids only; L01 structural shell = main ship bow, forward hull ribs, deck edge and fractured facade frames gripping the hull only; L02 identity core = distinctive anchor recess, bridge/front superstructure fragment and torn prow plating only; L03 detail props = sparse winch, bollards, lifeboat-davit fragments, chains and detached street fittings only; L04 terrain integration = discontinuous broken facade bites, roof lips, masonry/rebar roots and hull contact brackets at far edges only, never a floor; L05 foreground occluder = sparse close hanging chain, torn net strips, railing fragment and edge cable silhouettes only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-8550c9ed-1c8d-4063-9afd-cbd4d4428b13.png",
+        "sha256": "52507349FBB2AC38E05F3B82EEAC6D9F7BCD54CCEEB0097CB0672D3255DA42ED"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_source_sheet.png",
+        "sha256": "52507349FBB2AC38E05F3B82EEAC6D9F7BCD54CCEEB0097CB0672D3255DA42ED",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          834,
+          837
+        ],
+        "horizontal_separators": [
+          [
+            311,
+            315
+          ],
+          [
+            625,
+            629
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_l00_rear_silhouette.png",
+          "sha256": "8AD1C64BF859FB013C7D25A32FE608330A779923ADAF11430FAF879D1812583F",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 475606,
+            "partially_transparent_pixels": 11679,
+            "fully_opaque_pixels": 37003,
+            "nonzero_fraction": 0.09285355,
+            "mean": 0.07895563,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_l01_structural_shell.png",
+          "sha256": "80F94F1489A639EF88E0C8EBB793992B21DDDB7C3B5B0871D5FB3B8E032154A9",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 410545,
+            "partially_transparent_pixels": 12771,
+            "fully_opaque_pixels": 100972,
+            "nonzero_fraction": 0.21694756,
+            "mean": 0.20406627,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_l02_identity_core.png",
+          "sha256": "FFCAD52C1C5F63B63A966B0C2B8AA2536EB71C03B07938A677B9476F1E8DD8BD",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 462056,
+            "partially_transparent_pixels": 5939,
+            "fully_opaque_pixels": 56293,
+            "nonzero_fraction": 0.11869812,
+            "mean": 0.11285245,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x297+6+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_l03_detail_props.png",
+          "sha256": "E2D6F02F12C2116B5729971D8850697BE3ADB23EFD1AEE507E2EBF189F610F9F",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 485190,
+            "partially_transparent_pixels": 14119,
+            "fully_opaque_pixels": 24979,
+            "nonzero_fraction": 0.07457352,
+            "mean": 0.06116084,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x297+844+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_l04_terrain_integration.png",
+          "sha256": "C2AE71131FBD1EC381D5699034318AD133A43C301D9058B5FBB86C3ECE107E95",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 461312,
+            "partially_transparent_pixels": 9787,
+            "fully_opaque_pixels": 53189,
+            "nonzero_fraction": 0.12011719,
+            "mean": 0.11054617,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+6+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/r1_07_ship_in_street_l05_foreground_occluder.png",
+          "sha256": "BDF0A6447F543A09D269BE2A99C1725A256D397086BA86B2083BAFAA381D3363",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 487133,
+            "partially_transparent_pixels": 27525,
+            "fully_opaque_pixels": 9630,
+            "nonzero_fraction": 0.07086754,
+            "mean": 0.04400529,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_07_ship_in_street/derived/r1_07_ship_in_street_composite_preview.png",
+        "sha256": "41D28316010FD8C7D361022A37CB26DB5436EB7BD4E3A5906636E17BBA8AF2CB",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_08_museum",
+      "object_id": "R1-08",
+      "display_name": "Muzeum",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a monumental ruined civic museum with a broad classical portico, tall gallery shell, fractured pediment, grand window bays and exposed exhibition halls.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear gallery mass, dome/pediment silhouette and distant roof volumes only; L01 structural shell = main museum masonry shell, colonnade frame, gallery floors and tall window bays only; L02 identity core = distinctive broken classical portico, monumental entry arch and one sculptural stair-wall fragment only; L03 detail props = sparse empty display cases, plinths, frame fragments, railing sections and detached statuary bases only, no readable plaques; L04 terrain integration = discontinuous broken terrace/roof attachment lips, stone brackets, rebar and drain stubs at far edges only, never a floor; L05 foreground occluder = sparse dark hanging exhibition cloth strips, close iron railing fragments and edge cables only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-3e78f2d0-954a-46c3-ae0e-c9b0bcfb7b61.png",
+        "sha256": "5AAFF0E5265AD0963BE43DC65063587E108F3756440F7C57CF0B35A035B3A0E4"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_source_sheet.png",
+        "sha256": "5AAFF0E5265AD0963BE43DC65063587E108F3756440F7C57CF0B35A035B3A0E4",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          833,
+          836
+        ],
+        "horizontal_separators": [
+          [
+            310,
+            314
+          ],
+          [
+            626,
+            630
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_l00_rear_silhouette.png",
+          "sha256": "7A763E1DBA2E85987D1B6C52301B957420EC471721370DFF9D3EA3EE109575CA",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 460387,
+            "partially_transparent_pixels": 4948,
+            "fully_opaque_pixels": 58953,
+            "nonzero_fraction": 0.12188148,
+            "mean": 0.11707208,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x298+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_l01_structural_shell.png",
+          "sha256": "B2316DBBE96EB2778F6D9D724CA17C78A2535C055CEC5B59BD7ADFAF13DE1291",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 403532,
+            "partially_transparent_pixels": 14537,
+            "fully_opaque_pixels": 106219,
+            "nonzero_fraction": 0.23032379,
+            "mean": 0.21562442,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "823x298+843+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_l02_identity_core.png",
+          "sha256": "A7FD21255B470613DBA96AD0C5A7ECC79EF11DEA1DB8081EF96FDFACFA7A4288",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 426732,
+            "partially_transparent_pixels": 7209,
+            "fully_opaque_pixels": 90347,
+            "nonzero_fraction": 0.1860733,
+            "mean": 0.17925147,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x299+6+321",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_l03_detail_props.png",
+          "sha256": "3093DB7EC796F6AC33E3B7AF3F24C59B1A8F01B64A304BF92296D41D836A2C25",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 473932,
+            "partially_transparent_pixels": 21976,
+            "fully_opaque_pixels": 28380,
+            "nonzero_fraction": 0.09604645,
+            "mean": 0.07248468,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "823x299+843+321",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_l04_terrain_integration.png",
+          "sha256": "FDB81A4FD7C30F7D95EFC12404468723971018683BC3081FACBB47424F2C4ED6",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 472889,
+            "partially_transparent_pixels": 10344,
+            "fully_opaque_pixels": 41055,
+            "nonzero_fraction": 0.09803581,
+            "mean": 0.0874113,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x298+6+637",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/r1_08_museum_l05_foreground_occluder.png",
+          "sha256": "A5CA56C017E973CE7E093CB4BB591F23189636906ACF1ACC0EECA93A144E0906",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 470952,
+            "partially_transparent_pixels": 25026,
+            "fully_opaque_pixels": 28310,
+            "nonzero_fraction": 0.10173035,
+            "mean": 0.07537825,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "823x298+843+637",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_08_museum/derived/r1_08_museum_composite_preview.png",
+        "sha256": "A0D236CD3474B5DD44C66CD432CC7457112BDF52E27A2B46AFEA315A5F2A4830",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    },
+    {
+      "slug": "r1_09_flooded_archive",
+      "object_id": "R1-09",
+      "display_name": "Zalane Archiwum",
+      "prompt": "Use case: stylized-concept\nAsset type: production source sheet for six registered 2D parallax layers of one underwater-map landmark\nInput image: Image 1 is style/material reference only. Match its strongly 2D orthographic side-elevation language, dark ink contours, weathered prewar masonry, old roof tile and corroded metal textures, muted charcoal/stone/oxidized-bronze palette, and restrained hand-painted game-art finish. Do not copy its composition or objects.\nPrimary request: Create one coherent R1 upper-city landmark: a ruined municipal archive with dense storage-stack architecture, secure vault doors, card-catalog drawer motifs and a compact records hall, absolutely no readable text.\nScene/backdrop: exactly six separate registered cells arranged as a 2-column by 3-row 16:9 source sheet on perfectly flat solid #FF00FF chroma key. Use thin pure-white grid dividers only; no labels or captions.\nCell order, reading left-to-right then top-to-bottom: L00 rear silhouette = quiet rear records-hall mass and distant compact-storage silhouettes only; L01 structural shell = main archive masonry shell, repetitive narrow bays, floor slabs and secure storage cage frame only; L02 identity core = distinctive circular vault-door surround, central records hall and tall card-catalog wall only; L03 detail props = sparse file-box shapes, card-catalog drawer banks, rolling shelf frames and detached cage panels only, no labels; L04 terrain integration = discontinuous broken masonry lips, vault-wall bites, rebar and service-pipe stubs at far edges only, never a floor; L05 foreground occluder = sparse dark hanging paperless binder straps, close cage-mesh fragments and edge cables only, center open.\nRegistration: all six cells use the exact same orthographic side camera, origin, scale and landmark footprint. Components occupy their correct shared composite coordinates; each physical component appears in exactly one cell, never duplicated. Overlaid L00 through L05, the cropped cells form one complete landmark. Keep every component fully inside its cell with generous clear padding.\nStyle/medium: strongly 2D hand-painted game environment cutouts, strict side-on orthographic elevation, crisp readable silhouettes, no perspective depth, no 3D render, no isometric angle.\nLighting/mood: neutral unlit material reference. No baked key light, lamp glow, emissive light, shadows, fog, haze, caustics, refraction, particles, bubbles, bloom, rays or depth grading; Godot supplies all runtime effects.\nR1 topology: this is the upper map region. Roof and upper-city attachment fragments are allowed in L04, but no continuous seabed, ground strip, floor, platform or bottom edge.\nChroma constraints: background in every cell must be one exact uniform #FF00FF with no gradient, noise, texture, shadow, reflection or lighting variation. Do not use #FF00FF inside any subject. Crisp isolated edges, no cast or contact shadows.\nAvoid: readable text, letters, numbers, signs, labels, logos, HUD, diver, characters, creatures, water background, scenery, duplicated components, six alternate versions, complete landmark repeated in each cell, continuous floor, watermark.",
+      "reference_image": {
+        "path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+        "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+      },
+      "built_in_imagegen_raw_cache": {
+        "path": "C:\\Users\\Piotr\\.codex\\generated_images\\01a00bf9-9a86-74f2-908c-26ce7ab03b2c\\exec-950351bb-7c79-4d65-93b9-552b12bfc810.png",
+        "sha256": "0982DB589ACF1FC2ABD19829BACA119CDD4718BCFDE3936B6645004E19FC0C49"
+      },
+      "source_sheet": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_source_sheet.png",
+        "sha256": "0982DB589ACF1FC2ABD19829BACA119CDD4718BCFDE3936B6645004E19FC0C49",
+        "width": 1672,
+        "height": 941,
+        "channels": "RGB",
+        "copy_sha256_matches_raw": true,
+        "reused_approved_source": false
+      },
+      "generation_notes": {
+        "regenerated_for_margin": false,
+        "runtime_effects_baked": false,
+        "grid_layout": "2 columns x 3 rows",
+        "registration": "shared orthographic origin and scale; center-padded without resize"
+      },
+      "detected_grid": {
+        "vertical_separator": [
+          833,
+          837
+        ],
+        "horizontal_separators": [
+          [
+            310,
+            315
+          ],
+          [
+            625,
+            629
+          ]
+        ],
+        "crop_inset_pixels": 6
+      },
+      "layers": [
+        {
+          "layer": "L00",
+          "semantic": "rear_silhouette",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_l00_rear_silhouette.png",
+          "sha256": "F5BCA1CE420C3C95140B5FB2C908AF467DDA378EA6B09758ED9EFFFBB8A9E1AB",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 464084,
+            "partially_transparent_pixels": 4415,
+            "fully_opaque_pixels": 55789,
+            "nonzero_fraction": 0.11483002,
+            "mean": 0.11021783,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x298+6+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L01",
+          "semantic": "structural_shell",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_l01_structural_shell.png",
+          "sha256": "EEF8A46BF983EE9A486C1B55D9223A962C1B2677FBEC721BEC8B2DDE6DFDD800",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 437377,
+            "partially_transparent_pixels": 14497,
+            "fully_opaque_pixels": 72414,
+            "nonzero_fraction": 0.16576958,
+            "mean": 0.15216079,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x298+844+6",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L02",
+          "semantic": "identity_core",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_l02_identity_core.png",
+          "sha256": "8A7431C0EF38047F0C21416DFACE1CE54A15FB6D7C245246B8C42E700F07FF9E",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 409163,
+            "partially_transparent_pixels": 3436,
+            "fully_opaque_pixels": 111689,
+            "nonzero_fraction": 0.21958351,
+            "mean": 0.21612714,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x297+6+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L03",
+          "semantic": "detail_props",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_l03_detail_props.png",
+          "sha256": "6DB0A873A365EC389F540D3484475CE50196D63D0FF682CC0B4C163DFFD7A27A",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 456116,
+            "partially_transparent_pixels": 20126,
+            "fully_opaque_pixels": 48046,
+            "nonzero_fraction": 0.13002777,
+            "mean": 0.10936757,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x297+844+322",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L04",
+          "semantic": "terrain_integration",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_l04_terrain_integration.png",
+          "sha256": "B2029CE0BC19E3615A5F0FF528F4C34F0594E8042949BB975E9351EFA53C964A",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 457650,
+            "partially_transparent_pixels": 9455,
+            "fully_opaque_pixels": 57183,
+            "nonzero_fraction": 0.1271019,
+            "mean": 0.11776151,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "821x299+6+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        },
+        {
+          "layer": "L05",
+          "semantic": "foreground_occluder",
+          "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/r1_09_flooded_archive_l05_foreground_occluder.png",
+          "sha256": "86246D27F531BCD5CDE45E3C22AB281D09D152CF7866DCA2A43977BB251A2E9E",
+          "width": 1024,
+          "height": 512,
+          "channels": "RGBA",
+          "alpha": {
+            "transparent_pixels": 477278,
+            "partially_transparent_pixels": 24163,
+            "fully_opaque_pixels": 22847,
+            "nonzero_fraction": 0.08966446,
+            "mean": 0.06583707,
+            "corner_values": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "source_crop_geometry": "822x299+844+636",
+          "pad_operation": "center-pad only; no resize; transparent canvas 1024x512"
+        }
+      ],
+      "preview": {
+        "path": "res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/r1_rooftops/r1_09_flooded_archive/derived/r1_09_flooded_archive_composite_preview.png",
+        "sha256": "7D4AB60CB866A0F1746912384407BDD6CF1A8917AAB9FEB287FCCE416DB90016",
+        "width": 1024,
+        "height": 512,
+        "channels": "RGBA",
+        "composite_order": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05"
+        ],
+        "background": "#0E3646",
+        "operator": "source-over"
+      },
+      "qa": {
+        "technical_status": "PASS",
+        "codex_visual_recommendation": "ACCEPT",
+        "user_review": "PENDING",
+        "checks": [
+          "source sheet decodes as 1672x941 RGB",
+          "six final layers decode as 1024x512 RGBA",
+          "every layer has nonzero and transparent alpha pixels",
+          "all four corners of every layer have alpha 0",
+          "preview decodes as 1024x512 RGBA",
+          "visual contact-sheet review found no separator seams after dynamic recrop",
+          "no baked runtime lighting, fog, caustics, refraction or particles observed"
+        ]
+      }
+    }
+  ]
+}

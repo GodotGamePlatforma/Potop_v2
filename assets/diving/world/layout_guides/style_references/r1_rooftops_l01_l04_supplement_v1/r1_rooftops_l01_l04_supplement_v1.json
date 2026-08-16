@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "id": "r1_rooftops_l01_l04_supplement_v1",
+  "created_utc": "2026-08-16",
+  "asset_type": "additional_2d_layered_style_reference",
+  "authority": {
+    "static_world": "res://scenes/diving/UnderwaterMap.tscn",
+    "macro_terrain": "scene Polygon2D nodes",
+    "these_images": "reference_only",
+    "production_master": false,
+    "runtime_asset": false,
+    "runtime_wired": false,
+    "forbidden_authority": [
+      "topology",
+      "collision",
+      "SDF",
+      "routes",
+      "stable IDs",
+      "landmark placement",
+      "gameplay objects",
+      "persistence"
+    ]
+  },
+  "status": {
+    "technical": "present_valid",
+    "artistic": "pending_user_review",
+    "promotion": "not_promoted",
+    "note": "Additional R1 visual vocabulary only. It supplements, and does not replace, the accepted V3 six-layer style reference. Production derivation still requires an accepted full-map composition master."
+  },
+  "canvas": {
+    "width": 1672,
+    "height": 941,
+    "origin": "0,0 NorthWest",
+    "trim": "none",
+    "co_registration": "all four outputs share identical canvas and origin with the accepted R1 V3 reference",
+    "colorspace": "sRGB",
+    "bit_depth": 8,
+    "overlay_channels": "straight sRGBA"
+  },
+  "relationship": {
+    "supplements": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/",
+    "replacement": false,
+    "production_master": false,
+    "runtime_use": "none",
+    "integration_rule": "Keep each PNG independent. If reviewed as useful vocabulary, place it at its matching parallax depth without changing scene topology or collider authority."
+  },
+  "style_references": [
+    {
+      "role": "accepted_r1_v3_composite",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/derived/r1_rooftops_composite_preview.png",
+      "sha256": "44EB5BE345D3BEB6359D423E9A9EA66EDD6E78AD74D3C4696FBD1FE31CEF6FEA"
+    },
+    {
+      "role": "accepted_r1_v3_l01_coverage",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/r1_rooftops_l01_ultra_far_silhouettes.png",
+      "sha256": "F45CD0C110CF74FD85273360E19F102D425399FC5EC2E39B9BA058AC36FF0EAD"
+    },
+    {
+      "role": "accepted_r1_v3_l02_coverage",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/r1_rooftops_l02_far_structures.png",
+      "sha256": "78C051EBC8770AF6F758F5600A1AE54B4A8B4911E383F5471D2F5119BAD0B3CC"
+    },
+    {
+      "role": "accepted_r1_v3_l03_coverage",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/r1_rooftops_l03_mid_drift_props.png",
+      "sha256": "965389EEC61F536C59EDF6366F60607F85F23F3C9EA3AF1404D1178FF35F4C74"
+    },
+    {
+      "role": "accepted_r1_v3_l04_coverage",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v3_six_layer/r1_rooftops/r1_rooftops_l04_near_terrain_skin.png",
+      "sha256": "AF7B01F03A5A0FA5F7E62DC6F395131CA617259C9C15EE4FDBACF9023E5D73CE"
+    },
+    {
+      "role": "r1_v2_composition_reference",
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r1_rooftops_layered_reference_v2.png",
+      "sha256": "90ECC56A1C14A33D3BA0E1705D6A5983FD5DDC15E2A3ECA3B3742CAAC4D1476D"
+    }
+  ],
+  "generation": {
+    "tool": "built-in OpenAI ImageGen",
+    "seed_sampler_guidance": "unavailable_not_exposed_by_tool",
+    "source_background_contract": "uniform technical chroma key; no baked Godot-owned lighting or atmosphere",
+    "layers": [
+      {
+        "id": "L01",
+        "role": "ultra_far_silhouettes",
+        "parallax_order": 1,
+        "prompt_sha256": "6471FA3446147266587333C42A25640C295DF0C74757DB6D8E8DF5D59058BBA5",
+        "prompt": "Use case: stylized-concept\nAsset type: additional transparent-source parallax layer for the R1 drowned-rooftops biome, L01 ultra-far silhouettes, wide 16:9 game environment plate\nInput images: Image 1 is the user-accepted R1 V3 style and composition reference. Image 2 is the existing R1 L01 coverage reference; complement it without copying or replacing its clusters.\nPrimary request: generate ONLY one additional L01 plane of very distant drowned-city rooftop silhouettes for R1. This is a supplementary layer that will be converted to alpha and stacked independently with the existing six-layer set.\nScene/backdrop: perfectly flat uniform pure magenta #FF00FF technical chroma-key background from edge to edge.\nSubject: four to six disconnected, low-frequency silhouettes of old European rooftop blocks, short chimney groups, water tanks, sparse antenna frames and broken parapet rhythms. Keep them broad, simplified, quiet and clearly farther away than all structural/detail layers. Use different contours from Image 2. Preserve a large calm open swimming corridor through the middle of the canvas; clusters may enter from side edges but must not join into a continuous floor, ceiling or navigable platform.\nStyle/medium: strongly flat orthographic 2D side-scroller environment art, restrained painterly silhouette edges, muted blue-teal material around #1D5261, very low internal detail and low contrast. No perspective, no vanishing point, no horizon line, no 3D extrusion, no cast shadow, no bright rim or white outline.\nComposition/framing: wide landscape matching the reference aspect ratio; all clusters share one far-depth class. Generous separation between clusters. Do not reproduce existing L01 placement one-to-one.\nLighting/mood: neutral unlit material reference; Godot will provide lighting and atmosphere.\nBackground extraction contract: the background must be exactly one uniform #FF00FF color with no gradient, texture, haze, shadow, floor plane, vignette or color variation. Do not use magenta in the subject. Crisp antialiased boundaries and no halo.\nConstraints: no text, labels, borders, panel divisions, watermark, HUD, diver, characters, creatures, landmark hero object, gameplay item, lamps, glow, reflections, fog, caustics, light rays, particles, bubbles, refraction or global color grading. Do not imply new collision or topology.\nAvoid: medium-detail masonry, floating props, collider-adjacent terrain skin, foreground occluders, a finished composite scene.",
+        "imagegen": {
+          "call_id": "exec-348d4fc4-3b02-432a-86e8-236abebf18cf",
+          "tool_output_path": "C:/Users/Piotr/.codex/generated_images/01a00b36-93ce-71f3-9565-b56fdbf5d120/exec-348d4fc4-3b02-432a-86e8-236abebf18cf.png"
+        },
+        "source": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/sources/r1_rooftops_supplement_v1_l01_ultra_far_silhouettes_chroma_source.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGB RGB",
+          "bytes": 1024588,
+          "sha256": "269F7826293452B7EC9774DB6BE79A310699190BEFBFD0F432B54E2BEBC34C1E"
+        },
+        "postprocess": {
+          "tool": "imagegen remove_chroma_key.py",
+          "auto_key": "border",
+          "detected_key": "#FA03F8",
+          "soft_matte": true,
+          "transparent_threshold": 12,
+          "opaque_threshold": 72,
+          "despill": true,
+          "edge_contract": 0
+        },
+        "output": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/layers/r1_rooftops_supplement_v1_l01_ultra_far_silhouettes.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGBA",
+          "bytes": 272642,
+          "sha256": "94134FB9BDFFFA75192E99550C238E62863F55B56880A69728F891CD8B422B04",
+          "alpha_min": 0.0,
+          "alpha_max": 1.0,
+          "alpha_mean": 0.117674,
+          "alpha_nonzero_coverage": 0.123705
+        },
+        "qa": "pass; five broad disconnected distant silhouette clusters, open center, no visible magenta"
+      },
+      {
+        "id": "L02",
+        "role": "far_structures",
+        "parallax_order": 2,
+        "prompt_sha256": "D7898DEF8BCE1C5E741932905DF18CE00AE6F983B30BFF749BE45B002F52E703",
+        "prompt": "Use case: stylized-concept\nAsset type: additional transparent-ready game environment parallax layer for R1 Rooftops, L02 far structures\nInput images: Image 1 is the accepted R1 V3 composite and defines only the flat 2D visual language, muted palette, material vocabulary, scale hierarchy, and rooftop identity. Image 2 is the existing R1 L02 layer and defines occupied coverage to complement rather than copy; do not reproduce its groups, placements, contours, or exact props.\nPrimary request: Generate one ADDITIONAL R1 L02 far-structures plane containing 7–10 disconnected small architectural groups that complement the empty coverage of Image 2. Use balcony-edge fragments, broken roof-edge fragments, thin trusses, fire-escape fragments, short masonry runs, short roof-tile runs, and sparse short masts. Every group must be isolated with generous empty space around it.\nScene/backdrop: perfectly flat solid #FF00FF chroma-key field for local background removal. Every background pixel must remain the same uniform key color with no gradient, texture, shadow, haze, reflections, floor plane, or lighting variation. Do not use #FF00FF in the artwork.\nStyle/medium: premium painterly but strongly flat 2D game-environment cutouts; strict orthographic side elevation; subdued stylized realism matching Image 1; clean shape separation; restrained internal texture; no perspective convergence; no 3D camera angle; no photorealism; no thick comic outline.\nComposition/framing: wide landscape technical asset sheet with one shared coordinate plane, not panels. Distribute 7–10 small disconnected groups mainly through currently empty peripheral and secondary bands left and right of center. Preserve one very broad calm central negative-space corridor both horizontally and vertically. Keep at least about 70% of the canvas as untouched chroma field. No group may touch another, any canvas edge, or form a continuous span, platform, floor, bridge, wall, frame, tunnel, room, route, or traversable ledge.\nColor palette: desaturated cool blue-gray slate, muted wet masonry gray, restrained dark teal and oxidized brown accents; lower contrast and slightly softer than near terrain; no bright colors.\nMaterials/textures: short broken balustrade or balcony fragments, small runs of roof tile, chipped masonry edges, thin rusted truss or fire-escape pieces, sparse short masts; all distant and non-identifying.\nConstraints: only L02 far structures. Strongly flat orthographic 2D. Complement Image 2 without copying or tracing it. No landmark identity, recognizable unique building, objective, gameplay object, new topology, collider, terrain skin, foreground occluder, base-color fill, light source, lit window, glow, emission, highlight halo, white rim, fog, haze, caustics, particles, bubbles, refraction, light beam, global lighting, cast shadow, contact shadow, diver, creature, HUD, text, logo, watermark, labels, grid, panel separators, seabed, continuous ground, cave, platform, bridge, corridor, frame, or complete facade. Crisp color-matched antialiased edges with generous padding and no magenta spill.",
+        "imagegen": {
+          "call_id": "exec-9edb70ee-d669-45bd-833e-222714c05c3a",
+          "tool_output_path": "C:/Users/Piotr/.codex/generated_images/01a00c56-9377-7883-90b7-c0112db7cbd7/exec-9edb70ee-d669-45bd-833e-222714c05c3a.png"
+        },
+        "source": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/sources/r1_rooftops_supplement_v1_l02_far_structures_chroma_source.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGB RGB",
+          "bytes": 1213779,
+          "sha256": "C735B0E3B60BF6B249F952EE7F223FA11F1470D02377CF2A7793C88BA515B57B"
+        },
+        "postprocess": {
+          "tool": "imagegen remove_chroma_key.py",
+          "auto_key": "border",
+          "detected_key": "#FA03F7",
+          "soft_matte": true,
+          "transparent_threshold": 12,
+          "opaque_threshold": 72,
+          "despill": true,
+          "edge_contract": 1
+        },
+        "output": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/layers/r1_rooftops_supplement_v1_l02_far_structures.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGBA",
+          "bytes": 338685,
+          "sha256": "251E8F78B01752B663C5C2CBC924D92681618F36B80389E20DCE51A86A9942BF",
+          "alpha_min": 0.0,
+          "alpha_max": 1.0,
+          "alpha_mean": 0.0532496,
+          "alpha_nonzero_coverage": 0.0616397
+        },
+        "qa": "pass; nine disconnected groups, 82.73 percent of mask outside prior L02 coverage, open center, no visible magenta"
+      },
+      {
+        "id": "L03",
+        "role": "mid_drift_props",
+        "parallax_order": 3,
+        "prompt_sha256": "7E46BBFB88D9B329C5CE98D4027C36292D07D1EC0120517EFD8364497CD8380C",
+        "prompt": "Use case: stylized-concept\nAsset type: additional parallax source plane for R1 L03 mid-depth drifting city debris, landscape game bitmap to be converted into a transparent straight-sRGBA PNG\nInput images: Image 1 is the accepted R1 V3 composite and defines only the muted drowned-rooftop palette, controlled painterly material language and strong flat 2D treatment. Image 2 is the existing R1 L03 layer and defines only scale, sparse spacing and depth-class vocabulary; create distinct alternate silhouettes rather than copying its objects.\nPrimary request: Generate EXACTLY TEN fully disconnected, non-interactive drowned-city debris objects, all isolated on one perfectly uniform pure #FF00FF chroma-key background. Include exactly one of each: (1) one damaged chair with a broken back slat, (2) one small simple stool, (3) one compact square empty window frame distinct from the tall frame in Image 2, (4) one narrow empty door frame, (5) one short straight gutter segment, (6) one short bent wrought-iron railing section, (7) one small irregular clay roof-tile patch distinct from Image 2, (8) one blank weathered sign fragment with absolutely no text, letters, numbers, icons or symbols, (9) one short splintered timber beam, and (10) one compact broken concrete chunk with a few exposed rebar ends.\nScene/backdrop: perfectly flat solid #FF00FF technical chroma field from edge to edge. Every background pixel must be the same color: no gradient, texture, checkerboard, vignette, floor plane, shadow, reflection, halo, haze or lighting variation. Do not use #FF00FF or near-magenta anywhere inside the objects.\nStyle/medium: premium but unmistakably flat orthographic 2D side-scroller environment cutouts; strict front or side elevation; subdued stylized realism; clean readable silhouettes; only 2–4 broad value groups per object; restrained tactile material detail matching Image 1. Muted wet gray stone, dull oxidized iron, dark desaturated wood and dark clay tile. Color-matched antialiasing, no white outline.\nComposition/framing: landscape canvas. Distribute the ten objects sparsely across two loose staggered rows with very large magenta breathing room. Every object must be fully visible, modest in size, separately countable and surrounded on all sides by clean key color. No two objects may touch, overlap, align into a chain, or share a support. Keep generous empty margins around the entire set. Do not crop any object at a canvas edge.\nLighting/mood: neutral unlit diffuse material reference, no identifiable light source.\nConstraints: exactly ten objects and no additional fragments. Decorative floating debris only. No continuous platform, shelf, bridge, floor, wall, route, stepping stones, room, terrain mass, collider shape or new topology. No landmark identity or recognizable pharmacy, hotel, hospital, museum, archive, station, parking structure, grocery or ship motif. No gameplay loot, crate, pickup, objective, interactable, lamp or device.\nAvoid: perspective, vanishing point, horizon, 3D extrusion, cast shadow, contact shadow, reflection, bright rim, glow, emission, bloom, fog, haze, caustics, refraction, particles, bubbles, water rays, global color grading, HUD, diver, people, creatures, plants, text, labels, panel divisions, border, logo or watermark.",
+        "imagegen": {
+          "call_id": "exec-ba0479a3-d015-4db9-a252-528ddd70e1d0",
+          "tool_output_path": "C:/Users/Piotr/.codex/generated_images/01a00c56-d48a-78b1-b3f6-56de29275a9b/exec-ba0479a3-d015-4db9-a252-528ddd70e1d0.png",
+          "c2pa": "gpt-image 2.0, OpenAI Media Service"
+        },
+        "source": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/sources/r1_rooftops_supplement_v1_l03_mid_drift_props_chroma_source.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGB RGB",
+          "bytes": 1281412,
+          "sha256": "2B86B2CD0ECC7EBC27AA68945CE9F27BF103CAC76D80129784A475917A6B1C1E"
+        },
+        "postprocess": {
+          "tool": "imagegen remove_chroma_key.py plus ImageMagick technical border cleanup",
+          "auto_key": "border",
+          "detected_key": "#F504F7",
+          "soft_matte": true,
+          "transparent_threshold": 12,
+          "opaque_threshold": 72,
+          "despill": true,
+          "edge_contract": 0,
+          "technical_cleanup": "shave 2x2 then restore a transparent 2px border"
+        },
+        "output": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/layers/r1_rooftops_supplement_v1_l03_mid_drift_props.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGBA",
+          "bytes": 490565,
+          "sha256": "43DC2CCB59AD8E68D664A5E0F4D1A3B97BAEC5DD38BAC2A189658D950F2B8C23",
+          "alpha_min": 0.0,
+          "alpha_max": 1.0,
+          "alpha_mean": 0.118276,
+          "alpha_nonzero_coverage": 0.125751
+        },
+        "qa": "pass; exactly ten alpha-connected objects at 50 percent threshold and area at least 500 pixels, no visible magenta"
+      },
+      {
+        "id": "L04",
+        "role": "near_terrain_skin",
+        "parallax_order": 4,
+        "prompt_sha256": "EEA413F0AC9BE39E72D563CABEA234B384ED4156D956AA8786FD829FBCBCA79E",
+        "prompt": "Use case: stylized-concept\nAsset type: additional transparent-ready 2D game-environment parallax layer, R1 Rooftops L04 near-collider terrain-skin plane\nInput images: Image 1 is the accepted R1 V3 composite and defines the strongly flat orthographic 2D visual language, palette, line treatment, and scale; Image 2 is the existing R1 L04 and defines the current layer role and coverage pattern. Use both only as style and layer-role references. Generate new complementary coverage, not a copy and not an edit.\nPrimary request: create exactly 5 to 7 disconnected irregular roof-edge and terrain-edge skin clusters made from wet aged concrete, exposed brick, dark terracotta roof tile, cracked plaster, and sparse short rebar. These are presentation-only skins placed close to existing colliders; they must never communicate new traversal geometry.\nScene/backdrop: perfectly flat uniform solid #FF00FF chroma-key background for local removal. The entire background must be exactly one color with no gradient, texture, noise, lighting variation, floor plane, reflection, shadow, or vignette. Do not use #FF00FF anywhere in the artwork.\nStyle/medium: strongly flat orthographic side-view 2D hand-painted game illustration matching the references; crisp dark ink contours, compact stylized material texture, restrained muted R1 rooftop colors; no 3D rendering and no perspective depth.\nComposition/framing: landscape canvas. Place all 5 to 7 clusters only in margin and edge zones: distribute disconnected fragments along the left edge, right edge, lower corners, and optionally one or two fragments entering from the upper edge because R1 is the upper region. Preserve a very broad completely empty central gameplay area. Each cluster must be clearly separated from every other cluster by visible magenta space. Generous safe padding around all non-edge-facing sides. Never join the clusters into one perimeter.\nMaterials/textures: water-darkened concrete, broken brick courses, terracotta tiles, peeled plaster, very sparse bent rebar; opaque surfaces, clean cutout-ready silhouettes.\nLighting/mood: neutral material shading only, subdued underwater ruin palette. No depicted light source, glow, bright rim light, cast shadow, ambient fog, caustics, particles, bubbles, rays, bloom, or atmospheric wash; Godot owns all effects.\nConstraints: no continuous floor, no continuous ceiling, no continuous wall, no tunnel, no platform, no enclosed chamber, no bridge across the center, no collider diagram, no collision marks, no arrows, no text, no labels, no HUD, no diver, no creature, no furniture, no recognizable landmark identity, no doors or windows suggesting access, no new topology. No cast shadow, contact shadow, white outline, bright halo, reflection, watermark, logo, frame, grid, panel dividers, or sheet layout. Keep edges crisp and separable for chroma removal. Output one unified landscape image only.",
+        "imagegen": {
+          "call_id": "exec-981d7d8f-fb3c-4625-b530-dddac01f3698",
+          "tool_output_path": "C:/Users/Piotr/.codex/generated_images/01a00c61-3e06-7422-9e0f-abda06de6c4b/exec-981d7d8f-fb3c-4625-b530-dddac01f3698.png"
+        },
+        "source": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/sources/r1_rooftops_supplement_v1_l04_near_terrain_skin_chroma_source.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGB RGB",
+          "bytes": 1714537,
+          "sha256": "AD6FD8395B5B422B6DF83E315947904A0A562556663B7D94E3A0AAAA6E7AD600"
+        },
+        "postprocess": {
+          "tool": "imagegen remove_chroma_key.py",
+          "auto_key": "border",
+          "detected_key": "technical magenta border",
+          "soft_matte": true,
+          "transparent_threshold": 12,
+          "opaque_threshold": 72,
+          "despill": true,
+          "edge_contract": 0
+        },
+        "output": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/layers/r1_rooftops_supplement_v1_l04_near_terrain_skin.png",
+          "width": 1672,
+          "height": 941,
+          "channels": "sRGBA",
+          "bytes": 1000585,
+          "sha256": "E84F039248F6D04C350C798E8DECB0261FB63C6603D98B722717F71B45A0DB48",
+          "alpha_min": 0.0,
+          "alpha_max": 1.0,
+          "alpha_mean": 0.213827,
+          "alpha_nonzero_coverage": 0.225214
+        },
+        "qa": "pass; six disconnected margin clusters, broad open center, no continuous floor or wall, no visible magenta"
+      }
+    ]
+  },
+  "derived_preview": {
+    "role": "review_only_v3_plus_supplement_composite_not_a_layer",
+    "composition_order": [
+      "V3 L00",
+      "V3 L01",
+      "supplement L01",
+      "V3 L02",
+      "supplement L02",
+      "V3 L03",
+      "supplement L03",
+      "V3 L04",
+      "supplement L04",
+      "V3 L05"
+    ],
+    "output": {
+      "stored_path": "res://assets/diving/world/layout_guides/style_references/r1_rooftops_l01_l04_supplement_v1/derived/r1_rooftops_v3_plus_supplement_v1_composite_preview.png",
+      "width": 1672,
+      "height": 941,
+      "channels": "sRGBA",
+      "bytes": 2172901,
+      "sha256": "4129680C6936BB8C11FE3593B5677B85123EB32932AE92E5DCC0980F0E3111AA"
+    }
+  },
+  "qa": {
+    "technical": "pass",
+    "artistic": "pending_user_review",
+    "source_count": 4,
+    "layer_count": 4,
+    "all_dimensions_equal": true,
+    "all_outputs_straight_rgba": true,
+    "all_alpha_ranges_include_transparent_and_opaque_pixels": true,
+    "visible_magenta_fraction_each_layer": 0.0,
+    "visual_review": "pass as a strongly flat 2D supplemental vocabulary set; integrated preview retains an open central corridor",
+    "godot_runtime_test": "not_run_reference_only_runtime_unwired"
+  }
+}

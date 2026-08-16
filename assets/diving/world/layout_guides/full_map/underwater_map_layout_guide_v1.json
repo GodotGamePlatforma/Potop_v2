@@ -4,8 +4,8 @@
     "contract": "presentation_only_derived_authoring_guide",
     "map_scene": {
       "path": "res://scenes/diving/UnderwaterMap.tscn",
-      "sha256": "3ad4dd3e60c7657007bab4f7e3c35e1eb8143fcdde50b25bddeb921705271adc",
-      "size_bytes": 199935
+      "sha256": "883a3803ab1c09903e04b14bcc4929dd429937759301d48852da197fc854f707",
+      "size_bytes": 199536
     },
     "map_script": {
       "path": "res://scripts/diving/UnderwaterMapScene.gd",
@@ -2713,7 +2713,7 @@
     "model": "not_applicable",
     "path": "res://tools/build_dive_map_layout_guide.py",
     "seed": "not_applicable",
-    "sha256": "e53742daa9da981535a8131933874aeb51d3bb7aebb8c056a038bd4302179646",
+    "sha256": "1b1f8eca72be9b08ea39f81e353d3ec2f2ccfc13199cf3fbddb0c03396203d66",
     "version": 2
   },
   "guide_size": [
@@ -2752,8 +2752,8 @@
     },
     {
       "bounds": [
-        968.898,
-        67.37492,
+        972.6097,
+        127.23657,
         1502.7806,
         313.52686
       ],
@@ -2767,8 +2767,8 @@
       "kind": "pharmacy",
       "name": "Apteka",
       "position": [
-        1720.2883,
-        224.13835
+        1724.0,
+        284.0
       ],
       "region_id": "R1",
       "role": "medicine",
@@ -2808,8 +2808,8 @@
     },
     {
       "bounds": [
-        7581.133,
-        553.6751,
+        7581.516,
+        565.2304,
         1660.968,
         333.5392
       ],
@@ -2823,8 +2823,8 @@
       "kind": "hotel",
       "name": "Zatopiony Hotel",
       "position": [
-        8411.617,
-        720.4447
+        8412.0,
+        732.0
       ],
       "region_id": "R1",
       "role": "survivor",
@@ -2864,8 +2864,8 @@
     },
     {
       "bounds": [
-        4931.49335,
-        677.7517,
+        4857.28935,
+        677.2304,
         1621.4213,
         333.5392
       ],
@@ -2879,8 +2879,8 @@
       "kind": "grocery",
       "name": "Sklep Spożywczy",
       "position": [
-        5742.204,
-        844.5213
+        5668.0,
+        844.0
       ],
       "region_id": "R1",
       "role": "tutorial_food",
@@ -2892,8 +2892,8 @@
     },
     {
       "bounds": [
-        9321.1947,
-        1108.68437,
+        9228.6097,
+        1291.90117,
         1502.7806,
         320.19766
       ],
@@ -2907,8 +2907,8 @@
       "kind": "hospital",
       "name": "Szpital",
       "position": [
-        10072.585,
-        1268.7832
+        9980.0,
+        1452.0
       ],
       "region_id": "R1",
       "role": "medicine",
@@ -2920,8 +2920,8 @@
     },
     {
       "bounds": [
-        8245.5197,
-        186.78195,
+        8242.1957,
+        214.5596,
         1779.6086,
         346.8808
       ],
@@ -2935,8 +2935,8 @@
       "kind": "ship",
       "name": "Statek w Ulicy",
       "position": [
-        9135.324,
-        360.22235
+        9132.0,
+        388.0
       ],
       "region_id": "R1",
       "role": "heavy_salvage",
@@ -3004,8 +3004,8 @@
     },
     {
       "bounds": [
-        553.6561,
-        1394.1939,
+        548.6097,
+        1405.2304,
         1502.7806,
         333.5392
       ],
@@ -3019,8 +3019,8 @@
       "kind": "greenhouse",
       "name": "Szklarnia",
       "position": [
-        1305.0464,
-        1560.9635
+        1300.0,
+        1572.0
       ],
       "region_id": "R2",
       "role": "landmark",
@@ -3032,8 +3032,8 @@
     },
     {
       "bounds": [
-        2511.22535,
-        1467.5726,
+        2513.28935,
+        1374.5596,
         1621.4213,
         346.8808
       ],
@@ -3047,8 +3047,8 @@
       "kind": "park",
       "name": "Park",
       "position": [
-        3321.936,
-        1641.013
+        3324.0,
+        1548.0
       ],
       "region_id": "R2",
       "role": "buoy",
@@ -3060,23 +3060,23 @@
     },
     {
       "bounds": [
-        5338.826,
-        1507.5973,
+        5341.516,
+        1710.5596,
         1660.968,
         346.8808
       ],
       "camera_cells": [
         [
           6,
-          3
+          4
         ]
       ],
       "id": "R2-03",
       "kind": "garden_center",
       "name": "Centrum Ogrodnicze",
       "position": [
-        6169.31,
-        1681.0377
+        6172.0,
+        1884.0
       ],
       "region_id": "R2",
       "role": "salvage",
@@ -3088,14 +3088,14 @@
     },
     {
       "bounds": [
-        7652.31625,
-        1474.2434,
+        7792.83625,
+        1205.2304,
         1542.3275,
         333.5392
       ],
       "camera_cells": [
         [
-          8,
+          9,
           3
         ]
       ],
@@ -3103,8 +3103,8 @@
       "kind": "seed_bank",
       "name": "Bank Nasion",
       "position": [
-        8423.48,
-        1641.013
+        8564.0,
+        1372.0
       ],
       "region_id": "R2",
       "role": "critical_food",
@@ -3116,8 +3116,8 @@
     },
     {
       "bounds": [
-        9095.7777,
-        1946.5348,
+        9092.6097,
+        2037.2304,
         1502.7806,
         333.5392
       ],
@@ -3131,8 +3131,8 @@
       "kind": "suburbs",
       "name": "Przedmieścia",
       "position": [
-        9847.168,
-        2113.3044
+        9844.0,
+        2204.0
       ],
       "region_id": "R2",
       "role": "survivor",
@@ -3144,8 +3144,8 @@
     },
     {
       "bounds": [
-        1198.28935,
-        2209.5596,
+        1241.28935,
+        1830.5596,
         1621.4213,
         346.8808
       ],
@@ -3159,8 +3159,8 @@
       "kind": "tangled",
       "name": "Splątane Korytarze",
       "position": [
-        2009.0,
-        2383.0
+        2052.0,
+        2004.0
       ],
       "region_id": "R2",
       "role": "hazard",
@@ -3200,29 +3200,29 @@
     },
     {
       "bounds": [
-        3191.4315,
-        2165.336625,
+        3234.1957,
+        2092.0,
         1779.6086,
-        360.22235
+        624.0
       ],
       "camera_cells": [
         [
           4,
-          4
+          5
         ]
       ],
       "id": "R3-02",
       "kind": "shipyard",
       "name": "Stara Stocznia",
       "position": [
-        4081.2358,
-        2345.4478
+        4124.0,
+        2404.0
       ],
       "region_id": "R3",
       "role": "heavy_salvage",
       "size": [
         1779.6086,
-        360.22235
+        624.0
       ],
       "source_node_path": "Landmarks/R3_02_StaraStocznia"
     },
@@ -3312,8 +3312,8 @@
     },
     {
       "bounds": [
-        2266.0351,
-        3133.934525,
+        2266.1957,
+        2991.888825,
         1779.6086,
         360.22235
       ],
@@ -3327,8 +3327,8 @@
       "kind": "scrapyard",
       "name": "Złomowisko",
       "position": [
-        3155.8394,
-        3314.0457
+        3156.0,
+        3172.0
       ],
       "region_id": "R3",
       "role": "heavy_salvage",
@@ -3340,10 +3340,10 @@
     },
     {
       "bounds": [
-        1127.0855,
-        4202.594425,
+        1090.1957,
+        4092.0,
         1779.6086,
-        360.22235
+        576.0
       ],
       "camera_cells": [
         [
@@ -3355,14 +3355,14 @@
       "kind": "metro",
       "name": "Dworzec Metra",
       "position": [
-        2016.8898,
-        4382.7056
+        1980.0,
+        4380.0
       ],
       "region_id": "R4",
       "role": "buoy",
       "size": [
         1779.6086,
-        360.22235
+        576.0
       ],
       "source_node_path": "Landmarks/R4_01_DworzecMetra"
     },
@@ -3424,8 +3424,8 @@
     },
     {
       "bounds": [
-        9621.75025,
-        4448.079,
+        9624.83625,
+        4477.2304,
         1542.3275,
         333.5392
       ],
@@ -3439,8 +3439,8 @@
       "kind": "sealed_gate",
       "name": "Zamknięte Grodzie",
       "position": [
-        10392.914,
-        4614.8486
+        10396.0,
+        4644.0
       ],
       "region_id": "R4",
       "role": "story_gate",
@@ -3452,8 +3452,8 @@
     },
     {
       "bounds": [
-        4994.76835,
-        4913.69955,
+        4990.87535,
+        5066.54725,
         1898.2493,
         386.9055
       ],
@@ -3467,8 +3467,8 @@
       "kind": "city_center",
       "name": "Centrum Miasta",
       "position": [
-        5943.893,
-        5107.1523
+        5940.0,
+        5260.0
       ],
       "region_id": "R4",
       "role": "deep_bell",
@@ -3531,9 +3531,9 @@
   "output": {
     "format": "RGBA PNG",
     "path": "res://assets/diving/world/layout_guides/full_map/underwater_map_layout_guide_v1.png",
-    "pixel_sha256": "7ef01d470cb61163625c9757c140c5135ca9f4c8b1f7ce2f55c248d557d77e01",
-    "sha256": "23879bc81001ca9a71d799a0b72f81810c4d88797722e1314d60d3dedfe5079c",
-    "size_bytes": 112180
+    "pixel_sha256": "faaf170470029931c2d76be24ba1d6ba66b19a34be993aae0039da108b6e0d3f",
+    "sha256": "53442cb22aad7d407ebe30b50b19aee3af232367795fb1f31d9de4da5a23f999",
+    "size_bytes": 112700
   },
   "pixels_per_world_unit": 0.375,
   "region_count": 4,

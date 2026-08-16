@@ -1,0 +1,503 @@
+{
+  "schema_version": 2,
+  "asset_id": "biome_layered_style_reference_set_v2",
+  "created_on": "2026-08-16",
+  "role": "presentation_only_layered_parallax_reference_set",
+  "status": {
+    "technical": "present_valid",
+    "artistic": "pending_user_review",
+    "production_master": false,
+    "runtime_asset": false
+  },
+  "rights_confirmation": {
+    "status": "user_confirmed",
+    "confirmed_on": "2026-08-16",
+    "scope": "repository inclusion and publication of the seven v2 input assets and their derivatives",
+    "license_or_rights_identifier": "not_specified_by_user",
+    "evidence": "explicit_user_confirmation_in_codex_task"
+  },
+  "authority": {
+    "static_world": "res://scenes/diving/UnderwaterMap.tscn",
+    "macro_terrain": "scene Polygon2D nodes",
+    "these_images": "reference_only",
+    "forbidden_authority": [
+      "topology",
+      "collision",
+      "SDF",
+      "routes",
+      "stable IDs",
+      "landmark placement",
+      "gameplay objects",
+      "persistence"
+    ]
+  },
+  "composition_contract": {
+    "projection": "strict orthographic 2D side elevation",
+    "flattened_reference_count_per_biome": 1,
+    "intended_rebuild": "four independent Godot parallax layers",
+    "layers": [
+      {
+        "order": 1,
+        "id": "far_background",
+        "motion_owner": "Godot",
+        "relative_motion": "slowest",
+        "visual_role": "large sparse low-contrast flat silhouettes; no topology"
+      },
+      {
+        "order": 2,
+        "id": "floating_props",
+        "motion_owner": "Godot",
+        "relative_motion": "independent",
+        "visual_role": "small isolated decorative debris; never loot, route or interaction"
+      },
+      {
+        "order": 3,
+        "id": "collider_sdf_adjacent_material_skin",
+        "motion_owner": "Godot",
+        "relative_motion": "terrain-adjacent",
+        "visual_role": "high-detail material reference clipped later against canonical scene geometry; never collision authority"
+      },
+      {
+        "order": 4,
+        "id": "foreground_overlay",
+        "motion_owner": "Godot",
+        "relative_motion": "fastest",
+        "visual_role": "dark cropped edge occluders; no continuous frame or central obstruction"
+      }
+    ],
+    "geography": {
+      "R1": "upper map region; disconnected horizontal rooftop/parapet shelf motifs are allowed as decorative edge rhythm",
+      "R2": "descending depth; bottomless central and lower open water; no ground",
+      "R3": "descending industrial abyss; bottomless central and lower open water; no ground",
+      "R4": "deepest descending abyss; bottomless central and lower open water; no ground"
+    },
+    "godot_owned_runtime_effects": [
+      "lighting",
+      "gameplay light",
+      "global fog",
+      "caustics",
+      "refraction",
+      "water motion",
+      "particles",
+      "bubbles",
+      "currents",
+      "color processing",
+      "quality profile behavior",
+      "reduced_motion behavior"
+    ],
+    "baked_effects_forbidden": [
+      "sunlight",
+      "lamps",
+      "emissive pixels",
+      "bloom",
+      "light beams",
+      "god rays",
+      "caustics",
+      "fog",
+      "haze",
+      "volumetrics",
+      "suspended particles",
+      "marine snow",
+      "bubbles",
+      "refraction",
+      "motion streaks",
+      "vignette",
+      "color grading"
+    ],
+    "content_forbidden": [
+      "HUD",
+      "UI",
+      "text",
+      "numbers",
+      "logos",
+      "watermarks",
+      "divers",
+      "people",
+      "creatures",
+      "objectives",
+      "interactions",
+      "collectibles",
+      "gameplay devices"
+    ]
+  },
+  "inputs": [
+    {
+      "id": "material_quality_user_ref",
+      "source_name": "codex-clipboard-da93ecd6-0ed1-40b4-9211-7bbf9669138f.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "material fidelity and controlled painterly realism only; lighting, composition, objects, diver and HUD excluded",
+      "width": 1672,
+      "height": 941,
+      "pixel_format": "Format24bppRgb",
+      "bytes": 2991067,
+      "sha256": "ED95086A8C0B7120EDD6FC752B51FA975E3681628B93AED5286294CD26C24740",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+    {
+      "id": "side_layout_user_ref_01",
+      "source_name": "codex-clipboard-6e9c5411-4fd5-48fb-9cfa-2e22cada044a.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "2D side-scroll spatial grammar only; HUD, diver, lamps, creatures, exact geometry and cel-shading excluded",
+      "width": 1907,
+      "height": 1078,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 2285156,
+      "sha256": "8E4CA73AE02651DC4E267D9528E6372C86BC472E6FF4B0EC80A284470375C26E",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+    {
+      "id": "side_layout_user_ref_02",
+      "source_name": "codex-clipboard-50c4000f-ab8b-47a2-a016-2d6619b3059d.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "2D side-scroll spatial grammar only; HUD, diver, lamps, creatures, exact geometry and cel-shading excluded",
+      "width": 1919,
+      "height": 1079,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 2458294,
+      "sha256": "1D2640D607E398867AC28323954221567074C763F5E26C6A39D0D1601023AEB0",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+    {
+      "id": "side_layout_user_ref_03",
+      "source_name": "codex-clipboard-32751c06-d85e-464a-87c5-d40d85c62c69.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "2D side-scroll spatial grammar only; HUD, diver, lamps, creatures, exact geometry and cel-shading excluded",
+      "width": 1919,
+      "height": 1079,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 2341429,
+      "sha256": "0B8243B2920CC56EB87D87C12D3D1BE4EB4C8B003B57D68790D4CDB71E289CE9",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+    {
+      "id": "side_layout_user_ref_04",
+      "source_name": "codex-clipboard-a3ef56bd-3291-4582-8f6d-a71f4586f58a.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "2D side-scroll spatial grammar only; HUD, diver, lamps, creatures, exact geometry and cel-shading excluded",
+      "width": 1919,
+      "height": 1056,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 2288321,
+      "sha256": "879C9D3C8290C4879C3C7D5CC0908184C9E38A6584BD5386D510551C2B099790",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+    {
+      "id": "side_layout_user_ref_05",
+      "source_name": "codex-clipboard-2f84bc08-55d7-4921-ba60-c1f23bcb0b85.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "2D side-scroll spatial grammar only; HUD, diver, lamps, creatures, exact geometry and cel-shading excluded",
+      "width": 1919,
+      "height": 1067,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 2028495,
+      "sha256": "E18A819A29682E1B6213E27326FFF85CA515C114893E96424F0984AAC1ABCCDA",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+    {
+      "id": "side_layout_user_ref_06",
+      "source_name": "codex-clipboard-4382786d-9cad-41f8-a245-211bdf8eda10.png",
+      "stored_path": null,
+      "availability": "conversation_attachment_only_not_stored_in_repo",
+      "role": "2D side-scroll spatial grammar only; HUD, diver, lamps, creatures, exact geometry and cel-shading excluded",
+      "width": 1919,
+      "height": 1079,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 2030284,
+      "sha256": "664E32AA35596961E078F6D447E54C2674EDB61529F3E193259055200BD711AF",
+      "rights": "user_confirmed_for_repository_inclusion_and_publication"
+    },
+  {
+    "id": "full_map_layout_guide_v1",
+    "source_name": "underwater_map_layout_guide_v1.png",
+    "stored_path": null,
+    "historical_project_path": "res://assets/diving/world/layout_guides/full_map/underwater_map_layout_guide_v1.png",
+    "availability": "versioned_project_reference_at_git_commit",
+    "git_commit": "bb04ebb86677b94b3f7d9246930e8062d941131e",
+    "git_lfs_oid_sha256": "23879BC81001CA9A71D799A0B72F81810C4D88797722E1314D60D3DEDFE5079C",
+    "role": "map band and scale context only; grid, labels, terrain topology and landmark layout excluded from generated art",
+      "width": 4320,
+      "height": 2430,
+      "pixel_format": "Format32bppArgb",
+      "bytes": 112180,
+      "sha256": "23879BC81001CA9A71D799A0B72F81810C4D88797722E1314D60D3DEDFE5079C",
+      "rights": "project_asset"
+    }
+  ],
+  "profile_context": [
+    {
+      "biome": "R1",
+      "path": "res://data/diving_visuals/r1_rooftops.tres",
+      "sha256": "0B2C5E0D6D4204CD6E65428975EE8B177A847CCB0108089B0696ADBC4C5617B5"
+    },
+    {
+      "biome": "R2",
+      "path": "res://data/diving_visuals/r2_green_estates.tres",
+      "sha256": "D80716D30E2CEB0E6AAF299CAB0133F5E8C2D1BC8E454FB6BC4C120F0364BF36"
+    },
+    {
+      "biome": "R3",
+      "path": "res://data/diving_visuals/r3_rust_belt.tres",
+      "sha256": "787BDB9CD5F2C7A78DA2715AA7B7B305F43FB96318AAD613F7002F397B055D49"
+    },
+    {
+      "biome": "R4",
+      "path": "res://data/diving_visuals/r4_black_heart.tres",
+      "sha256": "7AD001F3EFA15CF1B7333D10BE4F780FA0D4EA5635656F25A592BCAC6F630DB3"
+    }
+  ],
+  "generation": {
+    "tool": "OpenAI built-in ImageGen",
+    "model": "gpt-image",
+    "model_version": "2.0",
+    "model_version_source": "embedded C2PA software-agent metadata",
+    "seed": "unavailable_not_exposed",
+    "sampler": "unavailable_not_exposed",
+    "quality_parameter": "unavailable_not_exposed",
+    "explicit_size_parameter": "unavailable_not_exposed",
+    "referenced_image_limit_per_call": 5,
+    "postprocessing": "none",
+    "operations": [
+      {
+        "id": "r1_stage_1",
+        "biome": "R1",
+        "order": 1,
+        "use_case": "stylized-concept",
+        "referenced_image_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03"
+        ],
+        "inspected_context_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "prompt": "Use case: stylized-concept\nAsset type: 16:9 game environment layered composite reference for Godot — intermediate composition pass\nPrimary request: Create ONE entirely new wide flattened composite reference for R1 \"Rooftops of the Dead City\", the upper region of a continuous underwater side-view map. The previous R1 draft is superseded. This intermediate image will be refined with additional layout references before project delivery. It is visual reference only and must never define topology, collision, a route, landmark placement, or gameplay.\nInput images and roles:\n- Image 1: material-quality reference ONLY. Borrow premium painterly-realistic surface fidelity, credible cracked concrete, corroded metal, masonry wear, aggregate, tile, and dense hand-authored material texture. Do not copy its diver, HUD, objects, layout, cyan illumination, glow, or atmosphere.\n- Image 2: macro layout-guide context ONLY. Use only the fact that R1 is the upper map band and may have a loose broken rhythm of horizontal rooftops or shelf motifs. Do not reproduce its grid, labels, text, boxes, landmark arrangement, terrain silhouettes, or topology.\n- Images 3 through 5: flat 2D side-scroll composition and layering references ONLY. Learn their dominant open-water negative space, parallel cutout-like planes, isolated floating props, material attached to cropped terrain edges, and darkest foreground occlusion entering from image edges. Do not copy their HUD, text, numbers, characters, divers, lamps, lighting, creatures, collectibles, exact terrain shapes, exact objects, palette, outlines, or cel-shaded/cartoon rendering.\nScene/backdrop: Submerged uppermost remains of a dead coastal city, represented as sparse front-facing cutout layers: cropped roof parapets, upper-floor facade fragments, broken cornices, thin tiled roof edges, restrained cable loops and rebar. Everything is inert, non-interactive, and disconnected. Cool relatively clear R1 palette: one calm field of dark desaturated blue-green water, slate concrete, oxidized steel, muted mineral grey, restrained matte algae. Preserve readable midtones without highlights.\nStyle/medium: premium painterly-realistic material rendering placed onto extremely flat graphic 2D planes; orthographic side-scrolling game environment composite; realistic textures but NOT photorealistic cinematic depth and NOT the cel-shaded style of Images 3-5. Matte neutral base plate with no baked atmosphere.\nComposition/framing: wide 16:9. EXTREMELY FLAT strict orthographic side elevation, more like layered 2D cutouts than a perspective scene. Every architectural face is front-on or perfect profile. Parallel verticals and horizontals. Zero vanishing point, zero perspective convergence, zero horizon line, zero receding ground or ceiling plane, zero three-quarter view, zero camera tilt, zero lens distortion, zero depth of field. The open-water negative space is dominant: keep approximately 55-65 percent of the full frame calm, empty, and low-detail, including a broad uncluttered center. It is visual breathing space only, never a tunnel, doorway, shortcut, platform, corridor boundary, or playable route. R1 may have broad horizontal rooftop/shelf motifs, but they must be broken, cropped by the canvas edges, discontinuous, clearly decorative, and non-navigable.\nFour clearly separable composited visual planes integrated into ONE image, with NO labels, borders, panels, layer diagrams, or text:\n1. Far slow-parallax backdrop: a few very large, extremely simplified, low-contrast front-facing silhouettes of distant upper facades, roof tanks without lights, parapets, chimneys, and collapsed rooflines. Flat silhouette blocks only, no perspective, no blur, no fog, no texture noise, broad quiet masses.\n2. Isolated floating-prop plane: only 4-7 small, widely separated, inert fragments floating in the open field: a blank broken awning frame, a plain detached railing section, a few masonry or roof-tile fragments, one loose cable loop. Each reads as an independent decorative prop, never a pickup, container, clue, hazard, creature, lamp, or focal object.\n3. Collider/SDF-adjacent material plane: thin premium material skins attached only to disconnected, cropped upper and lower boundary fragments. Show cracked concrete, roof tile, mineral aggregate, corroded reinforcement, chipped plaster, and sparse matte algae. These skins must look like decorative surface treatment on an assumed external edge, not an authored landmass; do not connect them into a route, room, tunnel, or closed passage.\n4. Dark edge-only foreground overlay: very dark, low-detail occluding shapes ONLY in sparse outer corners and along short extreme-edge sections. Use cropped rebar, cable tangles, broken stone, and parapet fragments. Never form a continuous frame and never enter the central open-water field. This plane must be clearly darker and flatter than plane 3.\nLighting/mood: no depicted light source. Uniform neutral diffuse material visibility and even exposure, restrained local ambient occlusion/contact shading only. No cast-light pattern, no directional light, no highlights, no rim light, no bright focal point, no dramatic shadow cone.\nOutput intent: one clean flattened 24-bit RGB composite reference with no alpha and no baked global atmosphere or post-processing, suitable as a visual layering target before Godot independently adds water, lighting, motion, particles, refraction, caustics, fog, and color processing.\nConstraints: background/reference art only; four planes must remain visibly distinct through flat value grouping, scale, edge attachment, and overlap rather than atmospheric perspective; dominant central negative space; no topology authority; no text or character.\nAvoid: HUD, UI, icons, health bars, inventory, portraits, text, letters, numbers, labels, signage, logos, watermark, diver, person, body, creature, fish, monster, tentacle, vehicle, weapon, loot, chest, crate, collectible, medicine, terminal, switch, control panel, gauge, valve handle, active door, ladder, marker, objective, interactable device, gameplay hazard cue, lamp, streetlight, flashlight, headlight, searchlight, lit window, indicator light, emissive material, glowing cable, bioluminescence, bloom, flare, bright hotspot, light beam, god rays, sun rays, sparks, electricity, fire, caustics, fog, haze, volumetrics, suspended particles, marine snow, bubbles, current streaks, refraction, chromatic aberration, vignette, film grain, color grading, post-processing, horizon, perspective, vanishing point, diagonal depth construction, three-quarter architecture, dramatic central landmark, cel shading, cartoon outlines.",
+        "result": {
+          "stored_path": null,
+          "availability": "intermediate_local_cache_not_versioned",
+          "width": 1672,
+          "height": 941,
+          "sha256": "D9418FB9F0702F23FF101B3E0A3787C286053E6F7CDDCCFEA605327E11F35FB0"
+        }
+      },
+      {
+        "id": "r1_stage_2",
+        "biome": "R1",
+        "order": 2,
+        "use_case": "style-transfer",
+        "referenced_image_ids": [
+          "r1_stage_1_result",
+          "material_quality_user_ref",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "inspected_context_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "prompt": "Use case: style-transfer\nAsset type: final 16:9 game environment layered composite reference for Godot\nInput images and roles:\n- Image 1: edit target and intermediate R1 composition. Refine this into the final image; preserve its wide canvas, cool R1 palette, premium realistic cracked-concrete/roof-tile/corroded-metal material fidelity, strict side elevation, distant silhouette language, and calm open center.\n- Image 2: material-quality reference ONLY. Use its high-end painterly-realistic surface detail and credible wear; do not copy its composition, diver, HUD, objects, lighting, glow, or atmosphere.\n- Images 3 through 5: additional flat 2D side-scroll layout references ONLY. Learn their dominant empty-water field, strong parallel cutout planes, sparse isolated floating props, terrain/material entering from cropped edges, and darkest foreground occlusion confined to edges. Do not copy their HUD, text, numbers, characters, divers, lamps, illumination, creatures, collectibles, exact objects, exact terrain shapes, palette, outlines, or cel-shaded/cartoon rendering.\nPrimary request: Rebuild Image 1 into the final R1 \"Rooftops of the Dead City\" flattened layered reference. Make the composition EVEN FLATTER, more orthographic, more side-scroll readable, and less like a complete architectural scene. The image is reference art only and must never define topology, collision, routes, landmark placement, or gameplay.\nTargeted composition changes:\n- Increase the dominant calm, low-detail open-water negative space to approximately 60 percent of the frame.\n- Remove the continuous lower rooftop/platform impression. Break all detailed upper and lower boundary material into disconnected, cropped fragments separated by open water; no continuous floor, ceiling, route, room, tunnel, ledge chain, or passage.\n- Keep R1 as the upper-city biome with a restrained broken rhythm of horizontal roof/parapet shelf motifs entering from outer edges.\n- Retain only 4-7 very small, widely separated floating decorative fragments; none may resemble loot, a clue, a lamp, a creature, a container, or an objective.\n- Strengthen four visibly distinct flat planes without labels or panels:\n  1. Far slow-parallax: very large, very sparse, low-contrast, front-facing city/roof silhouettes; broad flat masses only.\n  2. Floating props: small isolated blank railing, awning, masonry, tile, and cable fragments.\n  3. Collider/SDF-adjacent material skin: premium cracked concrete, roof tile, aggregate, chipped plaster, corroded rebar, and sparse matte algae attached only to disconnected cropped boundary fragments; decorative skin, never topology.\n  4. Foreground overlay: near-black, low-detail occluding rock/rebar/cable/parapet fragments ONLY at a few extreme corners and short edge sections; clearly darker and flatter than plane 3; never intrude into the central field and never form a continuous frame.\nView and geometry: EXTREMELY FLAT strict orthographic 2D side elevation, layered cutout construction. All architecture front-on or perfect profile. Parallel verticals and horizontals. Zero horizon, zero vanishing point, zero perspective convergence, zero receding plane, zero three-quarter surface, zero camera tilt, zero lens distortion, zero depth of field.\nLighting and finish: no depicted light source. Uniform neutral diffuse material visibility, even exposure, restrained local ambient occlusion/contact shading only. No directional lighting, highlights, rim light, bright focal point, or dramatic shadows. Clean flattened 24-bit RGB base composite with no alpha and no baked atmosphere or post-processing; Godot will add water, lighting, motion, particles, refraction, caustics, fog, and color processing.\nConstraints: preserve premium realistic material density while keeping the planes graphically flat; no exact cel shading or cartoon outlines; no topology authority; no text, character, or gameplay semantics.\nAvoid: HUD, UI, icons, health bars, inventory, portraits, text, letters, numbers, labels, signage, logos, watermark, diver, person, body, creature, fish, monster, tentacle, vehicle, weapon, loot, chest, crate, collectible, medicine, terminal, switch, control panel, gauge, valve handle, active door, ladder, marker, objective, interactable device, gameplay hazard cue, lamp, streetlight, flashlight, headlight, searchlight, lit window, indicator light, emissive material, glowing cable, bioluminescence, bloom, flare, bright hotspot, light beam, god rays, sun rays, sparks, electricity, fire, caustics, fog, haze, volumetrics, suspended particles, marine snow, bubbles, current streaks, refraction, chromatic aberration, vignette, film grain, color grading, post-processing, perspective, horizon, vanishing point, diagonal depth construction, three-quarter architecture, dramatic central landmark, cel shading, cartoon outlines.",
+        "result": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r1_rooftops_layered_reference_v2.png",
+          "width": 1672,
+          "height": 941,
+          "sha256": "90ECC56A1C14A33D3BA0E1705D6A5983FD5DDC15E2A3ECA3B3742CAAC4D1476D"
+        }
+      },
+      {
+        "id": "r2_final",
+        "biome": "R2",
+        "order": 1,
+        "use_case": "stylized-concept",
+        "referenced_image_ids": [],
+        "referenced_image_note": "ImageGen call was text-only; the prompt was synthesized after direct inspection of every context image.",
+        "inspected_context_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "prompt": "Use case: stylized-concept\nAsset type: ONE flattened game-environment layer reference for R2 “Zielone Osiedla”, derived from the inspected realistic material reference, full-map guide, and six inspected 2D side-scroll layout references.\nPrimary request: generate a NEW wide 16:9 premium 2D environment composite. Use the references only for their side-scrolling spatial grammar: a mostly empty open underwater field, terrain and overlays entering only from frame edges, a clearly bottomless vertical drop, and a few isolated floating props. Do NOT copy their diver, HUD, lamps, creatures, cel-shading, exact geometry or gameplay layout.\n\nView and geometry: extremely strict ORTHOGRAPHIC SIDE ELEVATION, like a side-scrolling 2D game layer stack. No camera perspective, no vanishing point, no horizon, no depth-floor illusion. At least 70% of the canvas must remain unobstructed open water/vertical void. The lower-center open void must visibly continue downward beyond the image.\n\nR2 subject language: drowned residential garden estates—sparse greenhouse ribs, broken window frames, balcony planters, fragments of communal garden infrastructure, thin vertical plant strands. Premium tactile controlled painterly realism: weathered concrete aggregate, dull oxidized metal, cloudy glass, olive organic deposits, restrained algae. Material quality may be realistic, but composition stays flat 2D and unlit.\n\nShow four unmistakable visual plans in one flattened composite:\n1. FAR BACKGROUND / slow parallax: only a few very faint, large, flat orthographic silhouettes of distant greenhouse frames and drowned estate fragments, widely separated, low detail and low contrast; they must not fill the open water or create a horizon.\n2. ISOLATED FLOATING PROPS: exactly a small handful of detached non-interactive props distributed through the open void at different heights—a single chair, two empty window frames, one planter, one short broken railing fragment. Small relative to the frame; none touching terrain; none forming stepping stones or a route.\n3. COLLIDER/SDF MATERIAL SKIN: high-detail rock/concrete/algae material ONLY on narrow vertical side faces and undersides of a few irregular overhangs entering from the extreme left and right edges. Keep these edge masses discontinuous. No detailed material in the center and no bottom terrain.\n4. FOREGROUND OVERLAY: darkest near-black edge-only silhouettes, cropped fragments at extreme left/right and sparse upper corners; no complete frame, no mass across the bottom edge, no central occlusion.\n\nAbsolute spatial prohibitions: NO BOTTOM, NO FLOOR, NO SEABED, NO GROUND PLANE, NO ROAD, NO PATH, NO PLATFORM, NO TERRACE, NO HORIZONTAL SHELF SPANNING INTO THE SCENE, NO CAVE FLOOR, NO HORIZON. Do not place architecture along the bottom. The central and lower middle must stay empty, calm and vertically open.\n\nPalette: R2 muted olive-green and deep teal. Open water flat field around #13342B / #091B17; material rock/concrete around #5C6954, shadow #141C17, restrained edge #617559; distant olive #1F4A30; sparse accent #78994A. Readable midtones, organic but not a dense reef.\n\nLighting/mood: FLAT UNLIT MATERIAL REFERENCE. Uniform neutral diffuse visibility with no identifiable light direction. No cast shadows, no bright edge lighting, no glow. Do not simulate runtime lighting or underwater postprocess.\n\nConstraints: one seamless composite; no labels, captions, panel divisions, text, borders, logos or watermark. No diver, person, HUD, objective, UI, pickups, interactable markers, enemies or gameplay devices. Decorative props only. No implied traversable gaps, ladders, entrances or routes.\n\nAvoid completely: sunlight, lamps, emissive pixels, bloom, flashlight cone, god rays, light shafts, caustics, fog, haze, suspended particles, marine snow, bubbles, refraction, motion blur, color grading, vignette, depth gradient; dense coral reef, threatening fauna, giant creatures, electrical arcs, toxic clouds, cables suggesting a route; comic outlines or cel shading.",
+        "result": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r2_green_estates_layered_reference_v2.png",
+          "width": 1672,
+          "height": 941,
+          "sha256": "4D7B92135A485F6F9001D6638BD839439F636733D3F46E306FD392F40BA6BC78"
+        }
+      },
+      {
+        "id": "r3_stage_1",
+        "biome": "R3",
+        "order": 1,
+        "use_case": "stylized-concept",
+        "referenced_image_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03"
+        ],
+        "inspected_context_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "prompt": "Use case: stylized-concept\nAsset type: presentation-only game environment authoring reference; intermediate base for one final flattened 16:9 composite, never a gameplay screenshot, runtime background plate, or topology authority.\nPrimary request: Create a new wide visual reference base for underwater biome R3 \"Rdzawy Pas\" (Rust Belt): a corroded industrial abyss that continues downward without end. The view must be an extremely orthographic 2D side-scroller elevation: straight-on side view, parallel projection, flat layered staging, no camera perspective, no vanishing point, no horizon, no cinematic angle, no top-down view.\nInput-image roles:\n- Image 1 is ONLY the quality bar for realistic corroded metal, stained concrete, rock, surface wear and premium material detail. Do not copy its composition, diver, HUD, cables, lamps, lighting, particles or gameplay objects.\n- Image 2 is ONLY macro-layout context for the long map and R3's vertical open silhouette language. Do not reproduce its grid, labels, boxes, text, landmarks or exact topology.\n- Images 3 through 5 are ONLY layout/layer references for a 2D side-scroller: very large open water space, edge-entering terrain, isolated floating props, distant silhouettes and near-edge overlays. Do not copy their art style, HUD, diver, lamps, lights, creatures, plants, text, icons, markers, particles or exact geometry.\nSingle flattened composite with exactly four visually distinct depth planes, communicated only through scale, overlap and value; no labels, panels, or layer diagram:\n1. Far background / slow parallax: large low-frequency silhouettes of remote corroded industrial ribs, broken warehouse frames and vertical structural remains, clearly far behind the open play space; broad sparse forms, no unique landmark, no atmospheric fog.\n2. Isolated drifting props: only a few clearly detached noninteractive objects suspended in open water—a worn chair, one or two metal grates, and small loose rusted fragments—with generous empty space. They must not connect into a bridge, platform, route, floor, wall, barrier or interaction.\n3. Collider/SDF material skin: premium realistic oxidized iron, corroded steel, stained concrete and rock material appears ONLY on vertical walls entering from the extreme left and extreme right edges, plus short side overhangs attached to those walls. No material band may cross the image center, span underneath it, or form a bottom.\n4. Foreground overlay: near-black cropped silhouettes confined tightly to the extreme left and right edges and tiny upper side corners, clearly nearest to camera. Never cover the central vertical channel and never create a bottom border, lower frame, floor or route.\nCritical spatial invariant: R3 is a deep vertical drop continuing beyond the bottom of the image. ABSOLUTELY NO seabed, ground, road, walkway, horizontal slab, floor, platform, terrain base, bottom ledge, lower boundary or bottom silhouette anywhere. The middle and entire lower central area must remain a broad uninterrupted bottomless vertical open-water void. Side walls may descend out of frame only within the extreme side margins.\nStyle/medium: premium realistic 2D game-environment concept art, crisp readable material detail from Image 1, flattened orthographic side-view staging from Images 3–5. Restrained natural base colors only: dark neutral steel and concrete, brown-orange rust, muted mineral staining. Use material/value contrast—not lighting or atmosphere—to distinguish planes.\nLighting/mood: uniform neutral diffuse visibility solely for material readability. No visible or implied authored light event, directional illumination, localized illumination, or cast-light pools.\nHard exclusions: no unique R3-04 power-plant landmark; no diver; no human; no character; no creature; no fish; no monster; no vegetation; no HUD; no UI; no objective; no text; no numbers; no labels; no symbols; no icons; no watermark; no interaction cue; no collectible; no gameplay device.\nAvoid completely: any lamp, bulb, spotlight, headlamp, emissive element, glowing window, glow, bloom, light pool, light shaft, god ray, sunbeam, caustics, volumetric fog, depth fog, haze, refraction, bubbles, suspended particles, current streaks, cinematic color grading, vignette, depth-of-field, perspective, horizon, seabed, floor, path, platform, horizontal foundation, bottom framing, and all UI or gameplay content visible in the references.\nOutput intent: a clean wide 16:9 base composite whose final iteration will teach the four-layer 2D layout while leaving runtime lighting and atmosphere to Godot.",
+        "result": {
+          "stored_path": null,
+          "availability": "intermediate_local_cache_not_versioned",
+          "width": 1672,
+          "height": 940,
+          "sha256": "2C07CF86378EE50833F368830B0C4AE8EC06B1B7794C7F8F7681B557B96EEC44"
+        }
+      },
+      {
+        "id": "r3_stage_2",
+        "biome": "R3",
+        "order": 2,
+        "use_case": "precise-object-edit",
+        "referenced_image_ids": [
+          "r3_stage_1_result",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06",
+          "material_quality_user_ref"
+        ],
+        "inspected_context_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "prompt": "Use case: precise-object-edit\nAsset type: final presentation-only R3 game-environment authoring reference; one flattened 16:9 raster composite, not a gameplay screenshot, runtime background plate, or topology authority.\nInput-image roles:\n- Image 1 is the edit target and current R3 base. Preserve its wide 16:9 framing, strict orthographic side-view, central open vertical abyss, left/right material walls, detached props, far silhouettes and black edge-only foreground treatment.\n- Images 2 through 4 are ONLY additional 2D side-scroller layout references. Use only their sense of broad empty open water, terrain entering from edges, and occasional isolated floating debris. Do not copy their HUD, diver, lamps, lights, creatures, plants, particles, text, icons, markers, colors, art style or exact geometry.\n- Image 5 is ONLY the quality bar for realistic corroded metal, stained concrete, rock, surface wear and premium material detail. Do not copy its composition, diver, HUD, cables, lamps, lighting, particles or gameplay objects.\nPrimary request: Refine Image 1 into the final wide visual reference for underwater biome R3 \"Rdzawy Pas\" (Rust Belt), a corroded industrial abyss continuing downward without end. Keep the extremely orthographic 2D side-scroller elevation: straight-on side view, parallel projection, flat layered staging, no perspective, vanishing point, horizon, cinematic angle or top-down view.\nPreserve and clarify exactly four composited depth planes, with no labels or panels:\n1. Far background / slow parallax: sparse large low-frequency silhouettes of remote corroded industrial ribs, broken warehouse frames and vertical structural remains; broad and clearly behind; no unique landmark and no fog.\n2. Isolated drifting props: only a few detached noninteractive objects suspended in open water—a worn chair, one or two metal grates, and small loose rusted fragments—with generous separation. Never connect them into a route, bridge, platform, wall or interaction.\n3. Collider/SDF material skin: detailed oxidized iron, corroded steel, stained concrete and rock ONLY on vertical side walls entering from the extreme left and right and on short overhangs attached to those walls. Never place terrain or material beneath the open center.\n4. Foreground overlay: near-black cropped silhouettes only at the extreme left/right edges and tiny upper side corners. Never cover the central channel and never create a bottom border.\nCritical invariant to preserve exactly: ABSOLUTELY NO seabed, ground, road, walkway, horizontal slab, floor, platform, terrain base, bottom ledge, lower boundary or bottom silhouette. The middle and entire lower central area must remain broad, uninterrupted, bottomless open water visibly continuing out through the bottom edge. Side walls may descend out of frame only along extreme side margins.\nStyle/medium: premium realistic 2D game-environment concept art with crisp material detail from Image 5. Restrained natural base colors: dark neutral steel/concrete, brown-orange rust, muted mineral staining. Separate planes with scale, overlap and value—not lighting or atmosphere.\nLighting/mood: uniform neutral diffuse visibility solely for material readability. No authored light event, directional or localized illumination, or cast-light pools.\nHard exclusions: no R3-04 power-plant landmark; no diver; no human; no character; no creature; no fish; no monster; no vegetation; no HUD; no UI; no objective; no text; no numbers; no labels; no symbols; no icons; no watermark; no interaction cue; no collectible; no gameplay device.\nAvoid completely: lamp, bulb, spotlight, headlamp, emissive element, glowing window, glow, bloom, light pool, light shaft, god ray, sunbeam, caustics, volumetric fog, depth fog, haze, refraction, bubbles, suspended particles, current streaks, cinematic color grading, vignette, depth-of-field, perspective, horizon, seabed, floor, path, platform, horizontal foundation, bottom framing, and all UI/gameplay content from the references.\nChange only what is needed to incorporate the additional layout guidance; keep every listed invariant. Output one clean final 16:9 flattened composite reference, with Godot responsible for all runtime lighting and atmosphere.",
+        "result": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r3_rust_belt_layered_reference_v2.png",
+          "width": 1672,
+          "height": 940,
+          "sha256": "3BD838952C165A4B5D1D5BE1470CD362DB8E2BAAA20A354F4BC793AAC624C5D7"
+        }
+      },
+      {
+        "id": "r4_final",
+        "biome": "R4",
+        "order": 1,
+        "use_case": "stylized-concept",
+        "referenced_image_ids": [
+          "material_quality_user_ref",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "inspected_context_ids": [
+          "material_quality_user_ref",
+          "full_map_layout_guide_v1",
+          "side_layout_user_ref_01",
+          "side_layout_user_ref_02",
+          "side_layout_user_ref_03",
+          "side_layout_user_ref_04",
+          "side_layout_user_ref_05",
+          "side_layout_user_ref_06"
+        ],
+        "prompt": "Use case: stylized-concept\nAsset type: non-runtime layered-parallax game environment reference\nInput images: Image 1 is ONLY a material-quality reference: borrow premium painterly realism, credible aged rock/metal, fine surface detail and restrained density. Do not copy its lighting, composition, diver, HUD or objects. Images 2–5 are ONLY structural references for a strongly 2D side-scrolling underwater layout: open water, cliff forms entering from screen edges, clearly separate far silhouettes, isolated floating props, collider-adjacent decoration and foreground occluders. Do not copy their HUD, characters, creatures, lamps, light effects, text, exact objects, palette, outlines or cartoon rendering.\nPrimary request: Create one new wide 16:9 composite visual reference for “R4 — Black Heart”, designed so an artist can later rebuild it as four independent 2D parallax layers in Godot.\n2D requirement: extremely strong orthographic side-view 2D side-scroller composition, materially rich but deliberately flat. Side elevations and cutout-like silhouette bands. Zero vanishing point, no converging lines, no horizon, no three-quarter camera, no floor-plane perspective, no cinematic depth haze.\nVertical geography: R4 is the deep lower part of the full map and continues downward beyond the frame. The central and lower frame must read as open, bottomless water. Absolutely no ground, seabed, floor, road, path, valley, basin, platform, horizontal landing surface, receding corridor or implied bottom.\nLayer 1 — far background / slowest parallax: broad flat low-detail silhouettes of monumental dead-network pylons, broken ring fragments and severed spans, mostly attached to distant side walls or cropped at the upper distance. Simple shapes and muted value, never a floor.\nLayer 2 — drifting decoration / independent parallax: a sparse set of clearly isolated, non-interactive floating objects with generous empty separation: one broken plain chair frame, detached dark cable loops, two small metal rib fragments and inert blank panels without controls. Each object must be visibly separable and must not resemble loot, a hazard or an objective.\nLayer 3 — collider/SDF-adjacent material skin: higher-detail graphite rock, pressure-aged dark alloy, inert conduit carcasses and cable bundles hugging ONLY the left and right vertical wall edges plus tiny side overhangs. This layer is a material reference for later SDF clipping, not collision authority. It must never bridge the center or bottom.\nLayer 4 — foreground overlay / fastest parallax: a few large cropped dark rock-and-cable forms touching only extreme left/right edges and top corners, sharply darker and higher detail, clearly readable as a separable occluding overlay; never close the central vertical shaft.\nStyle/medium: premium painterly-realistic 2D game environment art with flattened bands, crisp layer separation and restrained detail hierarchy. Keep the sophisticated material rendering of Image 1 while borrowing only the strong 2D spatial organization of Images 2–5. No thick comic outline. Not a gameplay screenshot, not a final background and not a composition master.\nColor palette: blue-black, graphite, cold slate, muted iron, restrained petrol-grey; readable midtones, no crushed black void.\nLighting/mood: neutral uniform diffuse authoring visibility only, like an albedo/material reference. Soft local contact shading only, no visible or implied directional source.\nConstraints: four visually separable planes; large bottomless open center; no unique C-4 switchboard, R4-06 device, reactor, core, portal or altar; no topology authority; no text or watermark.\nAvoid: HUD, UI, icons, letters, numbers, signs, labels, diver, people, bodies, creatures, fish, vehicles, weapons, loot, collectibles, terminals, switches, active machines, doors, ladders, markers, objectives or hazards; lamps, lit windows, glowing cores, glowing eyes, bioluminescence, emissive seams, bloom, flare, hotspots, beams, god rays, sparks, electricity or fire; caustics, fog, haze, volumetrics, suspension, marine snow, dust, bubbles, current streaks, refraction, vignette, depth grading, color grading, chromatic aberration, film grain or cinematic postprocess.",
+        "result": {
+          "stored_path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r4_black_heart_layered_reference_v2.png",
+          "width": 1672,
+          "height": 941,
+          "sha256": "43C5CE2BCBF049E5FE0B493831316C5A8059A2AED689580F094399CF9F2D9860"
+        }
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "biome": "R1",
+      "path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r1_rooftops_layered_reference_v2.png",
+      "width": 1672,
+      "height": 941,
+      "pixel_format": "Format24bppRgb",
+      "bytes": 1566754,
+      "sha256": "90ECC56A1C14A33D3BA0E1705D6A5983FD5DDC15E2A3ECA3B3742CAAC4D1476D",
+      "technical_review": "pass",
+      "artistic_review": "pending_user_review"
+    },
+    {
+      "biome": "R2",
+      "path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r2_green_estates_layered_reference_v2.png",
+      "width": 1672,
+      "height": 941,
+      "pixel_format": "Format24bppRgb",
+      "bytes": 1594870,
+      "sha256": "4D7B92135A485F6F9001D6638BD839439F636733D3F46E306FD392F40BA6BC78",
+      "technical_review": "pass",
+      "artistic_review": "pending_user_review"
+    },
+    {
+      "biome": "R3",
+      "path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r3_rust_belt_layered_reference_v2.png",
+      "width": 1672,
+      "height": 940,
+      "pixel_format": "Format24bppRgb",
+      "bytes": 1908105,
+      "sha256": "3BD838952C165A4B5D1D5BE1470CD362DB8E2BAAA20A354F4BC793AAC624C5D7",
+      "technical_review": "pass",
+      "artistic_review": "pending_user_review"
+    },
+    {
+      "biome": "R4",
+      "path": "res://assets/diving/world/layout_guides/style_references/biomes_v2_layered/r4_black_heart_layered_reference_v2.png",
+      "width": 1672,
+      "height": 941,
+      "pixel_format": "Format24bppRgb",
+      "bytes": 2240536,
+      "sha256": "43C5CE2BCBF049E5FE0B493831316C5A8059A2AED689580F094399CF9F2D9860",
+      "technical_review": "pass",
+      "artistic_review": "pending_user_review"
+    }
+  ],
+  "verification": {
+    "performed_on": "2026-08-16",
+    "checks": [
+      "all output paths exist",
+      "SHA-256 captured from versioned output bytes",
+      "dimensions and pixel format decoded with System.Drawing",
+      "final four-image visual review for orthographic 2D staging, layer readability and runtime-effect exclusions",
+      "R2-R4 reviewed for bottomless central/lower void and absence of floor, seabed, road, platform and horizon"
+    ],
+    "godot_run": false,
+    "reason_godot_not_run": "non-runtime presentation references only; no scene, data profile, collider, shader or script changed"
+  }
+}

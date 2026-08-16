@@ -696,7 +696,7 @@ def _render_guide(
     mask = terrain.resize(GUIDE_SIZE, Image.Resampling.NEAREST)
     blocked = Image.new("RGBA", GUIDE_SIZE, (5, 17, 27, 255))
     open_water = Image.new("RGBA", GUIDE_SIZE, (18, 68, 88, 255))
-    image = Image.composite(open_water, blocked, mask)
+    image = Image.composite(blocked, open_water, mask)
 
     overlay = Image.new("RGBA", GUIDE_SIZE, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay, "RGBA")

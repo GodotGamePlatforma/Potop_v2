@@ -39,6 +39,9 @@ Reguły gry, globalna architektura, persistence i potwierdzony runtime pozostaj�
 - wizualne prefaby mapy: `res://scenes/diving/map_visuals/`;
 - przyszłe zatwierdzone mastery i ArtCells: `res://assets/diving/world/art_cells/`;
 - layout guides i provenance: `res://assets/diving/world/layout_guides/`;
+- kandydaci szerokich composition masterów i ich cropy podglądowe: `res://assets/diving/world/layout_guides/composition_masters/`;
+- referencje języka wizualnego, warstwy parallax i ich manifesty provenance: `res://assets/diving/world/layout_guides/style_references/`; nie są masterem, topologią ani assetem ładowanym przez grę;
+- sześciowarstwowe referencje 28 landmarków: `res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/`;
 - tła i foregroundy: `res://assets/diving/world/backdrops/`, `res://assets/diving/world/foregrounds/`;
 - materiały, shadery i propsy: `res://assets/diving/world/materials/`, `res://assets/diving/world/shaders/`, `res://assets/diving/world/props/`;
 - profile prezentacyjne regionów: `res://data/diving_visuals/`;
@@ -53,9 +56,23 @@ Nie przenoś tych plików do warsztatu. Produkcyjne ścieżki, UID-y i import Go
 - Aktywny manifest zawiera jedną warstwę `environment_decoration` i 15 cropów. Jej źródłowy master jest zarchiwizowany i nie istnieje w repozytorium.
 - `build_dive_visual_chunks.py` nie ma `--check` i nie potrafi odbudować warstwy bez brakującego źródła. Nie używaj go jako aktywnego buildera, dopóki pipeline nie zostanie jawnie naprawiony albo zastąpiony.
 - Pełnomapowy layout guide v1, manifest i generator są wersjonowanym pakietem referencyjnym z deterministycznym `--check`.
+- `biomes_v2_layered` zawiera cztery spłaszczone guide'y kompozycyjne R1-R4 oraz ich manifest provenance; nie są warstwami runtime ani composition masterem.
+- `biomes_v3_six_layer` zawiera po sześć współosiowych PNG `L00-L05` dla każdego biomu, cztery pochodne podglądy złożenia, 21 wersjonowanych surowych wyników ImageGen i manifest reprodukcji. Użytkownik zaakceptował go jako wzorzec stylu i konstrukcji sześciu warstw; nie jest to akceptacja composition mastera ani assetu runtime.
+- `landmarks_v1_six_layer` zawiera 28 źródłowych arkuszy, 168 niezależnych PNG alfa `L00-L05`, 28 pochodnych podglądów, cztery regionalne rekordy pełnego provenance i manifest nadrzędny. Zestaw jest technicznie kompletną referencją, oczekuje na odbiór artystyczny i pozostaje niepodłączony do runtime.
+- `composition_masters/biomes_l01_v1` zawiera technicznie poprawny kandydat full-map `L01`, cztery regionalne cropy i manifest provenance. Ma `production_master = false`, `runtime_asset = false` oraz `PENDING_USER_REVIEW`.
 - Nie istnieje zaakceptowany szeroki composition master R1-R4.
 
 Dokładny stan i rozdzielone statusy techniczny/artystyczny są w `.ai/PROJECT_CONTEXT.md`.
+
+## Użycie warstw landmarków
+
+Każdy landmark ma sześć współosiowych PNG `1024 × 512` ze wspólnym początkiem i bez przycinania płótna. Składaj je jako osobne dzieci `Sprite2D` w kolejności lokalnej `L00 rear_silhouette`, `L01 structural_shell`, `L02 identity_core`, `L03 detail_props`, `L04 terrain_integration`, `L05 foreground_occluder`. Źródłowy arkusz służy do provenance, a `derived/*_composite_preview.png` jest spłaszczonym podglądem nad kolorem biomu; żaden z nich nie jest siódmą warstwą runtime.
+
+Docelowy prefab landmarku ma być kolizyjnie pustym `Node2D` w `res://scenes/diving/map_visuals/`, przypisywanym przez istniejące pole `Visual Scene` właściwego obiektu w `UnderwaterMap.tscn`. Samo przypisanie sceny jest osobnym zadaniem dotyczącym chronionego runtime. Warstwy nie mogą tworzyć kolizji, topologii, tras, stable ID ani obiektów gameplayowych; `L04` tylko wizualnie styka się z kanonicznym terenem.
+
+Wszystkie sześć warstw pojedynczego landmarku pozostaje zakotwiczone do jego prefabu. Ogólny kontrakt `Visual Scene` daje kolejność rysowania, ale nie zapewnia niezależnego parallaxu względem kamery wewnątrz landmarku; szeroki parallax należy do warstw biomu. Jeżeli konkretne detale landmarku mają poruszać się niezależnie, wymaga to dedykowanej implementacji prezentacyjnej i weryfikacji runtime, a nie przesuwania plików referencyjnych.
+
+Światło gameplayowe, globalne pole wody, mgła, caustics, refrakcja, cząstki, bąble, prąd, grading, profile jakości i `reduced_motion` pozostają efektami Godota. Nie należy wypiekać ich do tych PNG.
 
 ## Jak pracować
 

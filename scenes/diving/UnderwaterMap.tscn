@@ -40,7 +40,6 @@
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineArchiveCableVisual.tscn" id="42_visual_common_line_archive"]
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineR3CableVisual.tscn" id="43_visual_common_line_r3"]
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineC4CableVisual.tscn" id="44_visual_common_line_c4"]
-[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/R3PowerPlantMidgroundVisual.tscn" id="45_visual_r3_power_plant_midground"]
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/R1J7ArtCell.tscn" id="46_visual_r1_j7_art_cell"]
 
 [node name="UnderwaterMap" type="Node2D" unique_id=1534845512]
@@ -299,7 +298,6 @@ accent_color = Color(0.352941, 0.568627, 0.901961, 1)
 water_color = Color(0.027451, 0.356863, 0.494118, 1)
 
 [node name="Landmarks" type="Node2D" parent="." unique_id=976886050]
-visible = false
 
 [node name="R1_00_StacjaNurkowa" parent="Landmarks" unique_id=1825890131 instance=ExtResource("9_landmark")]
 position = Vector2(5813.388, 372.22977)
@@ -312,7 +310,7 @@ visual_kind = "dive_station"
 aliases = PackedStringArray("dead_city_rooftops_001")
 
 [node name="R1_01_Apteka" parent="Landmarks" unique_id=1985716454 instance=ExtResource("9_landmark")]
-position = Vector2(1720.2883, 224.13835)
+position = Vector2(1724, 284)
 object_id = "R1-01"
 display_name = "Apteka"
 region_id = "R1"
@@ -332,7 +330,7 @@ visual_kind = "tenement"
 aliases = PackedStringArray()
 
 [node name="R1_03_ZatopionyHotel" parent="Landmarks" unique_id=1998667635 instance=ExtResource("9_landmark")]
-position = Vector2(8411.617, 720.4447)
+position = Vector2(8412, 732)
 object_id = "R1-03"
 display_name = "Zatopiony Hotel"
 region_id = "R1"
@@ -354,7 +352,7 @@ visual_scene = ExtResource("46_visual_r1_j7_art_cell")
 visual_z_index = -60
 
 [node name="R1_05_SklepSpozywczy" parent="Landmarks" unique_id=26453563 instance=ExtResource("9_landmark")]
-position = Vector2(5742.204, 844.5213)
+position = Vector2(5668, 844)
 object_id = "R1-05"
 display_name = "Sklep Spożywczy"
 region_id = "R1"
@@ -364,7 +362,7 @@ visual_kind = "grocery"
 aliases = PackedStringArray()
 
 [node name="R1_06_Szpital" parent="Landmarks" unique_id=1086926392 instance=ExtResource("9_landmark")]
-position = Vector2(10072.585, 1268.7832)
+position = Vector2(9980, 1452)
 object_id = "R1-06"
 display_name = "Szpital"
 region_id = "R1"
@@ -374,7 +372,7 @@ visual_kind = "hospital"
 aliases = PackedStringArray()
 
 [node name="R1_07_StatekWUlicy" parent="Landmarks" unique_id=1741748997 instance=ExtResource("9_landmark")]
-position = Vector2(9135.324, 360.22235)
+position = Vector2(9132, 388)
 object_id = "R1-07"
 display_name = "Statek w Ulicy"
 region_id = "R1"
@@ -404,7 +402,7 @@ visual_kind = "archive"
 aliases = PackedStringArray()
 
 [node name="R2_01_Szklarnia" parent="Landmarks" unique_id=66229333 instance=ExtResource("9_landmark")]
-position = Vector2(1305.0464, 1560.9635)
+position = Vector2(1300, 1572)
 object_id = "R2-01"
 display_name = "Szklarnia"
 region_id = "R2"
@@ -414,7 +412,7 @@ visual_kind = "greenhouse"
 aliases = PackedStringArray()
 
 [node name="R2_02_Park" parent="Landmarks" unique_id=1442311396 instance=ExtResource("9_landmark")]
-position = Vector2(3321.936, 1641.013)
+position = Vector2(3324, 1548)
 object_id = "R2-02"
 display_name = "Park"
 region_id = "R2"
@@ -425,7 +423,7 @@ aliases = PackedStringArray()
 anchor_id = "B-01"
 
 [node name="R2_03_CentrumOgrodnicze" parent="Landmarks" unique_id=1371098947 instance=ExtResource("9_landmark")]
-position = Vector2(6169.31, 1681.0377)
+position = Vector2(6172, 1884)
 object_id = "R2-03"
 display_name = "Centrum Ogrodnicze"
 region_id = "R2"
@@ -435,7 +433,7 @@ visual_kind = "garden_center"
 aliases = PackedStringArray()
 
 [node name="R2_04_BankNasion" parent="Landmarks" unique_id=810474644 instance=ExtResource("9_landmark")]
-position = Vector2(8423.48, 1641.013)
+position = Vector2(8564, 1372)
 object_id = "R2-04"
 display_name = "Bank Nasion"
 region_id = "R2"
@@ -445,7 +443,7 @@ visual_kind = "seed_bank"
 aliases = PackedStringArray()
 
 [node name="R2_05_Przedmiescia" parent="Landmarks" unique_id=1459417021 instance=ExtResource("9_landmark")]
-position = Vector2(9847.168, 2113.3044)
+position = Vector2(9844, 2204)
 object_id = "R2-05"
 display_name = "Przedmieścia"
 region_id = "R2"
@@ -455,7 +453,7 @@ visual_kind = "suburbs"
 aliases = PackedStringArray()
 
 [node name="R2_06_SplataneKorytarze" parent="Landmarks" unique_id=2075612842 instance=ExtResource("9_landmark")]
-position = Vector2(2009, 2383)
+position = Vector2(2052, 2004)
 object_id = "R2-06"
 display_name = "Splątane Korytarze"
 region_id = "R2"
@@ -476,11 +474,11 @@ aliases = PackedStringArray()
 anchor_id = "B-02"
 
 [node name="R3_02_StaraStocznia" parent="Landmarks" unique_id=2105279017 instance=ExtResource("9_landmark")]
-position = Vector2(4081.2358, 2345.4478)
+position = Vector2(4124, 2404)
 object_id = "R3-02"
 display_name = "Stara Stocznia"
 region_id = "R3"
-bounds_size = Vector2(1779.6086, 360.22235)
+bounds_size = Vector2(1779.6086, 624)
 landmark_role = "heavy_salvage"
 visual_kind = "shipyard"
 aliases = PackedStringArray()
@@ -504,8 +502,6 @@ bounds_size = Vector2(1621.4213, 346.8808)
 landmark_role = "hazard"
 visual_kind = "power_plant"
 aliases = PackedStringArray()
-visual_scene = ExtResource("45_visual_r3_power_plant_midground")
-visual_z_index = -56
 
 [node name="R3_05_SkladChemikaliow" parent="Landmarks" unique_id=332628244 instance=ExtResource("9_landmark")]
 position = Vector2(7937.0547, 3366.078)
@@ -518,7 +514,7 @@ visual_kind = "chemical_storage"
 aliases = PackedStringArray()
 
 [node name="R3_06_Zlomowisko" parent="Landmarks" unique_id=259631245 instance=ExtResource("9_landmark")]
-position = Vector2(3155.8394, 3314.0457)
+position = Vector2(3156, 3172)
 object_id = "R3-06"
 display_name = "Złomowisko"
 region_id = "R3"
@@ -528,11 +524,11 @@ visual_kind = "scrapyard"
 aliases = PackedStringArray()
 
 [node name="R4_01_DworzecMetra" parent="Landmarks" unique_id=1913967542 instance=ExtResource("9_landmark")]
-position = Vector2(2016.8898, 4382.7056)
+position = Vector2(1980, 4380)
 object_id = "R4-01"
 display_name = "Dworzec Metra"
 region_id = "R4"
-bounds_size = Vector2(1779.6086, 360.22235)
+bounds_size = Vector2(1779.6086, 576)
 landmark_role = "buoy"
 visual_kind = "metro"
 aliases = PackedStringArray()
@@ -559,7 +555,7 @@ visual_kind = "laboratory"
 aliases = PackedStringArray()
 
 [node name="R4_04_ZamknieteGrodzie" parent="Landmarks" unique_id=2115273016 instance=ExtResource("9_landmark")]
-position = Vector2(10392.914, 4614.8486)
+position = Vector2(10396, 4644)
 object_id = "R4-04"
 display_name = "Zamknięte Grodzie"
 region_id = "R4"
@@ -569,7 +565,7 @@ visual_kind = "sealed_gate"
 aliases = PackedStringArray()
 
 [node name="R4_05_CentrumMiasta" parent="Landmarks" unique_id=1168386999 instance=ExtResource("9_landmark")]
-position = Vector2(5943.893, 5107.1523)
+position = Vector2(5940, 5260)
 object_id = "R4-05"
 display_name = "Centrum Miasta"
 region_id = "R4"
