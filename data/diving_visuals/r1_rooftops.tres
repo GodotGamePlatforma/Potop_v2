@@ -24,6 +24,6 @@ edge_width_texels = 1.00
 edge_highlight_strength = 0.16
 backdrop_tint = Color(0.13, 0.32, 0.33, 1)
 backdrop_accent = Color(0.42, 0.65, 0.59, 1)
-backdrop_strength = 0.62
+backdrop_strength = 0.0
 backdrop_motion_scale = 0.72
 backdrop_motif_scale = 1.0

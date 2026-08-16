@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
+  "visual_revision": 2,
   "region_id": "R1",
   "display_name": "Dachy Umarłego Miasta",
   "role": "Presentation-only overlapping source ArtCells composed offline into streamed runtime crops",
-  "source": "OpenAI built-in imagegen using supplied visual targets and sequential far-background continuation references",
+  "source": "OpenAI built-in imagegen using supplied visual targets, sequential continuation references and an offline overlap-normalized master",
   "cell_size": [2730, 1536],
   "world_size": [11520, 1536],
   "overlap": 426,
@@ -13,50 +14,83 @@
   "runtime_light_mode": "unshaded",
   "constraints": [
     "background-only",
-    "extreme-distant-background-only",
+    "multi-kilometre distant background only",
+    "authored skyline remains unmistakably visible in production gameplay frames",
+    "three atmospheric depth planes with a calm player-readability corridor",
+    "multi-kilometre skyline begins around 43-48 percent height and recedes through three depth planes toward the bottom",
+    "no single solid landmark exceeds 5 percent of plate width or 18 percent of plate height",
     "neutral diffuse source without baked light, glow or emissive windows",
     "lighting, atmospheric motion and parallax remain Godot runtime effects",
+    "R1 procedural placeholder architecture is disabled so it cannot overpaint the authored skyline",
     "no collision authority",
     "no gameplay objects",
     "no map authoring nodes",
     "canonical terrain remains foreground authority",
-    "constant one source pixel per world unit after normalization"
+    "constant one source pixel per world unit after normalization",
+    "adjacent 426-pixel overlaps are pixel-identical slices of one composed master"
+  ],
+  "qa_visibility_cases": [
+    {
+      "id": "Background_001",
+      "camera": [1365, 960],
+      "screen_roi": [64, 0, 1152, 540]
+    },
+    {
+      "id": "Background_002",
+      "camera": [3800, 960],
+      "screen_roi": [64, 80, 1152, 540]
+    },
+    {
+      "id": "Background_003",
+      "camera": [5568, 960],
+      "screen_roi": [64, 0, 1152, 540]
+    },
+    {
+      "id": "Background_004",
+      "camera": [8192, 960],
+      "screen_roi": [64, 0, 1152, 540]
+    },
+    {
+      "id": "Background_005",
+      "camera": [9696, 1120],
+      "screen_roi": [64, 360, 1152, 344]
+    }
   ],
   "cells": [
     {
       "id": "Background_001",
       "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_001.png",
       "world_origin": [0, 0],
-      "focus": "western edge of the minute drowned-city skyline",
-      "generation_prompt": "Extreme-distance R1 background several kilometres behind gameplay; tiny low-contrast drowned skyline readable through the middle-lower frame, with its tallest roofs and spires around 45-60 percent of image height; upper 45 percent remains open hazy water; flat dim diffuse blue-teal albedo with no rays, caustics, glow, lit windows or hotspots; no fish or other baked living forms; no foreground, traversal cue, diver, UI, text or gameplay prop; calm low-detail side overlaps."
+      "focus": "western industrial approach with tiny concrete roofs, greenhouse frames, pipe bridges and thin aerials",
+      "generation_prompt": "One continuous premium photorealistic drowned post-industrial Polish city several kilometres behind gameplay; the first fine skyline begins around 43-48 percent height and hundreds of miniature utility blocks, skeletal greenhouse domes, water towers, cranes, pipe bridges and aerials recede through three depth planes; no form exceeds 5 percent of plate width or 18 percent of plate height; neutral diffuse petrol-blue albedo only, with no fantasy palaces, baked rays, caustics, glow, lamps, lit windows, foreground, diver, UI, text or gameplay props."
     },
     {
       "id": "Background_002",
       "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_002.png",
       "world_origin": [2304, 0],
-      "focus": "remote observatory and antenna silhouettes",
-      "generation_prompt": "Seamless right continuation of Background_001; match water, haze, diffuse exposure, grain, skyline baseline and extreme apparent distance across the left overlap; keep the upper 45 percent as open murky water; introduce only very small broken domes and thin aerials through the middle-lower frame; no baked light, glow, emissive detail, fish or other living silhouettes; no foreground, traversal cue, diver, UI, text or gameplay prop; calm low-detail side overlaps."
+      "focus": "remote utility quarter with small conservatory frames, water towers and collapsed pipe viaducts",
+      "generation_prompt": "Immediate seamless right continuation of Background_001 with identical water, haze, exposure, skyline height and tiny scale; a remote utility district of miniature greenhouse frames, concrete service blocks, water towers, antenna forests and collapsed pipe viaducts occupies three atmospheric depth planes; no form exceeds 5 percent of plate width or 18 percent of plate height and no fantasy architecture, baked illumination, life, foreground, diver, UI, text or gameplay props appears."
     },
     {
       "id": "Background_003",
       "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_003.png",
       "world_origin": [4608, 0],
-      "focus": "remote research-district silhouettes",
-      "generation_prompt": "Seamless right continuation of Background_002 with identical extreme distance, diffuse exposure, haze and skyline baseline; upper 45 percent remains open water; minute research-district roofs, tiny collapsed domes and hair-thin towers remain readable through the middle-lower frame and dissolve into dark water below; no rays, caustics, bloom, lamps, lit windows, hotspots, fish or other living forms; no foreground, collision cue, diver, UI, text or gameplay prop."
+      "focus": "remote infrastructure district with stepped utility blocks, pipe grids and sparse cranes",
+      "generation_prompt": "Immediate seamless right continuation of Background_002 with unchanged blue-teal palette, haze, skyline height and miniature scale; hundreds of small concrete rooftops, pipe grids, water towers, broken conservatory ribs, cranes and needle masts remain coherent across three distant planes; no dominant mass, fantasy palace, baked light, life, foreground, diver, UI, text or gameplay props."
     },
     {
       "id": "Background_004",
       "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_004.png",
       "world_origin": [6912, 0],
-      "focus": "remote eroded archival skyline",
-      "generation_prompt": "Seamless right continuation of Background_003; same dark blue-teal water, quiet diffuse tone, haze, skyline baseline and extreme scale; tiny eroded blocks, skeletal aerials and very small domes stay several kilometres away through the middle-lower frame; upper 45 percent remains open water; no foreground or sharp texture; zero baked rays, caustics, glow, lamps, emissive windows, hotspots, fish or other living silhouettes; calm low-detail side overlaps."
+      "focus": "remote research quarter with one small conservatory frame among utility blocks and antennas",
+      "generation_prompt": "Immediate seamless right continuation of Background_003; many tiny research blocks, pipe bridges, aerials and one or two modest skeletal conservatory frames share the same multi-kilometre scale, skyline height, diffuse tone and atmospheric hierarchy; every form stays below 5 percent of plate width and 18 percent of plate height; no fantasy architecture, baked light, life, foreground, diver, UI, text or gameplay props."
     },
     {
       "id": "Background_005",
       "path": "res://assets/diving/world/art_cells/r1/r1_art_cell_005.png",
       "world_origin": [9216, 0],
-      "focus": "eastern skyline fading into open depth",
-      "generation_prompt": "Final seamless right continuation of Background_004; the upper 45 percent remains open murky water; sparse minute roofs, hair-thin masts and barely visible domes stay several kilometres away through the middle-lower frame, then simplify gently toward the calm map edge without an abrupt skyline drop; neutral dim diffuse albedo with no rays, caustics, glow, lamps, lit windows, hotspots, fish or other living forms; no foreground, traversal cue, diver, UI, text or gameplay prop."
+      "focus": "sparse eastern hydraulic terraces with a thin remote ridge, tiny pump blocks, pipe bridges and water towers",
+      "generation_prompt": "Final seamless right continuation of Background_004; a thin heavily hazed back ridge rises gradually just enough to remain visible through the upper cavern opening, while two sparse lower hydraulic terraces use tiny pump blocks, plain water towers, antenna masts and low pipe bridges separated by large areas of open water; no dense city carpet, dominant mass, ornamental or fantasy architecture, baked light, life, foreground, diver, UI, text or gameplay props."
     }
   ]
 }

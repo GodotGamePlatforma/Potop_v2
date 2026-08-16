@@ -32,6 +32,23 @@ LAYER_ID = "r1_art_cells"
 RUNTIME_PARENT = "R1ArtCells"
 RUNTIME_Z_INDEX = -96
 RUNTIME_LIGHT_MODE = "unshaded"
+VISUAL_REVISION = 2
+QA_VIEWPORT_SIZE = (1280, 720)
+QA_CAMERA_ZOOM = 1.2
+QA_VISIBILITY_CASES = (
+    ("Background_001", (1365, 960), (64, 0, 1152, 540)),
+    ("Background_002", (3800, 960), (64, 80, 1152, 540)),
+    ("Background_003", (5568, 960), (64, 0, 1152, 540)),
+    ("Background_004", (8192, 960), (64, 0, 1152, 540)),
+    ("Background_005", (9696, 1120), (64, 360, 1152, 344)),
+)
+SOURCE_CONTENT_BAND = (64, 600, 2666, 1250)
+SOURCE_CONTENT_DOWNSAMPLE = 4
+SOURCE_CONTENT_GRADIENT_THRESHOLD = 3
+SOURCE_CONTENT_MIN_COVERAGE = 0.04
+SOURCE_CONTENT_BIN_COUNT = 8
+SOURCE_CONTENT_BIN_MIN_COVERAGE = 0.02
+SOURCE_CONTENT_MIN_PASSING_BINS = 5
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -70,9 +87,195 @@ def _pair(value: Any, context: str) -> tuple[int, int]:
     return int(value[0]), int(value[1])
 
 
+def _integer_tuple(value: Any, length: int, context: str) -> tuple[int, ...]:
+    if not isinstance(value, list) or len(value) != length:
+        raise RuntimeError(f"{context} must contain exactly {length} integers.")
+    result: list[int] = []
+    for component in value:
+        if (
+            isinstance(component, bool)
+            or not isinstance(component, (int, float))
+            or not float(component).is_integer()
+        ):
+            raise RuntimeError(f"{context} must contain exactly {length} integers.")
+        result.append(int(component))
+    return tuple(result)
+
+
+def _source_content_metrics(image: Image.Image) -> tuple[float, list[float]]:
+    band = image.convert("RGB").crop(SOURCE_CONTENT_BAND)
+    source_width, source_height = band.size
+    downsample = SOURCE_CONTENT_DOWNSAMPLE
+    downsampled_width = source_width // downsample
+    downsampled_height = source_height // downsample
+    source_data = band.tobytes()
+    downsampled = bytearray(downsampled_width * downsampled_height)
+
+    # Use fixed 4x4 box averages and integer BT.601 luma so the Python and
+    # Godot validators have identical sampling and rounding semantics.
+    for output_y in range(downsampled_height):
+        for output_x in range(downsampled_width):
+            red_sum = 0
+            green_sum = 0
+            blue_sum = 0
+            for block_y in range(downsample):
+                source_offset = (
+                    ((output_y * downsample + block_y) * source_width)
+                    + output_x * downsample
+                ) * 3
+                for _block_x in range(downsample):
+                    red_sum += source_data[source_offset]
+                    green_sum += source_data[source_offset + 1]
+                    blue_sum += source_data[source_offset + 2]
+                    source_offset += 3
+            weighted_sum = 299 * red_sum + 587 * green_sum + 114 * blue_sum
+            downsampled[output_y * downsampled_width + output_x] = (
+                weighted_sum + 8000
+            ) // 16000
+
+    structured_count = 0
+    total_count = 0
+    bin_structured = [0] * SOURCE_CONTENT_BIN_COUNT
+    bin_totals = [0] * SOURCE_CONTENT_BIN_COUNT
+    gradient_width = downsampled_width - 1
+    gradient_height = downsampled_height - 1
+    for y in range(gradient_height):
+        for x in range(gradient_width):
+            offset = y * downsampled_width + x
+            gradient = max(
+                abs(downsampled[offset + 1] - downsampled[offset]),
+                abs(downsampled[offset + downsampled_width] - downsampled[offset]),
+            )
+            bin_index = min(
+                SOURCE_CONTENT_BIN_COUNT - 1,
+                x * SOURCE_CONTENT_BIN_COUNT // gradient_width,
+            )
+            total_count += 1
+            bin_totals[bin_index] += 1
+            if gradient >= SOURCE_CONTENT_GRADIENT_THRESHOLD:
+                structured_count += 1
+                bin_structured[bin_index] += 1
+
+    global_coverage = structured_count / total_count
+    bin_coverage = [
+        bin_structured[index] / bin_totals[index]
+        for index in range(SOURCE_CONTENT_BIN_COUNT)
+    ]
+    return global_coverage, bin_coverage
+
+
+def _validate_source_content(image: Image.Image, path: Path) -> None:
+    global_coverage, bin_coverage = _source_content_metrics(image)
+    passing_bins = sum(
+        coverage >= SOURCE_CONTENT_BIN_MIN_COVERAGE for coverage in bin_coverage
+    )
+    if (
+        global_coverage < SOURCE_CONTENT_MIN_COVERAGE
+        or passing_bins < SOURCE_CONTENT_MIN_PASSING_BINS
+    ):
+        formatted_bins = ", ".join(f"{coverage:.2%}" for coverage in bin_coverage)
+        raise RuntimeError(
+            f"R1 ArtCell source has insufficient authored structure: {path}; "
+            f"global={global_coverage:.2%} (minimum "
+            f"{SOURCE_CONTENT_MIN_COVERAGE:.2%}), passing_bins={passing_bins}/"
+            f"{SOURCE_CONTENT_BIN_COUNT} (minimum "
+            f"{SOURCE_CONTENT_MIN_PASSING_BINS}), bins=[{formatted_bins}]."
+        )
+
+
+def _validate_qa_visibility_cases(
+    library: dict[str, Any], cells: list[dict[str, Any]]
+) -> None:
+    cases = library.get("qa_visibility_cases", [])
+    if not isinstance(cases, list) or len(cases) != len(QA_VISIBILITY_CASES):
+        raise RuntimeError("R1 requires exactly five qa_visibility_cases.")
+
+    world_width, world_height = _pair(library["world_size"], "world_size")
+    cell_width, cell_height = _pair(library["cell_size"], "cell_size")
+    half_viewport = (
+        QA_VIEWPORT_SIZE[0] / (2.0 * QA_CAMERA_ZOOM),
+        QA_VIEWPORT_SIZE[1] / (2.0 * QA_CAMERA_ZOOM),
+    )
+    seen_ids: set[str] = set()
+    for index, expected in enumerate(QA_VISIBILITY_CASES):
+        case = cases[index]
+        if not isinstance(case, dict):
+            raise RuntimeError(f"qa_visibility_cases[{index}] must be an object.")
+        if set(case) != {"id", "camera", "screen_roi"}:
+            raise RuntimeError(
+                f"qa_visibility_cases[{index}] must contain only id, camera and "
+                "screen_roi."
+            )
+        case_id = str(case.get("id", ""))
+        camera = _integer_tuple(case.get("camera", []), 2, f"{case_id}.camera")
+        screen_roi = _integer_tuple(
+            case.get("screen_roi", []), 4, f"{case_id}.screen_roi"
+        )
+        expected_id, expected_camera, expected_roi = expected
+        if case_id != expected_id or case_id != str(cells[index].get("id", "")):
+            raise RuntimeError(
+                f"qa_visibility_cases[{index}] must target {expected_id}, got {case_id!r}."
+            )
+        if case_id in seen_ids:
+            raise RuntimeError(f"Duplicated qa_visibility_cases id: {case_id}")
+        seen_ids.add(case_id)
+        if camera != expected_camera or screen_roi != expected_roi:
+            raise RuntimeError(
+                f"{case_id} QA anchor must remain camera={expected_camera}, "
+                f"screen_roi={expected_roi}; got camera={camera}, "
+                f"screen_roi={screen_roi}."
+            )
+
+        camera_x, camera_y = camera
+        if not (
+            camera_x - half_viewport[0] >= 0.0
+            and camera_x + half_viewport[0] <= world_width
+            and camera_y - half_viewport[1] >= 0.0
+            and camera_y + half_viewport[1] <= world_height
+        ):
+            raise RuntimeError(f"{case_id} QA camera falls outside the R1 world.")
+        roi_x, roi_y, roi_width, roi_height = screen_roi
+        if not (
+            roi_x >= 0
+            and roi_y >= 0
+            and roi_width > 0
+            and roi_height > 0
+            and roi_x + roi_width <= QA_VIEWPORT_SIZE[0]
+            and roi_y + roi_height <= QA_VIEWPORT_SIZE[1]
+        ):
+            raise RuntimeError(f"{case_id} screen_roi falls outside the QA viewport.")
+
+        cell_origin_x, cell_origin_y = _pair(
+            cells[index].get("world_origin", []), f"{case_id}.world_origin"
+        )
+        world_roi = (
+            camera_x - half_viewport[0] + roi_x / QA_CAMERA_ZOOM,
+            camera_y - half_viewport[1] + roi_y / QA_CAMERA_ZOOM,
+            camera_x
+            - half_viewport[0]
+            + (roi_x + roi_width) / QA_CAMERA_ZOOM,
+            camera_y
+            - half_viewport[1]
+            + (roi_y + roi_height) / QA_CAMERA_ZOOM,
+        )
+        cell_right = min(cell_origin_x + cell_width, world_width)
+        cell_bottom = min(cell_origin_y + cell_height, world_height)
+        if not (
+            world_roi[0] >= cell_origin_x
+            and world_roi[1] >= cell_origin_y
+            and world_roi[2] <= cell_right
+            and world_roi[3] <= cell_bottom
+        ):
+            raise RuntimeError(
+                f"{case_id} screen_roi does not project entirely inside its ArtCell."
+            )
+
+
 def _validate_library(library: dict[str, Any]) -> None:
     if int(library.get("schema_version", 0)) != 1:
         raise RuntimeError("Unsupported ArtCell library schema.")
+    if int(library.get("visual_revision", 0)) != VISUAL_REVISION:
+        raise RuntimeError(f"R1 visual_revision must remain {VISUAL_REVISION}.")
     if str(library.get("region_id", "")) != "R1":
         raise RuntimeError("This builder currently expects the R1 ArtCell library.")
     cell_size = _pair(library.get("cell_size", []), "cell_size")
@@ -95,13 +298,20 @@ def _validate_library(library: dict[str, Any]) -> None:
     if not isinstance(cells, list) or len(cells) != 5:
         raise RuntimeError("R1 requires exactly five source ArtCells.")
     expected_origins = [0, 2304, 4608, 6912, 9216]
+    expected_ids = [f"Background_{index:03d}" for index in range(1, 6)]
     seen_ids: set[str] = set()
+    validated_cells: list[dict[str, Any]] = []
+    previous_right_overlap: bytes | None = None
     for index, cell_variant in enumerate(cells):
         if not isinstance(cell_variant, dict):
             raise RuntimeError(f"ArtCell {index + 1} must be an object.")
         cell_id = str(cell_variant.get("id", ""))
         if not cell_id or cell_id in seen_ids:
             raise RuntimeError(f"ArtCell id is empty or duplicated: {cell_id!r}")
+        if cell_id != expected_ids[index]:
+            raise RuntimeError(
+                f"ArtCell {index + 1} id must be {expected_ids[index]}, got {cell_id!r}."
+            )
         seen_ids.add(cell_id)
         origin = _pair(cell_variant.get("world_origin", []), f"{cell_id}.world_origin")
         if origin != (expected_origins[index], 0):
@@ -111,11 +321,24 @@ def _validate_library(library: dict[str, Any]) -> None:
         path = _project_path(str(cell_variant.get("path", "")))
         if not path.is_file():
             raise RuntimeError(f"Missing ArtCell source: {path}")
-        with Image.open(path) as image:
-            if image.size != cell_size:
+        with Image.open(path) as opened:
+            if opened.size != cell_size:
                 raise RuntimeError(
-                    f"{path} has size {image.size}; expected constant {cell_size}."
+                    f"{path} has size {opened.size}; expected constant {cell_size}."
                 )
+            image = opened.convert("RGBA")
+        _validate_source_content(image, path)
+        left_overlap = image.crop((0, 0, overlap, cell_size[1])).tobytes()
+        if previous_right_overlap is not None and left_overlap != previous_right_overlap:
+            raise RuntimeError(
+                f"Adjacent R1 ArtCell overlap is not pixel-identical before {cell_id}."
+            )
+        previous_right_overlap = image.crop(
+            (cell_size[0] - overlap, 0, cell_size[0], cell_size[1])
+        ).tobytes()
+        validated_cells.append(cell_variant)
+
+    _validate_qa_visibility_cases(library, validated_cells)
 
 
 def _cosine_mask(width: int, height: int) -> Image.Image:

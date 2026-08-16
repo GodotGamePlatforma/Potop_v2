@@ -136,6 +136,16 @@ const R1_ART_CELL_WORLD_SIZE := Vector2i(11_520, 1536)
 const R1_ART_CELL_OVERLAP := 426
 const R1_ART_CELL_STRIDE := 2304
 const R1_ART_CELL_Z_INDEX := -96
+const R1_ART_CELL_VISUAL_REVISION := 2
+const R1_QA_VIEWPORT_SIZE := Vector2i(1280, 720)
+const R1_QA_CAMERA_ZOOM := 1.2
+const R1_SOURCE_CONTENT_BAND := Rect2i(64, 600, 2602, 650)
+const R1_SOURCE_CONTENT_DOWNSAMPLE := 4
+const R1_SOURCE_CONTENT_GRADIENT_THRESHOLD := 3
+const R1_SOURCE_CONTENT_MIN_COVERAGE := 0.04
+const R1_SOURCE_CONTENT_BIN_COUNT := 8
+const R1_SOURCE_CONTENT_BIN_MIN_COVERAGE := 0.02
+const R1_SOURCE_CONTENT_MIN_PASSING_BINS := 5
 const EXPECTED_R1_ART_CELLS := [
 	{
 		"id": "Background_001",
@@ -161,6 +171,33 @@ const EXPECTED_R1_ART_CELLS := [
 		"id": "Background_005",
 		"path": "res://assets/diving/world/art_cells/r1/r1_art_cell_005.png",
 		"world_origin": Vector2i(9216, 0),
+	},
+]
+const EXPECTED_R1_QA_VISIBILITY_CASES := [
+	{
+		"id": "Background_001",
+		"camera": Vector2i(1365, 960),
+		"screen_roi": Rect2i(64, 0, 1152, 540),
+	},
+	{
+		"id": "Background_002",
+		"camera": Vector2i(3800, 960),
+		"screen_roi": Rect2i(64, 80, 1152, 540),
+	},
+	{
+		"id": "Background_003",
+		"camera": Vector2i(5568, 960),
+		"screen_roi": Rect2i(64, 0, 1152, 540),
+	},
+	{
+		"id": "Background_004",
+		"camera": Vector2i(8192, 960),
+		"screen_roi": Rect2i(64, 0, 1152, 540),
+	},
+	{
+		"id": "Background_005",
+		"camera": Vector2i(9696, 1120),
+		"screen_roi": Rect2i(64, 360, 1152, 344),
 	},
 ]
 
@@ -269,6 +306,7 @@ func _test_r1_art_cell_layer() -> void:
 			var library: Dictionary = parsed
 			var cells: Array = library.get("cells", [])
 			_assert(int(library.get("schema_version", 0)) == 1, "Biblioteka R1 ArtCells musi mieć jawną wersję.")
+			_assert(int(library.get("visual_revision", 0)) == R1_ART_CELL_VISUAL_REVISION, "Biblioteka R1 ArtCells musi wskazywać zaakceptowaną rewizję wizualną 2.")
 			_assert(str(library.get("region_id", "")) == "R1", "Biblioteka ArtCells musi jednoznacznie należeć do R1.")
 			var cell_size: Array = library.get("cell_size", [])
 			_assert(
@@ -295,6 +333,7 @@ func _test_r1_art_cell_layer() -> void:
 			_assert(cells.size() == EXPECTED_R1_ART_CELLS.size(), "Pełny pas R1 musi składać się z pięciu źródłowych ArtCells.")
 			var seen_ids := {}
 			var seen_paths := {}
+			var source_images_by_id := {}
 			for cell_index in range(mini(cells.size(), EXPECTED_R1_ART_CELLS.size())):
 				var cell_variant = cells[cell_index]
 				_assert(cell_variant is Dictionary, "Każdy wpis biblioteki R1 ArtCells musi być słownikiem.")
@@ -324,7 +363,253 @@ func _test_r1_art_cell_layer() -> void:
 					_assert(not source_image.is_empty(), "Źródłowy R1 ArtCell musi być poprawnym obrazem: %s." % source_path)
 					if not source_image.is_empty():
 						_assert(source_image.get_size() == R1_ART_CELL_SIZE, "Źródłowy R1 ArtCell musi mieć rzeczywisty rozmiar 2730x1536: %s." % source_path)
+						if source_image.get_size() == R1_ART_CELL_SIZE:
+							_assert_r1_source_content(source_image, source_path)
+							source_images_by_id[cell_id] = source_image
+			_assert_r1_qa_visibility_cases(library, cells)
+			_assert_r1_pixel_identical_overlaps(source_images_by_id)
 	map_root.free()
+
+
+func _assert_r1_qa_visibility_cases(library: Dictionary, cells: Array) -> void:
+	var cases: Array = library.get("qa_visibility_cases", [])
+	_assert(
+		cases.size() == EXPECTED_R1_QA_VISIBILITY_CASES.size(),
+		"Biblioteka R1 musi publikować dokładnie pięć przypadków QA widoczności."
+	)
+	var seen_case_ids := {}
+	var half_viewport := Vector2(
+		float(R1_QA_VIEWPORT_SIZE.x) / (2.0 * R1_QA_CAMERA_ZOOM),
+		float(R1_QA_VIEWPORT_SIZE.y) / (2.0 * R1_QA_CAMERA_ZOOM)
+	)
+	for case_index in range(mini(cases.size(), EXPECTED_R1_QA_VISIBILITY_CASES.size())):
+		var case_variant = cases[case_index]
+		_assert(case_variant is Dictionary, "Każdy przypadek QA widoczności R1 musi być słownikiem.")
+		if not (case_variant is Dictionary):
+			continue
+		var visibility_case: Dictionary = case_variant
+		var expected: Dictionary = EXPECTED_R1_QA_VISIBILITY_CASES[case_index]
+		var case_id := str(visibility_case.get("id", ""))
+		var camera_values: Array = visibility_case.get("camera", [])
+		var roi_values: Array = visibility_case.get("screen_roi", [])
+		_assert(
+			_visibility_case_has_exact_keys(visibility_case),
+			"Przypadek QA %s może zawierać wyłącznie id, camera i screen_roi." % case_id
+		)
+		var camera_is_valid := _is_exact_integer_array(camera_values, 2)
+		var roi_is_valid := _is_exact_integer_array(roi_values, 4)
+		_assert(camera_is_valid, "Przypadek QA %s musi mieć dwuelementową całkowitą kamerę." % case_id)
+		_assert(roi_is_valid, "Przypadek QA %s musi mieć czteroelementowy całkowity screen_roi." % case_id)
+		var camera := Vector2i.ZERO
+		var screen_roi := Rect2i()
+		if camera_is_valid:
+			camera = Vector2i(int(camera_values[0]), int(camera_values[1]))
+		if roi_is_valid:
+			screen_roi = Rect2i(
+				int(roi_values[0]),
+				int(roi_values[1]),
+				int(roi_values[2]),
+				int(roi_values[3])
+			)
+		var expected_id := str(expected.get("id", ""))
+		var expected_camera: Vector2i = expected.get("camera", Vector2i.ZERO)
+		var expected_roi: Rect2i = expected.get("screen_roi", Rect2i())
+		_assert(case_id == expected_id, "Przypadek QA %d musi zachować dokładne ID %s." % [case_index + 1, expected_id])
+		_assert(not seen_case_ids.has(case_id), "ID przypadku QA widoczności nie może się powtarzać: %s." % case_id)
+		seen_case_ids[case_id] = true
+		_assert(camera == expected_camera, "Przypadek QA %s musi zachować kamerę %s." % [case_id, expected_camera])
+		_assert(screen_roi == expected_roi, "Przypadek QA %s musi zachować screen_roi %s." % [case_id, expected_roi])
+		if case_index < cells.size() and cells[case_index] is Dictionary:
+			_assert(
+				case_id == str((cells[case_index] as Dictionary).get("id", "")),
+				"Przypadek QA %s musi odpowiadać źródłowemu ArtCell o tym samym ID." % case_id
+			)
+
+		var camera_position := Vector2(camera)
+		_assert(
+			camera_position.x - half_viewport.x >= 0.0
+				and camera_position.x + half_viewport.x <= float(R1_ART_CELL_WORLD_SIZE.x)
+				and camera_position.y - half_viewport.y >= 0.0
+				and camera_position.y + half_viewport.y <= float(R1_ART_CELL_WORLD_SIZE.y),
+			"Kamera przypadku QA %s musi mieścić pełny kadr w pasie R1." % case_id
+		)
+		_assert(
+			screen_roi.position.x >= 0
+				and screen_roi.position.y >= 0
+				and screen_roi.size.x > 0
+				and screen_roi.size.y > 0
+				and screen_roi.end.x <= R1_QA_VIEWPORT_SIZE.x
+				and screen_roi.end.y <= R1_QA_VIEWPORT_SIZE.y,
+			"screen_roi przypadku QA %s musi mieścić się w viewport 1280x720." % case_id
+		)
+
+		var expected_cell: Dictionary = EXPECTED_R1_ART_CELLS[case_index]
+		var cell_origin_i: Vector2i = expected_cell.get("world_origin", Vector2i.ZERO)
+		var cell_origin := Vector2(cell_origin_i)
+		var cell_end := Vector2(
+			minf(float(cell_origin_i.x + R1_ART_CELL_SIZE.x), float(R1_ART_CELL_WORLD_SIZE.x)),
+			minf(float(cell_origin_i.y + R1_ART_CELL_SIZE.y), float(R1_ART_CELL_WORLD_SIZE.y))
+		)
+		var world_roi_begin := (
+			camera_position
+			- half_viewport
+			+ Vector2(screen_roi.position) / R1_QA_CAMERA_ZOOM
+		)
+		var world_roi_end := (
+			camera_position
+			- half_viewport
+			+ Vector2(screen_roi.end) / R1_QA_CAMERA_ZOOM
+		)
+		_assert(
+			world_roi_begin.x >= cell_origin.x
+				and world_roi_begin.y >= cell_origin.y
+				and world_roi_end.x <= cell_end.x
+				and world_roi_end.y <= cell_end.y,
+			"screen_roi przypadku QA %s musi rzutować się w całości wewnątrz jego ArtCell." % case_id
+		)
+
+
+func _visibility_case_has_exact_keys(visibility_case: Dictionary) -> bool:
+	if visibility_case.size() != 3:
+		return false
+	return (
+		visibility_case.has("id")
+		and visibility_case.has("camera")
+		and visibility_case.has("screen_roi")
+	)
+
+
+func _is_exact_integer_array(values: Array, expected_size: int) -> bool:
+	if values.size() != expected_size:
+		return false
+	for value in values:
+		if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+			return false
+		if float(value) != float(int(value)):
+			return false
+	return true
+
+
+func _assert_r1_source_content(source_image: Image, source_path: String) -> void:
+	var normalized := source_image.duplicate() as Image
+	normalized.convert(Image.FORMAT_RGB8)
+	var source_data := normalized.get_data()
+	var source_width := normalized.get_width()
+	var downsampled_width := floori(
+		float(R1_SOURCE_CONTENT_BAND.size.x) / float(R1_SOURCE_CONTENT_DOWNSAMPLE)
+	)
+	var downsampled_height := floori(
+		float(R1_SOURCE_CONTENT_BAND.size.y) / float(R1_SOURCE_CONTENT_DOWNSAMPLE)
+	)
+	var downsampled := PackedByteArray()
+	downsampled.resize(downsampled_width * downsampled_height)
+	for output_y in range(downsampled_height):
+		for output_x in range(downsampled_width):
+			var red_sum := 0
+			var green_sum := 0
+			var blue_sum := 0
+			for block_y in range(R1_SOURCE_CONTENT_DOWNSAMPLE):
+				var source_offset := (
+					(
+						R1_SOURCE_CONTENT_BAND.position.y
+						+ output_y * R1_SOURCE_CONTENT_DOWNSAMPLE
+						+ block_y
+					) * source_width
+					+ R1_SOURCE_CONTENT_BAND.position.x
+					+ output_x * R1_SOURCE_CONTENT_DOWNSAMPLE
+				) * 3
+				for _block_x in range(R1_SOURCE_CONTENT_DOWNSAMPLE):
+					red_sum += int(source_data[source_offset])
+					green_sum += int(source_data[source_offset + 1])
+					blue_sum += int(source_data[source_offset + 2])
+					source_offset += 3
+			var weighted_sum := 299 * red_sum + 587 * green_sum + 114 * blue_sum
+			downsampled[output_y * downsampled_width + output_x] = clampi(
+				int(float(weighted_sum + 8000) / 16000.0),
+				0,
+				255
+			)
+
+	var structured_count := 0
+	var total_count := 0
+	var bin_structured := PackedInt32Array()
+	var bin_totals := PackedInt32Array()
+	bin_structured.resize(R1_SOURCE_CONTENT_BIN_COUNT)
+	bin_totals.resize(R1_SOURCE_CONTENT_BIN_COUNT)
+	var gradient_width := downsampled_width - 1
+	var gradient_height := downsampled_height - 1
+	for y in range(gradient_height):
+		for x in range(gradient_width):
+			var offset := y * downsampled_width + x
+			var gradient := maxi(
+				absi(int(downsampled[offset + 1]) - int(downsampled[offset])),
+				absi(int(downsampled[offset + downsampled_width]) - int(downsampled[offset]))
+			)
+			var bin_index := mini(
+				R1_SOURCE_CONTENT_BIN_COUNT - 1,
+				floori(float(x * R1_SOURCE_CONTENT_BIN_COUNT) / float(gradient_width))
+			)
+			total_count += 1
+			bin_totals[bin_index] += 1
+			if gradient >= R1_SOURCE_CONTENT_GRADIENT_THRESHOLD:
+				structured_count += 1
+				bin_structured[bin_index] += 1
+
+	var global_coverage := float(structured_count) / float(maxi(total_count, 1))
+	var passing_bins := 0
+	var formatted_bins := PackedStringArray()
+	for bin_index in range(R1_SOURCE_CONTENT_BIN_COUNT):
+		var bin_coverage := (
+			float(bin_structured[bin_index])
+			/ float(maxi(bin_totals[bin_index], 1))
+		)
+		formatted_bins.append("%.2f%%" % (bin_coverage * 100.0))
+		if bin_coverage >= R1_SOURCE_CONTENT_BIN_MIN_COVERAGE:
+			passing_bins += 1
+	_assert(
+		global_coverage >= R1_SOURCE_CONTENT_MIN_COVERAGE
+			and passing_bins >= R1_SOURCE_CONTENT_MIN_PASSING_BINS,
+		(
+			"Źródłowy R1 ArtCell ma za mało autorskiej struktury: %s; global=%.2f%% "
+			+ "(minimum %.2f%%), segmenty=%d/%d (minimum %d), bins=[%s]."
+		) % [
+			source_path,
+			global_coverage * 100.0,
+			R1_SOURCE_CONTENT_MIN_COVERAGE * 100.0,
+			passing_bins,
+			R1_SOURCE_CONTENT_BIN_COUNT,
+			R1_SOURCE_CONTENT_MIN_PASSING_BINS,
+			", ".join(formatted_bins),
+		]
+	)
+
+
+func _assert_r1_pixel_identical_overlaps(source_images_by_id: Dictionary) -> void:
+	for cell_index in range(1, EXPECTED_R1_ART_CELLS.size()):
+		var previous_id := str(EXPECTED_R1_ART_CELLS[cell_index - 1].get("id", ""))
+		var current_id := str(EXPECTED_R1_ART_CELLS[cell_index].get("id", ""))
+		if not source_images_by_id.has(previous_id) or not source_images_by_id.has(current_id):
+			continue
+		var previous := (source_images_by_id[previous_id] as Image).duplicate() as Image
+		var current := (source_images_by_id[current_id] as Image).duplicate() as Image
+		previous.convert(Image.FORMAT_RGBA8)
+		current.convert(Image.FORMAT_RGBA8)
+		var previous_overlap := previous.get_region(
+			Rect2i(
+				R1_ART_CELL_SIZE.x - R1_ART_CELL_OVERLAP,
+				0,
+				R1_ART_CELL_OVERLAP,
+				R1_ART_CELL_SIZE.y
+			)
+		)
+		var current_overlap := current.get_region(
+			Rect2i(0, 0, R1_ART_CELL_OVERLAP, R1_ART_CELL_SIZE.y)
+		)
+		_assert(
+			previous_overlap.get_data() == current_overlap.get_data(),
+			"Zakład %s/%s musi być identyczny pikselowo na pełnych 426 px."
+			% [previous_id, current_id]
+		)
 
 
 func _test_compiled_manifest(world) -> void:
