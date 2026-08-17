@@ -52,6 +52,7 @@ var _dropped_loot_fallback_sequence: int = 0
 var _runtime_dynamic: Node2D
 var _terrain_renderer: UnderwaterTerrainRenderer
 var _visual_chunk_streamer
+var _visual_layer_stack
 var _terrain_profiles: Array[Resource] = []
 var _collision_segments_by_chunk: Dictionary = {}
 var _loaded_collision_chunks: Dictionary = {}
@@ -163,6 +164,10 @@ func terrain_visual_profiles() -> Array[Resource]:
 
 func set_graphics_quality(quality_id: String) -> void:
 	_graphics_quality = quality_id if quality_id in ["low", "medium", "high"] else "high"
+	if _visual_layer_stack != null and is_instance_valid(_visual_layer_stack):
+		_visual_layer_stack.set_graphics_quality(_graphics_quality)
+	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
+		_visual_chunk_streamer.set_graphics_quality(_graphics_quality)
 	if _terrain_renderer != null:
 		_terrain_renderer.set_graphics_quality(_graphics_quality)
 	_apply_interactable_visual_setting(&"set_graphics_quality", _graphics_quality)
@@ -170,6 +175,10 @@ func set_graphics_quality(quality_id: String) -> void:
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
+	if _visual_layer_stack != null and is_instance_valid(_visual_layer_stack):
+		_visual_layer_stack.set_reduced_motion(enabled)
+	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
+		_visual_chunk_streamer.set_reduced_motion(enabled)
 	if _terrain_renderer != null:
 		_terrain_renderer.set_reduced_motion(enabled)
 	_apply_interactable_visual_setting(&"set_reduced_motion", enabled)
@@ -443,8 +452,8 @@ func landmark_id_at(world_position: Vector2) -> String:
 func update_streaming(world_position: Vector2, force: bool = false, visible_half_extent: Vector2 = Vector2.ZERO) -> void:
 	if _blueprint == null:
 		return
-	if _terrain_renderer != null:
-		_terrain_renderer.set_view_center(world_position)
+	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
+		_visual_chunk_streamer.update_streaming(world_position, visible_half_extent, force)
 	var center_chunk: Vector2i = _blueprint.chunk_coord_at(world_position)
 	var safe_chunk_size := maxi(_blueprint.chunk_size, 1)
 	var stream_radius := Vector2i(
@@ -464,8 +473,6 @@ func update_streaming(world_position: Vector2, force: bool = false, visible_half
 			streamed_sector_ids.append(str(landmark.get("id", "")))
 	if _terrain_renderer != null:
 		_terrain_renderer.set_active_chunks(active_chunk_keys)
-	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
-		_visual_chunk_streamer.update_streaming(world_position, visible_half_extent, force)
 	_sync_collision_chunks(active_chunk_keys)
 
 func _reset_dropped_loot_piles() -> void:
@@ -793,6 +800,7 @@ func _rebuild_world() -> void:
 	_collision_chunks_root = null
 	_terrain_renderer = null
 	_visual_chunk_streamer = null
+	_visual_layer_stack = null
 	_terrain_profiles.clear()
 	if not _snapshot_analysis_mode:
 		_build_source_visual_layers()
@@ -811,6 +819,9 @@ func _build_source_visual_layers() -> void:
 		return
 	visual_layers.name = "VisualLayers"
 	_runtime_add_child(visual_layers)
+	_visual_layer_stack = visual_layers.get_node_or_null("SixLayerVisuals")
+	if _visual_layer_stack == null:
+		push_error("Scena mapy nie zawiera stosu VisualLayers/SixLayerVisuals.")
 	_visual_chunk_streamer = visual_layers.get_node_or_null("VisualChunkStreamer")
 	if _visual_chunk_streamer == null:
 		_visual_chunk_streamer = VisualChunkStreamerScript.new()
@@ -827,7 +838,18 @@ func _build_source_visual_layers() -> void:
 	_terrain_renderer.chunk_size = _blueprint.chunk_size if _blueprint != null else 512
 	_terrain_renderer.region_profiles.assign(_terrain_profiles)
 	visual_layers.add_child(_terrain_renderer)
+	if _visual_layer_stack != null and _visual_layer_stack.has_method("content_root"):
+		_terrain_renderer.configure_layer_roots(
+			_visual_layer_stack.content_root("L00_base_color", "world", "generated"),
+			_visual_layer_stack.content_root("L01_ultra_far_silhouettes", "parallax", "generated"),
+			_visual_layer_stack.content_root("L04_near_terrain_skin", "world", "generated")
+		)
 	_terrain_renderer.rebuild_visuals()
+	if _visual_layer_stack != null:
+		_visual_layer_stack.set_graphics_quality(_graphics_quality)
+		_visual_layer_stack.set_reduced_motion(_reduced_motion)
+	_visual_chunk_streamer.set_graphics_quality(_graphics_quality)
+	_visual_chunk_streamer.set_reduced_motion(_reduced_motion)
 	_terrain_renderer.set_graphics_quality(_graphics_quality)
 	_terrain_renderer.set_reduced_motion(_reduced_motion)
 

@@ -10,6 +10,35 @@ const MapNavigationRasterScript := preload("res://scripts/diving/MapNavigationRa
 const TerrainDerivativesScript := preload("res://scripts/diving/DiveTerrainDerivatives.gd")
 
 const MAP_SCENE_PATH := "res://scenes/diving/UnderwaterMap.tscn"
+const VISUAL_COMPOSITION_SCENE_PATH := "res://scenes/diving/map_visuals/UnderwaterMapSixLayerVisuals.tscn"
+const VISUAL_LAYER_ELEMENT_TEMPLATE_PATH := "res://scenes/diving/map_visuals/LayerVisualElement.tscn"
+const VISUAL_CHUNK_MANIFEST_PATH := "res://assets/diving/world/map_v2/visual_chunks/map_visual_chunks_v2.json"
+const VISUAL_LAYER_PROFILE_PATHS: Array[String] = [
+	"res://data/diving_visuals/layers/l00_base_color.tres",
+	"res://data/diving_visuals/layers/l01_ultra_far_silhouettes.tres",
+	"res://data/diving_visuals/layers/l02_far_structures.tres",
+	"res://data/diving_visuals/layers/l03_mid_drift_props.tres",
+	"res://data/diving_visuals/layers/l04_near_terrain_skin.tres",
+	"res://data/diving_visuals/layers/l05_foreground_occluders.tres",
+]
+const EXPECTED_VISUAL_LAYER_IDS: Array[String] = [
+	"L00_base_color",
+	"L01_ultra_far_silhouettes",
+	"L02_far_structures",
+	"L03_mid_drift_props",
+	"L04_near_terrain_skin",
+	"L05_foreground_occluders",
+]
+const VISUAL_MANIFEST_FORBIDDEN_TRANSFORM_FIELDS: Array[String] = [
+	"position",
+	"rotation",
+	"rotation_degrees",
+	"scale",
+	"skew",
+	"transform",
+	"transform_2d",
+	"z_index",
+]
 ## Source version 4 remains stable because the Polygon2D cutover reproduces the
 ## established semantic cells exactly and changes neither blueprint data nor
 ## save meaning. Scene polygons are now the authority; the committed PNG is a
@@ -141,7 +170,8 @@ func ensure_world_is_current(world) -> PackedStringArray:
 
 func _compile_source_map(campaign_seed: int) -> Dictionary:
 	var normalized_seed := maxi(campaign_seed, 1)
-	var source_fingerprint := _source_dependency_fingerprint()
+	var strict_source_hashes := OS.has_feature("editor")
+	var source_fingerprint := _source_dependency_fingerprint(strict_source_hashes)
 	if source_fingerprint != _compiled_source_fingerprint:
 		clear_runtime_caches()
 		_compiled_source_fingerprint = source_fingerprint
@@ -172,7 +202,7 @@ func _compile_source_map(campaign_seed: int) -> Dictionary:
 	_terrain_detail_texture_cache = source_root.terrain_detail_texture
 	_terrain_visual_profiles_cache.assign(source_root.terrain_visual_profiles)
 	_cache_source_dependency_paths(source_root)
-	_compiled_source_fingerprint = _source_dependency_fingerprint()
+	_compiled_source_fingerprint = _source_dependency_fingerprint(strict_source_hashes)
 	source_root.free()
 	var errors: PackedStringArray = compilation.get("errors", PackedStringArray())
 	var blueprint = compilation.get("blueprint")
@@ -181,10 +211,31 @@ func _compile_source_map(campaign_seed: int) -> Dictionary:
 	return compilation
 
 
-static func _source_dependency_fingerprint() -> String:
+static func _source_dependency_fingerprint(strict_source_hashes: bool = true) -> String:
 	var payload := PackedStringArray()
 	for dependency_path in _source_dependency_paths:
-		if FileAccess.file_exists(dependency_path):
+		if strict_source_hashes and FileAccess.file_exists(dependency_path):
+			payload.append("%s:%s" % [dependency_path, FileAccess.get_sha256(dependency_path).to_lower()])
+		elif (
+			not strict_source_hashes
+			and dependency_path == VISUAL_CHUNK_MANIFEST_PATH
+			and FileAccess.file_exists(dependency_path)
+		):
+			# The schema JSON is a direct non-resource input even if a platform
+			# happens to expose a generic loader for its extension.
+			payload.append("%s:%s" % [dependency_path, FileAccess.get_sha256(dependency_path).to_lower()])
+		elif not strict_source_hashes and ResourceLoader.exists(dependency_path):
+			# Exported resources live in the PCK/import remap and need not expose
+			# their source bytes through FileAccess. Their immutable export plus a
+			# stable resolved type is sufficient for a runtime cache fingerprint;
+			# editor builds retain byte-accurate invalidation above.
+			var resource_marker := dependency_path.get_extension().to_lower()
+			if resource_marker.is_empty():
+				resource_marker = "resource"
+			payload.append("%s:resource:%s" % [dependency_path, resource_marker])
+		elif not strict_source_hashes and FileAccess.file_exists(dependency_path):
+			# Non-resource inputs such as the JSON manifest remain directly
+			# readable from an exported pack and can keep byte-accurate identity.
 			payload.append("%s:%s" % [dependency_path, FileAccess.get_sha256(dependency_path).to_lower()])
 		else:
 			payload.append("%s:missing" % dependency_path)
@@ -193,6 +244,11 @@ static func _source_dependency_fingerprint() -> String:
 
 static func _cache_source_dependency_paths(source_root: UnderwaterMapScene) -> void:
 	var dependencies := PackedStringArray([MAP_SCENE_PATH])
+	dependencies.append(VISUAL_COMPOSITION_SCENE_PATH)
+	dependencies.append(VISUAL_LAYER_ELEMENT_TEMPLATE_PATH)
+	dependencies.append(VISUAL_CHUNK_MANIFEST_PATH)
+	for profile_path in VISUAL_LAYER_PROFILE_PATHS:
+		dependencies.append(profile_path)
 	if OS.has_feature("editor"):
 		dependencies.append(TerrainDerivativesScript.NAVIGATION_MANIFEST_PATH)
 		dependencies.append(TerrainDerivativesScript.SDF_MANIFEST_PATH)
@@ -201,6 +257,22 @@ static func _cache_source_dependency_paths(source_root: UnderwaterMapScene) -> v
 	_append_resource_path(dependencies, source_root.terrain_detail_texture)
 	for profile in source_root.terrain_visual_profiles:
 		_append_resource_path(dependencies, profile)
+	var visual_stack := source_root.get_node_or_null("VisualLayers/SixLayerVisuals")
+	if visual_stack != null:
+		for layer_id in EXPECTED_VISUAL_LAYER_IDS:
+			var layer_node := visual_stack.get_node_or_null(NodePath(layer_id))
+			if layer_node is DiveVisualLayer:
+				_append_resource_path(dependencies, (layer_node as DiveVisualLayer).profile)
+		for node in visual_stack.find_children("*", "", true, false):
+			if not (node is DiveVisualLayerElement):
+				continue
+			var element_resource_path := (node as DiveVisualLayerElement).resource_path.strip_edges()
+			if (
+				element_resource_path.begins_with("res://")
+				and not dependencies.has(element_resource_path)
+			):
+				# Direct hashing keeps sparse textures out of ResourceLoader's cache.
+				dependencies.append(element_resource_path)
 	dependencies.sort()
 	_source_dependency_paths = dependencies
 
@@ -209,6 +281,378 @@ static func _append_resource_path(paths: PackedStringArray, resource: Resource) 
 	if resource == null or resource.resource_path.is_empty() or paths.has(resource.resource_path):
 		return
 	paths.append(resource.resource_path)
+
+
+static func _visual_manifest_file_validation_errors(
+	visual_stack: Node,
+	expected_world_size: Vector2,
+	strict_source_hashes: bool = true
+) -> PackedStringArray:
+	if not FileAccess.file_exists(VISUAL_CHUNK_MANIFEST_PATH):
+		return PackedStringArray([
+			"Brak manifestu v2: %s." % VISUAL_CHUNK_MANIFEST_PATH,
+		])
+	var parser := JSON.new()
+	var parse_status := parser.parse(FileAccess.get_file_as_string(VISUAL_CHUNK_MANIFEST_PATH))
+	if parse_status != OK:
+		return PackedStringArray([
+			"Nie można odczytać JSON manifestu v2 (wiersz %d): %s."
+			% [parser.get_error_line(), parser.get_error_message()],
+		])
+	return visual_manifest_validation_errors(
+		visual_stack,
+		parser.data,
+		expected_world_size,
+		strict_source_hashes
+	)
+
+
+## Pure compiler gate shared with negative tests. It deliberately reports
+## expected authoring failures instead of calling push_error().
+static func visual_manifest_validation_errors(
+	visual_stack: Node,
+	manifest_value: Variant,
+	expected_world_size: Vector2 = Vector2.ZERO,
+	strict_source_hashes: bool = true
+) -> PackedStringArray:
+	var errors := PackedStringArray()
+	if visual_stack == null:
+		errors.append("Walidacja manifestu wymaga scenowego stosu sześciu warstw.")
+		return errors
+	if not (manifest_value is Dictionary):
+		errors.append("Manifest v2 musi być słownikiem JSON.")
+		return errors
+	var manifest: Dictionary = manifest_value
+	if int(manifest.get("schema_version", 0)) != 2:
+		errors.append("Manifest warstw wizualnych musi używać schema_version = 2.")
+		return errors
+	if str(manifest.get("transform_authority", "")) != "composition_scene_only":
+		errors.append("Manifest v2 musi pozostawić transformy scenie kompozycji.")
+
+	var manifest_world_size_value = _manifest_vector2(manifest.get("world_size", null))
+	if manifest_world_size_value == null:
+		errors.append("Manifest v2 wymaga dodatniego world_size [x, y].")
+	elif (
+		expected_world_size.x > 0.0
+		and expected_world_size.y > 0.0
+		and not (manifest_world_size_value as Vector2).is_equal_approx(expected_world_size)
+	):
+		errors.append(
+			"Manifest v2 ma world_size %s zamiast %s."
+			% [manifest_world_size_value, expected_world_size]
+		)
+
+	var composition_value = manifest.get("composition_scene", null)
+	if not (composition_value is Dictionary):
+		errors.append("Manifest v2 wymaga rekordu composition_scene.")
+	else:
+		var composition: Dictionary = composition_value
+		var composition_path := str(composition.get("path", ""))
+		if composition_path != VISUAL_COMPOSITION_SCENE_PATH:
+			errors.append(
+				"Manifest v2 wskazuje kompozycję %s zamiast %s."
+				% [composition_path, VISUAL_COMPOSITION_SCENE_PATH]
+			)
+		_append_manifest_resource_hash_errors(
+			errors,
+			composition_path,
+			str(composition.get("sha256", "")),
+			"Scena kompozycji",
+			"PackedScene",
+			strict_source_hashes
+		)
+
+	var layers_value = manifest.get("layers", null)
+	if not (layers_value is Array) or layers_value.size() != EXPECTED_VISUAL_LAYER_IDS.size():
+		errors.append("Manifest v2 musi zawierać dokładnie sześć warstw L00-L05.")
+	else:
+		var layers: Array = layers_value
+		for layer_index in range(EXPECTED_VISUAL_LAYER_IDS.size()):
+			var layer_value = layers[layer_index]
+			if not (layer_value is Dictionary):
+				errors.append("Warstwa manifestu v2 na pozycji %d musi być słownikiem." % layer_index)
+				continue
+			var layer: Dictionary = layer_value
+			var expected_layer_id := EXPECTED_VISUAL_LAYER_IDS[layer_index]
+			if str(layer.get("id", "")) != expected_layer_id:
+				errors.append(
+					"Manifest v2 ma niepoprawne ID warstwy na pozycji %d; oczekiwano %s."
+					% [layer_index, expected_layer_id]
+				)
+			var profile_path := str(layer.get("profile_path", ""))
+			var expected_profile_path := VISUAL_LAYER_PROFILE_PATHS[layer_index]
+			if profile_path != expected_profile_path:
+				errors.append(
+					"Warstwa %s wskazuje profil %s zamiast %s."
+					% [expected_layer_id, profile_path, expected_profile_path]
+				)
+			var actual_profile_path := _visual_layer_profile_path(
+				visual_stack,
+				expected_layer_id
+			)
+			if actual_profile_path.is_empty():
+				errors.append(
+					"Warstwa %s nie ma faktycznie przypisanego zapisanego profilu."
+					% expected_layer_id
+				)
+			else:
+				if actual_profile_path != expected_profile_path:
+					errors.append(
+						"Warstwa %s ma faktycznie przypisany profil %s zamiast kanonicznego %s."
+						% [expected_layer_id, actual_profile_path, expected_profile_path]
+					)
+				if actual_profile_path != profile_path:
+					errors.append(
+						"Warstwa %s ma faktycznie przypisany profil %s zamiast profile_path manifestu %s."
+						% [expected_layer_id, actual_profile_path, profile_path]
+					)
+			_append_manifest_resource_hash_errors(
+				errors,
+				profile_path,
+				str(layer.get("profile_sha256", "")),
+				"Profil warstwy %s" % expected_layer_id,
+				"DiveVisualLayerProfile",
+				strict_source_hashes
+			)
+
+	var manifest_counts: Dictionary = {}
+	var manifest_records: Dictionary = {}
+	var payloads_value = manifest.get("payloads", null)
+	if not (payloads_value is Array):
+		errors.append("Manifest v2 wymaga tablicy payloads.")
+	else:
+		for payload_index in range(payloads_value.size()):
+			var payload_value = payloads_value[payload_index]
+			if not (payload_value is Dictionary):
+				errors.append("Payload v2 na pozycji %d musi być słownikiem." % payload_index)
+				continue
+			var payload: Dictionary = payload_value
+			var target_layer := str(payload.get("target_layer", ""))
+			if not EXPECTED_VISUAL_LAYER_IDS.has(target_layer):
+				errors.append("Payload v2 wskazuje nieznaną warstwę %s." % target_layer)
+			if str(payload.get("placement_authority", "")) != "composition_scene_elements":
+				errors.append("Payload v2 musi pozostawić rozmieszczenie elementom sceny kompozycji.")
+			var elements_value = payload.get("elements", null)
+			if not (elements_value is Array):
+				errors.append("Payload v2 %d wymaga tablicy elements." % payload_index)
+				continue
+			for element_index in range(elements_value.size()):
+				var entry_value = elements_value[element_index]
+				if not (entry_value is Dictionary):
+					errors.append(
+						"Element payloadu v2 %d/%d musi być słownikiem."
+						% [payload_index, element_index]
+					)
+					continue
+				var entry: Dictionary = entry_value
+				for forbidden_field in VISUAL_MANIFEST_FORBIDDEN_TRANSFORM_FIELDS:
+					if entry.has(forbidden_field):
+						errors.append(
+							"Element payloadu v2 %d/%d zawiera scenowe pole transformu %s."
+							% [payload_index, element_index, forbidden_field]
+						)
+				var key := str(entry.get("key", "")).strip_edges()
+				if key.is_empty():
+					errors.append("Element payloadu v2 %d/%d wymaga niepustego key." % [payload_index, element_index])
+					continue
+				manifest_counts[key] = int(manifest_counts.get(key, 0)) + 1
+				if not manifest_records.has(key):
+					manifest_records[key] = {
+						"path": str(entry.get("path", "")).strip_edges(),
+						"target_layer": target_layer,
+					}
+				var entry_path := str(entry.get("path", "")).strip_edges()
+				_append_manifest_resource_hash_errors(
+					errors,
+					entry_path,
+					str(entry.get("sha256", "")),
+					"Element %s" % key,
+					_expected_manifest_payload_resource_type(entry_path),
+					strict_source_hashes
+				)
+				for rect_field in ["source_rect", "texture_region", "world_rect"]:
+					if not _is_valid_manifest_rect(entry.get(rect_field, null)):
+						errors.append("Element %s ma niepoprawne %s." % [key, rect_field])
+
+	if manifest_counts.is_empty():
+		errors.append("Manifest v2 nie zawiera żadnych elementów.")
+	for key_variant in manifest_counts.keys():
+		var key := str(key_variant)
+		if int(manifest_counts[key]) != 1:
+			errors.append("Manifest v2 zawiera powtórzony key %s." % key)
+
+	_append_visual_manifest_mapping_errors(
+		errors,
+		visual_stack,
+		manifest_counts,
+		manifest_records
+	)
+	return errors
+
+
+static func _append_visual_manifest_mapping_errors(
+	errors: PackedStringArray,
+	visual_stack: Node,
+	manifest_counts: Dictionary,
+	manifest_records: Dictionary
+) -> void:
+	var scene_counts: Dictionary = {}
+	var streamed_scene_counts: Dictionary = {}
+	var scene_elements: Dictionary = {}
+	for node in visual_stack.find_children("*", "", true, false):
+		if not (node is DiveVisualLayerElement):
+			continue
+		var element := node as DiveVisualLayerElement
+		var key := String(element.element_id).strip_edges()
+		if key.is_empty():
+			continue
+		scene_counts[key] = int(scene_counts.get(key, 0)) + 1
+		if not scene_elements.has(key):
+			scene_elements[key] = element
+		if element.is_manifest_streamed():
+			streamed_scene_counts[key] = int(streamed_scene_counts.get(key, 0)) + 1
+
+	var manifest_keys := PackedStringArray()
+	for key_variant in manifest_counts.keys():
+		manifest_keys.append(str(key_variant))
+	manifest_keys.sort()
+	for key in manifest_keys:
+		var manifest_count := int(manifest_counts.get(key, 0))
+		var scene_count := int(scene_counts.get(key, 0))
+		var streamed_count := int(streamed_scene_counts.get(key, 0))
+		if manifest_count != 1:
+			continue
+		if scene_count != 1:
+			errors.append(
+				"Wpis manifestu v2 %s wymaga dokładnie jednego scenowego elementu; znaleziono %d."
+				% [key, scene_count]
+			)
+			continue
+		if streamed_count != 1:
+			errors.append("Element %s z manifestu v2 musi używać trybu Manifest Streamed." % key)
+			continue
+		var element := scene_elements.get(key) as DiveVisualLayerElement
+		var record: Dictionary = manifest_records.get(key, {})
+		if element.resource_path.strip_edges() != str(record.get("path", "")):
+			errors.append("Element %s wskazuje inny zasób niż manifest v2." % key)
+		var actual_layer_id := _visual_element_layer_id(visual_stack, element)
+		var expected_layer_id := str(record.get("target_layer", ""))
+		if actual_layer_id != expected_layer_id:
+			errors.append(
+				"Element %s należy do warstwy %s zamiast wskazanej w manifeście %s."
+				% [key, actual_layer_id, expected_layer_id]
+			)
+
+	var streamed_keys := PackedStringArray()
+	for key_variant in streamed_scene_counts.keys():
+		streamed_keys.append(str(key_variant))
+	streamed_keys.sort()
+	for key in streamed_keys:
+		var manifest_count := int(manifest_counts.get(key, 0))
+		if manifest_count != 1:
+			errors.append(
+				"Scenowy element Manifest Streamed %s wymaga dokładnie jednego wpisu manifestu v2; znaleziono %d."
+				% [key, manifest_count]
+			)
+
+
+static func _visual_element_layer_id(visual_stack: Node, element: Node) -> String:
+	var ancestor := element.get_parent()
+	while ancestor != null and ancestor != visual_stack:
+		if ancestor.get_parent() == visual_stack:
+			if ancestor.has_method("layer_id"):
+				return str(ancestor.call("layer_id"))
+			return str(ancestor.name)
+		ancestor = ancestor.get_parent()
+	return ""
+
+
+static func _visual_layer_profile_path(visual_stack: Node, layer_id: String) -> String:
+	var layer_node := visual_stack.get_node_or_null(NodePath(layer_id))
+	if not (layer_node is DiveVisualLayer):
+		return ""
+	var profile := (layer_node as DiveVisualLayer).profile
+	return profile.resource_path.strip_edges() if profile != null else ""
+
+
+static func _expected_manifest_payload_resource_type(resource_path: String) -> String:
+	var extension := resource_path.get_extension().to_lower()
+	if ResourceLoader.get_recognized_extensions_for_type("PackedScene").has(extension):
+		return "PackedScene"
+	return "Texture2D"
+
+
+static func _append_manifest_resource_hash_errors(
+	errors: PackedStringArray,
+	resource_path: String,
+	expected_sha256: String,
+	context: String,
+	expected_resource_type: String,
+	strict_source_hashes: bool
+) -> void:
+	if not resource_path.begins_with("res://"):
+		errors.append("%s wskazuje brakujący zasób %s." % [context, resource_path])
+		return
+	if not _is_sha256(expected_sha256):
+		errors.append("%s nie zawiera poprawnego SHA-256." % context)
+	if strict_source_hashes:
+		if not FileAccess.file_exists(resource_path):
+			errors.append("%s wskazuje brakujący zasób %s." % [context, resource_path])
+			return
+		if _is_sha256(expected_sha256):
+			var actual_sha256 := FileAccess.get_sha256(resource_path).to_lower()
+			if actual_sha256 != expected_sha256.to_lower():
+				errors.append(
+					"%s ma SHA-256 %s zamiast %s."
+					% [context, actual_sha256, expected_sha256.to_lower()]
+				)
+		return
+	if not ResourceLoader.exists(resource_path):
+		errors.append("%s wskazuje brakujący zasób %s." % [context, resource_path])
+	elif not _resource_extension_matches_expected_type(resource_path, expected_resource_type):
+		errors.append(
+			"%s wskazuje %s, który nie jest zasobem typu %s."
+			% [context, resource_path, expected_resource_type]
+		)
+
+
+static func _resource_extension_matches_expected_type(
+	resource_path: String,
+	expected_resource_type: String
+) -> bool:
+	if expected_resource_type.is_empty():
+		return true
+	var extension := resource_path.get_extension().to_lower()
+	match expected_resource_type:
+		"PackedScene":
+			return extension in ["tscn", "scn"]
+		"Texture2D":
+			# Importowane obrazy są w PCK remapowane do formatu silnika, dlatego
+			# ResourceLoader nie raportuje źródłowego PNG jako rozszerzenia Texture2D.
+			return extension in ["png", "jpg", "jpeg", "webp", "svg", "bmp", "tga", "dds", "ktx", "hdr", "exr"]
+		"DiveVisualLayerProfile":
+			# Faktyczny profil jest już przypisany do warstwy i sprawdzany wyżej.
+			return extension in ["tres", "res"]
+	return false
+
+
+static func _manifest_vector2(value: Variant) -> Variant:
+	if not (value is Array) or value.size() != 2:
+		return null
+	for component in value:
+		if typeof(component) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(component)):
+			return null
+	var result := Vector2(float(value[0]), float(value[1]))
+	return result if result.x > 0.0 and result.y > 0.0 else null
+
+
+static func _is_valid_manifest_rect(value: Variant) -> bool:
+	if not (value is Array) or value.size() != 4:
+		return false
+	for component in value:
+		if typeof(component) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(component)):
+			return false
+	return float(value[2]) > 0.0 and float(value[3]) > 0.0
 
 
 func compile_map(map_root: UnderwaterMapScene, campaign_seed: int = 1) -> Dictionary:
@@ -247,6 +691,44 @@ func compile_map(map_root: UnderwaterMapScene, campaign_seed: int = 1) -> Dictio
 	for required_path in REQUIRED_AUTHORING_NODES:
 		if map_root.get_node_or_null(required_path) == null:
 			errors.append("Scena mapy nie zawiera wymaganej grupy %s." % required_path)
+	var visual_layers_parent := map_root.get_node_or_null("VisualLayers") as Node2D
+	if visual_layers_parent == null:
+		errors.append("Scena mapy wymaga VisualLayers typu Node2D.")
+	elif (
+		not visual_layers_parent.position.is_equal_approx(Vector2.ZERO)
+		or not is_zero_approx(visual_layers_parent.rotation)
+		or not visual_layers_parent.scale.is_equal_approx(Vector2.ONE)
+		or not is_zero_approx(visual_layers_parent.skew)
+		or visual_layers_parent.top_level
+	):
+		errors.append(
+			"VisualLayers musi zachować identity transform i top_level = false, "
+			+ "aby L04 nie odsunęła grafiki terenu od kolizji i SDF."
+		)
+	var visual_streamer := map_root.get_node_or_null(
+		"VisualLayers/VisualChunkStreamer"
+	) as DiveVisualChunkStreamer
+	if visual_streamer == null:
+		errors.append("Scena mapy wymaga VisualLayers/VisualChunkStreamer.")
+	elif visual_streamer.manifest_path != VISUAL_CHUNK_MANIFEST_PATH:
+		errors.append(
+			"Produkcyjny VisualChunkStreamer musi używać manifestu v2 %s, a wskazuje %s."
+			% [VISUAL_CHUNK_MANIFEST_PATH, visual_streamer.manifest_path]
+		)
+	var visual_stack := map_root.get_node_or_null("VisualLayers/SixLayerVisuals")
+	if visual_stack == null:
+		errors.append("Scena mapy nie zawiera kompozycji VisualLayers/SixLayerVisuals.")
+	elif not visual_stack.has_method("validation_errors"):
+		errors.append("Kompozycja SixLayerVisuals nie implementuje walidacji warstw.")
+	else:
+		for visual_error in visual_stack.validation_errors():
+			errors.append("Warstwy wizualne: %s" % visual_error)
+		for manifest_error in _visual_manifest_file_validation_errors(
+			visual_stack,
+			map_root.world_size,
+			OS.has_feature("editor")
+		):
+			errors.append("Manifest warstw wizualnych: %s" % manifest_error)
 
 	var macro_raster := TerrainDerivativesScript.rasterize_map(map_root)
 	var macro_errors: PackedStringArray = macro_raster.get("errors", PackedStringArray())

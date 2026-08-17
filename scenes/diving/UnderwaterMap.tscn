@@ -41,6 +41,7 @@
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineR3CableVisual.tscn" id="43_visual_common_line_r3"]
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/CommonLineC4CableVisual.tscn" id="44_visual_common_line_c4"]
 [ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/R1J7ArtCell.tscn" id="46_visual_r1_j7_art_cell"]
+[ext_resource type="PackedScene" path="res://scenes/diving/map_visuals/UnderwaterMapSixLayerVisuals.tscn" id="47_six_layer_visuals"]
 
 [node name="UnderwaterMap" type="Node2D" unique_id=1534845512]
 editor_description = "Jedno źródło prawdy świata podwodnego. Tunele i skały edytuj jako Polygon2D w Terrain/TerrainNavigation, trasy jako Path2D, a obiekty jako instancje map_objects. Po zmianie terenu użyj Odbuduj PNG i SDF terenu, potem Waliduj mapę."
@@ -54,14 +55,10 @@ terrain_visual_profiles = Array[Resource]([ExtResource("28_visual_r1"), ExtResou
 
 [node name="VisualLayers" type="Node2D" parent="." unique_id=1485954516]
 
-[node name="EnvironmentDecoration" type="Node2D" parent="VisualLayers" unique_id=2144235696]
-z_index = -90
+[node name="SixLayerVisuals" parent="VisualLayers" unique_id=854819668 instance=ExtResource("47_six_layer_visuals")]
 
 [node name="VisualChunkStreamer" type="Node2D" parent="VisualLayers" unique_id=348195514]
 script = ExtResource("38_visual_streamer")
-
-[node name="TopOverlay" type="Node2D" parent="VisualLayers" unique_id=1798141132]
-z_index = 100
 
 [node name="Terrain" type="Node2D" parent="." unique_id=763603734]
 
@@ -432,16 +429,6 @@ landmark_role = "salvage"
 visual_kind = "garden_center"
 aliases = PackedStringArray()
 
-[node name="R2_04_BankNasion" parent="Landmarks" unique_id=810474644 instance=ExtResource("9_landmark")]
-position = Vector2(8564, 1372)
-object_id = "R2-04"
-display_name = "Bank Nasion"
-region_id = "R2"
-bounds_size = Vector2(1542.3275, 333.5392)
-landmark_role = "critical_food"
-visual_kind = "seed_bank"
-aliases = PackedStringArray()
-
 [node name="R2_05_Przedmiescia" parent="Landmarks" unique_id=1459417021 instance=ExtResource("9_landmark")]
 position = Vector2(9844, 2204)
 object_id = "R2-05"
@@ -712,24 +699,6 @@ to_landmark_id = "R2-05"
 kind = 1
 width = 148.8
 
-[node name="C019_CentrumOgrodniczeBankNasion" parent="Routes" unique_id=1422708360 instance=ExtResource("12_connection")]
-connection_id = "C019"
-from_landmark_id = "R2-03"
-to_landmark_id = "R2-04"
-width = 148.8
-
-[node name="C020_BankNasionPrzedmiescia" parent="Routes" unique_id=653696845 instance=ExtResource("12_connection")]
-connection_id = "C020"
-from_landmark_id = "R2-04"
-to_landmark_id = "R2-05"
-width = 156.0
-
-[node name="C021_BankNasionFabryka" parent="Routes" unique_id=149500455 instance=ExtResource("12_connection")]
-connection_id = "C021"
-from_landmark_id = "R2-04"
-to_landmark_id = "R3-03"
-width = 148.8
-
 [node name="C022_PrzedmiesciaKorytarze" parent="Routes" unique_id=1187896717 instance=ExtResource("12_connection")]
 connection_id = "C022"
 from_landmark_id = "R2-05"
@@ -846,13 +815,6 @@ from_landmark_id = "R1-04"
 to_landmark_id = "R1-00"
 kind = 2
 width = 124.8
-
-[node name="SC02_BankNasionArchiwum" parent="Routes" unique_id=1818797472 instance=ExtResource("12_connection")]
-connection_id = "SC-02"
-from_landmark_id = "R2-04"
-to_landmark_id = "R1-09"
-kind = 2
-width = 120.0
 
 [node name="SC03_SzklarniaMuzeum" parent="Routes" unique_id=1003623006 instance=ExtResource("12_connection")]
 connection_id = "SC-03"
@@ -1067,24 +1029,11 @@ display_name = "Skrzynia ogrodnika"
 linked_object_id = "R2-01"
 contents = {
 "fabric_rubber": 2,
-"food": 8
+"food": 14
 }
 required_tool = "knife"
 interaction_action = "cut"
 interaction_seconds = 1.55
-
-[node name="SeedBankVault" parent="Gameplay/Containers" unique_id=294164668 instance=ExtResource("14_container")]
-position = Vector2(8636, 1428)
-object_id = "seed_bank_vault"
-display_name = "Kapsuła nasion"
-linked_object_id = "R2-04"
-contents = {
-"food": 11,
-"tech_parts": 1
-}
-required_tool = "crowbar"
-interaction_action = "pry"
-interaction_seconds = 2.1
 
 [node name="PortToolCrate" parent="Gameplay/Containers" unique_id=1987832941 instance=ExtResource("14_container")]
 position = Vector2(2000, 2800)
@@ -1189,7 +1138,7 @@ display_name = "Zalany domek techniczny"
 linked_object_id = "R2-02"
 contents = {
 "fabric_rubber": 5,
-"food": 2,
+"food": 7,
 "planks": 16,
 "scrap": 4
 }
@@ -1206,7 +1155,7 @@ contents = {
 "fabric_rubber": 6,
 "planks": 18,
 "scrap": 5,
-"tech_parts": 1
+"tech_parts": 2
 }
 required_tool = "knife"
 interaction_action = "cut"
@@ -1606,14 +1555,6 @@ interaction_action = "cut"
 gate_width = 168.48
 visual_scene = ExtResource("41_visual_cable_blockage")
 visual_z_index = 2
-
-[node name="ShortcutSC02" parent="Gameplay/ShortcutGates" unique_id=2039098167 instance=ExtResource("20_shortcut")]
-position = Vector2(8180, 1340)
-rotation = -0.903924
-object_id = "SC-02"
-display_name = "Skrót: Bank Nasion — Archiwum"
-linked_object_id = "SC-02"
-gate_width = 162.0
 
 [node name="ShortcutSC03" parent="Gameplay/ShortcutGates" unique_id=1789240080 instance=ExtResource("20_shortcut")]
 position = Vector2(2580, 1412)

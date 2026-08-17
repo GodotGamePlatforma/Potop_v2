@@ -129,6 +129,9 @@ func refresh_editor_previews() -> void:
 		if node is DiveMapObject:
 			(node as DiveMapObject).refresh_editor_preview()
 			refreshed += 1
+		elif node.has_method("refresh_editor_preview"):
+			node.refresh_editor_preview()
+			refreshed += 1
 	print("[UnderwaterMap] Odświeżono podglądy prefabów: %d." % refreshed)
 	queue_redraw()
 
@@ -193,6 +196,14 @@ func _get_configuration_warnings() -> PackedStringArray:
 	for required_path in REQUIRED_AUTHORING_NODES:
 		if get_node_or_null(required_path) == null:
 			warnings.append("Brakuje wymaganej grupy authoringu: %s." % required_path)
+	var visual_stack := get_node_or_null("VisualLayers/SixLayerVisuals")
+	if visual_stack == null:
+		warnings.append("Mapa wymaga kompozycji VisualLayers/SixLayerVisuals.")
+	elif not visual_stack.has_method("validation_errors"):
+		warnings.append("Kompozycja SixLayerVisuals nie implementuje walidacji warstw.")
+	else:
+		for visual_error in visual_stack.validation_errors():
+			warnings.append("Warstwy wizualne: %s" % visual_error)
 	for validation_error in _last_validation_errors:
 		warnings.append("Walidacja: %s" % validation_error)
 	return warnings

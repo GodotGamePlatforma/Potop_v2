@@ -6,6 +6,15 @@ const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const PersistentInteractableScript := preload("res://scripts/diving/DivePersistentInteractable.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 
+const EXPECTED_VISUAL_LAYER_IDS: Array[StringName] = [
+	&"L00_base_color",
+	&"L01_ultra_far_silhouettes",
+	&"L02_far_structures",
+	&"L03_mid_drift_props",
+	&"L04_near_terrain_skin",
+	&"L05_foreground_occluders",
+]
+
 var _failed := false
 
 func _initialize() -> void:
@@ -43,6 +52,13 @@ func _run() -> void:
 					"Kazdy prezentacyjny occluder musi korzystac z konturu wspolnej maski."
 				)
 		_assert(occluder_count > 0, "Streamowany collider skaly powinien dostarczac occludery latarki z tego samego konturu.")
+	var visual_stack := dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/SixLayerVisuals") as DiveVisualLayerStack
+	_assert(visual_stack != null and visual_stack.validation_errors().is_empty(), "Runtime powinien zachować poprawny stos dokładnie sześciu edytowalnych warstw.")
+	if visual_stack != null:
+		_assert(visual_stack.get_child_count() == EXPECTED_VISUAL_LAYER_IDS.size(), "Runtime nie może zgubić ani dodać siódmej warstwy wizualnej.")
+		for layer_id in EXPECTED_VISUAL_LAYER_IDS:
+			var layer := visual_stack.layer_root(layer_id)
+			_assert(layer != null and StringName(layer.name) == layer_id, "Runtime musi zachować stabilną warstwę %s." % layer_id)
 	var terrain_renderer = dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/TerrainRenderer")
 	_assert(terrain_renderer is UnderwaterTerrainRenderer, "Mapa powinna zawierac chunkowany renderer terenu ze wspolnej maski.")
 	if terrain_renderer is UnderwaterTerrainRenderer:
@@ -56,6 +72,10 @@ func _run() -> void:
 		_assert(int(terrain_state.get("backdrop_material_count", 0)) == 1, "Dalekie tlo biomow powinno wspoldzielic jeden material globalny.")
 		_assert(int(terrain_state.get("backdrop_z_index", 0)) == -95, "Dalekie tlo biomow powinno lezec miedzy woda a dekoracjami srodowiska.")
 		_assert(bool(terrain_state.get("uses_global_terrain_layer", false)), "Proceduralna skala powinna byc jedna pelnomapowa warstwa bez szwow miedzy chunkami.")
+		if visual_stack != null:
+			_assert(str(terrain_state.get("water_parent", "")) == str(visual_stack.content_root(&"L00_base_color", &"world", &"generated").get_path()), "Renderer musi kierować wodę do L00/WorldContent/Generated.")
+			_assert(str(terrain_state.get("backdrop_parent", "")) == str(visual_stack.content_root(&"L01_ultra_far_silhouettes", &"parallax", &"generated").get_path()), "Renderer musi kierować dalekie sylwetki do L01/ParallaxContent/Generated.")
+			_assert(str(terrain_state.get("terrain_parent", "")) == str(visual_stack.content_root(&"L04_near_terrain_skin", &"world", &"generated").get_path()), "Renderer musi kierować skórę terenu do L04/WorldContent/Generated.")
 	var blueprint = dive_map._blueprint
 	var empty_chunk_key := ""
 	var empty_chunk_coordinates := Vector2i(-1, -1)
@@ -81,16 +101,21 @@ func _run() -> void:
 	_assert(dive_map.active_chunk_keys.has(empty_chunk_key), "Streaming terenu i kolizji nie moze pomijac pustych chunkow swiata.")
 	if terrain_renderer is UnderwaterTerrainRenderer:
 		_assert(_string_set(terrain_renderer.active_chunk_keys()) == _string_set(dive_map.active_chunk_keys), "Renderer terenu musi otrzymac dokladnie zestaw aktywnych chunkow swiata.")
-		var water_background := terrain_renderer.get_node_or_null("WaterBackground") as Polygon2D
-		var distant_backdrop := terrain_renderer.get_node_or_null("DistantBiomeBackground") as Polygon2D
+		var water_background: Polygon2D
+		var distant_backdrop: Polygon2D
+		var rock_sprite: Sprite2D
+		if visual_stack != null:
+			water_background = visual_stack.content_root(&"L00_base_color", &"world", &"generated").get_node_or_null("WaterBackground") as Polygon2D
+			distant_backdrop = visual_stack.content_root(&"L01_ultra_far_silhouettes", &"parallax", &"generated").get_node_or_null("DistantBiomeBackground") as Polygon2D
+			rock_sprite = visual_stack.content_root(&"L04_near_terrain_skin", &"world", &"generated").get_node_or_null("TerrainBackground") as Sprite2D
 		_assert(water_background != null, "Jedna proceduralna warstwa wody powinna pokrywac caly swiat.")
 		_assert(distant_backdrop != null, "Dalekie tlo biomow powinno byc globalnym Polygon2D renderera terenu.")
-		var rock_sprite := terrain_renderer.get_node_or_null("TerrainBackground") as Sprite2D
 		_assert(rock_sprite != null and rock_sprite.texture == terrain_renderer.contour_sdf, "Jedna pelnomapowa warstwa skal musi uzywac prezentacyjnego SDF renderera.")
 		if water_background != null and distant_backdrop != null and rock_sprite != null:
-			_assert(water_background.z_index < distant_backdrop.z_index, "Woda musi pozostac pod dalekim tlem biomow.")
-			_assert(distant_backdrop.z_index < -90, "Dalekie tlo biomow musi pozostac pod dekoracjami srodowiska.")
-			_assert(-90 < rock_sprite.z_index, "Dekoracje srodowiska musza pozostac pod glowna warstwa skal.")
+			_assert(water_background.z_index == 0 and distant_backdrop.z_index == 0 and rock_sprite.z_index == 0, "Elementy generowane mają dziedziczyć z-order wyłącznie z własnych wrapperów warstw.")
+			_assert(visual_stack.layer_root(&"L00_base_color").z_index < visual_stack.layer_root(&"L01_ultra_far_silhouettes").z_index, "Woda L00 musi pozostać pod dalekim tłem L01.")
+			_assert(visual_stack.layer_root(&"L01_ultra_far_silhouettes").z_index < visual_stack.layer_root(&"L02_far_structures").z_index, "Dalekie tło L01 musi pozostać pod autorskimi konstrukcjami L02.")
+			_assert(visual_stack.layer_root(&"L02_far_structures").z_index < visual_stack.layer_root(&"L04_near_terrain_skin").z_index, "Konstrukcje L02 muszą pozostać pod skórą terenu L04.")
 	var loaded_collision_keys: Array[String] = dive_map.loaded_collision_chunk_keys()
 	for loaded_collision_key in loaded_collision_keys:
 		_assert(dive_map.active_chunk_keys.has(loaded_collision_key), "Zaladowany collider musi nalezec do aktywnego pierscienia chunkow.")
@@ -122,22 +147,28 @@ func _run() -> void:
 			"Globalne VFX musi przechodzic plynnie przez granice profili, bez skoku parametrow."
 		)
 	_assert(dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/OceanBackground") == null, "Monolityczne tlo oceanu powinno zostac zastapione proceduralna woda chunkow.")
-	var environment_layer = dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/EnvironmentDecoration")
-	_assert(environment_layer is Node2D and not (environment_layer is Sprite2D), "Pierwszy slot powinien grupowac tylko streamowane, rzadkie fragmenty srodowiska.")
-	if environment_layer is Node2D:
-		_assert(environment_layer.z_index == -90, "Warstwa srodowiska powinna pozostac za glowna geometria i nurkiem.")
+	_assert(dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/EnvironmentDecoration") == null, "Stary pojedynczy kontener EnvironmentDecoration nie może pozostać równoległą siódmą warstwą.")
+	if visual_stack != null:
+		var l02_authored := visual_stack.content_root(&"L02_far_structures", &"world", &"authored")
+		var authored_elements: Array[DiveVisualLayerElement] = []
+		for child in l02_authored.get_children():
+			if child is DiveVisualLayerElement:
+				authored_elements.append(child as DiveVisualLayerElement)
+		_assert(authored_elements.size() == 15, "Piętnaście odziedziczonych cropów musi zachować piętnaście niezależnych transformacji w L02.")
 	var visual_streamer = dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/VisualChunkStreamer")
 	_assert(visual_streamer is DiveVisualChunkStreamer, "Warstwy authored powinien obslugiwac prezentacyjny streamer chunkow.")
 	if visual_streamer is DiveVisualChunkStreamer:
 		var visual_stream_state: Dictionary = visual_streamer.presentation_state()
 		_assert(bool(visual_stream_state.get("manifest_loaded", false)), "Streamer powinien zaladowac pochodny manifest bez ladowania pelnych tekstur.")
+		_assert(int(visual_stream_state.get("schema_version", 0)) == 2 and str(visual_stream_state.get("transform_authority", "")) == "composition_scene_only", "Runtime musi korzystać z manifestu v2, w którym transformy pozostają wyłącznie w scenie.")
 		_assert(int(visual_stream_state.get("entry_count", 0)) == 15, "Manifest powinien zawierac tylko 15 rzadkich cropow dekoracji srodowiska.")
+		_assert(int(visual_stream_state.get("authored_element_count", 0)) == 15, "Każdy wpis manifestu v2 musi mieć dokładnie jeden niezależny element scenowy.")
 		_assert(int(visual_stream_state.get("all_chunks_decoded_rgba_bytes", 0)) < 4 * 1024 * 1024, "Komplet cropow dekoracji powinien zajmowac mniej niz 4 MiB decoded RGBA.")
 		_assert(int(visual_stream_state.get("loaded_count", 0)) < int(visual_stream_state.get("entry_count", 0)), "Runtime nie powinien jednoczesnie materializowac wszystkich cropow.")
 	_assert(not ResourceLoader.has_cached("res://assets/diving/world/map_v2/visuals/duzaMapaEnvironmentDecorationLayer-v3.png"), "Runtime nie powinien ladowac pelnej warstwy dekoracji.")
 	_assert(dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/ColliderVisual") == null, "Monolityczny PNG collidera nie powinien pozostac drugim zrodlem widocznej geometrii.")
 	_assert(dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/RockTransition") == null, "Recznie synchronizowane przejscie skalne powinien zastapic material wspolnej maski.")
-	_assert(dive_map.get_node_or_null("RuntimeDynamic/VisualLayers/TopOverlay") != null, "Mapa powinna miec pusty slot warstwy nad calym swiatem.")
+	_assert(visual_stack != null and visual_stack.layer_root(&"L05_foreground_occluders") != null, "Mapa musi mieć niezależną, oszczędną warstwę L05 pierwszego planu.")
 	_assert(dive_map.get_node_or_null("BiomeBackdrops") == null, "Stare modularne panoramy nie powinny byc podlaczone do runtime.")
 	_assert(dive_map.get_node_or_null("LandmarkVisuals") == null, "Stare proceduralne sylwetki landmarkow nie powinny byc podlaczone do runtime.")
 	var container_visual_paths: Dictionary = {}
@@ -174,6 +205,14 @@ func _run() -> void:
 	_assert(_string_set(dive_map.active_chunk_keys) == active_chunks_before_presentation, "Zmiana prezentacji nie może zmienić aktywnych chunków świata.")
 	_assert(_string_set(dive_map.loaded_collision_chunk_keys()) == loaded_collision_chunks_before_presentation, "Zmiana prezentacji nie może przeładować ani odłączyć aktywnych colliderów.")
 	_assert(dive_map.collision_segment_count() == collision_segment_count_before_presentation, "Zmiana prezentacji nie może zmienić liczby segmentów kanonicznej kolizji.")
+	if visual_stack != null:
+		for layer_id in EXPECTED_VISUAL_LAYER_IDS:
+			var layer := visual_stack.layer_root(layer_id)
+			var parallax: Parallax2D
+			if layer != null:
+				parallax = layer.get_node_or_null("ParallaxContent") as Parallax2D
+			_assert(layer != null and layer.visible, "Reduced motion nie może ukrywać warstwy %s." % layer_id)
+			_assert(parallax != null and parallax.scroll_scale.is_equal_approx(Vector2.ONE), "Reduced motion musi wyłączyć różnicę prędkości warstwy %s bez jej usuwania." % layer_id)
 	for pickup in dive_map.world_pickups:
 		_assert(str(pickup.get("_graphics_quality")) == "low", "Profil low musi dotrzeć do każdej znajdźki.")
 		_assert(bool(pickup.get("_reduced_motion")), "Reduced motion musi dotrzeć do każdej znajdźki.")
@@ -181,7 +220,7 @@ func _run() -> void:
 		_assert(pickup_sprite != null and pickup_sprite.position == Vector2.ZERO and is_zero_approx(pickup_sprite.rotation), "Reduced motion musi zatrzymać bob i obrót znajdźki.")
 	dive_map.set_graphics_quality("high")
 	dive_map.set_reduced_motion(false)
-	_assert(dive_map.persistent_interactables.size() >= 11, "Mapa powinna budowac trwałe bramy skrótów i ciężkie obiekty z blueprintu.")
+	_assert(dive_map.persistent_interactables.size() == 10, "Mapa powinna budować dokładnie siedem trwałych bram skrótów i trzy ciężkie obiekty z blueprintu.")
 	var persistent_visual_paths: Dictionary = {}
 	for interactable in dive_map.persistent_interactables:
 		_assert(dive_map.is_world_position_navigable(interactable.global_position), "Każdy trwały punkt eksploracji musi zostać przeniesiony do dostępnej wody.")

@@ -37,7 +37,6 @@ const BUOY_POSITIONS := {
 }
 const MIN_CRITICAL_INTERACTABLE_SEPARATION := 300.0
 const CRITICAL_INTERACTABLE_PAIRS := [
-	["archive_terminal", "SC-02"],
 	["archive_terminal", "archive_maintenance_store"],
 	["rescue_hotel_leon", "hotel_linen_cache"],
 	["r3_diagnostic_panel", "r3_generator"],
@@ -181,6 +180,19 @@ const REQUIRED_PREFABS := [
 	"MapDecoration.tscn",
 ]
 
+const SIX_LAYER_VISUALS_PATH := "VisualLayers/SixLayerVisuals"
+const LAYER_ELEMENT_TEMPLATE_PATH := "res://scenes/diving/map_visuals/LayerVisualElement.tscn"
+const RESIDENT_ELEMENT_TEST_TEXTURE := "res://assets/diving/world/map_v2/visual_chunks/environment_decoration/chunk_04_01.png"
+const EXPECTED_VISUAL_LAYER_IDS: Array[StringName] = [
+	&"L00_base_color",
+	&"L01_ultra_far_silhouettes",
+	&"L02_far_structures",
+	&"L03_mid_drift_props",
+	&"L04_near_terrain_skin",
+	&"L05_foreground_occluders",
+]
+const LEGACY_VISUAL_ELEMENT_COUNT := 15
+
 var _failures := 0
 
 
@@ -198,6 +210,8 @@ func _initialize() -> void:
 		_test_stale_source_version_is_rejected(compiler, world)
 		_test_stale_gameplay_signature_is_rejected(compiler, world)
 		_test_unique_authoring_ids()
+		_test_six_layer_authoring_contract(compiler)
+		_test_visual_manifest_compiler_gate(compiler)
 		_test_visual_only_change_preserves_signature(compiler)
 		_test_gameplay_position_change_updates_signature(compiler)
 		_test_landmark_position_change_updates_signature(compiler)
@@ -232,7 +246,14 @@ func _test_compiled_manifest(compiler, world) -> void:
 	_assert(str(blueprint.map_gameplay_signature).length() == 64, "Mapa musi otrzymać 64-znakowy podpis gameplayowy.")
 	_assert(not blueprint.entry_landmark_id.is_empty() and blueprint.landmark_lookup.has(blueprint.entry_landmark_id), "Entry Point musi wskazywać istniejący landmark.")
 	_assert(blueprint.fixed_device_spawns.size() == 6, "Mapa musi kompilować J-7, Archiwum, dwa etapy R-3, Rozdzielnię C-4 i gniazdo Rozdzielacza.")
-	_assert(blueprint.shortcut_spawns.size() == 8, "Mapa musi zachować dokładnie osiem istniejących skrótów; blokada kabla wykorzystuje SC-01 zamiast tworzyć dziewiąty.")
+	_assert(blueprint.landmarks.size() == 27, "Mapa po usunięciu Banku Nasion musi zawierać dokładnie 27 landmarków.")
+	_assert(blueprint.connections.size() == 43, "Mapa po usunięciu tras Banku Nasion musi zawierać dokładnie 43 połączenia.")
+	_assert(blueprint.shortcut_spawns.size() == 7, "Mapa po usunięciu SC-02 musi zachować dokładnie siedem trwałych skrótów.")
+	_assert(not blueprint.landmark_lookup.has("R2-04"), "Usunięty Bank Nasion R2-04 nie może wrócić do blueprintu.")
+	_assert(_record_by_id(blueprint.connections, "C019").is_empty() and _record_by_id(blueprint.connections, "C020").is_empty() and _record_by_id(blueprint.connections, "C021").is_empty(), "Trasy zależne od R2-04 muszą pozostać usunięte.")
+	_assert(_record_by_id(blueprint.connections, "SC-02").is_empty() and _record_by_id(blueprint.shortcut_spawns, "SC-02").is_empty(), "Połączenie i brama SC-02 Bank Nasion — Archiwum muszą pozostać usunięte.")
+	_assert(_record_by_id(blueprint.loot_spawns, "seed_bank_vault").is_empty(), "Kapsuła Banku Nasion nie może wrócić jako źródło łupu.")
+	_assert_regular_connection_reachability(blueprint)
 	_assert(_vectors_match(blueprint.exit_position, TUTORIAL_POSITIONS["exit_line"]), "Lina platformy musi zachować zatwierdzoną pozycję startową kabla.")
 	var junction: Dictionary = _record_by_id(blueprint.fixed_device_spawns, "junction_j7")
 	_assert(junction.get("id", "") == "junction_j7" and junction.get("device_role", "") == "common_line_junction", "J-7 musi zachować stabilne ID i typowaną rolę urządzenia.")
@@ -279,9 +300,8 @@ func _test_compiled_manifest(compiler, world) -> void:
 		"pharmacy_medicine_case": 4,
 		"hotel_linen_cache": 6,
 		"pickup_r1_food_01": 1,
-		"greenhouse_supply_box": 8,
-		"seed_bank_vault": 11,
-		"park_service_shed": 2,
+		"greenhouse_supply_box": 14,
+		"park_service_shed": 7,
 		"pickup_r2_food_01": 1,
 		"port_tool_crate": 3,
 		"power_plant_service_store": 3,
@@ -294,7 +314,7 @@ func _test_compiled_manifest(compiler, world) -> void:
 	}
 	var expected_food_ids_by_region := {
 		"R1": ["tutorial_market_crate", "pharmacy_medicine_case", "hotel_linen_cache", "pickup_r1_food_01"],
-		"R2": ["greenhouse_supply_box", "seed_bank_vault", "park_service_shed", "pickup_r2_food_01"],
+		"R2": ["greenhouse_supply_box", "park_service_shed", "pickup_r2_food_01"],
 		"R3": ["port_tool_crate", "power_plant_service_store", "scrapyard_sorting_cache", "pickup_r3_food_01"],
 		"R4": ["metro_maintenance_store", "bunker_construction_reserve", "city_center_relief_store", "pickup_r4_food_01"],
 	}
@@ -514,7 +534,6 @@ func _assert_linked_gameplay_stays_with_landmark(blueprint) -> void:
 		"R2-01": true,
 		"R2-02": true,
 		"R2-03": true,
-		"R2-04": true,
 		"R2-05": true,
 		"R2-06": true,
 		"R3-02": true,
@@ -613,6 +632,546 @@ func _test_unique_authoring_ids() -> void:
 			connection_ids[connection.connection_id] = true
 	for group_path in REQUIRED_AUTHORING_GROUPS:
 		_assert(map_root.get_node_or_null(group_path) != null, "Scena musi mieć wymaganą gałąź authoringu: %s." % group_path)
+	map_root.free()
+
+
+func _test_six_layer_authoring_contract(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var stack := map_root.get_node_or_null(SIX_LAYER_VISUALS_PATH) as DiveVisualLayerStack
+	_assert(stack != null, "Scena mapy musi instancjonować edytowalny stos VisualLayers/SixLayerVisuals.")
+	if stack == null:
+		map_root.free()
+		return
+	_assert(stack.validation_errors().is_empty(), "Sześciowarstwowa kompozycja musi przechodzić walidację profili, kolejności i bucketów.")
+	_assert(
+		MapCompilerScript._source_dependency_paths.has(LAYER_ELEMENT_TEMPLATE_PATH),
+		"Fingerprint cache kompilatora musi obejmować prefab LayerVisualElement."
+	)
+	_assert(stack.get_child_count() == EXPECTED_VISUAL_LAYER_IDS.size(), "Stos wizualny musi zawierać dokładnie sześć niezależnych wrapperów warstw.")
+	var previous_scroll_scale := Vector2(-INF, -INF)
+	var previous_z_index := -1_000_000
+	var profile_paths := {}
+	var visual_elements: Array[DiveVisualLayerElement] = []
+	for layer_index in range(EXPECTED_VISUAL_LAYER_IDS.size()):
+		var layer_id := EXPECTED_VISUAL_LAYER_IDS[layer_index]
+		var layer := stack.layer_root(layer_id)
+		_assert(layer != null, "Brakuje wymaganej warstwy %s." % layer_id)
+		if layer == null:
+			continue
+		_assert(StringName(layer.name) == layer_id, "Nazwa wrappera warstwy musi być identyczna ze stabilnym ID %s." % layer_id)
+		_assert(layer.get_index() == layer_index, "Warstwa %s musi zachować stabilną kolejność L00-L05 w scenie." % layer_id)
+		_assert(layer.profile != null and layer.profile.layer_id == layer_id, "Warstwa %s musi wskazywać własny walidowany profil." % layer_id)
+		if layer.profile != null:
+			_assert(not layer.profile.role.strip_edges().is_empty(), "Profil %s musi opisywać jednoznaczną rolę warstwy." % layer_id)
+			_assert(not layer.profile.resource_path.is_empty() and not profile_paths.has(layer.profile.resource_path), "Każda warstwa musi mieć odrębny zasób profilu .tres: %s." % layer_id)
+			profile_paths[layer.profile.resource_path] = true
+			_assert(
+				MapCompilerScript._source_dependency_paths.has(layer.profile.resource_path),
+				"Fingerprint cache kompilatora musi obejmować faktycznie przypisany profil warstwy %s."
+				% layer_id
+			)
+			_assert(layer.profile.reduced_motion_scroll_scale.is_equal_approx(Vector2.ONE), "Profil %s musi blokować parallax przy reduced motion bez ukrywania warstwy." % layer_id)
+			_assert(layer.profile.normal_scroll_scale.x > previous_scroll_scale.x and layer.profile.normal_scroll_scale.y > previous_scroll_scale.y, "Kolejne plany L00-L05 muszą poruszać się coraz szybciej względem kamery.")
+			_assert(layer.profile.z_index > previous_z_index and layer.z_index == layer.profile.z_index, "Kolejne plany L00-L05 muszą zachować rosnący z-order profili.")
+			previous_scroll_scale = layer.profile.normal_scroll_scale
+			previous_z_index = layer.profile.z_index
+		var parallax_content := layer.get_node_or_null("ParallaxContent") as Parallax2D
+		var world_content := layer.get_node_or_null("WorldContent") as Node2D
+		_assert(parallax_content != null, "Warstwa %s musi mieć niezależny ParallaxContent." % layer_id)
+		_assert(world_content != null, "Warstwa %s musi mieć niezależny WorldContent." % layer_id)
+		for coordinate_space in [&"parallax", &"world"]:
+			for bucket in [&"authored", &"generated", &"streamed"]:
+				var bucket_root := layer.content_root(coordinate_space, bucket)
+				_assert(bucket_root != null, "Warstwa %s musi mieć bucket %s/%s." % [layer_id, coordinate_space, bucket])
+		var authored_world := layer.content_root(&"world", &"authored")
+		if authored_world != null:
+			for descendant in authored_world.find_children("*", "", true, false):
+				if descendant is DiveVisualLayerElement:
+					visual_elements.append(descendant as DiveVisualLayerElement)
+	_assert(bool(stack.layer_root(&"L04_near_terrain_skin").profile.world_locked), "L04 musi pozostać związana z kanonicznym terenem świata.")
+	_assert(visual_elements.size() == LEGACY_VISUAL_ELEMENT_COUNT, "Piętnaście istniejących cropów musi być piętnastoma niezależnymi elementami L02, a nie jedną spłaszczoną warstwą.")
+	var element_ids := {}
+	for element in visual_elements:
+		_assert(
+			MapCompilerScript._source_dependency_paths.has(element.resource_path),
+			"Fingerprint cache kompilatora musi obejmować resource_path elementu %s." % element.element_id
+		)
+		_assert(not ResourceLoader.has_cached(element.resource_path), "Walidacja sceny nie może preloadować streamowanego cropa %s." % element.element_id)
+		_assert(element.get_parent() == stack.content_root(&"L02_far_structures", &"world", &"authored"), "Każdy odziedziczony crop musi być authoringowym elementem L02/WorldContent/Authored.")
+		_assert(element.is_valid(), "Każdy element warstwy musi mieć poprawne ID, zasób i lokalne bounds: %s." % element.element_id)
+		_assert(element.is_manifest_streamed(), "Odziedziczony crop %s musi jawnie używać streamingu z manifestu." % element.element_id)
+		_assert(not element_ids.has(element.element_id), "ID elementu warstwy musi być unikalne: %s." % element.element_id)
+		element_ids[element.element_id] = true
+	var visibility_layer := stack.layer_root(&"L03_mid_drift_props")
+	visibility_layer.visible = false
+	stack.set_graphics_quality("low")
+	stack.set_reduced_motion(true)
+	stack.set_graphics_quality("high")
+	stack.set_reduced_motion(false)
+	_assert(not visibility_layer.visible, "Autorskie visible=false całej warstwy musi przetrwać zmiany jakości i reduced motion.")
+	visibility_layer.visible = true
+	if not visual_elements.is_empty():
+		var visibility_element := visual_elements[0]
+		visibility_element.visible = false
+		visibility_element.set_graphics_quality("low")
+		visibility_element.set_graphics_quality("high")
+		_assert(not visibility_element.visible, "Autorskie visible=false elementu musi przetrwać zmiany jakości.")
+		visibility_element.visible = true
+	var live_layer := stack.layer_root(&"L03_mid_drift_props")
+	var live_parallax := live_layer.get_node_or_null("ParallaxContent") as Parallax2D
+	var original_live_scale := live_layer.profile.normal_scroll_scale
+	var original_live_z := live_layer.profile.z_index
+	var profile_script := live_layer.profile.get_script() as Script
+	_assert(profile_script != null and profile_script.is_tool(), "Profil warstwy musi być @tool, aby Inspector stosował emit_changed bez przeładowania sceny.")
+	live_layer.profile.normal_scroll_scale = Vector2(0.965, 0.965)
+	live_layer.profile.z_index = -61
+	_assert(live_parallax.scroll_scale.is_equal_approx(Vector2(0.965, 0.965)) and live_layer.z_index == -61, "Edycja profilu .tres musi na żywo aktualizować scroll_scale i z-order warstwy.")
+	live_layer.profile.normal_scroll_scale = original_live_scale
+	live_layer.profile.z_index = original_live_z
+	for descendant in stack.find_children("*", "", true, false):
+		_assert(not (descendant is CollisionObject2D) and not (descendant is CollisionShape2D) and not (descendant is CollisionPolygon2D), "Warstwy prezentacyjne nie mogą dodawać kolizji ani przejmować authority gameplayu: %s." % descendant.name)
+	var element_template := ResourceLoader.load(LAYER_ELEMENT_TEMPLATE_PATH) as PackedScene
+	_assert(element_template != null, "Projekt musi udostępniać prefab nowego edytowalnego elementu warstwy.")
+	if element_template != null:
+		var template_instance := element_template.instantiate()
+		_assert(template_instance is DiveVisualLayerElement, "Prefab elementu musi być Node2D z kontraktem DiveVisualLayerElement.")
+		if template_instance is DiveVisualLayerElement:
+			_assert(not template_instance.is_manifest_streamed(), "Nowy element autorski musi domyślnie działać jako scene-resident bez wpisu w manifeście.")
+			template_instance.position = Vector2(13.0, -7.0)
+			template_instance.rotation = 0.25
+			template_instance.scale = Vector2(1.3, 0.7)
+			_assert(template_instance.position == Vector2(13.0, -7.0) and is_equal_approx(template_instance.rotation, 0.25) and template_instance.scale == Vector2(1.3, 0.7), "Każdy element musi zachować natywne przesuwanie, obrót i niezależne rozciąganie osi Node2D.")
+			template_instance.element_id = &"resident_element_test"
+			template_instance.resource_path = RESIDENT_ELEMENT_TEST_TEXTURE
+			template_instance.local_bounds = Rect2(0.0, 0.0, 620.0, 167.0)
+			_assert(template_instance.ensure_scene_resident_resource_loaded(), "Nowy element scene-resident musi samodzielnie wczytać wskazany zasób bez wpisu w manifeście.")
+			_assert(template_instance.runtime_content_node() is Sprite2D, "Element scene-resident z teksturą musi utworzyć runtime Sprite2D w Attachment.")
+			template_instance.resource_kind = DiveVisualLayerElement.ResourceKind.PACKED_SCENE
+			var mismatched_type_rejected := false
+			for validation_error in template_instance.resource_content_validation_errors():
+				if String(validation_error).contains("nie jest PackedScene"):
+					mismatched_type_rejected = true
+					break
+			_assert(mismatched_type_rejected, "Walidacja headless musi odrzucać zasób o typie niezgodnym z resource_kind.")
+		template_instance.free()
+		var invalid_attachment_instance := element_template.instantiate() as DiveVisualLayerElement
+		invalid_attachment_instance.element_id = &"invalid_attachment_test"
+		invalid_attachment_instance.resource_path = RESIDENT_ELEMENT_TEST_TEXTURE
+		invalid_attachment_instance.local_bounds = Rect2(0.0, 0.0, 620.0, 167.0)
+		var attachment := invalid_attachment_instance.get_node_or_null("Attachment") as Node2D
+		attachment.position = Vector2(4.0, 0.0)
+		var attachment_transform_rejected := false
+		for validation_error in invalid_attachment_instance.validation_errors():
+			if String(validation_error).contains("identity transform węzła Attachment"):
+				attachment_transform_rejected = true
+				break
+		_assert(attachment_transform_rejected, "Attachment musi pozostać neutralnym kontenerem, aby culling odpowiadał obrazowi.")
+		invalid_attachment_instance.free()
+		var invalid_bounds_instance := element_template.instantiate() as DiveVisualLayerElement
+		invalid_bounds_instance.element_id = &"invalid_bounds_test"
+		invalid_bounds_instance.resource_path = RESIDENT_ELEMENT_TEST_TEXTURE
+		invalid_bounds_instance.load_policy = DiveVisualLayerElement.LoadPolicy.MANIFEST_STREAMED
+		invalid_bounds_instance.local_bounds = Rect2(0.0, 0.0, 620.0, 167.0)
+		invalid_bounds_instance.texture_region = Rect2(2.0, 2.0, 619.0, 167.0)
+		var bounds_mismatch_rejected := false
+		for validation_error in invalid_bounds_instance.validation_errors():
+			if String(validation_error).contains("local_bounds.size zgodnego z texture_region.size"):
+				bounds_mismatch_rejected = true
+				break
+		_assert(bounds_mismatch_rejected, "Streamowany element teksturowy musi odrzucać bounds niezgodne z rysowanym regionem.")
+		invalid_bounds_instance.free()
+		var duplicate_instance := element_template.instantiate() as DiveVisualLayerElement
+		duplicate_instance.element_id = visual_elements[0].element_id
+		duplicate_instance.resource_path = RESIDENT_ELEMENT_TEST_TEXTURE
+		duplicate_instance.local_bounds = Rect2(0.0, 0.0, 620.0, 167.0)
+		var l03_authored := stack.content_root(&"L03_mid_drift_props", &"parallax", &"authored")
+		l03_authored.add_child(duplicate_instance)
+		var duplicate_rejected := false
+		for validation_error in stack.validation_errors():
+			if String(validation_error).contains("powtórzony element_id"):
+				duplicate_rejected = true
+				break
+		_assert(duplicate_rejected, "Walidator stosu musi odrzucać powielone element_id także między warstwami.")
+		l03_authored.remove_child(duplicate_instance)
+		duplicate_instance.free()
+		var misplaced_instance := element_template.instantiate() as DiveVisualLayerElement
+		misplaced_instance.element_id = &"misplaced_element_test"
+		misplaced_instance.resource_path = RESIDENT_ELEMENT_TEST_TEXTURE
+		misplaced_instance.local_bounds = Rect2(0.0, 0.0, 620.0, 167.0)
+		var l03_generated := stack.content_root(&"L03_mid_drift_props", &"parallax", &"generated")
+		l03_generated.add_child(misplaced_instance)
+		var ancestry_rejected := false
+		for validation_error in stack.validation_errors():
+			if String(validation_error).contains("musi należeć do ParallaxContent/Authored"):
+				ancestry_rejected = true
+				break
+		_assert(ancestry_rejected, "Walidator musi odrzucać ręczny element umieszczony poza bucketem Authored.")
+		l03_generated.remove_child(misplaced_instance)
+		misplaced_instance.free()
+		var unsafe_direct_sprite := Sprite2D.new()
+		unsafe_direct_sprite.z_index = 2
+		unsafe_direct_sprite.top_level = true
+		l03_authored.add_child(unsafe_direct_sprite)
+		var direct_z_rejected := false
+		for validation_error in stack.validation_errors():
+			if String(validation_error).contains("musi dziedziczyć pasmo z-order") or String(validation_error).contains("nie może używać top_level"):
+				direct_z_rejected = true
+				break
+		_assert(direct_z_rejected, "Bezpośredni Sprite2D nie może ominąć transformu ani pasma z-order warstwy.")
+		l03_authored.remove_child(unsafe_direct_sprite)
+		unsafe_direct_sprite.free()
+		var l04_world := stack.layer_root(&"L04_near_terrain_skin").get_node("WorldContent") as Node2D
+		l04_world.position = Vector2(5.0, 0.0)
+		var terrain_infrastructure_rejected := false
+		for validation_error in stack.validation_errors():
+			if String(validation_error).contains("L04_near_terrain_skin wymaga WorldContent z identity transform"):
+				terrain_infrastructure_rejected = true
+				break
+		_assert(terrain_infrastructure_rejected, "Infrastruktura L04 nie może odsunąć grafiki terenu od kanonicznej kolizji/SDF.")
+		l04_world.position = Vector2.ZERO
+		var l03_parallax := stack.layer_root(&"L03_mid_drift_props").get_node("ParallaxContent") as Parallax2D
+		var default_limit_begin := l03_parallax.limit_begin
+		l03_parallax.limit_begin = Vector2(-1_000.0, -1_000.0)
+		var bounded_parallax_rejected := false
+		for validation_error in stack.validation_errors():
+			if String(validation_error).contains("domyślnych nieaktywnych limitów Parallax2D"):
+				bounded_parallax_rejected = true
+				break
+		_assert(bounded_parallax_rejected, "Aktywne limity Parallax2D muszą być odrzucone, bo łamią dokładną kompensację reduced motion.")
+		l03_parallax.limit_begin = default_limit_begin
+	var scripted_visual := Node2D.new()
+	scripted_visual.set_script(MapObjectScript)
+	var scripted_errors := DiveVisualLayerElement.visual_subtree_validation_errors(scripted_visual)
+	var script_rejected := false
+	for validation_error in scripted_errors:
+		if String(validation_error).contains("własnego skryptu runtime"):
+			script_rejected = true
+			break
+	_assert(script_rejected, "PackedScene elementu wizualnego nie może przemycić skryptu gameplay/runtime.")
+	scripted_visual.free()
+	# Use a real text scene whose `script` property is explicitly serialized.
+	# Packing a transient node can normalize its global-script class into the
+	# node type, making that synthetic fixture dependent on engine internals.
+	var scripted_packed := ResourceLoader.load(CABLE_VISUAL_PATH) as PackedScene
+	_assert(scripted_packed != null, "Test preflightu wymaga istniejącego skryptowego PackedScene.")
+	var preflight_script_rejected := false
+	if scripted_packed != null:
+		for validation_error in DiveVisualLayerElement.packed_scene_preflight_validation_errors(scripted_packed):
+			var error_text := String(validation_error)
+			if error_text.contains("skrypt") and error_text.contains("runtime"):
+				preflight_script_rejected = true
+				break
+	_assert(preflight_script_rejected, "Preflight SceneState musi odrzucić skrypt przed PackedScene.instantiate().")
+	var absolute_z_visual := Sprite2D.new()
+	absolute_z_visual.z_as_relative = false
+	var absolute_z_errors := DiveVisualLayerElement.visual_subtree_validation_errors(absolute_z_visual)
+	var absolute_z_rejected := false
+	for validation_error in absolute_z_errors:
+		if String(validation_error).contains("z_as_relative = true"):
+			absolute_z_rejected = true
+			break
+	_assert(absolute_z_rejected, "PackedScene elementu wizualnego nie może ominąć pasma z-order warstwy.")
+	absolute_z_visual.free()
+	var visual_layers_parent := map_root.get_node_or_null("VisualLayers") as Node2D
+	_assert(visual_layers_parent != null, "Test world-lock wymaga rodzica VisualLayers typu Node2D.")
+	if visual_layers_parent != null:
+		visual_layers_parent.position = Vector2(5.0, 0.0)
+		var shifted_parent_result: Dictionary = compiler.compile_map(map_root, 91_018)
+		var shifted_parent_errors: PackedStringArray = shifted_parent_result.get(
+			"errors",
+			PackedStringArray()
+		)
+		_assert(
+			_packed_strings_contain(shifted_parent_errors, "VisualLayers musi zachować identity transform"),
+			"Kompilator musi odrzucać przesunięcie nadrzędnego VisualLayers, które odkleja L04 od kolizji/SDF."
+		)
+		visual_layers_parent.position = Vector2.ZERO
+	var visual_streamer := map_root.get_node_or_null(
+		"VisualLayers/VisualChunkStreamer"
+	) as DiveVisualChunkStreamer
+	_assert(visual_streamer != null, "Produkcyjna scena musi zawierać VisualChunkStreamer.")
+	if visual_streamer != null:
+		var canonical_manifest_path := visual_streamer.manifest_path
+		visual_streamer.manifest_path = (
+			"res://assets/diving/world/map_v2/visual_chunks/map_visual_chunks_v1.json"
+		)
+		var legacy_streamer_result: Dictionary = compiler.compile_map(map_root, 91_018)
+		var legacy_streamer_errors: PackedStringArray = legacy_streamer_result.get(
+			"errors",
+			PackedStringArray()
+		)
+		_assert(
+			_packed_strings_contain(legacy_streamer_errors, "Produkcyjny VisualChunkStreamer musi używać manifestu v2"),
+			"Kompilator musi odrzucać produkcyjny streamer wskazujący legacy v1 zamiast scenowego authority v2."
+		)
+		visual_streamer.manifest_path = canonical_manifest_path
+	var baseline: Dictionary = compiler.compile_map(map_root, 91_019)
+	var baseline_errors: PackedStringArray = baseline.get("errors", PackedStringArray())
+	_assert(baseline_errors.is_empty(), "Bazowa scena musi kompilować się przed testem transformacji sześciu warstw.")
+	if baseline_errors.is_empty():
+		for element_index in range(visual_elements.size()):
+			var element := visual_elements[element_index]
+			element.position += Vector2(3.0 + element_index, -2.0)
+			element.rotation += 0.01 * float(element_index + 1)
+			element.scale *= Vector2(1.01, 0.99)
+		var changed: Dictionary = compiler.compile_map(map_root, 91_019)
+		var changed_errors: PackedStringArray = changed.get("errors", PackedStringArray())
+		_assert(changed_errors.is_empty(), "Transformacje elementów warstw nie mogą zepsuć kompilacji mapy.")
+		if changed_errors.is_empty():
+			_assert(str(baseline.get("blueprint").map_gameplay_signature) == str(changed.get("blueprint").map_gameplay_signature), "Przesuwanie, obracanie i rozciąganie elementów sześciu warstw nie może zmieniać podpisu gameplayowego.")
+	map_root.free()
+
+
+func _test_visual_manifest_compiler_gate(compiler) -> void:
+	var map_root := _instantiate_map()
+	if map_root == null:
+		return
+	var stack := map_root.get_node_or_null(SIX_LAYER_VISUALS_PATH) as DiveVisualLayerStack
+	_assert(stack != null, "Test manifestu wymaga scenowego stosu sześciu warstw.")
+	if stack == null:
+		map_root.free()
+		return
+	var parser := JSON.new()
+	var parse_status := parser.parse(
+		FileAccess.get_file_as_string(MapCompilerScript.VISUAL_CHUNK_MANIFEST_PATH)
+	)
+	_assert(parse_status == OK and parser.data is Dictionary, "Produkcyjny manifest v2 musi być poprawnym JSON-em.")
+	if parse_status != OK or not (parser.data is Dictionary):
+		map_root.free()
+		return
+	var manifest: Dictionary = parser.data
+	var baseline_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		manifest,
+		map_root.world_size,
+		true
+	)
+	_assert(
+		baseline_errors.is_empty(),
+		"Bramka kompilatora musi akceptować aktualny manifest v2 i mapowanie sceny: %s"
+		% "; ".join(baseline_errors)
+	)
+	var export_baseline_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		manifest,
+		map_root.world_size,
+		false
+	)
+	_assert(
+		export_baseline_errors.is_empty(),
+		"Bramka non-strict eksportu musi akceptować zasoby rozwiązywane przez ResourceLoader: %s"
+		% "; ".join(export_baseline_errors)
+	)
+	var export_fingerprint := MapCompilerScript._source_dependency_fingerprint(false)
+	_assert(
+		export_fingerprint.contains("%s:resource:" % MapCompilerScript.VISUAL_COMPOSITION_SCENE_PATH)
+		and export_fingerprint.contains("%s:resource:" % RESIDENT_ELEMENT_TEST_TEXTURE)
+		and not export_fingerprint.contains("%s:missing" % MapCompilerScript.VISUAL_COMPOSITION_SCENE_PATH)
+		and not export_fingerprint.contains("%s:missing" % RESIDENT_ELEMENT_TEST_TEXTURE),
+		"Fingerprint non-editor musi oznaczać importowane sceny i tekstury stabilnym markerem ResourceLoader zamiast :missing."
+	)
+	var composition_sha := FileAccess.get_sha256(
+		MapCompilerScript.VISUAL_COMPOSITION_SCENE_PATH
+	).to_lower()
+	_assert(
+		not export_fingerprint.contains(
+			"%s:%s" % [MapCompilerScript.VISUAL_COMPOSITION_SCENE_PATH, composition_sha]
+		),
+		"Fingerprint non-editor nie może zależeć od źródłowych bajtów importowanej sceny."
+	)
+	var manifest_sha := FileAccess.get_sha256(
+		MapCompilerScript.VISUAL_CHUNK_MANIFEST_PATH
+	).to_lower()
+	_assert(
+		export_fingerprint.contains(
+			"%s:%s" % [MapCompilerScript.VISUAL_CHUNK_MANIFEST_PATH, manifest_sha]
+		),
+		"Fingerprint non-editor może zachować hash bezpośrednio czytelnego manifestu JSON."
+	)
+
+	var hash_mismatch_manifest: Dictionary = manifest.duplicate(true)
+	var hash_mismatch_composition: Dictionary = hash_mismatch_manifest.get(
+		"composition_scene",
+		{}
+	)
+	hash_mismatch_composition["sha256"] = "0".repeat(64)
+	hash_mismatch_manifest["composition_scene"] = hash_mismatch_composition
+	var non_strict_hash_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		hash_mismatch_manifest,
+		map_root.world_size,
+		false
+	)
+	_assert(
+		not _packed_strings_contain(non_strict_hash_errors, "Scena kompozycji ma SHA-256"),
+		"Bramka non-strict ma wymagać poprawnego formatu SHA, ale nie porównywać źródłowych bajtów eksportowanego zasobu."
+	)
+	var strict_hash_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		hash_mismatch_manifest,
+		map_root.world_size,
+		true
+	)
+	_assert(
+		_packed_strings_contain(strict_hash_errors, "Scena kompozycji ma SHA-256"),
+		"Bramka strict edytora musi odrzucać nieaktualny source hash kompozycji."
+	)
+	var malformed_hash_manifest: Dictionary = manifest.duplicate(true)
+	var malformed_hash_composition: Dictionary = malformed_hash_manifest.get(
+		"composition_scene",
+		{}
+	)
+	malformed_hash_composition["sha256"] = "niepoprawny"
+	malformed_hash_manifest["composition_scene"] = malformed_hash_composition
+	var malformed_hash_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		malformed_hash_manifest,
+		map_root.world_size,
+		false
+	)
+	_assert(
+		_packed_strings_contain(malformed_hash_errors, "Scena kompozycji nie zawiera poprawnego SHA-256"),
+		"Bramka non-strict nadal musi wymagać poprawnie sformatowanego SHA-256."
+	)
+	var wrong_type_manifest: Dictionary = manifest.duplicate(true)
+	var wrong_type_composition: Dictionary = wrong_type_manifest.get("composition_scene", {})
+	wrong_type_composition["path"] = RESIDENT_ELEMENT_TEST_TEXTURE
+	wrong_type_manifest["composition_scene"] = wrong_type_composition
+	var wrong_type_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		wrong_type_manifest,
+		map_root.world_size,
+		false
+	)
+	_assert(
+		_packed_strings_contain(wrong_type_errors, "nie jest zasobem typu PackedScene"),
+		"Bramka non-strict musi odrzucać istniejący importowany zasób niezgodnego typu."
+	)
+
+	var first_layer := stack.layer_root(EXPECTED_VISUAL_LAYER_IDS[0])
+	var second_layer := stack.layer_root(EXPECTED_VISUAL_LAYER_IDS[1])
+	_assert(first_layer != null and second_layer != null, "Test profilu wymaga pierwszych dwóch warstw.")
+	if first_layer != null and second_layer != null:
+		var original_profile := first_layer.profile
+		first_layer.profile = second_layer.profile
+		var replaced_profile_errors := MapCompilerScript.visual_manifest_validation_errors(
+			stack,
+			manifest,
+			map_root.world_size,
+			true
+		)
+		_assert(
+			_packed_strings_contain(replaced_profile_errors, "ma faktycznie przypisany profil")
+			and _packed_strings_contain(replaced_profile_errors, "zamiast kanonicznego"),
+			"Bramka manifestu musi odrzucać profil warstwy podmieniony mimo poprawnych ścieżek w manifeście."
+		)
+		first_layer.profile = original_profile
+
+	var stale_schema: Dictionary = manifest.duplicate(true)
+	stale_schema["schema_version"] = 1
+	var stale_schema_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		stale_schema,
+		map_root.world_size
+	)
+	_assert(
+		_packed_strings_contain(stale_schema_errors, "schema_version = 2"),
+		"Kompilator musi odrzucać manifest inny niż schema v2 przed akceptacją mapy."
+	)
+
+	var missing_entry_manifest: Dictionary = manifest.duplicate(true)
+	var missing_payloads: Array = missing_entry_manifest.get("payloads", [])
+	var missing_payload: Dictionary = missing_payloads[0]
+	var missing_elements: Array = missing_payload.get("elements", [])
+	var removed_entry: Dictionary = missing_elements.pop_back()
+	missing_payload["elements"] = missing_elements
+	missing_payloads[0] = missing_payload
+	missing_entry_manifest["payloads"] = missing_payloads
+	var missing_entry_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		missing_entry_manifest,
+		map_root.world_size
+	)
+	_assert(
+		_packed_strings_contain(
+			missing_entry_errors,
+			"Scenowy element Manifest Streamed %s wymaga dokładnie jednego wpisu manifestu v2"
+			% str(removed_entry.get("key", ""))
+		),
+		"Każdy scenowy MANIFEST_STREAMED musi mieć dokładnie jeden wpis manifestu v2."
+	)
+
+	var ghost_entry_manifest: Dictionary = manifest.duplicate(true)
+	var ghost_payloads: Array = ghost_entry_manifest.get("payloads", [])
+	var ghost_payload: Dictionary = ghost_payloads[0]
+	var ghost_elements: Array = ghost_payload.get("elements", [])
+	var ghost_entry: Dictionary = removed_entry.duplicate(true)
+	ghost_entry["key"] = "manifest_only_test"
+	ghost_elements.append(ghost_entry)
+	ghost_payload["elements"] = ghost_elements
+	ghost_payloads[0] = ghost_payload
+	ghost_entry_manifest["payloads"] = ghost_payloads
+	var ghost_entry_errors := MapCompilerScript.visual_manifest_validation_errors(
+		stack,
+		ghost_entry_manifest,
+		map_root.world_size
+	)
+	_assert(
+		_packed_strings_contain(
+			ghost_entry_errors,
+			"Wpis manifestu v2 manifest_only_test wymaga dokładnie jednego scenowego elementu"
+		),
+		"Każdy wpis manifestu v2 musi mieć dokładnie jeden scenowy element."
+	)
+
+	var streamed_elements: Array[DiveVisualLayerElement] = []
+	for node in stack.find_children("*", "", true, false):
+		if node is DiveVisualLayerElement and (node as DiveVisualLayerElement).is_manifest_streamed():
+			streamed_elements.append(node as DiveVisualLayerElement)
+	_assert(streamed_elements.size() >= 2, "Test mapowania manifestu wymaga co najmniej dwóch elementów streamowanych.")
+	if streamed_elements.size() >= 2:
+		var element := streamed_elements[0]
+		var original_policy := element.load_policy
+		element.load_policy = DiveVisualLayerElement.LoadPolicy.SCENE_RESIDENT
+		var resident_result: Dictionary = compiler.compile_map(map_root, 91_020)
+		var resident_errors: PackedStringArray = resident_result.get("errors", PackedStringArray())
+		_assert(
+			_packed_strings_contain(resident_errors, "musi używać trybu Manifest Streamed"),
+			"Bramka compile_map musi odrzucać wpis manifestu wskazujący element Scene Resident."
+		)
+		element.load_policy = original_policy
+
+		var original_resource_path := element.resource_path
+		element.resource_path = streamed_elements[1].resource_path
+		var path_result: Dictionary = compiler.compile_map(map_root, 91_021)
+		var path_errors: PackedStringArray = path_result.get("errors", PackedStringArray())
+		_assert(
+			_packed_strings_contain(path_errors, "wskazuje inny zasób niż manifest v2"),
+			"Bramka compile_map musi odrzucać rozbieżność resource_path scena↔manifest."
+		)
+		element.resource_path = original_resource_path
+
+		var original_parent := element.get_parent()
+		var original_owner := element.owner
+		var foreign_layer_parent := stack.content_root(
+			&"L03_mid_drift_props",
+			&"world",
+			&"authored"
+		)
+		element.owner = null
+		original_parent.remove_child(element)
+		foreign_layer_parent.add_child(element)
+		var layer_result: Dictionary = compiler.compile_map(map_root, 91_022)
+		var layer_errors: PackedStringArray = layer_result.get("errors", PackedStringArray())
+		_assert(
+			_packed_strings_contain(layer_errors, "zamiast wskazanej w manifeście L02_far_structures"),
+			"Bramka compile_map musi odrzucać rozbieżność target_layer scena↔manifest."
+		)
+		foreign_layer_parent.remove_child(element)
+		original_parent.add_child(element)
+		element.owner = original_owner
 	map_root.free()
 
 
@@ -1508,8 +2067,12 @@ func _test_stale_gameplay_signature_is_rejected(compiler, world) -> void:
 	stale_world.delta = world.delta.duplicate(true)
 	var stale_blueprint = stale_world.blueprint
 	var original_delta = stale_world.delta
-	var original_active_landmark_id := str(original_delta.active_landmark_id)
-	var original_discovered_landmarks: Array[String] = original_delta.discovered_landmarks.duplicate()
+	stale_world.delta.active_landmark_id = "R2-04"
+	stale_world.delta.discovered_landmarks.append("R2-04")
+	stale_world.delta.opened_shortcuts.append("SC-02")
+	stale_world.delta.opened_containers.append("seed_bank_vault")
+	stale_world.delta.collapsed_paths.append("C019")
+	var original_delta_projection := _world_delta_projection(original_delta)
 	var replacement_signature := "0".repeat(64)
 	if replacement_signature == str(stale_blueprint.map_gameplay_signature):
 		replacement_signature = "f".repeat(64)
@@ -1520,10 +2083,31 @@ func _test_stale_gameplay_signature_is_rejected(compiler, world) -> void:
 	_assert(stale_world.blueprint == stale_blueprint, "Clean break podpisu nie może po cichu zastąpić blueprintu niezgodnego zapisu.")
 	_assert(
 		stale_world.delta == original_delta
-		and str(stale_world.delta.active_landmark_id) == original_active_landmark_id
-		and stale_world.delta.discovered_landmarks == original_discovered_landmarks,
+		and _world_delta_projection(stale_world.delta) == original_delta_projection,
 		"Odrzucenie nieaktualnego podpisu nie może mutować WorldDelta."
 	)
+
+
+func _world_delta_projection(delta) -> Dictionary:
+	return {
+		"active_landmark_id": delta.active_landmark_id,
+		"discovered_landmarks": delta.discovered_landmarks.duplicate(),
+		"discovered_chunks": delta.discovered_chunks.duplicate(),
+		"opened_containers": delta.opened_containers.duplicate(),
+		"collected_items": delta.collected_items.duplicate(),
+		"remaining_container_contents": delta.remaining_container_contents.duplicate(true),
+		"dead_divers": delta.dead_divers.duplicate(true),
+		"lost_backpacks": delta.lost_backpacks.duplicate(true),
+		"dropped_loot_piles": delta.dropped_loot_piles.duplicate(true),
+		"rescued_or_dead_survivors": delta.rescued_or_dead_survivors.duplicate(true),
+		"placed_buoys": delta.placed_buoys.duplicate(),
+		"marked_heavy_objects": delta.marked_heavy_objects.duplicate(),
+		"recovered_heavy_objects": delta.recovered_heavy_objects.duplicate(),
+		"opened_shortcuts": delta.opened_shortcuts.duplicate(),
+		"activated_fixed_devices": delta.activated_fixed_devices.duplicate(),
+		"collapsed_paths": delta.collapsed_paths.duplicate(),
+		"depleted_biological_nodes": delta.depleted_biological_nodes.duplicate(true),
+	}
 
 
 func _assert_unique_static_gameplay_positions(blueprint) -> void:
@@ -1586,6 +2170,73 @@ func _record_by_id(records: Array, record_id: String) -> Dictionary:
 		if str(record.get("id", "")) == record_id:
 			return record
 	return {}
+
+
+func _assert_regular_connection_reachability(blueprint) -> void:
+	var reachable_from_entry := _regular_connection_reachable_ids(
+		blueprint,
+		str(blueprint.entry_landmark_id)
+	)
+	_assert(
+		reachable_from_entry.size() == blueprint.landmarks.size(),
+		"Wszystkie 27 landmarków musi pozostawać w jednej składowej zwykłych połączeń; osiągalne %d/%d."
+		% [reachable_from_entry.size(), blueprint.landmarks.size()]
+	)
+	var reachable_from_archive := _regular_connection_reachable_ids(blueprint, "R1-09")
+	_assert(
+		reachable_from_archive.has("R3-04"),
+		"Zalane Archiwum R1-09 musi zachować zwykłą trasę do Elektrowni R3-04 bez SC-02."
+	)
+	var reachable_from_r3 := _regular_connection_reachable_ids(blueprint, "R3-04")
+	_assert(
+		reachable_from_r3.has("R4-06"),
+		"Elektrownia R3-04 musi zachować zwykłą trasę do Serca R4-06 i Rozdzielni C-4."
+	)
+
+
+func _regular_connection_reachable_ids(blueprint, start_landmark_id: String) -> Dictionary:
+	var adjacency: Dictionary = {}
+	for landmark in blueprint.landmarks:
+		var landmark_id := str(landmark.get("id", ""))
+		if not landmark_id.is_empty():
+			adjacency[landmark_id] = []
+	for connection in blueprint.connections:
+		if str(connection.get("type", "main")) == "shortcut":
+			continue
+		var from_id := str(connection.get("from_id", ""))
+		var to_id := str(connection.get("to_id", ""))
+		if not adjacency.has(from_id) or not adjacency.has(to_id):
+			continue
+		var from_neighbours: Array = adjacency[from_id]
+		from_neighbours.append(to_id)
+		adjacency[from_id] = from_neighbours
+		var to_neighbours: Array = adjacency[to_id]
+		to_neighbours.append(from_id)
+		adjacency[to_id] = to_neighbours
+
+	var reachable: Dictionary = {}
+	if not adjacency.has(start_landmark_id):
+		return reachable
+	var pending: Array[String] = [start_landmark_id]
+	reachable[start_landmark_id] = true
+	var read_index := 0
+	while read_index < pending.size():
+		var current_id := pending[read_index]
+		read_index += 1
+		for neighbour_value in adjacency.get(current_id, []):
+			var neighbour_id := str(neighbour_value)
+			if reachable.has(neighbour_id):
+				continue
+			reachable[neighbour_id] = true
+			pending.append(neighbour_id)
+	return reachable
+
+
+func _packed_strings_contain(values: PackedStringArray, fragment: String) -> bool:
+	for value in values:
+		if value.contains(fragment):
+			return true
+	return false
 
 
 func _assert(condition: bool, message: String) -> void:

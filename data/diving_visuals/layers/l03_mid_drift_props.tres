@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="DiveVisualLayerProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/DiveVisualLayerProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+layer_id = &"L03_mid_drift_props"
+role = "Średni plan, dryfujące dekoracje i ruchome akcenty"
+z_index = -60
+normal_scroll_scale = Vector2(0.97, 0.97)
+reduced_motion_scroll_scale = Vector2(1, 1)
+minimum_quality = "low"

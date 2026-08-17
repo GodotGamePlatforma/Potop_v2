@@ -4,13 +4,13 @@
     "contract": "presentation_only_derived_authoring_guide",
     "map_scene": {
       "path": "res://scenes/diving/UnderwaterMap.tscn",
-      "sha256": "883a3803ab1c09903e04b14bcc4929dd429937759301d48852da197fc854f707",
-      "size_bytes": 199536
+      "sha256": "bcf2111ba6ae59bb3805cd7f0429761031ff4491f76e88520800cc3d4259fd37",
+      "size_bytes": 197774
     },
     "map_script": {
       "path": "res://scripts/diving/UnderwaterMapScene.gd",
-      "sha256": "dc21d9a9b2679b9347bbae9871c7e1ebb96996e934f76a7aea2518f7192d43b3",
-      "size_bytes": 8653
+      "sha256": "9ad418dba20fcdb6fd9fb55d564089e52f9397a3ef5aade4a441adbea8571f05",
+      "size_bytes": 9184
     },
     "note": "UnderwaterMap.tscn remains the sole authority for topology, regions and landmarks."
   },
@@ -2713,14 +2713,14 @@
     "model": "not_applicable",
     "path": "res://tools/build_dive_map_layout_guide.py",
     "seed": "not_applicable",
-    "sha256": "1b1f8eca72be9b08ea39f81e353d3ec2f2ccfc13199cf3fbddb0c03396203d66",
+    "sha256": "90e38fe9aaa8a76153e536cef808312ff41fe001041bb1cc538454000b3a8f39",
     "version": 2
   },
   "guide_size": [
     4320,
     2430
   ],
-  "landmark_count": 28,
+  "landmark_count": 27,
   "landmarks": [
     {
       "bounds": [
@@ -3085,34 +3085,6 @@
         346.8808
       ],
       "source_node_path": "Landmarks/R2_03_CentrumOgrodnicze"
-    },
-    {
-      "bounds": [
-        7792.83625,
-        1205.2304,
-        1542.3275,
-        333.5392
-      ],
-      "camera_cells": [
-        [
-          9,
-          3
-        ]
-      ],
-      "id": "R2-04",
-      "kind": "seed_bank",
-      "name": "Bank Nasion",
-      "position": [
-        8564.0,
-        1372.0
-      ],
-      "region_id": "R2",
-      "role": "critical_food",
-      "size": [
-        1542.3275,
-        333.5392
-      ],
-      "source_node_path": "Landmarks/R2_04_BankNasion"
     },
     {
       "bounds": [
@@ -3524,16 +3496,16 @@
     "nearest-neighbor scale the 8-unit terrain grid by 3x",
     "overlay authored region bounds including overlaps",
     "overlay full production-camera frames with the final row and column clamped to world edges",
-    "overlay 28 semantic landmark positions and authored bounds",
+    "overlay 27 semantic landmark positions and authored bounds",
     "draw labels with the generator-embedded bitmap font",
     "encode RGBA PNG with Pillow compress_level=9 optimize=false"
   ],
   "output": {
     "format": "RGBA PNG",
     "path": "res://assets/diving/world/layout_guides/full_map/underwater_map_layout_guide_v1.png",
-    "pixel_sha256": "faaf170470029931c2d76be24ba1d6ba66b19a34be993aae0039da108b6e0d3f",
-    "sha256": "53442cb22aad7d407ebe30b50b19aee3af232367795fb1f31d9de4da5a23f999",
-    "size_bytes": 112700
+    "pixel_sha256": "c14399baa798a26b7cea95e8df368b702951b721ed6045756f5fd39894f9bb55",
+    "sha256": "ce88b10958afcf48a65e2a2993f9e1521900ef7f203e597a4bf1083e43c75baf",
+    "size_bytes": 111588
   },
   "pixels_per_world_unit": 0.375,
   "region_count": 4,

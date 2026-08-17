@@ -730,7 +730,7 @@ Wynik projektowy wskazuje co najmniej pozycję, profil, wejście, trasę, wymaga
 
 [AKTYWNE]
 
-Mapa ma 11 520 × 6 480 jednostek, cztery regiony, 28 landmarków, 39 zwykłych połączeń i osiem trwałych skrótów — 47 połączeń łącznie — 12 stałych, jednostkowych znalezisk, stałe kontenery, prądy, jedno zagrożenie, jedno spotkanie ratunkowe i trzy ciężkie obiekty.
+Mapa ma 11 520 × 6 480 jednostek, cztery regiony, 27 landmarków, 36 zwykłych połączeń i siedem trwałych skrótów — 43 połączenia łącznie — 12 stałych, jednostkowych znalezisk, stałe kontenery, prądy, jedno zagrożenie, jedno spotkanie ratunkowe i trzy ciężkie obiekty. Zielone Osiedla nie zawierają Banku Nasion ani dawnego skrótu prowadzącego z niego do Zalanego Archiwum; sam graf zwykłych połączeń nadal łączy wszystkie landmarki, więc osiągalność nie zależy od otwarcia skrótu.
 
 Geometria, pozycje ważnych obiektów i bramy skrótów są autorsko stałe. Seed kampanii nie zmienia funkcjonalnej topologii ani tras; wpływa tylko na jawnie losowane lub skalowane elementy, takie jak zaokrąglenie łupu kontenerowego.
 
@@ -738,11 +738,11 @@ Geometria, pozycje ważnych obiektów i bramy skrótów są autorsko stałe. See
 
 Decyzja twórcy / warunek:
 
-Twórca otwiera produkcyjną scenę świata podwodnego w edytorze Godot. Widzi warstwy całej mapy oraz instancje regionów, landmarków, tras, prądów, przeszkód, źródeł łupu, zagrożeń, celów interaktywnych i dekoracji. Może dodawać dostarczone prefaby, przesuwać je w widoku 2D, obracać i skalować tam, gdzie dopuszcza to dany typ, zmieniać ich dane oraz przypisywać własne sceny wizualne z assetami. Gracz nie wykonuje tych operacji podczas kampanii.
+Twórca otwiera produkcyjną scenę świata podwodnego w edytorze Godot, a szeroką grafikę edytuje w jej kanonicznej scenie kompozycji. Widzi instancję kompozycji całej mapy oraz instancje regionów, landmarków, tras, prądów, przeszkód, źródeł łupu, zagrożeń, celów interaktywnych i dekoracji. Szeroka grafika świata ma dokładnie sześć nazwanych planów prezentacyjnych `L00-L05`; każdy autorski element planu pozostaje osobnym, wybieralnym składnikiem, który można niezależnie przesunąć, obrócić, skalować, rozciągnąć, ukryć albo wymienić. Scena kompozycji jest częścią produkcyjnej mapy, a nie szkicem ani drugim modelem świata. Spłaszczony obraz może pozostać jednym elementem tylko wtedy, gdy cała jego zawartość ma być poprawiana i przemieszczana wspólnie. Twórca może także dodawać dostarczone prefaby, zmieniać ich dane oraz przypisywać własne sceny wizualne z assetami. Gracz nie wykonuje tych operacji podczas kampanii.
 
 Widoczny skutek i feedback:
 
-Zapisana i poprawnie zwalidowana scena jest dokładnie tym statycznym światem, który składa wyprawa — bez osobnego szkicu, katalogu publikacyjnego ani drugiej listy pozycji w kodzie. Markery, obrysy, etykiety, trasy i przypisane prefaby są widoczne bez uruchamiania gry. Walidacja wskazuje brakujące lub powielone ID, obiekt w niewłaściwej gałęzi drzewa, błędne referencje, cele poza mapą, niedozwolone prefaby i utratę podstawowej przechodniości.
+Zapisana i poprawnie zwalidowana scena jest dokładnie tym statycznym światem, który składa wyprawa — bez osobnego szkicu, katalogu publikacyjnego ani drugiej listy pozycji w kodzie. Markery, obrysy, etykiety, trasy, sześć planów grafiki i przypisane prefaby są widoczne bez uruchamiania gry. Walidacja wskazuje brakujące albo powielone role planów, niedozwolony element wizualny, brakujące lub powielone ID, obiekt w niewłaściwej gałęzi drzewa, błędne referencje, cele poza mapą, niedozwolone prefaby i utratę podstawowej przechodniości.
 
 Ograniczenia i wyjątki istotne dla gracza:
 
@@ -815,7 +815,7 @@ Odwołania: ARD-0040, ARD-0049, ARD-0052, ARD-0066, ARD-0085; architektura, sekc
 
 [AKTYWNE] — WARSTWOWE TŁO BIOMÓW
 
-Za trasą i terenem każdy region otrzymuje kilka nieinteraktywnych planów: dalekie sylwetki, atmosferę z promieniami i mgłą oraz autorski średni plan materiałowy. Dachy pokazują zatopione bryły miasta i odległe okna, Zielone Osiedla — kołyszące się pasma roślin oraz drobną faunę, Rdzawy Pas — konstrukcje, rurociągi, stacje i zawieszony osad przemysłowy, a Czarne Serce — monumentalne pozostałości sieci oraz powoli dryfujące sylwetki dalekiego życia. Formy pozostają zakotwiczone w przestrzeni świata, rozdzielają się łagodnym parallaxem i reagują na wodę, światło oraz prąd bez udawania zagrożenia, kolizji albo celu.
+Każdy region korzysta z tego samego stosu sześciu nieinteraktywnych planów: `L00` bazowego pola barwy, `L01` najdalszych sylwetek, `L02` dalekich konstrukcji, `L03` średniego planu i dryfujących dekoracji, `L04` skóry związanej z kanonicznym terenem oraz `L05` oszczędnych zasłonięć pierwszego planu. Dachy pokazują zatopione bryły miasta i odległe okna, Zielone Osiedla — kołyszące się pasma roślin oraz drobną faunę, Rdzawy Pas — konstrukcje, rurociągi, stacje i zawieszony osad przemysłowy, a Czarne Serce — monumentalne pozostałości sieci oraz powoli dryfujące sylwetki dalekiego życia. Dalsze plany poruszają się względem kamery wolniej od bliższych, `L04` nie odkleja się od fizycznego terenu, a `L05` nie zasłania nurka, celu ani sygnałów interakcji. Formy reagują na wodę, światło oraz prąd bez udawania zagrożenia, kolizji albo celu.
 
 Plan jest widoczny również bez latarni, lecz ma niższy kontrast od nurka, Wspólnej Linii i obiektów interaktywnych. Profil niski upraszcza detal, a ograniczenie ruchu zatrzymuje dryf i falowanie bez usuwania kompozycji ani tożsamości regionu.
 

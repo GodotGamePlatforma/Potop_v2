@@ -5,7 +5,6 @@ render_mode unshaded;
 // contains presentation only: no map mask, collision, or gameplay state.
 uniform vec2 world_size = vec2(11520.0, 6480.0);
 uniform vec2 world_origin = vec2(0.0);
-uniform vec2 view_center = vec2(5760.0, 3240.0);
 uniform float anim_time = 0.0;
 uniform bool reduced_motion = false;
 uniform int quality_level = 2;
@@ -38,7 +37,8 @@ uniform float r4_backdrop_strength : hint_range(0.0, 1.0) = 0.78;
 uniform float r4_backdrop_motion_scale : hint_range(0.0, 2.0) = 0.30;
 uniform float r4_backdrop_motif_scale : hint_range(0.5, 2.0) = 1.0;
 
-varying vec2 world_position;
+varying vec2 layer_position;
+varying vec2 scene_world_position;
 
 
 float hash21(vec2 point) {
@@ -69,9 +69,8 @@ float soft_segment(vec2 point, vec2 start, vec2 end, float width) {
 }
 
 
-vec2 distant_position(vec2 position, float time_value, float motion_scale, float parallax_factor, float wave_strength) {
-	float effective_parallax = reduced_motion ? 0.0 : parallax_factor;
-	vec2 sample_position = position - view_center * effective_parallax;
+vec2 distant_position(vec2 position, float time_value, float motion_scale, float wave_strength) {
+	vec2 sample_position = position;
 	float motion_time = time_value * motion_scale;
 	float first_wave = sin(sample_position.y / 238.0 + motion_time * 0.44);
 	float second_wave = sin(sample_position.y / 109.0 - motion_time * 0.29 + sample_position.x / 760.0);
@@ -99,7 +98,7 @@ vec4 blend_backdrops(vec4 first, vec4 second, float weight) {
 
 
 vec4 r1_city_backdrop(vec2 position, float time_value) {
-	position = distant_position(position, time_value, r1_backdrop_motion_scale, 0.08, 8.0);
+	position = distant_position(position, time_value, r1_backdrop_motion_scale, 8.0);
 	float scale = 420.0 * clamp(r1_backdrop_motif_scale, 0.5, 2.0);
 	vec2 grid = position / scale;
 	vec2 cell = floor(grid);
@@ -145,7 +144,7 @@ vec4 r1_city_backdrop(vec2 position, float time_value) {
 
 
 vec4 r2_garden_backdrop(vec2 position, float time_value) {
-	position = distant_position(position, time_value, r2_backdrop_motion_scale, 0.12, 15.0);
+	position = distant_position(position, time_value, r2_backdrop_motion_scale, 15.0);
 	float scale = 360.0 * clamp(r2_backdrop_motif_scale, 0.5, 2.0);
 	vec2 grid = position / scale;
 	vec2 cell = floor(grid);
@@ -192,7 +191,7 @@ vec4 r2_garden_backdrop(vec2 position, float time_value) {
 
 
 vec4 r3_industry_backdrop(vec2 position, float time_value) {
-	position = distant_position(position, time_value, r3_backdrop_motion_scale, 0.07, 6.0);
+	position = distant_position(position, time_value, r3_backdrop_motion_scale, 6.0);
 	float scale = 480.0 * clamp(r3_backdrop_motif_scale, 0.5, 2.0);
 	vec2 grid = position / scale;
 	vec2 cell = floor(grid);
@@ -222,7 +221,7 @@ vec4 r3_industry_backdrop(vec2 position, float time_value) {
 
 
 vec4 r4_monument_backdrop(vec2 position, float time_value) {
-	position = distant_position(position, time_value, r4_backdrop_motion_scale, 0.16, 9.0);
+	position = distant_position(position, time_value, r4_backdrop_motion_scale, 9.0);
 	float scale = 560.0 * clamp(r4_backdrop_motif_scale, 0.5, 2.0);
 	vec2 grid = position / scale;
 	vec2 cell = floor(grid);
@@ -274,38 +273,39 @@ vec4 r4_monument_backdrop(vec2 position, float time_value) {
 
 
 void vertex() {
-	world_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy - world_origin;
+	layer_position = VERTEX;
+	scene_world_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy - world_origin;
 }
 
 
 void fragment() {
 	float safe_world_height = max(world_size.y, 1.0);
-	float depth_ratio = clamp(world_position.y / safe_world_height, 0.0, 1.0);
+	float depth_ratio = clamp(scene_world_position.y / safe_world_height, 0.0, 1.0);
 	float time_value = reduced_motion ? 0.0 : anim_time;
 	vec4 backdrop = vec4(0.0);
 	if (depth_ratio < r1_depth_end) {
 		float transition = region_transition(region_depth(depth_ratio, 0.0, r1_depth_end));
 		backdrop = blend_backdrops(
-			r1_city_backdrop(world_position, time_value),
-			r2_garden_backdrop(world_position, time_value),
+			r1_city_backdrop(layer_position, time_value),
+			r2_garden_backdrop(layer_position, time_value),
 			transition
 		);
 	} else if (depth_ratio < r2_depth_end) {
 		float transition = region_transition(region_depth(depth_ratio, r1_depth_end, r2_depth_end));
 		backdrop = blend_backdrops(
-			r2_garden_backdrop(world_position, time_value),
-			r3_industry_backdrop(world_position, time_value),
+			r2_garden_backdrop(layer_position, time_value),
+			r3_industry_backdrop(layer_position, time_value),
 			transition
 		);
 	} else if (depth_ratio < r3_depth_end) {
 		float transition = region_transition(region_depth(depth_ratio, r2_depth_end, r3_depth_end));
 		backdrop = blend_backdrops(
-			r3_industry_backdrop(world_position, time_value),
-			r4_monument_backdrop(world_position, time_value),
+			r3_industry_backdrop(layer_position, time_value),
+			r4_monument_backdrop(layer_position, time_value),
 			transition
 		);
 	} else {
-		backdrop = r4_monument_backdrop(world_position, time_value);
+		backdrop = r4_monument_backdrop(layer_position, time_value);
 	}
 	COLOR = vec4(backdrop.rgb, clamp(backdrop.a, 0.0, 1.0));
 }

@@ -36,15 +36,16 @@ Reguły gry, globalna architektura, persistence i potwierdzony runtime pozostaj�
 Ścieżki `res://` są niezależne od lokalizacji worktree:
 
 - mapa i authority statycznego świata: `res://scenes/diving/UnderwaterMap.tscn`;
-- wizualne prefaby mapy: `res://scenes/diving/map_visuals/`;
+- wizualne prefaby mapy, w tym edytowalna kompozycja `UnderwaterMapSixLayerVisuals.tscn` i szablon `LayerVisualElement.tscn`: `res://scenes/diving/map_visuals/`;
 - przyszłe zatwierdzone mastery i ArtCells: `res://assets/diving/world/art_cells/`;
 - layout guides i provenance: `res://assets/diving/world/layout_guides/`;
 - kandydaci szerokich composition masterów i ich cropy podglądowe: `res://assets/diving/world/layout_guides/composition_masters/`;
 - referencje języka wizualnego, warstwy parallax i ich manifesty provenance: `res://assets/diving/world/layout_guides/style_references/`; nie są masterem, topologią ani assetem ładowanym przez grę;
-- sześciowarstwowe referencje 28 landmarków: `res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/`;
+- niezależne tekstury elementów biomów gotowe do przypisania do `Sprite2D`: `res://assets/diving/world/layout_guides/style_references/biomes_v3_sprite_elements_v1/`;
+- historyczne sześciowarstwowe referencje pierwotnych 28 landmarków: `res://assets/diving/world/layout_guides/style_references/landmarks_v1_six_layer/`; wycofane `R2-04` pozostaje tam tylko jako provenance i nie jest kandydatem runtime;
 - tła i foregroundy: `res://assets/diving/world/backdrops/`, `res://assets/diving/world/foregrounds/`;
 - materiały, shadery i propsy: `res://assets/diving/world/materials/`, `res://assets/diving/world/shaders/`, `res://assets/diving/world/props/`;
-- profile prezentacyjne regionów: `res://data/diving_visuals/`;
+- profile prezentacyjne regionów i sześciu planów: `res://data/diving_visuals/`;
 - pochodne streamingu: `res://assets/diving/world/map_v2/visual_chunks/`;
 - mapowe narzędzia i testy: `res://tools/` oraz `res://tests/`, tylko w zakresie wskazanym przez `AGENTS.md`.
 
@@ -53,16 +54,34 @@ Nie przenoś tych plików do warsztatu. Produkcyjne ścieżki, UID-y i import Go
 ## Bieżący baseline
 
 - Commit odniesienia `a1c33d5` usunął odrzuconą szeroką panoramę R1, pięć jej źródeł, 24 cropy i generator `build_dive_art_cells.py`.
-- Aktywny manifest zawiera jedną warstwę `environment_decoration` i 15 cropów. Jej źródłowy master jest zarchiwizowany i nie istnieje w repozytorium.
-- `build_dive_visual_chunks.py` nie ma `--check` i nie potrafi odbudować warstwy bez brakującego źródła. Nie używaj go jako aktywnego buildera, dopóki pipeline nie zostanie jawnie naprawiony albo zastąpiony.
+- Runtime ma dokładnie sześć planów `L00-L05` z profilami `scroll_scale`; `L04` pozostaje związana ze światem, a `reduced_motion` ustawia wszystkie plany na `(1,1)` bez ukrywania grafiki. Kompozycja i transformy elementów należą do `UnderwaterMapSixLayerVisuals.tscn`, nie do manifestu.
+- Aktywny `map_visual_chunks_v2.json` opisuje sześć planów i adoptuje 15 zachowanych cropów jako 15 osobnych, wybieralnych elementów L02. Zamrożony manifest v1 oraz PNG pozostają nienaruszonym dowodem integralności; ich źródłowy master jest zarchiwizowany i nie istnieje w repozytorium.
+- `build_dive_visual_chunks.py --build` zapisuje atomowo wyłącznie manifest v2 po walidacji sceny, profili, v1 i wszystkich cropów; `--check` niczego nie zapisuje. Builder nigdy nie otwiera brakującego mastera ani nie modyfikuje zamrożonych PNG.
 - Pełnomapowy layout guide v1, manifest i generator są wersjonowanym pakietem referencyjnym z deterministycznym `--check`.
 - `biomes_v2_layered` zawiera cztery spłaszczone guide'y kompozycyjne R1-R4 oraz ich manifest provenance; nie są warstwami runtime ani composition masterem.
 - `biomes_v3_six_layer` zawiera po sześć współosiowych PNG `L00-L05` dla każdego biomu, cztery pochodne podglądy złożenia, 21 wersjonowanych surowych wyników ImageGen i manifest reprodukcji. Użytkownik zaakceptował go jako wzorzec stylu i konstrukcji sześciu warstw; nie jest to akceptacja composition mastera ani assetu runtime.
-- `landmarks_v1_six_layer` zawiera 28 źródłowych arkuszy, 168 niezależnych PNG alfa `L00-L05`, 28 pochodnych podglądów, cztery regionalne rekordy pełnego provenance i manifest nadrzędny. Zestaw jest technicznie kompletną referencją, oczekuje na odbiór artystyczny i pozostaje niepodłączony do runtime.
+- `biomes_v3_sprite_elements_v1` rozdziela zaakceptowane referencje V3 na 4 pełne płaszczyzny `L00`, 84 niezależne elementy core `L01-L05` oraz 30 niezależnych elementów suplementu R1. Każdy crop zachowuje źródłowe RGBA, ma 16 px przezroczystego marginesu i pozycję rekonstrukcyjną w manifeście; pakiet pozostaje referencją niepodłączoną do runtime.
+- `landmarks_v1_six_layer` zachowuje historyczne 28 źródłowych arkuszy, 168 niezależnych PNG alfa `L00-L05`, 28 pochodnych podglądów, cztery regionalne rekordy pełnego provenance i manifest nadrzędny. `R2-04` jest wyłącznie wycofanym dowodem provenance; bieżąca mapa ma 27 landmarków. Zestaw oczekuje na odbiór artystyczny i pozostaje niepodłączony do runtime.
 - `composition_masters/biomes_l01_v1` zawiera technicznie poprawny kandydat full-map `L01`, cztery regionalne cropy i manifest provenance. Ma `production_master = false`, `runtime_asset = false` oraz `PENDING_USER_REVIEW`.
 - Nie istnieje zaakceptowany szeroki composition master R1-R4.
 
 Dokładny stan i rozdzielone statusy techniczny/artystyczny są w `.ai/PROJECT_CONTEXT.md`.
+
+## Edycja sześciu warstw runtime
+
+Otwórz bezpośrednio `res://scenes/diving/map_visuals/UnderwaterMapSixLayerVisuals.tscn`; `UnderwaterMap.tscn` instancjuje tę kompozycję pod `VisualLayers/SixLayerVisuals`. Każdy plan `L00-L05` ma dwie przestrzenie (`ParallaxContent` i `WorldContent`) oraz trzy buckety (`Authored`, `Generated`, `Streamed`). Nowe ręcznie ustawiane elementy dodawaj do `Authored`; elementy związane z kolizją lub kanonicznym terenem umieszczaj w `WorldContent`, a zwykłe tło i dekoracje głębi w `ParallaxContent`.
+
+Każdy niezależny obiekt musi być osobnym `DiveVisualLayerElement`, `Sprite2D`, `Polygon2D` albo kolizyjnie pustą instancją `PackedScene`. Jego zwykły transform `Node2D` i `visible` są authority pozycji, obrotu, skali, niezależnego rozciągania osi i ukrycia. Najprościej zduplikować `LayerVisualElement.tscn`, nadać unikalne `element_id`, wskazać teksturę lub scenę oraz ustawić `local_bounds`. Domyślny tryb `Scene Resident` sam ładuje zasób do dziecka `Attachment` i nie wymaga wpisu manifestu. `Manifest Streamed` wybieraj wyłącznie dla zasobu jawnie zarejestrowanego przez builder v2; obecnie dotyczy to 15 zaadaptowanych cropów L02. Oba tryby zachowują transform elementu, a jakość steruje tylko treścią `Attachment`, nigdy autorskim `visible=false`. Prefab `PackedScene` musi być czysto wizualny: bez własnych skryptów, kolizji, nawigacji, `CanvasLayer`, `top_level` i absolutnego albo lokalnie przesuniętego z-order; do ruchu całego obiektu używaj transformu zewnętrznego `DiveVisualLayerElement`.
+
+Jedna spłaszczona bitmapa nadal jest jednym elementem. Aby przesuwać osobno rurę, roślinę lub fragment budynku, trzeba dostarczyć je jako osobne tekstury albo prefaby; sześć dużych PNG daje tylko sześć transformów. Obecne 15 cropów jest już niezależne między sobą, ale piksele wewnątrz pojedynczego cropa pozostają nierozdzielne z powodu brakującego źródła.
+
+## Użycie elementów Sprite2D biomów
+
+Pakiet `res://assets/diving/world/layout_guides/style_references/biomes_v3_sprite_elements_v1/` zawiera osobny PNG dla każdego logicznego obiektu z referencji biomów V3 oraz suplementu R1. Katalogi są rozdzielone według biomu i warstwy, a `biome_sprite_element_set_v1.json` zapisuje dla każdego pliku warstwę `L01-L05`, źródłowy prostokąt, SHA-256, punkt obrotu i początkową pozycję odtwarzającą referencję przy `Sprite2D.centered = true`. `L00` pozostaje pojedynczą pełną płaszczyzną koloru na biom.
+
+Tekstury można przypisać pojedynczo do osobnych `Sprite2D` lub `DiveVisualLayerElement` i następnie ustawiać niezależnie w odpowiednim buckecie warstwy. Manifest jest wyłącznie provenance i pomocą kompozycyjną: nie ustanawia transformów produkcyjnych, stable ID ani authority mapy. Pakiet nie jest automatycznie ładowany przez grę i jego podłączenie do `UnderwaterMapSixLayerVisuals.tscn` pozostaje osobnym zadaniem runtime.
+
+Element z `edge_locked = true` był już ucięty przez krawędź źródłowego płótna. Nadal jest niezależną teksturą, lecz po odsunięciu od odpowiadającej krawędzi ujawni prostą linię kadru; przed swobodnym umieszczeniem w otwartej wodzie wymaga outpaintu. Suplement R1 zachowuje osobny namespace i status `PENDING_USER_REVIEW`.
 
 ## Użycie warstw landmarków
 
@@ -96,6 +115,26 @@ python ..\tools\build_dive_map_layout_guide.py --check
 ```
 
 Tryb `--check` nie zapisuje plików. Porównuje źródła, manifest i zdekodowane piksele bez zależności od fontów systemowych albo wariantu kompresji PNG.
+
+### Manifest sześciu warstw
+
+```powershell
+python ..\tools\build_dive_visual_chunks.py --build
+python ..\tools\build_dive_visual_chunks.py --check
+```
+
+Pierwsza komenda zapisuje atomowo tylko `map_visual_chunks_v2.json`; druga jest bez-zapisową bramką aktualności i integralności. Po zmianie sceny kompozycji lub profilu warstwy uruchom ponownie `--build`, a następnie `--check`.
+
+Przy tworzeniu presetu eksportu dodaj `*.json` do filtra **Resources > Filters to export non-resource files/folders**, aby `map_visual_chunks_v2.json` trafił do PCK. Repozytorium nie zawiera obecnie `export_presets.cfg`, więc tej bramki nie da się odziedziczyć automatycznie ani potwierdzić eksportem bez wskazania docelowej platformy i presetu. Importowane tekstury pozostają zwykłymi zasobami Godota; runtime sprawdza ich dostępność przez `ResourceLoader`, a ścisłe SHA-256 plików źródłowych pozostaje bramką edytora/buildera.
+
+### Elementy PNG biomów dla Sprite2D
+
+```powershell
+.\tools\build_biome_sprite_elements.ps1
+.\tools\build_biome_sprite_elements.ps1 -Check
+```
+
+Pierwsza komenda deterministycznie odtwarza `biomes_v3_sprite_elements_v1` z zaakceptowanych referencji i osobnego suplementu R1. `-Check` buduje pełnego kandydata wyłącznie w katalogu tymczasowym, porównuje listę plików i wszystkie SHA-256 z pakietem w repozytorium, po czym usuwa kandydata bez zapisu do projektu. Każda z 24 płaszczyzn alfa musi złożyć się z wyciętych elementów bez różnicy pikselowej.
 
 ### Celowane testy mapy
 

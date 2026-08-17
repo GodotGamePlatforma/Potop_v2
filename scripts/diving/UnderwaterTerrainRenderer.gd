@@ -40,7 +40,9 @@ var _terrain_materials: Dictionary = {}
 var _graphics_quality: String = "high"
 var _reduced_motion: bool = false
 var _anim_time: float = 0.0
-var _view_center: Vector2 = Vector2.ZERO
+var _water_parent: Node2D
+var _backdrop_parent: Node2D
+var _terrain_parent: Node2D
 
 
 func _ready() -> void:
@@ -49,6 +51,23 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	advance_animation(delta)
+
+
+func configure_layer_roots(
+	water_parent: Node2D,
+	backdrop_parent: Node2D,
+	terrain_parent: Node2D
+) -> void:
+	if (
+		_water_parent == water_parent
+		and _backdrop_parent == backdrop_parent
+		and _terrain_parent == terrain_parent
+	):
+		return
+	clear_visuals()
+	_water_parent = water_parent
+	_backdrop_parent = backdrop_parent
+	_terrain_parent = terrain_parent
 
 
 func set_active_chunks(chunk_keys: Array[String]) -> void:
@@ -129,16 +148,6 @@ func advance_animation(delta: float) -> void:
 	_refresh_animation_parameter()
 
 
-func set_view_center(value: Vector2) -> void:
-	if not is_finite(value.x) or not is_finite(value.y):
-		return
-	_view_center = value - global_position
-	for material_variant in _backdrop_materials.values():
-		var material := material_variant as ShaderMaterial
-		if material != null:
-			material.set_shader_parameter("view_center", _view_center)
-
-
 func active_chunk_keys() -> Array[String]:
 	var result: Array[String] = []
 	result.assign(_active_chunk_keys)
@@ -166,7 +175,9 @@ func presentation_state() -> Dictionary:
 		"backdrop_quality_level": QUALITY_IDS.find(_graphics_quality),
 		"backdrop_reduced_motion": _reduced_motion,
 		"backdrop_anim_time": 0.0 if _reduced_motion else _anim_time,
-		"backdrop_view_center": _view_center,
+		"water_parent": _node_path_or_empty(_water_parent),
+		"backdrop_parent": _node_path_or_empty(_backdrop_parent),
+		"terrain_parent": _node_path_or_empty(_terrain_parent),
 	}
 
 
@@ -234,10 +245,11 @@ func _ensure_global_water() -> void:
 		world_size,
 		Vector2(0.0, world_size.y),
 	])
-	_global_water.z_index = water_z_index
-	_global_water.z_as_relative = false
+	var parent := _valid_parent_or_self(_water_parent)
+	_global_water.z_index = 0 if parent != self else water_z_index
+	_global_water.z_as_relative = parent != self
 	_global_water.material = _water_material()
-	add_child(_global_water)
+	parent.add_child(_global_water)
 
 
 func _ensure_global_backdrop() -> void:
@@ -253,10 +265,11 @@ func _ensure_global_backdrop() -> void:
 		world_size,
 		Vector2(0.0, world_size.y),
 	])
-	_global_backdrop.z_index = backdrop_z_index
-	_global_backdrop.z_as_relative = false
+	var parent := _valid_parent_or_self(_backdrop_parent)
+	_global_backdrop.z_index = 0 if parent != self else backdrop_z_index
+	_global_backdrop.z_as_relative = parent != self
 	_global_backdrop.material = _backdrop_material()
-	add_child(_global_backdrop)
+	parent.add_child(_global_backdrop)
 
 
 func _ensure_global_terrain() -> void:
@@ -275,10 +288,11 @@ func _ensure_global_terrain() -> void:
 	_global_terrain.scale = world_size / texture_size
 	_global_terrain.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_global_terrain.texture_repeat = CanvasItem.TEXTURE_REPEAT_DISABLED
-	_global_terrain.z_index = terrain_z_index
-	_global_terrain.z_as_relative = false
+	var parent := _valid_parent_or_self(_terrain_parent)
+	_global_terrain.z_index = 0 if parent != self else terrain_z_index
+	_global_terrain.z_as_relative = parent != self
 	_global_terrain.material = _terrain_material()
-	add_child(_global_terrain)
+	parent.add_child(_global_terrain)
 
 
 func _water_material() -> ShaderMaterial:
@@ -317,7 +331,6 @@ func _backdrop_material() -> ShaderMaterial:
 	_apply_backdrop_profile_parameters(material)
 	material.set_shader_parameter("world_size", world_size)
 	material.set_shader_parameter("world_origin", global_position)
-	material.set_shader_parameter("view_center", _view_center)
 	_apply_backdrop_dynamic_parameters(material)
 	_backdrop_materials[GLOBAL_MATERIAL_KEY] = material
 	return material
@@ -478,3 +491,15 @@ func _parse_chunk_key(chunk_key: String) -> Vector2i:
 
 func _chunk_key(coordinates: Vector2i) -> String:
 	return "%d:%d" % [coordinates.x, coordinates.y]
+
+
+func _valid_parent_or_self(candidate: Node2D) -> Node2D:
+	if candidate != null and is_instance_valid(candidate):
+		return candidate
+	return self
+
+
+func _node_path_or_empty(node: Node2D) -> String:
+	if node == null or not is_instance_valid(node):
+		return ""
+	return str(node.get_path())

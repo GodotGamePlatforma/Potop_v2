@@ -43,10 +43,10 @@ const ALL_PROFILE_PATHS: Dictionary = {
 	"story_c4_buoy_b03": "res://data/diving_validation/profiles/story_c4_buoy_b03.tres",
 	"story_splitter_buoy_b03": "res://data/diving_validation/profiles/story_splitter_buoy_b03.tres",
 }
-const STATIC_TARGET_COUNT := 65
-const STATIC_RESOURCE_PAIR_QUERY_COUNT := 103
-const STATIC_FULL_INTERACTION_QUERY_COUNT := 35
-const STATIC_QUERY_COUNT := 138
+const STATIC_TARGET_COUNT := 63
+const STATIC_RESOURCE_PAIR_QUERY_COUNT := 101
+const STATIC_FULL_INTERACTION_QUERY_COUNT := 34
+const STATIC_QUERY_COUNT := 135
 const STATIC_TARGET_CERTIFICATION_PROFILE: Dictionary = {
 	"tutorial_market_crate": "tutorial_day2_station_i",
 	"tutorial_workshop_case": "tutorial_day2_station_i",
@@ -57,7 +57,6 @@ const STATIC_TARGET_CERTIFICATION_PROFILE: Dictionary = {
 	"pharmacy_medicine_case": "tank_ii_workshop_ii",
 	"hotel_linen_cache": "tank_ii_workshop_ii",
 	"greenhouse_supply_box": "tank_ii_workshop_ii",
-	"seed_bank_vault": "tank_ii_workshop_ii",
 	"ship_carpentry_store": "tank_ii_workshop_ii",
 	"museum_reinforcement_cache": "tank_ii_workshop_ii",
 	"archive_maintenance_store": "tank_ii_workshop_ii",
@@ -69,7 +68,6 @@ const STATIC_TARGET_CERTIFICATION_PROFILE: Dictionary = {
 	"pickup_r2_food_01": "tank_ii_workshop_ii",
 	"pickup_r2_planks_01": "tank_ii_workshop_ii",
 	"rescue_hotel_leon": "tank_ii_workshop_ii",
-	"SC-02": "tank_ii_workshop_ii",
 	"SC-03": "tank_ii_workshop_ii",
 	"hospital_emergency_store": "tank_iii_workshop_iii",
 	"hospital_structural_store": "tank_iii_workshop_iii",
@@ -194,7 +192,7 @@ const STATIC_PREFLIGHT_FAILURE_CODES: Array[StringName] = [
 	CertificateScript.CAPACITY_SLOT_EXCEEDED,
 	CertificateScript.CAPACITY_MASS_EXCEEDED,
 ]
-# Kluczem jest query_id: 103 pary źródło + zasób oraz 35 pełnych interakcji.
+# Kluczem jest query_id: 101 par źródło + zasób oraz 34 pełne interakcje.
 # Wypełnia się wyłącznie wynikiem pełnego discovery replayu; pusta mapa celowo
 # wymusza czytelny raport zamiast zgadywania najwcześniejszych profili.
 const EXPECTED_EARLIEST_PROFILES: Dictionary = {}
@@ -576,7 +574,7 @@ func _validate_profile_contracts_and_real_builder() -> void:
 
 
 func _validate_complete_catalog_contract() -> void:
-	_assert(STATIC_TARGET_CERTIFICATION_PROFILE.size() == STATIC_TARGET_COUNT, "Katalog musi przypisywać dokładnie 65 statycznych celów gameplayowych do legalnych profili certyfikacji.")
+	_assert(STATIC_TARGET_CERTIFICATION_PROFILE.size() == STATIC_TARGET_COUNT, "Katalog musi przypisywać dokładnie 63 statyczne cele gameplayowe do legalnych profili certyfikacji.")
 	var recovery_policy = ResourceLoader.load(POLICY_PATH)
 	_assert(recovery_policy != null and recovery_policy.is_valid(), "Publiczna polityka certyfikacji musi być poprawnym Resource.")
 	if recovery_policy != null:
@@ -676,12 +674,12 @@ func _validate_complete_catalog_on_public_difficulty(difficulty_path: String) ->
 	var observed_ids: Array[String] = []
 	observed_ids.assign(observed_assigned_ids.keys())
 	observed_ids.sort()
-	_assert(observed_ids == expected_ids, "Macierz %s musi wykonać każde z 65 przypisań dokładnie raz." % str(difficulty.profile_id))
+	_assert(observed_ids == expected_ids, "Macierz %s musi wykonać każde z 63 przypisań dokładnie raz." % str(difficulty.profile_id))
 	if difficulty_path.ends_with("standard.tres"):
 		var all_enumerated_ids: Array[String] = []
 		all_enumerated_ids.assign(enumerated_ids.keys())
 		all_enumerated_ids.sort()
-		_assert(all_enumerated_ids == expected_ids, "Katalog 65 celów musi być pełny względem unii rzeczywistych snapshotów progresji.")
+		_assert(all_enumerated_ids == expected_ids, "Katalog 63 celów musi być pełny względem unii rzeczywistych snapshotów progresji.")
 
 
 func _validate_catalog_profile_on_difficulty(
@@ -1269,7 +1267,7 @@ func _validate_expected_earliest_profile_contract(require_complete_expected: boo
 	if require_complete_expected:
 		_assert(
 			EXPECTED_EARLIEST_PROFILES.size() == STATIC_QUERY_COUNT,
-			"EXPECTED_EARLIEST_PROFILES musi deklarować dokładnie 138 query_id katalogu."
+			"EXPECTED_EARLIEST_PROFILES musi deklarować dokładnie 135 query_id katalogu."
 		)
 	for query_id in _sorted_string_values(EXPECTED_EARLIEST_PROFILES.keys()):
 		_assert(not query_id.is_empty(), "Jawny kontrakt najwcześniejszych profili nie może zawierać pustego query_id.")
@@ -1422,7 +1420,7 @@ func _validate_earliest_profile_frontier(shard: Dictionary = {}) -> void:
 func _sharded_query_ids(all_query_ids: Array[String], shard: Dictionary) -> Array[String]:
 	_assert(
 		all_query_ids.size() == STATIC_QUERY_COUNT,
-		"Sharding earliest wymaga pełnej, posortowanej unii 138 query_id."
+		"Sharding earliest wymaga pełnej, posortowanej unii 135 query_id."
 	)
 	if not bool(shard.get("enabled", false)):
 		return all_query_ids.duplicate()
@@ -1525,7 +1523,7 @@ func _accumulate_snapshot_union(
 func _validate_snapshot_union_contract(union_target_ids: Dictionary, union_queries: Dictionary) -> void:
 	var observed_target_ids := _sorted_string_values(union_target_ids.keys())
 	var expected_target_ids := _sorted_string_values(STATIC_TARGET_CERTIFICATION_PROFILE.keys())
-	_assert(observed_target_ids == expected_target_ids, "Unia 14 profili × 3 trudności musi zawierać dokładnie 65 statycznych celów.")
+	_assert(observed_target_ids == expected_target_ids, "Unia 14 profili × 3 trudności musi zawierać dokładnie 63 statyczne cele.")
 	var resource_pair_count := 0
 	var full_interaction_count := 0
 	var covered_target_ids: Dictionary = {}
@@ -1537,10 +1535,10 @@ func _validate_snapshot_union_contract(union_target_ids: Dictionary, union_queri
 			resource_pair_count += 1
 		if query.target_ids.size() == 1:
 			covered_target_ids[str(query.target_ids[0])] = true
-	_assert(resource_pair_count == STATIC_RESOURCE_PAIR_QUERY_COUNT, "Unia snapshotów musi zawierać dokładnie 103 pary źródło + zasób.")
-	_assert(full_interaction_count == STATIC_FULL_INTERACTION_QUERY_COUNT, "Unia snapshotów musi zawierać dokładnie 35 pełnych interakcji.")
-	_assert(union_queries.size() == STATIC_QUERY_COUNT, "Unia snapshotów musi zawierać dokładnie 138 zapytań statycznych.")
-	_assert(_sorted_string_values(covered_target_ids.keys()) == expected_target_ids, "Unia 138 zapytań musi pokryć dokładnie wszystkie 65 celów.")
+	_assert(resource_pair_count == STATIC_RESOURCE_PAIR_QUERY_COUNT, "Unia snapshotów musi zawierać dokładnie 101 par źródło + zasób.")
+	_assert(full_interaction_count == STATIC_FULL_INTERACTION_QUERY_COUNT, "Unia snapshotów musi zawierać dokładnie 34 pełne interakcje.")
+	_assert(union_queries.size() == STATIC_QUERY_COUNT, "Unia snapshotów musi zawierać dokładnie 135 zapytań statycznych.")
+	_assert(_sorted_string_values(covered_target_ids.keys()) == expected_target_ids, "Unia 135 zapytań musi pokryć dokładnie wszystkie 63 cele.")
 
 
 func _profile_case_query_ids(profile_cases: Array[Dictionary]) -> Array[String]:
@@ -1695,9 +1693,9 @@ func _validate_or_report_earliest_profiles(
 	var all_query_ids := _sorted_string_values(union_queries.keys())
 	var query_ids := _sorted_string_values(selected_query_ids)
 	var sharded := bool(shard.get("enabled", false))
-	_assert(all_query_ids.size() == STATIC_QUERY_COUNT, "Porównanie minimów wymaga pełnej unii 138 query_id.")
+	_assert(all_query_ids.size() == STATIC_QUERY_COUNT, "Porównanie minimów wymaga pełnej unii 135 query_id.")
 	if not sharded:
-		_assert(query_ids == all_query_ids, "Pełny przebieg minimów musi obejmować dokładnie 138 query_id.")
+		_assert(query_ids == all_query_ids, "Pełny przebieg minimów musi obejmować dokładnie 135 query_id.")
 	_assert(
 		_sorted_string_values(actual_profiles.keys()) == query_ids,
 		"Wyznaczone minima muszą odpowiadać dokładnie wybranemu zakresowi query_id."

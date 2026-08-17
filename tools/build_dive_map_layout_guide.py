@@ -45,7 +45,7 @@ WORLD_SIZE = (11_520.0, 6_480.0)
 PIXELS_PER_WORLD_UNIT = 3.0 / 8.0
 GUIDE_SIZE = (4_320, 2_430)
 EXPECTED_REGION_COUNT = 4
-EXPECTED_LANDMARK_COUNT = 28
+EXPECTED_LANDMARK_COUNT = 27
 
 PIXEL_FONT_VERSION = 1
 PIXEL_FONT_ROWS = 9
@@ -940,7 +940,7 @@ def _manifest(
             "nearest-neighbor scale the 8-unit terrain grid by 3x",
             "overlay authored region bounds including overlaps",
             "overlay full production-camera frames with the final row and column clamped to world edges",
-            "overlay 28 semantic landmark positions and authored bounds",
+            f"overlay {len(landmarks)} semantic landmark positions and authored bounds",
             "draw labels with the generator-embedded bitmap font",
             "encode RGBA PNG with Pillow compress_level=9 optimize=false",
         ],

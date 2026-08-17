@@ -14,6 +14,7 @@ Proces Codexa, CWD, allowlista i kolejność pracy należą wyłącznie do `../A
 | MAP-ARD-0002 | granica grafika-fizyka | Warstwa wizualna nie ustanawia topologii, kolizji ani zapisu. |
 | MAP-ARD-0003 | akceptacja | Integralność techniczna i odbiór artystyczny są niezależnymi bramkami. |
 | MAP-ARD-0004 | provenance | Źródła i operacje pozwalają prześledzić zaakceptowaną rewizję; pochodne nie są ręcznie poprawiane. |
+| MAP-ARD-0005 | authoring warstw | Sześć semantycznych planów grupuje osobne, transformowalne elementy bez drugiego modelu świata. |
 
 ---
 
@@ -60,3 +61,16 @@ Proces Codexa, CWD, allowlista i kolejność pracy należą wyłącznie do `../A
 - D3. Brak dostępnego parametru jest zapisywany jawnie jako niedostępny; nie wolno deklarować reprodukowalności na podstawie samego finalnego PNG.
 - D4. Pochodne ArtCells i chunki są odtwarzane deterministycznie ze źródeł i manifestu. Nie otrzymują ręcznych zmian, które nie wróciły do mastera.
 - Powód i skutek: kolejny Codex może kontynuować ten sam obraz i zdiagnozować zmianę bez zgadywania promptów, referencji i historii ręcznych poprawek.
+
+## MAP-ARD-0005 - Sześć planów jest scenowym authority edytowalnej grafiki
+
+- Status / aktywny zakres: Obowiązuje; D1-D6
+- Zatwierdzenie: 2026-08-16
+- Relacje: Zastępuje: brak | Zastąpiona przez: brak
+- D1. Produkcyjna grafika szerokiej mapy ma dokładnie sześć semantycznych planów `L00-L05`: bazowe pole barwy, najdalsze sylwetki, dalekie konstrukcje, średni plan i dryfujące dekoracje, skórę bliskiego terenu oraz niegameplayowe zasłonięcia pierwszego planu.
+- D2. Każdy element, który ma być wybierany albo poprawiany niezależnie, jest osobnym węzłem `Node2D`, `Sprite2D`, `Polygon2D` lub instancją wizualnej `PackedScene`; jego transform i widoczność należą do sceny kompozycji, nie do manifestu runtime.
+- D3. Każdy plan rozdziela zawartość paralaktyczną od zakotwiczonej w świecie. Skóra terenu i każdy element zależny od gameplayu pozostają współosiowe z kanoniczną sceną oraz nie mogą odpływać od kolizji, SDF ani stable ID.
+- D4. Dalsze plany używają mniejszego tempa kamery niż bliższe. `reduced_motion` usuwa różnicowy ruch i autoscroll, zachowując wszystkie elementy, role oraz z-order; wartości strojalne należą do walidowanych profili warstw.
+- D5. Spłaszczona bitmapa jest jednym elementem i cała jej zawartość dzieli transform. Indywidualna edycja obiektów wymaga osobnych węzłów albo prefabów; pochodne streamingu nigdy nie stają się źródłem authoringu.
+- D6. Manifest i chunki są deterministycznymi pochodnymi prezentacji. Nie przejmują authority topologii mapy, gameplayu, persistence ani transformów sceny; archiwalne pochodne bez mastera wolno jedynie zweryfikować i zaadaptować bez nadpisywania.
+- Powód i skutek: twórca otrzymuje pełną kontrolę nad każdym faktycznie niezależnym składnikiem obrazu, a runtime może stosować paralaksę i streaming bez tworzenia drugiej mapy albo rozjazdu grafiki z fizyką.
