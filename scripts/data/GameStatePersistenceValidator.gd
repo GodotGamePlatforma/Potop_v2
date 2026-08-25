@@ -285,6 +285,20 @@ static func validation_errors(state) -> PackedStringArray:
 		errors.append(str(preflight_error))
 	if not errors.is_empty():
 		return PackedStringArray(errors)
+	return _validation_errors_after_preflight(state, true)
+
+
+## Used only by GameState.load_validation_errors() after exact-script preflight
+## and ensure_world_is_current() have both succeeded.
+static func validation_errors_after_map_refresh(state) -> PackedStringArray:
+	return _validation_errors_after_preflight(state, false)
+
+
+static func _validation_errors_after_preflight(
+	state,
+	validate_current_scene_snapshot: bool
+) -> PackedStringArray:
+	var errors: Array[String] = []
 	if int(state.format_revision) != GameFormatScript.CAMPAIGN_FORMAT_REVISION:
 		errors.append("Walidacja agregatu wymaga rewizji %d, otrzymano %d." % [GameFormatScript.CAMPAIGN_FORMAT_REVISION, state.format_revision])
 		return PackedStringArray(errors)
@@ -302,7 +316,7 @@ static func validation_errors(state) -> PackedStringArray:
 	_validate_story(errors, state, survivor_by_id)
 	_validate_policies(errors, state)
 	_validate_equipment(errors, state.diving_equipment)
-	_validate_world(errors, state)
+	_validate_world(errors, state, validate_current_scene_snapshot)
 	_validate_missions(errors, state)
 	_validate_reports(errors, state)
 	_validate_weather_and_pressure(errors, state)
@@ -893,7 +907,11 @@ static func _validate_equipment(errors: Array[String], equipment) -> void:
 			errors.append("Magazyn wyposażenia nie zawiera awaryjnego zestawu %s." % emergency_gear_id)
 
 
-static func _validate_world(errors: Array[String], state) -> void:
+static func _validate_world(
+	errors: Array[String],
+	state,
+	validate_current_scene_snapshot: bool = true
+) -> void:
 	var world = state.underwater_world
 	var blueprint = world.blueprint
 	var delta = world.delta
@@ -903,7 +921,8 @@ static func _validate_world(errors: Array[String], state) -> void:
 		errors.append("Migawka mapy nie odpowiada seedowi kampanii.")
 	if str(blueprint.map_id).strip_edges().is_empty() or str(blueprint.map_gameplay_signature).strip_edges().is_empty():
 		errors.append("Migawka mapy nie ma kompletnej tożsamości źródła.")
-	_validate_current_scene_snapshot(errors, state, blueprint)
+	if validate_current_scene_snapshot:
+		_validate_current_scene_snapshot(errors, state, blueprint)
 	var landmark_ids := _record_ids(errors, blueprint.landmarks, "landmarku")
 	var landmark_refs: Dictionary = landmark_ids.duplicate(true)
 	var connection_ids := _record_ids(errors, blueprint.connections, "połączenia")

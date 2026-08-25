@@ -1013,7 +1013,13 @@ MISJA — MAPA WSPÓLNEJ SIECI
 
 Poniższe etapy Archiwum, Leona, R-3, C-4 i Rozdzielacza zachowują aktywną kolejność kampanii, zasady interakcji, ekonomię oraz skutki fabularne. Archiwum, panel diagnostyczny i Generator R-3 oraz C-4 są wymagane, Leon i wykonanie Rozdzielacza opcjonalni, natomiast promowalna mapa zapewnia również osiągalne gniazdo jego montażu. Konkretne instancje i położenia pochodzą wyłącznie z manifestu; dawne nazwy rejonów, identyfikatory pozycyjne i współrzędne nie mają authority.
 
-Klara przekazuje aktywny cel Archiwum, a manifest wyznacza jego konkretną instancję oraz osiągalną drogę.
+Klara przekazuje aktywny cel Archiwum, a manifest wyznacza jego konkretną instancję oraz osiągalną drogę. W bieżącym zakresie Archiwum pozostaje globalnym celem mapy z własnym terminalem; neutralny prototyp wieżowca nie jest celem kampanii i nie zawiera urządzenia Wspólnej Linii.
+
+[DOCELOWE] — ARCHIWUM W WIEŻOWCU
+
+Po osobnym wdrożeniu i odbiorze trasy Archiwum może zostać przypisane do zalanego, pokazanego centralnie w przekroju 2D wieżowca, do którego nurek wpływa przez czytelne uszkodzone wejście i porusza się wewnątrz pomiędzy kondygnacjami. Bliski budynek naturalnie zasłania istniejące dalekie plany miasta; nie usuwa ich ani nie zastępuje. Do tego czasu neutralny wieżowiec pozostaje prototypem świata, a aktywne Archiwum zachowuje położenie wynikające z manifestu.
+
+W docelowym wieżowcu nie ma checkpointów ani lokalnego odrodzenia. Wyczerpanie tlenu zabija nurka zgodnie z ogólną zasadą wyprawy, a wymagany etap nadal obejmuje fizyczny powrót do aktywnej liny. Docelowe urządzenia, ruchoma winda i zmienne blokady wewnątrz budynku mają własne czytelne stany, lecz nie zmieniają tej zasady śmierci i powrotu.
 
 Nurek:
 

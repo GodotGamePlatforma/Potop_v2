@@ -349,7 +349,24 @@ func _commit_resolved_day(candidate, report) -> bool:
 			push_warning("Nie udało się zapisać rozliczenia dnia. Kod błędu: %d." % save_error)
 			return false
 	game_state = candidate
-	_route_current_phase()
+	if not _refresh_base_after_day_resolution():
+		_route_current_phase()
+	return true
+
+
+func _refresh_base_after_day_resolution() -> bool:
+	if (
+		int(game_state.current_phase) != GamePhaseScript.Phase.END_DAY_REPORT
+		or current_scene == null
+		or current_scene.name != "BaseScene"
+		or not current_scene.has_method("bind")
+	):
+		return false
+	# End-day settlement changes data and overlays, not the mounted module. Keeping
+	# BaseScene avoids rebuilding the complete 3D environment and UI on the same frame.
+	current_scene.call("bind", self, game_state)
+	_apply_user_settings_to_scene(current_scene)
+	_queue_narrative_sync()
 	return true
 
 func acknowledge_day_report() -> bool:

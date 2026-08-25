@@ -55,7 +55,9 @@ static func build_from_cells(
 	world_size: Vector2,
 	obstacle_spawns: Array,
 	chunk_size: int = 0,
-	include_boundary_data: bool = true
+	include_boundary_data: bool = true,
+	solid_owner_cells: PackedInt32Array = PackedInt32Array(),
+	owner_ids: PackedStringArray = PackedStringArray()
 ) -> Dictionary:
 	var errors := PackedStringArray()
 	if width <= 0 or height <= 0 or base_cells.size() != width * height:
@@ -67,6 +69,17 @@ static func build_from_cells(
 
 	var cell_scale := Vector2(world_size.x / float(width), world_size.y / float(height))
 	var cells := base_cells.duplicate()
+	var owner_partition := _prepare_owner_partition(
+		cells,
+		solid_owner_cells,
+		owner_ids,
+		errors
+	)
+	if not errors.is_empty():
+		return {"errors": errors}
+	var resolved_owner_cells: PackedInt32Array = owner_partition["solid_owner_cells"]
+	var resolved_owner_ids: PackedStringArray = owner_partition["owner_ids"]
+	var has_owner_partition := bool(owner_partition["partitioned"])
 
 	for raw_record in obstacle_spawns:
 		if not (raw_record is Dictionary):
@@ -79,7 +92,15 @@ static func build_from_cells(
 		if polygon.size() < 3:
 			errors.append("Przeszkoda %s nie ma poprawnego obrysu nawigacyjnego." % str(record.get("id", "")))
 			continue
-		_rasterize_blocking_polygon(cells, width, height, cell_scale, polygon)
+		_rasterize_blocking_polygon(
+			cells,
+			width,
+			height,
+			cell_scale,
+			polygon,
+			resolved_owner_cells,
+			1
+		)
 	var boundary_data: Dictionary = {}
 	if include_boundary_data:
 		boundary_data = _build_boundary_data(
@@ -87,17 +108,25 @@ static func build_from_cells(
 			width,
 			height,
 			cell_scale,
-			chunk_size
+			chunk_size,
+			resolved_owner_cells,
+			resolved_owner_ids
 		)
+		errors.append_array(boundary_data.get("errors", PackedStringArray()))
 
 	return {
 		"errors": errors,
 		"cells": cells,
+		"solid_owner_cells": resolved_owner_cells,
+		"owner_ids": resolved_owner_ids,
+		"collision_partitioned": has_owner_partition,
 		"width": width,
 		"height": height,
 		"cell_scale": cell_scale,
 		"boundary_segments": boundary_data.get("segments", PackedVector2Array()),
-		"boundary_segments_by_chunk": boundary_data.get("segments_by_chunk", {}),
+		"boundary_segments_by_chunk": boundary_data.get("world_segments_by_chunk", {}),
+		"world_segments_by_chunk": boundary_data.get("world_segments_by_chunk", {}),
+		"structure_segments_by_id": boundary_data.get("structure_segments_by_id", {}),
 	}
 
 
@@ -132,7 +161,9 @@ static func build_from_cells_cached(
 	world_size: Vector2,
 	obstacle_spawns: Array,
 	chunk_size: int = 0,
-	include_boundary_data: bool = true
+	include_boundary_data: bool = true,
+	solid_owner_cells: PackedInt32Array = PackedInt32Array(),
+	owner_ids: PackedStringArray = PackedStringArray()
 ) -> Dictionary:
 	if cache_key.is_empty():
 		return build_from_cells(
@@ -142,14 +173,18 @@ static func build_from_cells_cached(
 			world_size,
 			obstacle_spawns,
 			chunk_size,
-			include_boundary_data
+			include_boundary_data,
+			solid_owner_cells,
+			owner_ids
 		)
-	var effective_cache_key := "%s|scene_cells=%dx%d|collision_chunk=%d|boundary=%d" % [
+	var effective_cache_key := "%s|scene_cells=%dx%d|collision_chunk=%d|boundary=%d|owners=%d:%d" % [
 		cache_key,
 		width,
 		height,
 		maxi(chunk_size, 0),
 		int(include_boundary_data),
+		hash(solid_owner_cells),
+		hash(owner_ids),
 	]
 	if _cached_rasters.has(effective_cache_key):
 		return (_cached_rasters[effective_cache_key] as Dictionary).duplicate(true)
@@ -160,7 +195,9 @@ static func build_from_cells_cached(
 		world_size,
 		obstacle_spawns,
 		chunk_size,
-		include_boundary_data
+		include_boundary_data,
+		solid_owner_cells,
+		owner_ids
 	)
 	if (raster.get("errors", PackedStringArray()) as PackedStringArray).is_empty():
 		_cached_rasters[effective_cache_key] = raster.duplicate(true)
@@ -188,9 +225,11 @@ static func boundary_segments_by_chunk(
 		width,
 		height,
 		cell_scale,
-		chunk_size
+		chunk_size,
+		_default_owner_cells(cells),
+		PackedStringArray(["", "world"])
 	)
-	return (boundary_data.get("segments_by_chunk", {}) as Dictionary).duplicate(true)
+	return (boundary_data.get("world_segments_by_chunk", {}) as Dictionary).duplicate(true)
 
 
 static func polygon_for_record(record: Dictionary) -> PackedVector2Array:
@@ -240,7 +279,9 @@ static func _rasterize_blocking_polygon(
 	width: int,
 	height: int,
 	cell_scale: Vector2,
-	polygon: PackedVector2Array
+	polygon: PackedVector2Array,
+	solid_owner_cells: PackedInt32Array = PackedInt32Array(),
+	owner_index: int = 1
 ) -> void:
 	var bounds := _polygon_bounds(polygon)
 	var from := cell_at(bounds.position, cell_scale)
@@ -252,7 +293,10 @@ static func _rasterize_blocking_polygon(
 				cell_scale
 			)
 			if _polygon_intersects_rect(polygon, cell_rect):
-				cells[y * width + x] = 0
+				var cell_index := y * width + x
+				cells[cell_index] = 0
+				if solid_owner_cells.size() == cells.size():
+					solid_owner_cells[cell_index] = owner_index
 
 
 static func _polygon_bounds(polygon: PackedVector2Array) -> Rect2:
@@ -308,7 +352,15 @@ static func _build_boundary_segments(
 	height: int,
 	cell_scale: Vector2
 ) -> PackedVector2Array:
-	var boundary_data := _build_boundary_data(cells, width, height, cell_scale, 0)
+	var boundary_data := _build_boundary_data(
+		cells,
+		width,
+		height,
+		cell_scale,
+		0,
+		_default_owner_cells(cells),
+		PackedStringArray(["", "world"])
+	)
 	return (boundary_data.get("segments", PackedVector2Array()) as PackedVector2Array).duplicate()
 
 
@@ -317,10 +369,17 @@ static func _build_boundary_data(
 	width: int,
 	height: int,
 	cell_scale: Vector2,
-	chunk_size: int
+	chunk_size: int,
+	solid_owner_cells: PackedInt32Array,
+	owner_ids: PackedStringArray
 ) -> Dictionary:
 	var segments := PackedVector2Array()
-	var segments_by_chunk: Dictionary = {}
+	var world_segments_by_chunk: Dictionary = {}
+	var structure_segments_by_id: Dictionary = {}
+	var errors := PackedStringArray()
+	var full_segment_keys: Dictionary = {}
+	var world_segment_count := 0
+	var structure_segment_count := 0
 	for y in range(height):
 		for x in range(width):
 			if cells[y * width + x] != 1:
@@ -330,48 +389,152 @@ static func _build_boundary_data(
 			var bottom_left := top_left + Vector2(0.0, cell_scale.y)
 			var bottom_right := top_left + cell_scale
 			var chunk_key := ""
-			var chunk_segments := PackedVector2Array()
 			if chunk_size > 0:
 				chunk_key = "%d:%d" % [
 					floori(top_left.x / float(chunk_size)),
 					floori(top_left.y / float(chunk_size)),
 				]
-				chunk_segments = segments_by_chunk.get(
-					chunk_key,
-					PackedVector2Array()
-				)
-			var added_to_chunk := false
 			if y == 0 or cells[(y - 1) * width + x] == 0:
-				segments.append(top_left)
-				segments.append(top_right)
-				if not chunk_key.is_empty():
-					chunk_segments.append(top_left)
-					chunk_segments.append(top_right)
-					added_to_chunk = true
+				var owner := 1 if y == 0 else solid_owner_cells[(y - 1) * width + x]
+				var result := _append_owned_boundary_segment(
+					segments, world_segments_by_chunk, structure_segments_by_id,
+					full_segment_keys, owner_ids, owner, chunk_key, top_left, top_right, errors
+				)
+				world_segment_count += int(result.x)
+				structure_segment_count += int(result.y)
 			if x == width - 1 or cells[y * width + x + 1] == 0:
-				segments.append(top_right)
-				segments.append(bottom_right)
-				if not chunk_key.is_empty():
-					chunk_segments.append(top_right)
-					chunk_segments.append(bottom_right)
-					added_to_chunk = true
+				var owner := 1 if x == width - 1 else solid_owner_cells[y * width + x + 1]
+				var result := _append_owned_boundary_segment(
+					segments, world_segments_by_chunk, structure_segments_by_id,
+					full_segment_keys, owner_ids, owner, chunk_key, top_right, bottom_right, errors
+				)
+				world_segment_count += int(result.x)
+				structure_segment_count += int(result.y)
 			if y == height - 1 or cells[(y + 1) * width + x] == 0:
-				segments.append(bottom_right)
-				segments.append(bottom_left)
-				if not chunk_key.is_empty():
-					chunk_segments.append(bottom_right)
-					chunk_segments.append(bottom_left)
-					added_to_chunk = true
+				var owner := 1 if y == height - 1 else solid_owner_cells[(y + 1) * width + x]
+				var result := _append_owned_boundary_segment(
+					segments, world_segments_by_chunk, structure_segments_by_id,
+					full_segment_keys, owner_ids, owner, chunk_key, bottom_right, bottom_left, errors
+				)
+				world_segment_count += int(result.x)
+				structure_segment_count += int(result.y)
 			if x == 0 or cells[y * width + x - 1] == 0:
-				segments.append(bottom_left)
-				segments.append(top_left)
-				if not chunk_key.is_empty():
-					chunk_segments.append(bottom_left)
-					chunk_segments.append(top_left)
-					added_to_chunk = true
-			if added_to_chunk:
-				segments_by_chunk[chunk_key] = chunk_segments
+				var owner := 1 if x == 0 else solid_owner_cells[y * width + x - 1]
+				var result := _append_owned_boundary_segment(
+					segments, world_segments_by_chunk, structure_segments_by_id,
+					full_segment_keys, owner_ids, owner, chunk_key, bottom_left, top_left, errors
+				)
+				world_segment_count += int(result.x)
+				structure_segment_count += int(result.y)
+	if segments.size() / 2 != world_segment_count + structure_segment_count:
+		errors.append("Partycja kolizji nie jest pełną unią segmentów granicznych.")
 	return {
 		"segments": segments,
-		"segments_by_chunk": segments_by_chunk,
+		"world_segments_by_chunk": world_segments_by_chunk,
+		"structure_segments_by_id": structure_segments_by_id,
+		"errors": errors,
 	}
+
+
+static func _prepare_owner_partition(
+	cells: PackedByteArray,
+	provided_owner_cells: PackedInt32Array,
+	provided_owner_ids: PackedStringArray,
+	errors: PackedStringArray
+) -> Dictionary:
+	var partitioned := not provided_owner_cells.is_empty() or not provided_owner_ids.is_empty()
+	var resolved_owner_cells := provided_owner_cells.duplicate()
+	var resolved_owner_ids := provided_owner_ids.duplicate()
+	if not partitioned:
+		resolved_owner_cells = _default_owner_cells(cells)
+		resolved_owner_ids = PackedStringArray(["", "world"])
+	elif provided_owner_cells.size() != cells.size():
+		errors.append("Partycja właścicieli kolizji ma nieprawidłowy rozmiar rastra.")
+	elif provided_owner_ids.size() < 2:
+		errors.append("Partycja właścicieli kolizji nie zawiera wpisów open/world.")
+	if not errors.is_empty():
+		return {}
+	if resolved_owner_ids[0] != "" or resolved_owner_ids[1] != "world":
+		errors.append("Partycja właścicieli musi zaczynać się od ['', 'world'].")
+	var seen_owner_ids: Dictionary = {}
+	for owner_index in range(resolved_owner_ids.size()):
+		var owner_id := resolved_owner_ids[owner_index]
+		if owner_index > 0 and owner_id.is_empty():
+			errors.append("Identyfikator właściciela stałej kolizji nie może być pusty.")
+		if seen_owner_ids.has(owner_id):
+			errors.append("Identyfikator właściciela kolizji %s występuje wielokrotnie." % owner_id)
+		seen_owner_ids[owner_id] = true
+	for cell_index in range(cells.size()):
+		var cell_value := int(cells[cell_index])
+		var owner_index := int(resolved_owner_cells[cell_index])
+		if cell_value != 0 and cell_value != 1:
+			errors.append("Raster nawigacji zawiera wartość inną niż solid/open.")
+			break
+		if cell_value == 1 and owner_index != 0:
+			errors.append("Otwarta komórka rastra ma właściciela stałej kolizji.")
+			break
+		if cell_value == 0 and (owner_index <= 0 or owner_index >= resolved_owner_ids.size()):
+			errors.append("Komórka solid nie ma poprawnego właściciela kolizji.")
+			break
+	return {
+		"solid_owner_cells": resolved_owner_cells,
+		"owner_ids": resolved_owner_ids,
+		"partitioned": partitioned,
+	}
+
+
+static func _default_owner_cells(cells: PackedByteArray) -> PackedInt32Array:
+	var owner_cells := PackedInt32Array()
+	owner_cells.resize(cells.size())
+	for cell_index in range(cells.size()):
+		owner_cells[cell_index] = 1 if cells[cell_index] == 0 else 0
+	return owner_cells
+
+
+static func _append_owned_boundary_segment(
+	segments: PackedVector2Array,
+	world_segments_by_chunk: Dictionary,
+	structure_segments_by_id: Dictionary,
+	full_segment_keys: Dictionary,
+	owner_ids: PackedStringArray,
+	owner_index: int,
+	chunk_key: String,
+	from: Vector2,
+	to: Vector2,
+	errors: PackedStringArray
+) -> Vector2i:
+	if owner_index <= 0 or owner_index >= owner_ids.size():
+		errors.append("Segment graniczny nie ma poprawnego właściciela kolizji.")
+		return Vector2i.ZERO
+	var segment_key := _boundary_segment_key(from, to)
+	if full_segment_keys.has(segment_key):
+		errors.append("Segment graniczny został przypisany więcej niż raz.")
+		return Vector2i.ZERO
+	full_segment_keys[segment_key] = true
+	segments.append(from)
+	segments.append(to)
+	var owner_id := owner_ids[owner_index]
+	if owner_id == "world":
+		if not chunk_key.is_empty():
+			var chunk_segments: PackedVector2Array = world_segments_by_chunk.get(
+				chunk_key,
+				PackedVector2Array()
+			)
+			chunk_segments.append(from)
+			chunk_segments.append(to)
+			world_segments_by_chunk[chunk_key] = chunk_segments
+		return Vector2i(1, 0)
+	var structure_segments: PackedVector2Array = structure_segments_by_id.get(
+		owner_id,
+		PackedVector2Array()
+	)
+	structure_segments.append(from)
+	structure_segments.append(to)
+	structure_segments_by_id[owner_id] = structure_segments
+	return Vector2i(0, 1)
+
+
+static func _boundary_segment_key(from: Vector2, to: Vector2) -> Vector4:
+	if from.x < to.x or (is_equal_approx(from.x, to.x) and from.y <= to.y):
+		return Vector4(from.x, from.y, to.x, to.y)
+	return Vector4(to.x, to.y, from.x, from.y)

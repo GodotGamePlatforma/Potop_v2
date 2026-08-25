@@ -7,7 +7,7 @@ const WorldBlueprintScript := preload("res://scripts/data/WorldBlueprint.gd")
 const MANIFEST_PATH := "res://underwater_map_workbench/map_manifest.json"
 const MAP_SCENE_PATH := "res://underwater_map_workbench/UnderwaterMap.tscn"
 const MAP_SOURCE_VERSION := 5
-const MANIFEST_SCHEMA_VERSION := 2
+const MANIFEST_SCHEMA_VERSION := 5
 const REQUIRED_GRID_SIZE := Vector2i(12, 12)
 const REQUIRED_GRID_CELL_SIZE := Vector2(1920.0, 1080.0)
 const REQUIRED_WORLD_SIZE := Vector2(23040.0, 12960.0)
@@ -35,11 +35,12 @@ const VISUAL_LAYER_SPACES := {
 const COLLIDER_AUTHORITY_LAYER_ID := "L05"
 const RESERVED_VISUAL_LAYER_ID := "L10"
 const NO_BLOCKING_AFFORDANCE_POLICY := "no_visual_blockage_in_protected_water"
+const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap_open_water"
 const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
 const L05_TOPOLOGY_MODE := "l05_mask_v1"
-const L05_SOURCE_FORMAT := "l05_rect_ops_v1"
+const L05_SOURCE_FORMAT := "l05_owned_rect_ops_v2"
 const L05_PIXEL_SIZE := Vector2i(576, 324)
 const L05_WORLD_UNITS_PER_PIXEL := Vector2(40.0, 40.0)
 const L05_MAPPING := {
@@ -49,10 +50,13 @@ const L05_MAPPING := {
 	"pixel_reference": "pixel_edge",
 	"rounding": "floor",
 }
+const ENTERABLE_TOWER_SOCKET_KINDS := [
+	"entry_opening", "moving_elevator", "dynamic_door", "fixed_interactable",
+]
 const L05_SOLID_MASK_PATH := "res://underwater_map_workbench/assets/generated/l05/solid_mask.png"
 const L05_SHADER_PATH := "res://underwater_map_workbench/assets/shaders/l05_ground_masked.gdshader"
 const VISUAL_ASSET_KEYS := [
-	"id", "layer_id", "kind", "path", "sha256", "pixel_size", "world_rect",
+	"id", "layer_id", "group_id", "kind", "path", "sha256", "pixel_size", "world_rect",
 	"enabled", "affordance", "topology_digest",
 ]
 const CAMPAIGN_CONTRACT_ID := "common_line_v1"
@@ -98,6 +102,7 @@ const PRESENTATION_FIELD_KEYS := [
 
 static var _cached_manifest_hash := ""
 static var _cached_manifest: Dictionary = {}
+static var _cached_source_fingerprint := ""
 static var _cached_gameplay_signature := ""
 static var _cached_presentation_fingerprint := ""
 static var _cached_blueprints: Dictionary = {}
@@ -107,6 +112,7 @@ static var _cached_navigation_raster: Dictionary = {}
 static func clear_runtime_caches() -> void:
 	_cached_manifest_hash = ""
 	_cached_manifest.clear()
+	_cached_source_fingerprint = ""
 	_cached_gameplay_signature = ""
 	_cached_presentation_fingerprint = ""
 	_cached_blueprints.clear()
@@ -213,16 +219,20 @@ func generated_scene_is_current() -> bool:
 
 
 func source_dependency_paths() -> PackedStringArray:
-	var paths := PackedStringArray([MANIFEST_PATH, MAP_SCENE_PATH])
+	var fallback_paths := PackedStringArray([MANIFEST_PATH, MAP_SCENE_PATH])
 	if not FileAccess.file_exists(MANIFEST_PATH):
-		return paths
+		return fallback_paths
 	var file := FileAccess.open(MANIFEST_PATH, FileAccess.READ)
 	if file == null:
-		return paths
+		return fallback_paths
 	var parsed = JSON.parse_string(file.get_as_text())
 	if not parsed is Dictionary:
-		return paths
-	var manifest := parsed as Dictionary
+		return fallback_paths
+	return _source_dependency_paths_for_manifest(parsed as Dictionary)
+
+
+func _source_dependency_paths_for_manifest(manifest: Dictionary) -> PackedStringArray:
+	var paths := PackedStringArray([MANIFEST_PATH, MAP_SCENE_PATH])
 	var topology_value = manifest.get("topology", null)
 	if topology_value is Dictionary:
 		var collision_value = (topology_value as Dictionary).get("collision_source", null)
@@ -239,6 +249,29 @@ func source_dependency_paths() -> PackedStringArray:
 				if asset_value is Dictionary:
 					_append_source_path(paths, str((asset_value as Dictionary).get("path", "")))
 	return paths
+
+
+func _source_dependency_fingerprint(
+	manifest: Dictionary,
+	manifest_hash: String
+) -> String:
+	if manifest_hash.is_empty():
+		return ""
+	var records := PackedStringArray(["manifest_sha256=%s" % manifest_hash])
+	for resource_path in _source_dependency_paths_for_manifest(manifest):
+		if not FileAccess.file_exists(resource_path):
+			return ""
+		var dependency_file := FileAccess.open(resource_path, FileAccess.READ)
+		if dependency_file == null:
+			return ""
+		var length := dependency_file.get_length()
+		dependency_file.close()
+		records.append("%s|%d|%d" % [
+			resource_path,
+			length,
+			FileAccess.get_modified_time(resource_path),
+		])
+	return "\n".join(records).sha256_text()
 
 
 func create_visual_layers() -> Node2D:
@@ -265,6 +298,30 @@ func create_visual_layers() -> Node2D:
 	return visual_layers
 
 
+func create_structure_roots() -> Node2D:
+	var source := _load_source()
+	var errors: PackedStringArray = source.get("errors", PackedStringArray())
+	if not errors.is_empty():
+		return null
+	var packed_scene := ResourceLoader.load(
+		MAP_SCENE_PATH,
+		"PackedScene",
+		ResourceLoader.CACHE_MODE_IGNORE
+	) as PackedScene
+	if packed_scene == null:
+		return null
+	var source_root := packed_scene.instantiate() as Node2D
+	if source_root == null:
+		return null
+	var structure_roots := source_root.get_node_or_null("StructureRoots") as Node2D
+	if structure_roots == null:
+		source_root.free()
+		return null
+	source_root.remove_child(structure_roots)
+	source_root.free()
+	return structure_roots
+
+
 func navigation_base_raster() -> Dictionary:
 	var source := _load_source()
 	var errors: PackedStringArray = source.get("errors", PackedStringArray())
@@ -275,6 +332,7 @@ func navigation_base_raster() -> Dictionary:
 	var manifest: Dictionary = source.get("manifest", {})
 	var map_record: Dictionary = manifest.get("map", {})
 	var topology: Dictionary = manifest.get("topology", {})
+	var structures: Dictionary = manifest.get("structures", {})
 	var topology_mode := str(topology.get("mode", ""))
 	if topology_mode not in ["open_world", L05_TOPOLOGY_MODE]:
 		return {
@@ -286,6 +344,9 @@ func navigation_base_raster() -> Dictionary:
 	var cell_extent := _json_vector(map_record.get("navigation_cell_size", []))
 	var grid_extent := Vector2i.ZERO
 	var cells := PackedByteArray()
+	var solid_owner_cells := PackedInt32Array()
+	var owner_ids := PackedStringArray(["", "world"])
+	var partition_digest := ""
 	if topology_mode == "open_world":
 		var world_extent := _json_vector(map_record.get("world_size", []))
 		grid_extent = Vector2i(
@@ -294,15 +355,24 @@ func navigation_base_raster() -> Dictionary:
 		)
 		cells.resize(grid_extent.x * grid_extent.y)
 		cells.fill(1)
+		solid_owner_cells.resize(cells.size())
+		solid_owner_cells.fill(0)
 	else:
 		var topology_errors := PackedStringArray()
-		var decoded := _decode_l05_collision_source(topology, topology_errors)
+		var decoded := _decode_l05_collision_source(topology, structures, topology_errors)
 		if not topology_errors.is_empty():
 			return {"errors": topology_errors}
 		grid_extent = L05_PIXEL_SIZE
 		cell_extent = L05_WORLD_UNITS_PER_PIXEL
 		var encoded_cells: PackedByteArray = decoded.get("cells", PackedByteArray())
 		var solid_value := int(decoded.get("solid", 0))
+		solid_owner_cells = (
+			decoded.get("solid_owner_cells", PackedInt32Array()) as PackedInt32Array
+		).duplicate()
+		owner_ids = (
+			decoded.get("owner_ids", PackedStringArray()) as PackedStringArray
+		).duplicate()
+		partition_digest = str(decoded.get("partition_digest", ""))
 		cells.resize(encoded_cells.size())
 		for index in range(encoded_cells.size()):
 			cells[index] = 0 if int(encoded_cells[index]) == solid_value else 1
@@ -312,6 +382,9 @@ func navigation_base_raster() -> Dictionary:
 		"height": grid_extent.y,
 		"cell_scale": cell_extent,
 		"cells": cells,
+		"solid_owner_cells": solid_owner_cells,
+		"owner_ids": owner_ids,
+		"partition_digest": partition_digest,
 	}
 	return _duplicate_raster(_cached_navigation_raster)
 
@@ -348,7 +421,6 @@ func _compile_source_map(campaign_seed: int) -> Dictionary:
 			"manifest_sha256": manifest_hash,
 			"map_gameplay_signature": gameplay_signature,
 			"presentation_fingerprint": presentation_fingerprint,
-			"macro_raster": navigation_base_raster(),
 		}
 	var manifest: Dictionary = source.get("manifest", {})
 	var blueprint = _build_blueprint(manifest, gameplay_signature, normalized_seed)
@@ -361,7 +433,6 @@ func _compile_source_map(campaign_seed: int) -> Dictionary:
 		"manifest_sha256": manifest_hash,
 		"map_gameplay_signature": gameplay_signature,
 		"presentation_fingerprint": presentation_fingerprint,
-		"macro_raster": navigation_base_raster(),
 	}
 
 
@@ -372,24 +443,21 @@ func _load_source() -> Dictionary:
 	if manifest_hash.is_empty():
 		return {"errors": PackedStringArray(["Nie można policzyć SHA-256 manifestu mapy."])}
 	if manifest_hash == _cached_manifest_hash and not _cached_manifest.is_empty():
-		var cached_manifest_errors := _manifest_validation_errors(_cached_manifest)
-		if not cached_manifest_errors.is_empty():
-			return {"errors": cached_manifest_errors}
-		var cached_scene_errors := _generated_scene_errors(
+		var current_source_fingerprint := _source_dependency_fingerprint(
 			_cached_manifest,
-			manifest_hash,
-			_cached_gameplay_signature,
-			_cached_presentation_fingerprint
+			manifest_hash
 		)
-		if not cached_scene_errors.is_empty():
-			return {"errors": cached_scene_errors}
-		return {
-			"errors": PackedStringArray(),
-			"manifest": _cached_manifest.duplicate(true),
-			"manifest_sha256": manifest_hash,
-			"gameplay_signature": _cached_gameplay_signature,
-			"presentation_fingerprint": _cached_presentation_fingerprint,
-		}
+		if (
+			not current_source_fingerprint.is_empty()
+			and current_source_fingerprint == _cached_source_fingerprint
+		):
+			return {
+				"errors": PackedStringArray(),
+				"manifest": _cached_manifest.duplicate(true),
+				"manifest_sha256": manifest_hash,
+				"gameplay_signature": _cached_gameplay_signature,
+				"presentation_fingerprint": _cached_presentation_fingerprint,
+			}
 	var file := FileAccess.open(MANIFEST_PATH, FileAccess.READ)
 	if file == null:
 		return {"errors": PackedStringArray(["Nie można otworzyć manifestu mapy."])}
@@ -397,6 +465,14 @@ func _load_source() -> Dictionary:
 	if not parsed is Dictionary:
 		return {"errors": PackedStringArray(["Manifest mapy nie jest poprawnym obiektem JSON."])}
 	var manifest := parsed as Dictionary
+	var source_fingerprint_before_validation := _source_dependency_fingerprint(
+		manifest,
+		manifest_hash
+	)
+	if source_fingerprint_before_validation.is_empty():
+		return {"errors": PackedStringArray([
+			"Nie można zbudować fingerprintu zależności źródła mapy.",
+		])}
 	var errors := _manifest_validation_errors(manifest)
 	if not errors.is_empty():
 		return {"errors": errors}
@@ -411,6 +487,15 @@ func _load_source() -> Dictionary:
 	))
 	if not errors.is_empty():
 		return {"errors": errors}
+	var source_fingerprint := _source_dependency_fingerprint(manifest, manifest_hash)
+	if source_fingerprint.is_empty():
+		return {"errors": PackedStringArray([
+			"Nie można zbudować fingerprintu zależności źródła mapy.",
+		])}
+	if source_fingerprint != source_fingerprint_before_validation:
+		return {"errors": PackedStringArray([
+			"Zależności źródła mapy zmieniły się podczas walidacji.",
+		])}
 	if manifest_hash != _cached_manifest_hash:
 		_cached_manifest_hash = manifest_hash
 		_cached_manifest = manifest.duplicate(true)
@@ -418,6 +503,7 @@ func _load_source() -> Dictionary:
 		_cached_presentation_fingerprint = presentation_fingerprint
 		_cached_blueprints.clear()
 		_cached_navigation_raster.clear()
+	_cached_source_fingerprint = source_fingerprint
 	return {
 		"errors": PackedStringArray(),
 		"manifest": manifest.duplicate(true),
@@ -461,13 +547,16 @@ func _generated_scene_errors(
 	if str(root.get_meta("presentation_fingerprint", "")) != expected_presentation_fingerprint:
 		errors.append("Scena mapy ma nieaktualny presentation_fingerprint.")
 	var expected_topology: Dictionary = expected_manifest.get("topology", {})
+	var expected_structures: Dictionary = expected_manifest.get("structures", {})
 	if str(expected_topology.get("mode", "")) == L05_TOPOLOGY_MODE:
 		var expected_collision: Dictionary = expected_topology.get("collision_source", {})
 		if str(root.get_meta("payload_sha256", "")).to_lower() != str(expected_collision.get("sha256", "")):
 			errors.append("Scena mapy ma nieaktualny payload_sha256 L05.")
 		if str(root.get_meta("canonical_digest", "")) != str(expected_collision.get("canonical_digest", "")):
 			errors.append("Scena mapy ma nieaktualny canonical_digest L05.")
-		errors.append_array(_generated_l05_mask_errors(expected_topology))
+		if str(root.get_meta("partition_digest", "")) != str(expected_collision.get("partition_digest", "")):
+			errors.append("Scena mapy ma nieaktualny partition_digest L05.")
+		errors.append_array(_generated_l05_mask_errors(expected_topology, expected_structures))
 	if int(root.get_meta("schema_version", 0)) != MANIFEST_SCHEMA_VERSION:
 		errors.append("Scena mapy ma nieaktualny schema_version.")
 	var expected_revision: Dictionary = expected_manifest.get("revision", {})
@@ -498,6 +587,12 @@ func _generated_scene_errors(
 	var scene_campaign = root.get_meta("campaign", {})
 	if not scene_campaign is Dictionary or _canonical_json(scene_campaign) != _canonical_json(expected_manifest.get("campaign", {})):
 		errors.append("Scena mapy ma nieaktualne metadata campaign.")
+	var scene_structures = root.get_meta("structures", {})
+	if (
+		not scene_structures is Dictionary
+		or _canonical_json(scene_structures) != _canonical_json(expected_structures)
+	):
+		errors.append("Scena mapy ma nieaktualne metadata structures.")
 	var visual_layers := root.get_node_or_null("VisualLayers") as Node2D
 	if visual_layers == null:
 		errors.append("Scena mapy nie zawiera VisualLayers.")
@@ -505,6 +600,14 @@ func _generated_scene_errors(
 		var expected_visual: Dictionary = expected_manifest.get("visual", {})
 		var expected_layers: Array = expected_visual.get("layers", [])
 		errors.append_array(_generated_visual_layer_errors(visual_layers, expected_layers))
+	var structure_roots := root.get_node_or_null("StructureRoots") as Node2D
+	if structure_roots == null:
+		errors.append("Scena mapy nie zawiera StructureRoots.")
+	else:
+		errors.append_array(_generated_structure_root_errors(
+			structure_roots,
+			expected_structures
+		))
 	root.free()
 	return errors
 
@@ -526,6 +629,7 @@ func _manifest_validation_errors(manifest: Dictionary) -> PackedStringArray:
 	var landmarks_value = manifest.get("landmarks", null)
 	var gameplay_value = manifest.get("gameplay", null)
 	var depth_value = manifest.get("depth_profile", null)
+	var structures_value = manifest.get("structures", null)
 	if (
 		not map_value is Dictionary
 		or not revision_value is Dictionary
@@ -538,6 +642,7 @@ func _manifest_validation_errors(manifest: Dictionary) -> PackedStringArray:
 		or not landmarks_value is Array
 		or not gameplay_value is Dictionary
 		or not depth_value is Array
+		or not structures_value is Dictionary
 	):
 		errors.append("Manifest nie zawiera kompletnego kontraktu mapy.")
 		return errors
@@ -708,8 +813,17 @@ func _manifest_validation_errors(manifest: Dictionary) -> PackedStringArray:
 			points.append(_json_vector(value))
 		errors.append_array(WorldBlueprintScript.depth_profile_validation_errors(points))
 
+	_validate_structures(
+		structures_value as Dictionary,
+		landmark_ids,
+		world_size,
+		topology_value as Dictionary,
+		seen_ids,
+		errors
+	)
 	_validate_topology(
 		topology_value as Dictionary,
+		structures_value as Dictionary,
 		world_size,
 		navigation_cell_size,
 		errors
@@ -722,6 +836,7 @@ func _manifest_validation_errors(manifest: Dictionary) -> PackedStringArray:
 	)
 
 	var gameplay := gameplay_value as Dictionary
+	var structure_instances_by_id := _structure_instances_by_id(structures_value as Dictionary)
 	if typeof(gameplay.get("tutorial_enabled", null)) != TYPE_BOOL:
 		errors.append("gameplay.tutorial_enabled musi być wartością logiczną.")
 	var gameplay_keys := [
@@ -739,8 +854,26 @@ func _manifest_validation_errors(manifest: Dictionary) -> PackedStringArray:
 			if not record_id_value is String:
 				errors.append("ID obiektu gameplayu musi być Stringiem.")
 			_register_unique_id(record_id, "obiektu gameplayu", seen_ids, errors)
-			if gameplay_key != "connections" and not _point_inside_world(_json_vector(record.get("position", null)), world_size):
-				errors.append("Obiekt gameplayu %s leży poza mapą." % record_id)
+			if gameplay_key != "connections":
+				var world_position := _json_vector(record.get("position", null))
+				if gameplay_key == "fixed_device_spawns" and str(record.get("position_space", "world")) == "structure_local":
+					var structure_id := str(record.get("structure_id", "")).strip_edges()
+					if not structure_instances_by_id.has(structure_id):
+						errors.append("Urządzenie %s wskazuje nieznaną strukturę %s." % [record_id, structure_id])
+					else:
+						var structure: Dictionary = structure_instances_by_id[structure_id]
+						if not bool(structure.get("enabled", false)):
+							errors.append("Urządzenie %s wskazuje wyłączoną strukturę %s." % [record_id, structure_id])
+						var local_size := _json_vector(structure.get("size", []))
+						if not _point_inside_local_rect(world_position, local_size):
+							errors.append("Urządzenie %s leży poza lokalnym obrysem struktury %s." % [record_id, structure_id])
+						world_position += _json_vector(structure.get("origin", []))
+				elif record.has("position_space") and str(record.get("position_space", "")) != "world":
+					errors.append("Obiekt gameplayu %s ma nieobsługiwane position_space." % record_id)
+				elif gameplay_key == "fixed_device_spawns" and record.has("structure_id"):
+					errors.append("Urządzenie %s może mieć structure_id tylko w structure_local." % record_id)
+				if not _point_inside_world(world_position, world_size):
+					errors.append("Obiekt gameplayu %s leży poza mapą." % record_id)
 			var landmark_id := str(record.get("landmark_id", "")).strip_edges()
 			if not landmark_id.is_empty() and not landmark_ids.has(landmark_id):
 				errors.append("Obiekt gameplayu %s wskazuje nieznany landmark %s." % [record_id, landmark_id])
@@ -821,6 +954,7 @@ func _build_blueprint(manifest: Dictionary, gameplay_signature: String, campaign
 	var entry: Dictionary = manifest["entry"]
 	var exit_record: Dictionary = manifest["exit"]
 	var gameplay: Dictionary = manifest["gameplay"]
+	var structures: Dictionary = manifest["structures"]
 	blueprint.campaign_seed = campaign_seed
 	blueprint.map_source_version = int(map_record["source_version"])
 	blueprint.map_id = str(map_record["id"])
@@ -837,6 +971,8 @@ func _build_blueprint(manifest: Dictionary, gameplay_signature: String, campaign
 		blueprint.regions.append(_region_record(region_source_value as Dictionary))
 	for landmark_source_value in manifest["landmarks"]:
 		blueprint.landmarks.append(_landmark_record(landmark_source_value as Dictionary))
+	for structure_source_value in structures["instances"]:
+		blueprint.structure_spawns.append(_structure_record(structure_source_value as Dictionary))
 	blueprint.rebuild_indexes()
 	var canonical_entry_landmark_id := blueprint.resolve_landmark_id(blueprint.entry_landmark_id)
 	if not canonical_entry_landmark_id.is_empty():
@@ -864,7 +1000,11 @@ func _build_blueprint(manifest: Dictionary, gameplay_signature: String, campaign
 	for source in gameplay["shortcut_spawns"]:
 		blueprint.shortcut_spawns.append(_spatial_gameplay_record(source as Dictionary))
 	for source in gameplay["fixed_device_spawns"]:
-		blueprint.fixed_device_spawns.append(_spatial_gameplay_record(source as Dictionary))
+		blueprint.fixed_device_spawns.append(_fixed_device_record(
+			source as Dictionary,
+			blueprint.structure_lookup,
+			blueprint.structure_spawns
+		))
 	for source in gameplay["obstacle_spawns"]:
 		blueprint.obstacle_spawns.append(_spatial_gameplay_record(source as Dictionary))
 	for source in gameplay["decoration_spawns"]:
@@ -937,6 +1077,34 @@ func _spatial_gameplay_record(source: Dictionary) -> Dictionary:
 	return result
 
 
+func _structure_record(source: Dictionary) -> Dictionary:
+	var result := source.duplicate(true)
+	result["origin"] = _json_vector(source.get("origin", []))
+	result["size"] = _json_vector(source.get("size", []))
+	result["sockets"] = (source.get("sockets", []) as Array).duplicate(true)
+	return result
+
+
+func _fixed_device_record(
+	source: Dictionary,
+	structure_lookup: Dictionary,
+	structure_spawns: Array[Dictionary]
+) -> Dictionary:
+	var result := _spatial_gameplay_record(source)
+	var position_space := str(source.get("position_space", "world"))
+	result["position_space"] = position_space
+	result["structure_id"] = str(source.get("structure_id", ""))
+	if position_space != "structure_local":
+		return result
+	var local_position := _json_vector(source.get("position", []))
+	result["local_position"] = local_position
+	var structure_index := int(structure_lookup.get(result["structure_id"], -1))
+	if structure_index >= 0 and structure_index < structure_spawns.size():
+		var structure: Dictionary = structure_spawns[structure_index]
+		result["position"] = (structure.get("origin", Vector2.ZERO) as Vector2) + local_position
+	return result
+
+
 func _index_blueprint_chunks(blueprint) -> void:
 	blueprint.chunk_index.clear()
 	var records: Array[Dictionary] = []
@@ -954,6 +1122,14 @@ func _index_blueprint_chunks(blueprint) -> void:
 	records.append_array(blueprint.decoration_spawns)
 	for record in records:
 		_index_spatial_record(blueprint, record)
+	for structure in blueprint.structure_spawns:
+		var origin: Vector2 = structure.get("origin", Vector2.ZERO)
+		var size: Vector2 = structure.get("size", Vector2.ZERO)
+		_index_rect_record(
+			blueprint,
+			Rect2(origin, size),
+			str(structure.get("id", ""))
+		)
 	for connection in blueprint.connections:
 		_index_connection_path(blueprint, connection)
 	_add_chunk_record(
@@ -1087,6 +1263,7 @@ func _manifest_identities(manifest: Dictionary) -> Dictionary:
 			manifest.get("landmarks", []) as Array,
 			["display_name", "short_name", "visual_kind", "visual_scene_path", "backdrop_path"]
 		),
+		"structures": (manifest.get("structures", {}) as Dictionary).duplicate(true),
 		"gameplay": _gameplay_semantic_projection(manifest.get("gameplay", {}) as Dictionary),
 		"campaign": (manifest.get("campaign", {}) as Dictionary).duplicate(true),
 	}
@@ -1100,6 +1277,7 @@ func _manifest_identities(manifest: Dictionary) -> Dictionary:
 		},
 		"regions": (manifest.get("regions", []) as Array).duplicate(true),
 		"landmarks": (manifest.get("landmarks", []) as Array).duplicate(true),
+		"structures": (manifest.get("structures", {}) as Dictionary).duplicate(true),
 		"topology": _topology_identity_projection(manifest),
 		"gameplay": (manifest.get("gameplay", {}) as Dictionary).duplicate(true),
 		"campaign": (manifest.get("campaign", {}) as Dictionary).duplicate(true),
@@ -1122,6 +1300,7 @@ func _topology_identity_projection(manifest: Dictionary) -> Dictionary:
 		"collision_source": {
 			"format": collision.get("format", null),
 			"canonical_digest": collision.get("canonical_digest", null),
+			"partition_digest": collision.get("partition_digest", null),
 			"pixel_size": (collision.get("pixel_size", []) as Array).duplicate(true),
 			"world_units_per_pixel": (
 				collision.get("world_units_per_pixel", []) as Array
@@ -1241,10 +1420,106 @@ func _generated_visual_layer_errors(visual_layers: Node2D, expected_layers: Arra
 				errors.append("Warstwa %s sceny ma nieaktualny z_index." % layer_id)
 			if (node as Node2D).visible != bool(layer.get("enabled", true)):
 				errors.append("Warstwa %s sceny ma nieaktualną widoczność." % layer_id)
+			var expected_modulate := _json_color(layer.get("rgb_modulate", "ffffff"))
+			if (node as Node2D).modulate != expected_modulate:
+				errors.append("Warstwa %s sceny ma nieaktualny rgb_modulate." % layer_id)
+			if not node.has_meta("rgb_modulate") or node.get_meta("rgb_modulate") != expected_modulate:
+				errors.append("Warstwa %s sceny ma nieaktualne metadata rgb_modulate." % layer_id)
 		if node is Parallax2D and (node as Parallax2D).scroll_scale != expected_scale:
 			errors.append("Warstwa %s sceny ma nieaktualny scroll_scale." % layer_id)
 		if layer_id == RESERVED_VISUAL_LAYER_ID and node.get_child_count() != 0:
 			errors.append("Zarezerwowana warstwa L10 sceny musi pozostać pusta.")
+	return errors
+
+
+func _generated_structure_root_errors(
+	structure_roots: Node2D,
+	expected_structures: Dictionary
+) -> PackedStringArray:
+	var errors := PackedStringArray()
+	if (
+		structure_roots.position != Vector2.ZERO
+		or structure_roots.rotation != 0.0
+		or structure_roots.scale != Vector2.ONE
+	):
+		errors.append("StructureRoots musi zachować identity transform.")
+	var expected_instances_value = expected_structures.get("instances", null)
+	if not expected_instances_value is Array:
+		errors.append("Metadata structures nie zawiera tablicy instances.")
+		return errors
+	var expected_enabled_by_id: Dictionary = {}
+	for instance_value in expected_instances_value as Array:
+		if not instance_value is Dictionary:
+			continue
+		var instance := instance_value as Dictionary
+		if bool(instance.get("enabled", false)):
+			expected_enabled_by_id[str(instance.get("id", ""))] = instance
+	var actual_by_id: Dictionary = {}
+	for child in structure_roots.get_children():
+		if not child is Node2D:
+			errors.append("StructureRoots może zawierać wyłącznie korzenie Node2D struktur.")
+			continue
+		var structure_id := str(child.get_meta("structure_id", ""))
+		if structure_id.is_empty() or actual_by_id.has(structure_id):
+			errors.append("Korzenie struktur wymagają niepustych, unikalnych metadata structure_id.")
+			continue
+		actual_by_id[structure_id] = child
+		if not expected_enabled_by_id.has(structure_id):
+			errors.append("Scena mapy zawiera nieoczekiwany korzeń struktury %s." % structure_id)
+			continue
+		var expected: Dictionary = expected_enabled_by_id[structure_id]
+		var root := child as Node2D
+		if (
+			root.position != _json_vector(expected.get("origin", []))
+			or root.rotation != 0.0
+			or root.scale != Vector2.ONE
+		):
+			errors.append("Struktura %s ma nieaktualny lokalny transform względem StructureRoots." % structure_id)
+		for metadata_key in [
+			"template_id", "topology_digest", "partition_digest",
+		]:
+			if root.get_meta(metadata_key, null) != expected.get(metadata_key, null):
+				errors.append("Struktura %s ma nieaktualne metadata %s." % [structure_id, metadata_key])
+		if expected.has("landmark_id"):
+			if (
+				not root.has_meta("landmark_id")
+				or root.get_meta("landmark_id") != expected.get("landmark_id")
+			):
+				errors.append("Struktura %s ma nieaktualne metadata landmark_id." % structure_id)
+		elif root.has_meta("landmark_id"):
+			errors.append("Neutralna struktura %s nie może publikować metadata landmark_id." % structure_id)
+		if root.get_meta("origin", Vector2(INF, INF)) != _json_vector(expected.get("origin", [])):
+			errors.append("Struktura %s ma nieaktualne metadata origin." % structure_id)
+		if root.get_meta("size", Vector2(INF, INF)) != _json_vector(expected.get("size", [])):
+			errors.append("Struktura %s ma nieaktualne metadata size." % structure_id)
+		for child_name in ["InteriorVisual", "StructureVisual", "DynamicBodies", "Interactives"]:
+			var local_root := root.get_node_or_null(child_name) as Node2D
+			if local_root == null:
+				errors.append("Struktura %s nie zawiera lokalnego korzenia %s." % [structure_id, child_name])
+			elif (
+				local_root.position != Vector2.ZERO
+				or local_root.rotation != 0.0
+				or local_root.scale != Vector2.ONE
+			):
+				errors.append("Struktura %s/%s musi zachować lokalny identity transform." % [structure_id, child_name])
+		var static_collision := root.get_node_or_null("StaticCollision") as StaticBody2D
+		if static_collision == null:
+			errors.append("Struktura %s nie zawiera lokalnego StaticCollision." % structure_id)
+		else:
+			if (
+				static_collision.position != Vector2.ZERO
+				or static_collision.rotation != 0.0
+				or static_collision.scale != Vector2.ONE
+			):
+				errors.append("Struktura %s/StaticCollision musi zachować lokalny identity transform." % structure_id)
+			var collision_shape := static_collision.get_node_or_null("CollisionShape2D") as CollisionShape2D
+			if collision_shape == null or not collision_shape.shape is ConcavePolygonShape2D:
+				errors.append("Struktura %s wymaga ConcavePolygonShape2D w StaticCollision." % structure_id)
+			elif (collision_shape.shape as ConcavePolygonShape2D).segments.is_empty():
+				errors.append("Struktura %s ma pusty lokalny kolider statyczny." % structure_id)
+	for structure_id in expected_enabled_by_id.keys():
+		if not actual_by_id.has(structure_id):
+			errors.append("Scena mapy nie zawiera korzenia struktury %s." % structure_id)
 	return errors
 
 
@@ -1277,7 +1552,7 @@ func _validate_visual(
 	var seen_layer_ids := {}
 	var required_layer_keys := [
 		"id", "role", "space", "z_index", "parallax_scale", "enabled", "reserved",
-		"affordance_policy", "geometry_role",
+		"affordance_policy", "geometry_role", "rgb_modulate",
 	]
 	for index in range(layers.size()):
 		var layer_value = layers[index]
@@ -1310,6 +1585,15 @@ func _validate_visual(
 		var parallax_scale := _json_vector(layer.get("parallax_scale", null))
 		if not parallax_scale.is_finite() or parallax_scale.x <= 0.0 or parallax_scale.y <= 0.0:
 			errors.append("Warstwa %s wymaga dodatniej parallax_scale." % layer_id)
+		var rgb_modulate_value = layer.get("rgb_modulate", null)
+		if (
+			not _valid_json_color(rgb_modulate_value)
+			or str(rgb_modulate_value).strip_edges().trim_prefix("#").length() != 6
+		):
+			errors.append(
+				"Warstwa %s wymaga nieprzezroczystego rgb_modulate."
+				% layer_id
+			)
 		var expected_space := str(VISUAL_LAYER_SPACES.get(layer_id, ""))
 		if str(layer.get("space", "")) != expected_space:
 			errors.append("Warstwa %s musi używać space=%s." % [layer_id, expected_space])
@@ -1334,6 +1618,9 @@ func _validate_visual(
 				errors.append("L05 musi używać affordance_policy=collider_authority.")
 			if not bool(layer.get("enabled", false)) or bool(layer.get("reserved", true)):
 				errors.append("L05 musi być włączone i niezarezerwowane.")
+		elif layer_id in NONBLOCKING_TEXTURE_LAYER_IDS:
+			if str(layer.get("affordance_policy", "")) != OPEN_WATER_BACKDROP_AFFORDANCE_POLICY:
+				errors.append("Warstwa %s musi używać polityki otwartego tła." % layer_id)
 		elif layer_id == RESERVED_VISUAL_LAYER_ID:
 			if bool(layer.get("enabled", true)) or not bool(layer.get("reserved", false)):
 				errors.append("L10 musi być wyłączone i zarezerwowane.")
@@ -1364,6 +1651,13 @@ func _validate_visual(
 			asset_ids[asset_id] = true
 		var layer_id_value = asset.get("layer_id", null)
 		var layer_id := str(layer_id_value).strip_edges()
+		var group_id_value = asset.get("group_id", null)
+		var group_id := str(group_id_value).strip_edges()
+		if (
+			not group_id_value is String
+			or not _valid_visual_group_id(group_id)
+		):
+			errors.append("Asset %s wymaga bezpiecznego, niepustego group_id." % asset_id)
 		var kind_value = asset.get("kind", null)
 		var kind := str(kind_value).strip_edges()
 		if (
@@ -1371,14 +1665,16 @@ func _validate_visual(
 			or not kind_value is String
 			or not [
 				["L01", "texture_rect"],
+				["L01", "composition_proxy"],
 				["L02", "texture_rect"],
+				["L02", "composition_proxy"],
 				["L05", "collision_masked_material"],
 			].has(
 				[layer_id, kind]
 			)
 		):
 			errors.append(
-				"Asset %s musi być L01-L02/texture_rect albo L05/collision_masked_material."
+				"Asset %s musi być L01-L02/texture_rect|composition_proxy albo L05/collision_masked_material."
 				% asset_id
 			)
 		if typeof(asset.get("enabled", null)) != TYPE_BOOL:
@@ -1386,7 +1682,10 @@ func _validate_visual(
 		var affordance_value = asset.get("affordance", null)
 		if not affordance_value is String or str(affordance_value).strip_edges().is_empty():
 			errors.append("Asset %s wymaga niepustego affordance." % asset_id)
-		_validate_hashed_png_asset(asset, label, errors)
+		if kind == "composition_proxy":
+			_validate_composition_proxy_asset(asset, label, errors)
+		else:
+			_validate_hashed_png_asset(asset, label, errors)
 		var world_rect := _json_rect(asset.get("world_rect", null))
 		if not _rect_inside_world(world_rect, world_size):
 			errors.append("Asset %s ma world_rect poza mapą." % asset_id)
@@ -1402,16 +1701,9 @@ func _validate_visual(
 					% [layer_id, asset_id, NONBLOCKING_BACKDROP_AFFORDANCE]
 				)
 			var pixel_size := _json_vector(asset.get("pixel_size", null))
-			if (
-				pixel_size.x > 0.0
-				and pixel_size.y > 0.0
-				and (
-					pixel_size.x * world_rect.size.y
-					!= pixel_size.y * world_rect.size.x
-				)
-			):
+			if pixel_size.x > 0.0 and pixel_size.y > 0.0 and pixel_size != world_rect.size:
 				errors.append(
-					"Asset %s %s musi zachować dokładną proporcję pixel_size zgodną z world_rect."
+					"Asset %s %s musi zachować pixel_size równy world_rect 1:1 bez skalowania."
 					% [layer_id, asset_id]
 				)
 		elif layer_id == "L05":
@@ -1429,8 +1721,154 @@ func _validate_visual(
 				errors.append("Brak shadera maskującego grafikę L05.")
 
 
+func _validate_structures(
+	structures: Dictionary,
+	landmark_ids: Dictionary,
+	world_size: Vector2,
+	topology: Dictionary,
+	seen_ids: Dictionary,
+	errors: PackedStringArray
+) -> void:
+	if not _dictionary_has_exact_keys(structures, ["templates", "instances"]):
+		errors.append("structures musi zawierać wyłącznie templates i instances.")
+	var templates := _dictionary_array(structures.get("templates", null), "structures.templates", errors)
+	var instances := _dictionary_array(structures.get("instances", null), "structures.instances", errors)
+	var template_ids: Dictionary = {}
+	for index in range(templates.size()):
+		var template: Dictionary = templates[index]
+		var label := "structures.templates[%d]" % index
+		if not _dictionary_has_exact_keys(template, [
+			"id", "kind", "interior_layer_id", "collider_layer_id", "allowed_socket_kinds",
+		]):
+			errors.append("%s ma niepoprawny zestaw pól." % label)
+		var template_id_value = template.get("id", null)
+		var template_id := str(template_id_value).strip_edges()
+		if (
+			not template_id_value is String
+			or template_id.is_empty()
+			or template_ids.has(template_id)
+		):
+			errors.append("Szablony struktur wymagają niepustych, unikalnych ID.")
+		else:
+			template_ids[template_id] = template
+		if str(template.get("kind", "")) != "enterable_tower":
+			errors.append("%s.kind musi mieć wartość enterable_tower." % label)
+		if str(template.get("interior_layer_id", "")) != "L04":
+			errors.append("%s.interior_layer_id musi wskazywać world-locked L04." % label)
+		if str(template.get("collider_layer_id", "")) != COLLIDER_AUTHORITY_LAYER_ID:
+			errors.append("%s.collider_layer_id musi wskazywać authority L05." % label)
+		var allowed_socket_kinds_value = template.get("allowed_socket_kinds", null)
+		if not allowed_socket_kinds_value is Array:
+			errors.append("%s.allowed_socket_kinds musi być tablicą." % label)
+		else:
+			if (allowed_socket_kinds_value as Array) != ENTERABLE_TOWER_SOCKET_KINDS:
+				errors.append("%s.allowed_socket_kinds musi zachować pełny kontrakt wieżowca." % label)
+	var collision: Dictionary = topology.get("collision_source", {})
+	var expected_topology_digest := str(collision.get("canonical_digest", ""))
+	var expected_partition_digest := str(collision.get("partition_digest", ""))
+	for index in range(instances.size()):
+		var instance: Dictionary = instances[index]
+		var label := "structures.instances[%d]" % index
+		if not _dictionary_has_required_and_optional_keys(
+			instance,
+			[
+				"id", "template_id", "origin", "size", "enabled",
+				"topology_digest", "partition_digest", "sockets",
+			],
+			["landmark_id"],
+		):
+			errors.append("%s ma niepoprawny zestaw pól." % label)
+		var instance_id_value = instance.get("id", null)
+		var instance_id := str(instance_id_value).strip_edges()
+		if not instance_id_value is String:
+			errors.append("%s.id musi być Stringiem." % label)
+		_register_unique_id(instance_id, "struktury", seen_ids, errors)
+		if template_ids.has(instance_id):
+			errors.append("ID struktury %s koliduje z ID szablonu." % instance_id)
+		var template_id_value = instance.get("template_id", null)
+		var template_id := str(template_id_value).strip_edges()
+		if not template_id_value is String or not template_ids.has(template_id):
+			errors.append("Struktura %s wskazuje nieznany template_id %s." % [instance_id, template_id])
+		if instance.has("landmark_id"):
+			var landmark_id_value = instance.get("landmark_id", null)
+			var landmark_id := str(landmark_id_value).strip_edges()
+			if (
+				not landmark_id_value is String
+				or landmark_id.is_empty()
+				or not landmark_ids.has(landmark_id)
+			):
+				errors.append("Struktura %s wskazuje nieznany landmark_id %s." % [instance_id, landmark_id])
+		var origin := _json_vector(instance.get("origin", null))
+		var size := _json_vector(instance.get("size", null))
+		if not _rect_inside_world(Rect2(origin, size), world_size):
+			errors.append("Struktura %s ma niepoprawny prostokąt origin/size." % instance_id)
+		elif (
+			not _vector_is_aligned(origin, L05_WORLD_UNITS_PER_PIXEL)
+			or not _vector_is_aligned(size, L05_WORLD_UNITS_PER_PIXEL)
+		):
+			errors.append("Struktura %s musi być wyrównana do rastra L05 40 x 40." % instance_id)
+		if typeof(instance.get("enabled", null)) != TYPE_BOOL:
+			errors.append("Struktura %s wymaga logicznego enabled." % instance_id)
+		var topology_digest_value = instance.get("topology_digest", null)
+		if (
+			not topology_digest_value is String
+			or not _valid_topology_digest(str(topology_digest_value))
+			or str(topology_digest_value) != expected_topology_digest
+		):
+			errors.append("Struktura %s musi wskazywać canonical_digest aktywnej topologii." % instance_id)
+		var partition_digest_value = instance.get("partition_digest", null)
+		if (
+			not partition_digest_value is String
+			or not _valid_partition_digest(str(partition_digest_value))
+			or str(partition_digest_value) != expected_partition_digest
+		):
+			errors.append("Struktura %s musi wskazywać aktywny partition_digest." % instance_id)
+		var sockets_value = instance.get("sockets", null)
+		if not sockets_value is Array:
+			errors.append("Struktura %s wymaga tablicy sockets." % instance_id)
+		else:
+			var socket_ids: Dictionary = {}
+			var template: Dictionary = template_ids.get(template_id, {})
+			var allowed_socket_kinds: Array = template.get("allowed_socket_kinds", [])
+			for socket_index in range((sockets_value as Array).size()):
+				var socket_value = (sockets_value as Array)[socket_index]
+				var socket_label := "%s.sockets[%d]" % [label, socket_index]
+				if not socket_value is Dictionary:
+					errors.append("%s musi być obiektem." % socket_label)
+					continue
+				var socket := socket_value as Dictionary
+				if not _dictionary_has_exact_keys(socket, ["id", "kind", "local_rect"]):
+					errors.append("%s musi zawierać wyłącznie id, kind i local_rect." % socket_label)
+				var socket_id_value = socket.get("id", null)
+				var socket_id := str(socket_id_value).strip_edges()
+				if (
+					not socket_id_value is String
+					or socket_id.is_empty()
+					or socket_ids.has(socket_id)
+				):
+					errors.append("%s wymaga niepustego, unikalnego lokalnie ID." % socket_label)
+				else:
+					socket_ids[socket_id] = true
+				var socket_kind_value = socket.get("kind", null)
+				var socket_kind := str(socket_kind_value).strip_edges()
+				if not socket_kind_value is String or socket_kind not in allowed_socket_kinds:
+					errors.append("%s.kind nie jest dozwolony przez szablon." % socket_label)
+				var local_rect := _json_rect(socket.get("local_rect", null))
+				if not _rect_inside_local(local_rect, size):
+					errors.append("%s.local_rect wykracza poza strukturę." % socket_label)
+				elif (
+					not _vector_is_aligned(local_rect.position, L05_WORLD_UNITS_PER_PIXEL)
+					or not _vector_is_aligned(local_rect.size, L05_WORLD_UNITS_PER_PIXEL)
+				):
+					errors.append(
+						"%s.local_rect musi być wyrównany do rastra L05 40 x 40."
+						% socket_label
+					)
+
+
 func _validate_topology(
 	topology: Dictionary,
+	structures: Dictionary,
 	world_size: Vector2,
 	navigation_cell_size: Vector2,
 	errors: PackedStringArray
@@ -1455,7 +1893,7 @@ func _validate_topology(
 	var collision := collision_value as Dictionary
 	var collision_keys := ["format", "path", "sha256", "pixel_size", "world_units_per_pixel", "encoding"]
 	if mode == L05_TOPOLOGY_MODE:
-		collision_keys.append_array(["canonical_digest", "mapping"])
+		collision_keys.append_array(["canonical_digest", "partition_digest", "mapping"])
 	if not _dictionary_has_exact_keys(collision, collision_keys):
 		errors.append("topology.collision_source ma niepoprawny zestaw pól dla trybu %s." % mode)
 	var source_format_value = collision.get("format", null)
@@ -1507,7 +1945,7 @@ func _validate_topology(
 			errors.append("map.navigation_cell_size musi odpowiadać mapowaniu L05 40 x 40.")
 		if Vector2(pixel_size.x * world_units_per_pixel.x, pixel_size.y * world_units_per_pixel.y) != world_size:
 			errors.append("Mapowanie pikseli L05 musi dokładnie pokrywać cały świat.")
-		_decode_l05_collision_source(topology, errors)
+		_decode_l05_collision_source(topology, structures, errors)
 
 	var corridors := _dictionary_array(
 		topology.get("protected_corridors", null),
@@ -1755,6 +2193,20 @@ func _dictionary_has_exact_keys(source: Dictionary, expected_keys: Array) -> boo
 	return true
 
 
+func _dictionary_has_required_and_optional_keys(
+	source: Dictionary,
+	required_keys: Array,
+	optional_keys: Array,
+) -> bool:
+	for key in required_keys:
+		if not source.has(key):
+			return false
+	for key in source.keys():
+		if key not in required_keys and key not in optional_keys:
+			return false
+	return true
+
+
 func _is_integral_number(value) -> bool:
 	if typeof(value) == TYPE_INT:
 		return true
@@ -1793,6 +2245,17 @@ func _valid_json_color(value) -> bool:
 	return true
 
 
+func _valid_visual_group_id(value: String) -> bool:
+	if value.is_empty() or not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".contains(value.left(1)):
+		return false
+	for index in range(1, value.length()):
+		if not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_".contains(
+			value.substr(index, 1)
+		):
+			return false
+	return true
+
+
 func _append_source_path(paths: PackedStringArray, package_path: String) -> void:
 	var resource_path := _package_resource_path(package_path)
 	if not resource_path.is_empty() and not paths.has(resource_path):
@@ -1808,6 +2271,29 @@ func _package_resource_path(package_path: String) -> String:
 		if part.is_empty() or part in [".", ".."]:
 			return ""
 	return "res://underwater_map_workbench/%s" % normalized
+
+
+func _validate_composition_proxy_asset(
+	asset: Dictionary,
+	label: String,
+	errors: PackedStringArray
+) -> void:
+	if asset.get("path", null) != "":
+		errors.append("%s proxy kompozycyjne musi mieć puste path." % label)
+	if asset.get("sha256", null) != "":
+		errors.append("%s proxy kompozycyjne musi mieć puste sha256." % label)
+	var pixel_size_value = asset.get("pixel_size", null)
+	var declared_integral := pixel_size_value is Array and (pixel_size_value as Array).size() == 2
+	if declared_integral:
+		for component in pixel_size_value as Array:
+			if not _is_integral_number(component) or int(component) <= 0:
+				declared_integral = false
+				break
+	if not declared_integral:
+		errors.append(
+			"%s proxy kompozycyjne musi deklarować dwie dodatnie całkowite wartości pixel_size."
+			% label
+		)
 
 
 func _validate_hashed_png_asset(
@@ -1854,6 +2340,7 @@ func _validate_hashed_png_asset(
 
 func _decode_l05_collision_source(
 	topology: Dictionary,
+	structures: Dictionary,
 	errors: PackedStringArray
 ) -> Dictionary:
 	var initial_error_count := errors.size()
@@ -1862,6 +2349,9 @@ func _decode_l05_collision_source(
 		errors.append("L05 wymaga obiektu topology.collision_source.")
 		return {}
 	var collision := collision_value as Dictionary
+	if str(collision.get("format", "")) != L05_SOURCE_FORMAT:
+		errors.append("L05 wymaga collision_source.format=%s." % L05_SOURCE_FORMAT)
+		return {}
 	var mapping_value = collision.get("mapping", null)
 	if (
 		not mapping_value is Dictionary
@@ -1915,8 +2405,8 @@ func _decode_l05_collision_source(
 	if not _dictionary_has_exact_keys(payload, ["schema_version", "base", "operations"]):
 		errors.append("Payload L05 musi zawierać wyłącznie schema_version, base i operations.")
 		return {}
-	if not _is_integral_number(payload.get("schema_version", null)) or int(payload.get("schema_version", 0)) != 1:
-		errors.append("Payload L05 musi używać schema_version=1.")
+	if not _is_integral_number(payload.get("schema_version", null)) or int(payload.get("schema_version", 0)) != 2:
+		errors.append("Payload L05 musi używać schema_version=2.")
 		return {}
 	if str(payload.get("base", "")) != "open_water":
 		errors.append("Payload L05 musi używać base=open_water.")
@@ -1928,6 +2418,28 @@ func _decode_l05_collision_source(
 	var cells := PackedByteArray()
 	cells.resize(L05_PIXEL_SIZE.x * L05_PIXEL_SIZE.y)
 	cells.fill(int(open_water_value))
+	var solid_owner_cells := PackedInt32Array()
+	solid_owner_cells.resize(cells.size())
+	solid_owner_cells.fill(0)
+	var owner_ids := PackedStringArray(["", "world"])
+	var structure_instances_by_id := _structure_instances_by_id(structures)
+	var structure_owner_index_by_id: Dictionary = {}
+	var instances_value = structures.get("instances", null)
+	if not instances_value is Array:
+		errors.append("Dekodowanie L05 wymaga structures.instances.")
+		return {}
+	for instance_value in instances_value as Array:
+		if not instance_value is Dictionary:
+			continue
+		var instance := instance_value as Dictionary
+		if not bool(instance.get("enabled", false)):
+			continue
+		var structure_id := str(instance.get("id", ""))
+		if structure_id.is_empty() or structure_owner_index_by_id.has(structure_id):
+			errors.append("Dekodowanie L05 wymaga stabilnych, unikalnych ID struktur.")
+			continue
+		structure_owner_index_by_id[structure_id] = owner_ids.size()
+		owner_ids.append(structure_id)
 	var operation_ids := {}
 	for index in range((operations_value as Array).size()):
 		var operation_value = (operations_value as Array)[index]
@@ -1936,8 +2448,15 @@ func _decode_l05_collision_source(
 			errors.append("%s musi być obiektem." % label)
 			continue
 		var operation := operation_value as Dictionary
-		if not _dictionary_has_exact_keys(operation, ["id", "op", "rect_px"]):
-			errors.append("%s musi zawierać wyłącznie id, op i rect_px." % label)
+		var operation_space := str(operation.get("space", ""))
+		var expected_operation_keys := ["id", "op", "space", "rect_px"]
+		if operation_space == "structure_local_px":
+			expected_operation_keys.append("structure_id")
+		if not _dictionary_has_exact_keys(operation, expected_operation_keys):
+			errors.append("%s ma niepoprawny zestaw pól dla swojej przestrzeni." % label)
+			continue
+		if operation_space not in ["world_px", "structure_local_px"]:
+			errors.append("%s.space musi być world_px albo structure_local_px." % label)
 			continue
 		var operation_id_value = operation.get("id", null)
 		var operation_id := str(operation_id_value).strip_edges()
@@ -1964,7 +2483,40 @@ func _decode_l05_collision_source(
 		var y := int(rect_components[1])
 		var width := int(rect_components[2])
 		var height := int(rect_components[3])
-		if (
+		var owner_index := 1
+		if operation_space == "structure_local_px":
+			var structure_id_value = operation.get("structure_id", null)
+			var structure_id := str(structure_id_value).strip_edges()
+			if (
+				not structure_id_value is String
+				or not structure_instances_by_id.has(structure_id)
+				or not structure_owner_index_by_id.has(structure_id)
+			):
+				errors.append("%s wskazuje nieznane structure_id %s." % [label, structure_id])
+				continue
+			var structure: Dictionary = structure_instances_by_id[structure_id]
+			if not bool(structure.get("enabled", false)):
+				errors.append("%s wskazuje wyłączoną strukturę %s." % [label, structure_id])
+				continue
+			var local_pixel_size := Vector2i(
+				roundi(_json_vector(structure.get("size", [])).x / L05_WORLD_UNITS_PER_PIXEL.x),
+				roundi(_json_vector(structure.get("size", [])).y / L05_WORLD_UNITS_PER_PIXEL.y)
+			)
+			if (
+				x < 0
+				or y < 0
+				or width <= 0
+				or height <= 0
+				or x + width > local_pixel_size.x
+				or y + height > local_pixel_size.y
+			):
+				errors.append("%s.rect_px wykracza poza lokalny raster struktury." % label)
+				continue
+			var structure_origin := _json_vector(structure.get("origin", []))
+			x += roundi(structure_origin.x / L05_WORLD_UNITS_PER_PIXEL.x)
+			y += roundi(structure_origin.y / L05_WORLD_UNITS_PER_PIXEL.y)
+			owner_index = int(structure_owner_index_by_id[structure_id])
+		elif (
 			x < 0
 			or y < 0
 			or width <= 0
@@ -1975,12 +2527,23 @@ func _decode_l05_collision_source(
 			errors.append("%s.rect_px wykracza poza raster L05." % label)
 			continue
 		var fill_value := int(solid_value) if operation_kind == "solid_rect" else int(open_water_value)
+		var fill_owner := owner_index if operation_kind == "solid_rect" else 0
 		for row in range(y, y + height):
 			var start := row * L05_PIXEL_SIZE.x + x
 			for cell_index in range(start, start + width):
 				cells[cell_index] = fill_value
+				solid_owner_cells[cell_index] = fill_owner
 	if errors.size() > initial_error_count:
 		return {}
+	for cell_index in range(cells.size()):
+		if int(cells[cell_index]) == int(solid_value):
+			var owner_index := int(solid_owner_cells[cell_index])
+			if owner_index <= 0 or owner_index >= owner_ids.size():
+				errors.append("Komórka solid L05 nie ma poprawnego właściciela.")
+				return {}
+		elif int(solid_owner_cells[cell_index]) != 0:
+			errors.append("Komórka open_water L05 ma właściciela kolizji.")
+			return {}
 	var digest_payload := {
 		"mapping": (mapping_value as Dictionary).duplicate(true),
 		"encoding": encoding.duplicate(true),
@@ -1998,18 +2561,39 @@ func _decode_l05_collision_source(
 	if str(declared_digest_value) != canonical_digest:
 		errors.append("L05 canonical_digest jest nieaktualny; oczekiwane %s." % canonical_digest)
 		return {}
+	var partition_payload := {
+		"owner_ids": _packed_string_to_array(owner_ids),
+		"solid_owner_cells": _packed_int32_to_array(solid_owner_cells),
+	}
+	var partition_digest := "partition-v1:%s" % _canonical_sha256(partition_payload)
+	var declared_partition_digest_value = collision.get("partition_digest", null)
+	if (
+		not declared_partition_digest_value is String
+		or not _valid_partition_digest(str(declared_partition_digest_value))
+	):
+		errors.append("L05 partition_digest musi mieć format partition-v1:<sha256>.")
+		return {}
+	if str(declared_partition_digest_value) != partition_digest:
+		errors.append("L05 partition_digest jest nieaktualny; oczekiwane %s." % partition_digest)
+		return {}
 	return {
 		"cells": cells,
+		"solid_owner_cells": solid_owner_cells,
+		"owner_ids": owner_ids,
 		"solid": int(solid_value),
 		"open_water": int(open_water_value),
 		"payload_sha256": actual_sha,
 		"canonical_digest": canonical_digest,
+		"partition_digest": partition_digest,
 	}
 
 
-func _generated_l05_mask_errors(topology: Dictionary) -> PackedStringArray:
+func _generated_l05_mask_errors(
+	topology: Dictionary,
+	structures: Dictionary
+) -> PackedStringArray:
 	var errors := PackedStringArray()
-	var decoded := _decode_l05_collision_source(topology, errors)
+	var decoded := _decode_l05_collision_source(topology, structures, errors)
 	if not errors.is_empty():
 		return errors
 	if not FileAccess.file_exists(L05_SOLID_MASK_PATH):
@@ -2049,6 +2633,12 @@ func _valid_topology_digest(value: String) -> bool:
 	if not value.begins_with("topology-v1:"):
 		return false
 	return _valid_sha256(value.trim_prefix("topology-v1:"), false)
+
+
+func _valid_partition_digest(value: String) -> bool:
+	if not value.begins_with("partition-v1:"):
+		return false
+	return _valid_sha256(value.trim_prefix("partition-v1:"), false)
 
 
 func _png_dimensions(resource_path: String) -> Vector2i:
@@ -2094,6 +2684,49 @@ func _rect_inside_world(bounds: Rect2, world_size: Vector2) -> bool:
 		and bounds.end.x <= world_size.x
 		and bounds.end.y <= world_size.y
 	)
+
+
+func _rect_inside_local(bounds: Rect2, size: Vector2) -> bool:
+	return _rect_inside_world(bounds, size)
+
+
+func _vector_is_aligned(value: Vector2, step: Vector2) -> bool:
+	if not value.is_finite() or step.x <= 0.0 or step.y <= 0.0:
+		return false
+	return (
+		is_equal_approx(value.x / step.x, round(value.x / step.x))
+		and is_equal_approx(value.y / step.y, round(value.y / step.y))
+	)
+
+
+func _structure_instances_by_id(structures: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	var instances_value = structures.get("instances", null)
+	if not instances_value is Array:
+		return result
+	for instance_value in instances_value as Array:
+		if not instance_value is Dictionary:
+			continue
+		var instance := instance_value as Dictionary
+		var structure_id := str(instance.get("id", ""))
+		if not structure_id.is_empty():
+			result[structure_id] = instance
+	return result
+
+
+func _packed_string_to_array(source: PackedStringArray) -> Array:
+	var result := []
+	for value in source:
+		result.append(value)
+	return result
+
+
+func _packed_int32_to_array(source: PackedInt32Array) -> Array:
+	var result := []
+	result.resize(source.size())
+	for index in range(source.size()):
+		result[index] = int(source[index])
+	return result
 
 
 func _dictionary_array(value, label: String, errors: PackedStringArray) -> Array[Dictionary]:
@@ -2147,8 +2780,25 @@ func _point_inside_world(point: Vector2, world_size: Vector2) -> bool:
 	return point.is_finite() and Rect2(Vector2.ZERO, world_size).has_point(point)
 
 
+func _point_inside_local_rect(point: Vector2, size: Vector2) -> bool:
+	return (
+		point.is_finite()
+		and size.is_finite()
+		and size.x > 0.0
+		and size.y > 0.0
+		and Rect2(Vector2.ZERO, size).has_point(point)
+	)
+
+
 func _duplicate_raster(source: Dictionary) -> Dictionary:
 	var result := source.duplicate(true)
 	var cells: PackedByteArray = source.get("cells", PackedByteArray())
 	result["cells"] = cells.duplicate()
+	var solid_owner_cells: PackedInt32Array = source.get(
+		"solid_owner_cells",
+		PackedInt32Array()
+	)
+	result["solid_owner_cells"] = solid_owner_cells.duplicate()
+	var owner_ids: PackedStringArray = source.get("owner_ids", PackedStringArray())
+	result["owner_ids"] = owner_ids.duplicate()
 	return result

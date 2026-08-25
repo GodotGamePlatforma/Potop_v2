@@ -2,29 +2,29 @@
   "artifacts": {
     "boundary_mask": {
       "path": "assets/generated/l05/boundary_mask.png",
-      "sha256": "0ed7d69e3ff6ca13c04e05349bc90b3af850615a7d7556d63242eb8a592188ef"
+      "sha256": "c4d970e4359c1293f1558f21e9cd9875b4c3f70d2a7fc39b5bcedd69ce532022"
     },
     "full_map_guide": {
       "path": "assets/generated/l05/full_map_guide.png",
-      "sha256": "ab54918c771d0205ed7d9ee49165ee380b3d6acf0348805dee65ecae3e8a417f"
+      "sha256": "bb5521fdc5d258ea97f8c05aa3471dd2c6ee21d662f684cff41af4398cc743b2"
     },
     "open_water_mask": {
       "path": "assets/generated/l05/open_water_mask.png",
-      "sha256": "5d8f2c6248befdbec0d23f3ea3463f64173b75b59c698bdb8df3a4089d925599"
+      "sha256": "f09c5b7232e67deb2320d3987afb7bf3aafbb4c5b94638796c87373dfc78754c"
     },
     "solid_mask": {
       "path": "assets/generated/l05/solid_mask.png",
-      "sha256": "bd1ac2f5a4d91941db8653bfa45c152a719dbae5053881fc5625ea6bcd59d0a8"
+      "sha256": "02ebf51beb6480452733126d158f76b872c28fd383c07bc0d66c2571951fec07"
     }
   },
   "authority": false,
-  "canonical_digest": "topology-v1:848fb14246567ab4396e4207be0bc0effdf7744594cf8495478c00597d49c672",
+  "canonical_digest": "topology-v1:08838834824a26b152ce9004e8fc270450684278e6f2465ade017e729ef5968a",
   "encoding": {
     "open_water": 255,
     "solid": 0
   },
   "generated": true,
-  "manifest_sha256": "b3173afb48588997c0dbaec76e1bd9e7931efe2e5c935a576d9268e6b8b6db06",
+  "manifest_sha256": "74517413d297b92fb89efa2b16cb9bc60be3c2b2117dacc9ebf811e59b59b97b",
   "mapping": {
     "pixel_reference": "pixel_edge",
     "rounding": "floor",
@@ -35,14 +35,58 @@
     "x_axis": "right",
     "y_axis": "down"
   },
-  "open_water_cell_count": 171072,
+  "open_water_cell_count": 166120,
+  "owner_cell_counts": [
+    {
+      "cell_count": 166120,
+      "owner_id": ""
+    },
+    {
+      "cell_count": 19008,
+      "owner_id": "world"
+    },
+    {
+      "cell_count": 1496,
+      "owner_id": "tower_prototype_01"
+    }
+  ],
+  "owner_ids": [
+    "",
+    "world",
+    "tower_prototype_01"
+  ],
+  "partition_digest": "partition-v1:78a31bb0124194502c768b93202e3f2471d6dbc1d153b966b5947a655008a74b",
   "payload_path": "assets/topology/l05_ground_mask_source.json",
-  "payload_sha256": "e3f2e8bfc31c2ce5a72771149c3b29396d85a2bafa63290540df5d3fbed7a876",
+  "payload_sha256": "e2461e09f642cc3178028dc8d8820414a79c4ff7a7627ca79fb3058f63210002",
   "pixel_size": [
     576,
     324
   ],
-  "solid_cell_count": 15552,
+  "solid_cell_count": 20504,
+  "structures": [
+    {
+      "enabled": true,
+      "id": "tower_prototype_01",
+      "origin": [
+        7760.0,
+        3120.0
+      ],
+      "partition_digest": "partition-v1:78a31bb0124194502c768b93202e3f2471d6dbc1d153b966b5947a655008a74b",
+      "pixel_rect": [
+        194,
+        78,
+        56,
+        84
+      ],
+      "size": [
+        2240.0,
+        3360.0
+      ],
+      "sockets": [],
+      "template_id": "enterable_tower_v1",
+      "topology_digest": "topology-v1:08838834824a26b152ce9004e8fc270450684278e6f2465ade017e729ef5968a"
+    }
+  ],
   "world_units_per_pixel": [
     40.0,
     40.0

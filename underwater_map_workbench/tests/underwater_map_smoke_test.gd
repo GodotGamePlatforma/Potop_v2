@@ -5,13 +5,20 @@ const LocalRuntimeScript := preload("res://underwater_map_workbench/runtime/Unde
 const WorldStateScript := preload("res://scripts/data/UnderwaterWorldState.gd")
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 
-const EXPECTED_SCHEMA_VERSION := 2
+const EXPECTED_SCHEMA_VERSION := 5
 const EXPECTED_LAYER_IDS := [
 	"L00", "L01", "L02", "L03", "L04", "L05", "L06", "L07", "L08", "L09", "L10",
 ]
 const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
+const NO_BLOCKING_AFFORDANCE_POLICY := "no_visual_blockage_in_protected_water"
+const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap_open_water"
+const COMPOSITION_PROXY_KIND := "composition_proxy"
+const BACKDROP_MIN_OPAQUE_SHARE := 0.95
+const BACKDROP_MAX_PARTIAL_CANVAS_SHARE := 0.03
+const BACKDROP_MAX_LOW_ALPHA_CANVAS_SHARE := 0.0025
+const BACKDROP_MIN_BOTTOM_OPAQUE_SHARE := 0.01
 const BLUEPRINT_GAMEPLAY_ARRAYS := {
 	"connections": "connections",
 	"current_zones": "current_zones",
@@ -26,9 +33,79 @@ const BLUEPRINT_GAMEPLAY_ARRAYS := {
 }
 const CAMPAIGN_SEED := 73_331
 const L05_TOPOLOGY_MODE := "l05_mask_v1"
-const L05_SOURCE_FORMAT := "l05_rect_ops_v1"
+const L05_SOURCE_FORMAT := "l05_owned_rect_ops_v2"
 const L05_PIXEL_SIZE := Vector2i(576, 324)
 const L05_CELL_SIZE := Vector2(40.0, 40.0)
+const STRUCTURE_TEMPLATE_ID := "enterable_tower_v1"
+const STRUCTURE_INSTANCE_ID := "tower_prototype_01"
+const STRUCTURE_ORIGIN := Vector2(7760.0, 3120.0)
+const STRUCTURE_SIZE := Vector2(2240.0, 3680.0)
+const REQUIRED_TOWER_SOCKETS := {
+	"entry_floor_12_broken_window": ["entry_opening", [0, 80, 80, 160]],
+	"elevator_upper_travel": ["moving_elevator", [1040, 80, 480, 1600]],
+	"gate_red_west": ["dynamic_door", [960, 960, 80, 120]],
+	"gate_red_east": ["dynamic_door", [1520, 960, 80, 120]],
+	"gate_blue_upper": ["dynamic_door", [1680, 840, 160, 80]],
+	"gate_blue_lower": ["dynamic_door", [1680, 1120, 160, 80]],
+	"gate_yellow": ["dynamic_door", [1920, 1680, 160, 80]],
+	"hatch_d": ["dynamic_door", [1920, 2240, 160, 80]],
+	"shortcut_b_upper": ["dynamic_door", [160, 840, 160, 80]],
+	"shortcut_b_lower": ["dynamic_door", [160, 1120, 160, 80]],
+	"shortcut_c_upper": ["dynamic_door", [1920, 840, 160, 80]],
+	"shortcut_c_middle": ["dynamic_door", [1920, 1120, 160, 80]],
+	"shortcut_c_lower": ["dynamic_door", [1920, 1400, 160, 80]],
+	"hatch_basement": ["dynamic_door", [1200, 3320, 160, 120]],
+	"control_a_distributor": ["fixed_interactable", [1760, 680, 320, 120]],
+	"control_b_red_relay": ["fixed_interactable", [160, 1240, 320, 120]],
+	"control_c_blue_lock": ["fixed_interactable", [1720, 1520, 320, 120]],
+	"control_d_valve_v1": ["fixed_interactable", [1640, 2040, 120, 120]],
+	"control_d_valve_v2": ["fixed_interactable", [1800, 2040, 120, 120]],
+	"control_d_valve_v3": ["fixed_interactable", [1960, 2040, 120, 120]],
+	"control_d_reset": ["fixed_interactable", [1640, 2160, 240, 80]],
+	"control_basement_hatch": ["fixed_interactable", [1360, 3440, 240, 120]],
+}
+const TOWER_ROUTE_OPEN_RECTS_PX := {
+	"entry": [0, 2, 2, 4],
+	"start_12_11": [4, 7, 4, 2],
+	"start_11_10": [18, 14, 4, 2],
+	"a_west": [24, 17, 2, 3],
+	"a_east": [38, 17, 2, 3],
+	"red_west": [24, 24, 2, 3],
+	"red_east": [38, 24, 2, 3],
+	"red_to_b": [18, 28, 4, 2],
+	"b_shortcut_upper": [4, 21, 4, 2],
+	"b_shortcut_lower": [4, 28, 4, 2],
+	"blue_upper": [42, 21, 4, 2],
+	"blue_lower": [42, 28, 4, 2],
+	"blue_to_c": [42, 35, 4, 2],
+	"c_shortcut_upper": [48, 21, 4, 2],
+	"c_shortcut_middle": [48, 28, 4, 2],
+	"c_shortcut_lower": [48, 35, 4, 2],
+	"yellow": [48, 42, 4, 2],
+	"yellow_to_d": [48, 49, 4, 2],
+	"d_hatch": [48, 56, 4, 2],
+	"floor_4_cross": [24, 59, 16, 3],
+	"floor_4_3": [18, 63, 4, 2],
+	"floor_3_cross": [24, 66, 16, 3],
+	"floor_3_2": [48, 70, 4, 2],
+	"floor_2_cross": [24, 73, 16, 3],
+	"floor_2_1": [18, 77, 4, 2],
+	"floor_1_cross": [24, 80, 16, 3],
+	"basement_hatch": [30, 83, 4, 3],
+	"basement_minus_1": [2, 86, 52, 4],
+}
+const TOWER_SEQUENCE_GUARD_SOLID_RECTS_PX := {
+	"shaft_bulkhead": [26, 42, 12, 2],
+	"floor_8_west_shaft_wall": [24, 30, 2, 5],
+	"floor_8_east_shaft_wall": [38, 30, 2, 5],
+	"floor_7_west_shaft_wall": [24, 37, 2, 5],
+	"floor_7_east_shaft_wall": [38, 37, 2, 5],
+}
+const ARCHIVE_WORLD_POSITION := Vector2(6600.0, 4400.0)
+const ARCHIVE_LANDMARK_SIZE := Vector2(960.0, 560.0)
+const WORLD_COLLISION_OWNER_ID := "world"
+const OPEN_WATER_OWNER_INDEX := 0
+const WORLD_OWNER_INDEX := 1
 
 var _failed := false
 
@@ -80,7 +157,10 @@ func _initialize() -> void:
 	)
 	_assert_source_dependencies(compiler, manifest)
 	var navigation_base: Dictionary = compiler.navigation_base_raster()
-	_assert_l05_navigation_base(navigation_base, topology)
+	_assert_l05_navigation_base(navigation_base, topology, manifest)
+	_assert_tower_socket_occupancy(manifest, navigation_base)
+	_assert_tower_route_rects(manifest, navigation_base)
+	_assert_tower_sequence_guard_solids(manifest, navigation_base)
 	_validate_manifest_fixtures_if_supported(compiler, manifest)
 
 	var packed_map := ResourceLoader.load(
@@ -114,6 +194,12 @@ func _initialize() -> void:
 	if generated_visual_layers != null:
 		_assert_visual_layers(generated_visual_layers, layer_records, visual, topology, "scena")
 		_assert_visual_content_matches_manifest(generated_visual_layers, manifest, "scena")
+	_assert_structure_roots(
+		map_root.get_node_or_null("StructureRoots"),
+		manifest,
+		navigation_base,
+		"scena",
+	)
 	_assert_generated_scene_records(map_root, manifest)
 	map_root.free()
 	_assert(
@@ -141,11 +227,12 @@ func _initialize() -> void:
 		exit_position,
 		canonical_entry_landmark_id,
 	)
+	_assert_archive_campaign_is_global(blueprint, manifest)
 
 	var runtime = LocalRuntimeScript.new()
 	runtime.name = "UnderwaterMapRuntimeSmoke"
 	var expedition_setup = ExpeditionSetupScript.new()
-	expedition_setup.day = 3
+	expedition_setup.day = 4
 	expedition_setup.base_support_level = 1
 	expedition_setup.tutorial_mode = bool(gameplay.get("tutorial_enabled", false))
 	runtime.configure(world, entry_landmark_id, expedition_setup)
@@ -156,6 +243,18 @@ func _initialize() -> void:
 		runtime.exit_line != null and runtime.exit_line.position == exit_position,
 		"Lokalny runtime musi zachować punkt powrotu manifestu.",
 	)
+	var runtime_dynamic := runtime.get_node_or_null("RuntimeDynamic")
+	var runtime_archive_terminal := _direct_child_with_property_value(
+		runtime_dynamic,
+		"persistent_id",
+		"archive_terminal",
+	) if runtime_dynamic != null else null
+	_assert(runtime_archive_terminal is Node2D, "Runtime musi utworzyć globalny archive_terminal.")
+	if runtime_archive_terminal is Node2D:
+		_assert(
+			(runtime_archive_terminal as Node2D).position == ARCHIVE_WORLD_POSITION,
+			"Runtime archive_terminal musi zachować globalne position [6600,4400].",
+		)
 	var navigation = runtime.navigation_snapshot()
 	_assert(navigation.is_valid(), "Lokalny runtime musi wystawić poprawną migawkę nawigacji.")
 	var expected_navigation_size := Vector2i(
@@ -173,6 +272,7 @@ func _initialize() -> void:
 		_assert_visual_layers(runtime_visual_layers, layer_records, visual, topology, "runtime")
 		_assert_visual_content_matches_manifest(runtime_visual_layers, manifest, "runtime")
 		_assert_reduced_motion_round_trip(runtime, runtime_visual_layers)
+	_assert_runtime_structure_partition(runtime, manifest, navigation_base)
 
 	_assert_root_integration_remains_loadable()
 	root.remove_child(runtime)
@@ -182,13 +282,14 @@ func _initialize() -> void:
 
 func _assert_manifest_contract(manifest: Dictionary) -> bool:
 	var schema_ok := int(manifest.get("schema_version", 0)) == EXPECTED_SCHEMA_VERSION
-	_assert(schema_ok, "Manifest musi używać schema_version=2.")
+	_assert(schema_ok, "Manifest musi używać schema_version=5.")
 	var revision_value = manifest.get("revision", null)
 	var map_value = manifest.get("map", null)
 	var regions_value = manifest.get("regions", null)
 	var topology_value = manifest.get("topology", null)
 	var campaign_value = manifest.get("campaign", null)
 	var visual_value = manifest.get("visual", null)
+	var structures_value = manifest.get("structures", null)
 	var gameplay_value = manifest.get("gameplay", null)
 	var entry_value = manifest.get("entry", null)
 	var exit_value = manifest.get("exit", null)
@@ -201,13 +302,14 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 		and topology_value is Dictionary
 		and campaign_value is Dictionary
 		and visual_value is Dictionary
+		and structures_value is Dictionary
 		and gameplay_value is Dictionary
 		and entry_value is Dictionary
 		and exit_value is Dictionary
 		and landmarks_value is Array
 		and depth_value is Array
 	)
-	_assert(root_types_ok, "Manifest v2 musi publikować kompletne rekordy root.")
+	_assert(root_types_ok, "Manifest v5 musi publikować kompletne rekordy root, w tym structures.")
 	if not schema_ok or not root_types_ok:
 		return false
 
@@ -266,7 +368,7 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 	var topology := topology_value as Dictionary
 	_assert(
 		str(topology.get("mode", "")) in ["open_world", L05_TOPOLOGY_MODE],
-		"Topologia v2 musi używać open_world albo edytowalnego l05_mask_v1.",
+		"Topologia v5 musi używać open_world albo edytowalnego l05_mask_v1.",
 	)
 	_assert(
 		topology.get("collision_source", null) is Dictionary,
@@ -278,13 +380,24 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 	)
 	if str(topology.get("mode", "")) == L05_TOPOLOGY_MODE:
 		var collision: Dictionary = topology.get("collision_source", {})
-		_assert(str(collision.get("format", "")) == L05_SOURCE_FORMAT, "L05 musi używać l05_rect_ops_v1.")
+		_assert(str(collision.get("format", "")) == L05_SOURCE_FORMAT, "L05 musi używać l05_owned_rect_ops_v2.")
 		_assert(_vector(collision.get("pixel_size", [])) == Vector2(L05_PIXEL_SIZE), "L05 musi mieć raster 576 x 324.")
 		_assert(_vector(collision.get("world_units_per_pixel", [])) == L05_CELL_SIZE, "L05 musi mapować piksel na 40 x 40 jednostek.")
 		_assert(
 			str(collision.get("canonical_digest", "")).begins_with("topology-v1:"),
 			"L05 musi publikować kanoniczny digest geometrii.",
 		)
+		_assert(
+			not str(collision.get("partition_digest", "")).is_empty(),
+			"L05 v2 musi publikować partition_digest właścicieli kolizji.",
+		)
+
+	_assert_structure_manifest_contract(
+		structures_value as Dictionary,
+		manifest,
+		map_record,
+		topology,
+	)
 
 	var visual := visual_value as Dictionary
 	var layers_value = visual.get("layers", null)
@@ -310,11 +423,181 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 		)
 		for key in [
 			"id", "role", "space", "z_index", "parallax_scale", "enabled", "reserved",
-			"affordance_policy", "geometry_role",
+			"affordance_policy", "geometry_role", "rgb_modulate",
 		]:
 			_assert(layer.has(key), "Warstwa %s nie publikuje pola %s." % [str(layer.get("id", "?")), key])
 	_assert_layer_policy_records(layers, assets_value as Array, topology)
 	return true
+
+
+func _assert_structure_manifest_contract(
+	structures: Dictionary,
+	manifest: Dictionary,
+	map_record: Dictionary,
+	topology: Dictionary,
+) -> void:
+	_assert_exact_dictionary_keys(structures, ["templates", "instances"], "structures")
+	var templates_value = structures.get("templates", null)
+	var instances_value = structures.get("instances", null)
+	_assert(templates_value is Array, "structures.templates musi być tablicą.")
+	_assert(instances_value is Array, "structures.instances musi być tablicą.")
+	if not templates_value is Array or not instances_value is Array:
+		return
+	var templates := templates_value as Array
+	var instances := instances_value as Array
+	_assert(not templates.is_empty(), "Schema v5 musi publikować co najmniej jeden template struktury.")
+	_assert(not instances.is_empty(), "Schema v5 musi publikować co najmniej jedną instancję struktury.")
+	var template_ids := {}
+	for index in range(templates.size()):
+		var template_value = templates[index]
+		_assert(template_value is Dictionary, "structures.templates[%d] musi być słownikiem." % index)
+		if not template_value is Dictionary:
+			continue
+		var template := template_value as Dictionary
+		_assert_exact_dictionary_keys(
+			template,
+			["id", "kind", "interior_layer_id", "collider_layer_id", "allowed_socket_kinds"],
+			"structures.templates[%d]" % index,
+		)
+		var template_id := str(template.get("id", ""))
+		_assert(not template_id.is_empty(), "Template struktury musi mieć ID.")
+		_assert(not template_ids.has(template_id), "ID template'ów struktur muszą być unikalne.")
+		template_ids[template_id] = template
+		_assert(not str(template.get("kind", "")).is_empty(), "Template %s musi mieć kind." % template_id)
+		_assert(str(template.get("interior_layer_id", "")) == "L04", "Template %s musi wiązać wnętrze z L04." % template_id)
+		_assert(str(template.get("collider_layer_id", "")) == "L05", "Template %s musi wiązać strukturę z L05." % template_id)
+		var allowed_socket_kinds = template.get("allowed_socket_kinds", null)
+		_assert(allowed_socket_kinds is Array, "Template %s musi publikować allowed_socket_kinds." % template_id)
+		if allowed_socket_kinds is Array:
+			for socket_kind in allowed_socket_kinds as Array:
+				_assert(not str(socket_kind).is_empty(), "Template %s nie może publikować pustego socket kind." % template_id)
+
+	var collision: Dictionary = topology.get("collision_source", {})
+	var world_size := _vector(map_record.get("world_size", []))
+	var instance_ids := {}
+	for index in range(instances.size()):
+		var instance_value = instances[index]
+		_assert(instance_value is Dictionary, "structures.instances[%d] musi być słownikiem." % index)
+		if not instance_value is Dictionary:
+			continue
+		var instance := instance_value as Dictionary
+		_assert_required_and_optional_dictionary_keys(
+			instance,
+			[
+				"id", "template_id", "origin", "size", "enabled",
+				"topology_digest", "partition_digest", "sockets",
+			],
+			["landmark_id"],
+			"structures.instances[%d]" % index,
+		)
+		var structure_id := str(instance.get("id", ""))
+		var template_id := str(instance.get("template_id", ""))
+		_assert(not structure_id.is_empty(), "Instancja struktury musi mieć ID.")
+		_assert(not instance_ids.has(structure_id), "ID instancji struktur muszą być unikalne.")
+		instance_ids[structure_id] = instance
+		_assert(template_ids.has(template_id), "Instancja %s musi wskazywać istniejący template_id." % structure_id)
+		if instance.has("landmark_id"):
+			var landmark_id := str(instance.get("landmark_id", ""))
+			_assert(
+				not landmark_id.is_empty()
+				and not _record_by_id(
+					manifest.get("landmarks", []) as Array,
+					landmark_id,
+				).is_empty(),
+				"Opcjonalny landmark_id instancji %s musi wskazywać istniejący landmark." % structure_id,
+			)
+		var origin := _vector(instance.get("origin", []))
+		var size := _vector(instance.get("size", []))
+		_assert(_vector_is_grid_aligned(origin, L05_CELL_SIZE), "Instancja %s origin musi leżeć na siatce L05." % structure_id)
+		_assert(_vector_is_grid_aligned(size, L05_CELL_SIZE), "Instancja %s size musi leżeć na siatce L05." % structure_id)
+		_assert(size.x > 0.0 and size.y > 0.0, "Instancja %s musi mieć dodatni size." % structure_id)
+		_assert(
+			Rect2(Vector2.ZERO, world_size).encloses(Rect2(origin, size)),
+			"Instancja %s musi mieścić się w map.world_size." % structure_id,
+		)
+		_assert(
+			str(instance.get("topology_digest", "")) == str(collision.get("canonical_digest", "")),
+			"Instancja %s musi wiązać aktualny topology_digest." % structure_id,
+		)
+		_assert(
+			str(instance.get("partition_digest", "")) == str(collision.get("partition_digest", "")),
+			"Instancja %s musi wiązać aktualny partition_digest." % structure_id,
+		)
+		_assert(typeof(instance.get("enabled", null)) == TYPE_BOOL, "Instancja %s musi publikować logiczne enabled." % structure_id)
+		var sockets_value = instance.get("sockets", null)
+		_assert(sockets_value is Array, "Instancja %s musi publikować sockets jako tablicę." % structure_id)
+		if sockets_value is Array and template_ids.has(template_id):
+			_assert_structure_sockets(
+				sockets_value as Array,
+				template_ids[template_id] as Dictionary,
+				size,
+				structure_id,
+			)
+
+	var tower_template: Dictionary = template_ids.get(STRUCTURE_TEMPLATE_ID, {})
+	var tower_instance: Dictionary = instance_ids.get(STRUCTURE_INSTANCE_ID, {})
+	_assert(not tower_template.is_empty(), "Schema v5 musi zawierać template enterable_tower_v1.")
+	_assert(not tower_instance.is_empty(), "Schema v5 musi zawierać tower_prototype_01.")
+	if not tower_instance.is_empty():
+		_assert(str(tower_instance.get("template_id", "")) == STRUCTURE_TEMPLATE_ID, "Prototyp wieżowca musi używać enterable_tower_v1.")
+		_assert(not tower_instance.has("landmark_id"), "Neutralny tower_prototype_01 nie może być semantycznie powiązany z landmarkiem kampanii.")
+		_assert(_vector(tower_instance.get("origin", [])) == STRUCTURE_ORIGIN, "Prototyp wieżowca musi mieć zatwierdzony origin [7760,3120].")
+		_assert(_vector(tower_instance.get("size", [])) == STRUCTURE_SIZE, "Prototyp wieżowca musi mieć zatwierdzony size [2240,3680].")
+		_assert(bool(tower_instance.get("enabled", false)), "Prototyp wieżowca musi być aktywny.")
+		_assert_required_tower_sockets(tower_instance.get("sockets", []) as Array)
+
+
+func _assert_structure_sockets(
+	sockets: Array,
+	template: Dictionary,
+	structure_size: Vector2,
+	structure_id: String,
+) -> void:
+	var allowed_kinds: Array = template.get("allowed_socket_kinds", [])
+	var socket_ids := {}
+	for index in range(sockets.size()):
+		var socket_value = sockets[index]
+		_assert(socket_value is Dictionary, "%s.sockets[%d] musi być słownikiem." % [structure_id, index])
+		if not socket_value is Dictionary:
+			continue
+		var socket := socket_value as Dictionary
+		_assert_exact_dictionary_keys(socket, ["id", "kind", "local_rect"], "%s.sockets[%d]" % [structure_id, index])
+		var socket_id := str(socket.get("id", ""))
+		_assert(not socket_id.is_empty(), "Socket struktury %s musi mieć ID." % structure_id)
+		_assert(not socket_ids.has(socket_id), "Socket IDs struktury %s muszą być unikalne." % structure_id)
+		socket_ids[socket_id] = true
+		_assert(allowed_kinds.has(str(socket.get("kind", ""))), "Socket %s ma kind niedozwolony przez template." % socket_id)
+		var local_rect := _rect(socket.get("local_rect", []))
+		_assert(
+			Rect2(Vector2.ZERO, structure_size).encloses(local_rect)
+			and local_rect.size.x > 0.0
+			and local_rect.size.y > 0.0,
+			"Socket %s local_rect musi mieścić się w bounds struktury." % socket_id,
+		)
+		_assert(
+			_vector_is_grid_aligned(local_rect.position, L05_CELL_SIZE)
+			and _vector_is_grid_aligned(local_rect.size, L05_CELL_SIZE),
+			"Socket %s local_rect musi leżeć na siatce L05." % socket_id,
+		)
+
+
+func _assert_required_tower_sockets(sockets: Array) -> void:
+	var sockets_by_id := {}
+	for socket_value in sockets:
+		if socket_value is Dictionary:
+			var socket := socket_value as Dictionary
+			sockets_by_id[str(socket.get("id", ""))] = socket
+	for socket_id in REQUIRED_TOWER_SOCKETS:
+		_assert(sockets_by_id.has(socket_id), "Prototyp wieżowca nie publikuje wymaganego socketu %s." % socket_id)
+		if not sockets_by_id.has(socket_id):
+			continue
+		var socket: Dictionary = sockets_by_id[socket_id]
+		var expected: Array = REQUIRED_TOWER_SOCKETS[socket_id]
+		_assert(str(socket.get("kind", "")) == str(expected[0]), "Socket %s ma niepoprawny kind." % socket_id)
+		_assert(
+			_manifest_value_matches(socket.get("local_rect", []), expected[1]),
+			"Socket %s ma niepoprawny local_rect." % socket_id,
+		)
 
 
 func _assert_layer_policy_records(layers: Array, assets: Array, topology: Dictionary) -> void:
@@ -334,14 +617,52 @@ func _assert_layer_policy_records(layers: Array, assets: Array, topology: Dictio
 	if not reserved_layer.is_empty():
 		_assert(not bool(reserved_layer.get("enabled", true)), "L10 musi być wyłączone.")
 		_assert(bool(reserved_layer.get("reserved", false)), "L10 musi być zarezerwowane.")
+	for layer_value in layers:
+		if not layer_value is Dictionary:
+			continue
+		var layer := layer_value as Dictionary
+		var layer_id := str(layer.get("id", ""))
+		var policy := str(layer.get("affordance_policy", ""))
+		if layer_id in NONBLOCKING_TEXTURE_LAYER_IDS:
+			_assert(
+				policy == OPEN_WATER_BACKDROP_AFFORDANCE_POLICY,
+				"%s może przecinać otwartą wodę wyłącznie jako niekolidujące tło." % layer_id,
+			)
+		elif layer_id != authority_layer_id:
+			_assert(
+				policy == NO_BLOCKING_AFFORDANCE_POLICY,
+				"%s musi zachować politykę chronionej wody." % layer_id,
+			)
+	var asset_ids := {}
 	for index in range(assets.size()):
 		var asset_value = assets[index]
 		_assert(asset_value is Dictionary, "visual.assets[%d] musi być słownikiem." % index)
 		if not asset_value is Dictionary:
 			continue
-		var layer_id := str((asset_value as Dictionary).get("layer_id", ""))
+		var asset := asset_value as Dictionary
+		var asset_id := str(asset.get("id", ""))
+		var layer_id := str(asset.get("layer_id", ""))
+		var group_id := str(asset.get("group_id", ""))
+		var kind := str(asset.get("kind", ""))
+		_assert(not asset_id.is_empty(), "Każdy asset wizualny musi mieć ID.")
+		_assert(not asset_ids.has(asset_id), "ID assetów wizualnych muszą być unikalne.")
+		asset_ids[asset_id] = true
 		_assert(EXPECTED_LAYER_IDS.has(layer_id), "Każdy asset musi wskazywać istniejący root L00-L10.")
 		_assert(layer_id != "L10", "Zarezerwowane L10 nie może zawierać assetów.")
+		_assert(
+			asset.has("group_id") and _valid_visual_group_id(group_id),
+			"Asset %s musi mieć bezpieczne, niepuste group_id." % asset_id,
+		)
+		_assert(
+			[layer_id, kind] in [
+				["L01", "texture_rect"],
+				["L01", COMPOSITION_PROXY_KIND],
+				["L02", "texture_rect"],
+				["L02", COMPOSITION_PROXY_KIND],
+				["L05", "collision_masked_material"],
+			],
+			"Asset %s ma nieobsługiwaną parę layer_id/kind." % asset_id,
+		)
 
 
 func _assert_source_dependencies(compiler, manifest: Dictionary) -> void:
@@ -363,11 +684,22 @@ func _assert_source_dependencies(compiler, manifest: Dictionary) -> void:
 		)
 	for asset_value in (manifest.get("visual", {}) as Dictionary).get("assets", []):
 		if asset_value is Dictionary:
-			var asset_path := "res://underwater_map_workbench/%s" % str((asset_value as Dictionary).get("path", ""))
+			var asset := asset_value as Dictionary
+			if str(asset.get("kind", "")) == COMPOSITION_PROXY_KIND:
+				_assert(
+					str(asset.get("path", "")).is_empty(),
+					"Proxy kompozycyjne nie może publikować zależności tekstury.",
+				)
+				continue
+			var asset_path := "res://underwater_map_workbench/%s" % str(asset.get("path", ""))
 			_assert(dependencies.has(asset_path), "Zależności muszą zawierać każdy typowany asset wizualny.")
 
 
-func _assert_l05_navigation_base(navigation_base: Dictionary, topology: Dictionary) -> void:
+func _assert_l05_navigation_base(
+	navigation_base: Dictionary,
+	topology: Dictionary,
+	manifest: Dictionary,
+) -> void:
 	var errors: PackedStringArray = navigation_base.get("errors", PackedStringArray())
 	_assert(errors.is_empty(), "Bazowy raster L05 musi kompilować się bez błędów: %s" % "; ".join(errors))
 	if not errors.is_empty() or str(topology.get("mode", "")) != L05_TOPOLOGY_MODE:
@@ -375,17 +707,53 @@ func _assert_l05_navigation_base(navigation_base: Dictionary, topology: Dictiona
 	_assert(int(navigation_base.get("width", 0)) == L05_PIXEL_SIZE.x, "Raster L05 musi mieć szerokość 576.")
 	_assert(int(navigation_base.get("height", 0)) == L05_PIXEL_SIZE.y, "Raster L05 musi mieć wysokość 324.")
 	_assert(navigation_base.get("cell_scale", Vector2.ZERO) == L05_CELL_SIZE, "Raster L05 musi używać skali 40 x 40.")
-	var expected_cells := _rasterize_l05_payload(topology)
+	var expected_partition := _rasterize_l05_payload(topology, manifest)
+	var expected_cells: PackedByteArray = expected_partition.get("cells", PackedByteArray())
+	var expected_owner_cells: PackedInt32Array = expected_partition.get("solid_owner_cells", PackedInt32Array())
+	var expected_owner_ids: PackedStringArray = expected_partition.get("owner_ids", PackedStringArray())
 	var runtime_cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
 	_assert(runtime_cells.size() == expected_cells.size(), "Runtime i payload L05 muszą mieć identyczną liczbę komórek.")
+	_assert(
+		str(navigation_base.get("partition_digest", ""))
+		== str((topology.get("collision_source", {}) as Dictionary).get("partition_digest", "")),
+		"navigation_base_raster musi publikować aktualny partition_digest.",
+	)
+	var owner_ids_value = navigation_base.get("owner_ids", null)
+	var owner_cells_value = navigation_base.get("solid_owner_cells", null)
+	_assert(
+		typeof(owner_ids_value) == TYPE_PACKED_STRING_ARRAY,
+		"navigation_base_raster.owner_ids musi być PackedStringArray.",
+	)
+	_assert(
+		typeof(owner_cells_value) == TYPE_PACKED_INT32_ARRAY,
+		"navigation_base_raster.solid_owner_cells musi być PackedInt32Array.",
+	)
+	var runtime_owner_ids := PackedStringArray()
+	var runtime_owner_cells := PackedInt32Array()
+	if typeof(owner_ids_value) == TYPE_PACKED_STRING_ARRAY:
+		runtime_owner_ids = owner_ids_value as PackedStringArray
+	if typeof(owner_cells_value) == TYPE_PACKED_INT32_ARRAY:
+		runtime_owner_cells = owner_cells_value as PackedInt32Array
+	_assert(runtime_owner_ids == expected_owner_ids, "Raster L05 musi zachować deterministyczną kolejność owner_ids.")
+	_assert(runtime_owner_cells == expected_owner_cells, "Raster L05 musi zachować owner każdego solid cell 1:1.")
+	_assert(runtime_owner_ids.size() >= 3, "Raster L05 musi rozdzielać open, world i co najmniej jedną strukturę.")
+	if runtime_owner_ids.size() >= 2:
+		_assert(runtime_owner_ids[OPEN_WATER_OWNER_INDEX].is_empty(), "owner_ids[0] musi oznaczać open_water.")
+		_assert(runtime_owner_ids[WORLD_OWNER_INDEX] == WORLD_COLLISION_OWNER_ID, "owner_ids[1] musi oznaczać world.")
+	_assert(runtime_owner_ids.has(STRUCTURE_INSTANCE_ID), "owner_ids musi zawierać tower_prototype_01.")
+	_assert(runtime_owner_cells.size() == runtime_cells.size(), "Owner raster i navigation cells muszą mieć ten sam rozmiar.")
 	var solid_count := 0
 	var open_count := 0
 	var comparable_count := mini(runtime_cells.size(), expected_cells.size())
 	for index in range(comparable_count):
 		if int(expected_cells[index]) == 0:
 			solid_count += 1
+			if index < runtime_owner_cells.size():
+				_assert(runtime_owner_cells[index] > OPEN_WATER_OWNER_INDEX, "Każda komórka solid musi mieć właściciela.")
 		else:
 			open_count += 1
+			if index < runtime_owner_cells.size():
+				_assert(runtime_owner_cells[index] == OPEN_WATER_OWNER_INDEX, "Komórka open_water nie może mieć właściciela kolizji.")
 		if int(runtime_cells[index]) != int(expected_cells[index]):
 			_assert(false, "Runtime L05 różni się od payloadu przy komórce %d." % index)
 			break
@@ -393,13 +761,162 @@ func _assert_l05_navigation_base(navigation_base: Dictionary, topology: Dictiona
 	_assert(open_count > 0, "Bieżący payload L05 musi pozostawiać otwartą wodę.")
 
 
-func _rasterize_l05_payload(topology: Dictionary) -> PackedByteArray:
+func _assert_tower_socket_occupancy(manifest: Dictionary, navigation_base: Dictionary) -> void:
+	var tower := _structure_instance(manifest, STRUCTURE_INSTANCE_ID)
+	_assert(not tower.is_empty(), "Kontrola socketów wymaga tower_prototype_01.")
+	if tower.is_empty():
+		return
+	var origin := _vector(tower.get("origin", []))
+	var origin_px := Vector2i(
+		roundi(origin.x / L05_CELL_SIZE.x),
+		roundi(origin.y / L05_CELL_SIZE.y),
+	)
+	var sockets_value = tower.get("sockets", null)
+	_assert(sockets_value is Array, "Kontrola occupancy wymaga tablicy socketów wieżowca.")
+	if not sockets_value is Array:
+		return
+	for socket_value in sockets_value as Array:
+		if not socket_value is Dictionary:
+			continue
+		var socket := socket_value as Dictionary
+		var socket_id := str(socket.get("id", "?"))
+		var local_rect := _rect(socket.get("local_rect", []))
+		var local_rect_px := [
+			roundi(local_rect.position.x / L05_CELL_SIZE.x),
+			roundi(local_rect.position.y / L05_CELL_SIZE.y),
+			roundi(local_rect.size.x / L05_CELL_SIZE.x),
+			roundi(local_rect.size.y / L05_CELL_SIZE.y),
+		]
+		_assert_tower_local_raster_rect(
+			navigation_base,
+			origin_px,
+			local_rect_px,
+			true,
+			"socket %s" % socket_id,
+		)
+	var entry: Dictionary = _record_by_id(sockets_value as Array, "entry_floor_12_broken_window")
+	_assert(not entry.is_empty(), "Wieżowiec musi publikować socket wybitego okna.")
+	if entry.is_empty():
+		return
+	var entry_rect := _rect(entry.get("local_rect", []))
+	var size := _vector(tower.get("size", []))
+	var touches_perimeter := (
+		is_zero_approx(entry_rect.position.x)
+		or is_zero_approx(entry_rect.position.y)
+		or is_equal_approx(entry_rect.end.x, size.x)
+		or is_equal_approx(entry_rect.end.y, size.y)
+	)
+	_assert(touches_perimeter, "Socket wejścia musi dotykać obwodu lokalnej struktury.")
+	var cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
+	var width := int(navigation_base.get("width", 0))
+	var entry_y_px := roundi(entry_rect.position.y / L05_CELL_SIZE.y)
+	var entry_height_px := roundi(entry_rect.size.y / L05_CELL_SIZE.y)
+	var outside_x := origin_px.x - 1
+	for local_y in range(entry_y_px, entry_y_px + entry_height_px):
+		var outside_y := origin_px.y + local_y
+		var outside_index := outside_y * width + outside_x
+		_assert(
+			outside_x >= 0 and outside_index >= 0 and outside_index < cells.size()
+			and int(cells[outside_index]) == 1,
+			"Zewnętrzny pas przy wybitym oknie musi pozostać open_water.",
+		)
+
+
+func _assert_tower_route_rects(manifest: Dictionary, navigation_base: Dictionary) -> void:
+	var tower := _structure_instance(manifest, STRUCTURE_INSTANCE_ID)
+	if tower.is_empty():
+		return
+	var origin := _vector(tower.get("origin", []))
+	var origin_px := Vector2i(
+		roundi(origin.x / L05_CELL_SIZE.x),
+		roundi(origin.y / L05_CELL_SIZE.y),
+	)
+	for route_id in TOWER_ROUTE_OPEN_RECTS_PX:
+		_assert_tower_local_raster_rect(
+			navigation_base,
+			origin_px,
+			TOWER_ROUTE_OPEN_RECTS_PX[route_id] as Array,
+			true,
+			"route rect %s" % route_id,
+		)
+
+
+func _assert_tower_sequence_guard_solids(manifest: Dictionary, navigation_base: Dictionary) -> void:
+	var tower := _structure_instance(manifest, STRUCTURE_INSTANCE_ID)
+	if tower.is_empty():
+		return
+	var origin := _vector(tower.get("origin", []))
+	var origin_px := Vector2i(
+		roundi(origin.x / L05_CELL_SIZE.x),
+		roundi(origin.y / L05_CELL_SIZE.y),
+	)
+	for guard_id in TOWER_SEQUENCE_GUARD_SOLID_RECTS_PX:
+		_assert_tower_local_raster_rect(
+			navigation_base,
+			origin_px,
+			TOWER_SEQUENCE_GUARD_SOLID_RECTS_PX[guard_id] as Array,
+			false,
+			"sequence guard %s" % guard_id,
+		)
+
+
+func _assert_tower_local_raster_rect(
+	navigation_base: Dictionary,
+	origin_px: Vector2i,
+	local_rect_px: Array,
+	expect_open_water: bool,
+	label: String,
+) -> void:
+	_assert(local_rect_px.size() == 4, "%s musi publikować rect_px[x,y,w,h]." % label)
+	if local_rect_px.size() != 4:
+		return
+	var local_x := int(local_rect_px[0])
+	var local_y := int(local_rect_px[1])
+	var rect_width := int(local_rect_px[2])
+	var rect_height := int(local_rect_px[3])
+	_assert(
+		local_x >= 0 and local_y >= 0 and rect_width > 0 and rect_height > 0,
+		"%s musi mieć dodatni lokalny prostokąt." % label,
+	)
+	var width := int(navigation_base.get("width", 0))
+	var height := int(navigation_base.get("height", 0))
+	var cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
+	var owner_cells: PackedInt32Array = navigation_base.get("solid_owner_cells", PackedInt32Array())
+	var owner_ids: PackedStringArray = navigation_base.get("owner_ids", PackedStringArray())
+	var tower_owner_index := owner_ids.find(STRUCTURE_INSTANCE_ID)
+	_assert(tower_owner_index > OPEN_WATER_OWNER_INDEX, "Raster musi publikować ownera wieżowca.")
+	for y in range(local_y, local_y + rect_height):
+		for x in range(local_x, local_x + rect_width):
+			var world_cell := origin_px + Vector2i(x, y)
+			var inside := (
+				world_cell.x >= 0 and world_cell.y >= 0
+				and world_cell.x < width and world_cell.y < height
+			)
+			_assert(inside, "%s wychodzi poza raster L05." % label)
+			if not inside:
+				continue
+			var cell_index := world_cell.y * width + world_cell.x
+			if expect_open_water:
+				_assert(int(cells[cell_index]) == 1, "%s musi leżeć w open_water." % label)
+				_assert(
+					int(owner_cells[cell_index]) == OPEN_WATER_OWNER_INDEX,
+					"%s open_water nie może mieć właściciela kolizji." % label,
+				)
+			else:
+				_assert(int(cells[cell_index]) == 0, "%s musi pozostać solid." % label)
+				_assert(
+					int(owner_cells[cell_index]) == tower_owner_index,
+					"%s solid musi należeć do tower_prototype_01." % label,
+				)
+
+
+func _rasterize_l05_payload(topology: Dictionary, manifest: Dictionary) -> Dictionary:
 	var collision: Dictionary = topology.get("collision_source", {})
 	var package_path := str(collision.get("path", ""))
 	var resource_path := "res://underwater_map_workbench/%s" % package_path
 	_assert(FileAccess.file_exists(resource_path), "Źródłowy payload L05 musi istnieć.")
 	if not FileAccess.file_exists(resource_path):
-		return PackedByteArray()
+		return {}
 	_assert(
 		FileAccess.get_sha256(resource_path).to_lower() == str(collision.get("sha256", "")),
 		"SHA źródłowego payloadu L05 musi odpowiadać manifestowi.",
@@ -407,26 +924,60 @@ func _rasterize_l05_payload(topology: Dictionary) -> PackedByteArray:
 	var file := FileAccess.open(resource_path, FileAccess.READ)
 	_assert(file != null, "Test musi móc otworzyć payload L05.")
 	if file == null:
-		return PackedByteArray()
+		return {}
 	var parsed = JSON.parse_string(file.get_as_text())
 	_assert(parsed is Dictionary, "Payload L05 musi być obiektem JSON.")
 	if not parsed is Dictionary:
-		return PackedByteArray()
+		return {}
 	var payload := parsed as Dictionary
+	_assert_exact_dictionary_keys(payload, ["schema_version", "base", "operations"], "payload L05 v2")
+	_assert(int(payload.get("schema_version", 0)) == 2, "Payload L05 musi używać schema_version=2.")
 	_assert(str(payload.get("base", "")) == "open_water", "Payload L05 musi zaczynać od otwartej wody.")
+	var owner_ids := PackedStringArray(["", WORLD_COLLISION_OWNER_ID])
+	var owner_index_by_id := {WORLD_COLLISION_OWNER_ID: WORLD_OWNER_INDEX}
+	var structure_origins_px := {}
+	var structure_sizes_px := {}
+	var structures: Dictionary = manifest.get("structures", {})
+	for instance_value in structures.get("instances", []):
+		if not instance_value is Dictionary:
+			continue
+		var structure_id := str((instance_value as Dictionary).get("id", ""))
+		if structure_id.is_empty() or owner_index_by_id.has(structure_id):
+			continue
+		owner_index_by_id[structure_id] = owner_ids.size()
+		owner_ids.append(structure_id)
+		var instance := instance_value as Dictionary
+		structure_origins_px[structure_id] = Vector2i(
+			roundi(_vector(instance.get("origin", [])).x / L05_CELL_SIZE.x),
+			roundi(_vector(instance.get("origin", [])).y / L05_CELL_SIZE.y),
+		)
+		structure_sizes_px[structure_id] = Vector2i(
+			roundi(_vector(instance.get("size", [])).x / L05_CELL_SIZE.x),
+			roundi(_vector(instance.get("size", [])).y / L05_CELL_SIZE.y),
+		)
 	var cells := PackedByteArray()
 	cells.resize(L05_PIXEL_SIZE.x * L05_PIXEL_SIZE.y)
 	cells.fill(1)
+	var solid_owner_cells := PackedInt32Array()
+	solid_owner_cells.resize(cells.size())
+	solid_owner_cells.fill(OPEN_WATER_OWNER_INDEX)
 	var operations_value = payload.get("operations", null)
 	_assert(operations_value is Array, "Payload L05 musi publikować edytowalną tablicę operations.")
 	if not operations_value is Array:
-		return PackedByteArray()
+		return {}
 	var operation_ids := {}
+	var saw_world_owner := false
+	var saw_structure_owner := false
 	for operation_value in operations_value as Array:
 		_assert(operation_value is Dictionary, "Każda operacja L05 musi być obiektem.")
 		if not operation_value is Dictionary:
 			continue
 		var operation := operation_value as Dictionary
+		var operation_space := str(operation.get("space", ""))
+		var expected_operation_keys := ["id", "op", "space", "rect_px"]
+		if operation_space == "structure_local_px":
+			expected_operation_keys.append("structure_id")
+		_assert_exact_dictionary_keys(operation, expected_operation_keys, "operacja L05 %s" % str(operation.get("id", "?")))
 		var operation_id := str(operation.get("id", ""))
 		_assert(not operation_id.is_empty() and not operation_ids.has(operation_id), "Operacje L05 muszą mieć unikalne ID.")
 		operation_ids[operation_id] = true
@@ -439,11 +990,46 @@ func _rasterize_l05_payload(topology: Dictionary) -> PackedByteArray:
 		var y := int(rect[1])
 		var width := int(rect[2])
 		var height := int(rect[3])
-		var value := 0 if str(operation.get("op", "")) == "solid_rect" else 1
+		var operation_kind := str(operation.get("op", ""))
+		_assert(operation_kind in ["solid_rect", "open_rect"], "Operacja L05 v2 musi być solid_rect albo open_rect.")
+		_assert(operation_space in ["world_px", "structure_local_px"], "Operacja L05 v2 musi używać world_px albo structure_local_px.")
+		var owner_id := WORLD_COLLISION_OWNER_ID
+		if operation_space == "structure_local_px":
+			owner_id = str(operation.get("structure_id", ""))
+			_assert(owner_index_by_id.has(owner_id), "Operacja L05 v2 musi wskazywać istniejącą strukturę.")
+			if structure_origins_px.has(owner_id):
+				var local_size: Vector2i = structure_sizes_px[owner_id]
+				_assert(
+					x >= 0 and y >= 0 and width > 0 and height > 0
+					and x + width <= local_size.x and y + height <= local_size.y,
+					"Operacja L05 struktury musi mieścić się w jej lokalnym rastrze.",
+				)
+				var structure_origin: Vector2i = structure_origins_px[owner_id]
+				x += structure_origin.x
+				y += structure_origin.y
+		else:
+			saw_world_owner = true
+		saw_structure_owner = saw_structure_owner or owner_id == STRUCTURE_INSTANCE_ID
+		_assert(
+			x >= 0 and y >= 0 and width > 0 and height > 0
+			and x + width <= L05_PIXEL_SIZE.x and y + height <= L05_PIXEL_SIZE.y,
+			"Operacja L05 musi mieścić się w pełnym rastrze.",
+		)
+		var value := 0 if operation_kind == "solid_rect" else 1
+		var owner_index := int(owner_index_by_id.get(owner_id, OPEN_WATER_OWNER_INDEX))
 		for row in range(y, y + height):
 			for column in range(x, x + width):
-				cells[row * L05_PIXEL_SIZE.x + column] = value
-	return cells
+				var cell_index := row * L05_PIXEL_SIZE.x + column
+				cells[cell_index] = value
+				solid_owner_cells[cell_index] = owner_index if value == 0 else OPEN_WATER_OWNER_INDEX
+	_assert(saw_world_owner, "Payload L05 v2 musi zawierać operacje w world_px należące do world.")
+	_assert(saw_structure_owner, "Payload L05 v2 musi zawierać operacje lokalne tower_prototype_01.")
+	return {
+		"cells": cells,
+		"owner_ids": owner_ids,
+		"solid_owner_cells": solid_owner_cells,
+		"partition_digest": str(collision.get("partition_digest", "")),
+	}
 
 
 func _validate_manifest_fixtures_if_supported(compiler, manifest: Dictionary) -> void:
@@ -452,6 +1038,8 @@ func _validate_manifest_fixtures_if_supported(compiler, manifest: Dictionary) ->
 	if not compiler.has_method("validate_manifest_for_tests") or not compiler.has_method("compile_from_manifest_for_tests"):
 		return
 	_validate_exact_map_dimensions(compiler, manifest)
+	_validate_structure_fixtures(compiler, manifest)
+	_validate_visual_element_fixtures(compiler, manifest)
 	for layer_id: String in _active_nonblocking_texture_layer_ids(manifest):
 		_validate_backdrop_aspect_ratio(compiler, manifest, layer_id)
 		if layer_id in GROUND_ANCHORED_BACKDROP_LAYER_IDS:
@@ -585,6 +1173,43 @@ func _validate_manifest_fixtures_if_supported(compiler, manifest: Dictionary) ->
 				"Zmiana display_name musi zmienić presentation fingerprint.",
 			)
 
+		var tint_fixture := manifest.duplicate(true)
+		var tint_layers: Array = (tint_fixture["visual"] as Dictionary)["layers"]
+		var tint_l01 := tint_layers[1] as Dictionary
+		tint_l01["rgb_modulate"] = "4f6270"
+		var tint_compilation = compiler.call(
+			"compile_from_manifest_for_tests",
+			tint_fixture,
+			CAMPAIGN_SEED,
+		)
+		_assert(tint_compilation is Dictionary, "Tint fixture musi zwrócić wynik kompilacji.")
+		if tint_compilation is Dictionary:
+			var tint_errors: PackedStringArray = tint_compilation.get("errors", PackedStringArray())
+			_assert(
+				tint_errors.is_empty(),
+				"Tint fixture musi kompilować się bez błędów: %s" % "; ".join(tint_errors),
+			)
+			_assert(
+				str(tint_compilation.get("map_gameplay_signature", ""))
+				== str(baseline_compilation.get("map_gameplay_signature", "")),
+				"Zmiana rgb_modulate nie może zmieniać gameplay signature.",
+			)
+			_assert(
+				str(tint_compilation.get("presentation_fingerprint", ""))
+				!= str(baseline_compilation.get("presentation_fingerprint", "")),
+				"Zmiana rgb_modulate musi zmienić presentation fingerprint.",
+			)
+
+		var alpha_tint_fixture := manifest.duplicate(true)
+		var alpha_tint_layers: Array = (alpha_tint_fixture["visual"] as Dictionary)["layers"]
+		(alpha_tint_layers[1] as Dictionary)["rgb_modulate"] = "4f627080"
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			alpha_tint_fixture,
+			"rgb_modulate",
+			"Manifest musi odrzucać rgb_modulate zawierający kanał alfa.",
+		)
+
 		var presentation_fixture := manifest.duplicate(true)
 		var presentation_revision: Dictionary = presentation_fixture["revision"].duplicate(true)
 		presentation_revision["presentation_revision"] = "%s-fixture" % str(presentation_revision["presentation_revision"])
@@ -629,6 +1254,215 @@ func _active_nonblocking_texture_layer_ids(manifest: Dictionary) -> Array[String
 		):
 			result.append(layer_id)
 	return result
+
+
+func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
+	var missing_template_fixture := manifest.duplicate(true)
+	var missing_template_instance := _structure_instance(
+		missing_template_fixture,
+		STRUCTURE_INSTANCE_ID,
+	)
+	_assert(not missing_template_instance.is_empty(), "Fixture wymaga tower_prototype_01.")
+	if not missing_template_instance.is_empty():
+		missing_template_instance["template_id"] = "__missing_structure_template__"
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			missing_template_fixture,
+			"template_id",
+			"Walidator musi odrzucać instancję wskazującą nieznany template.",
+		)
+
+	var optional_landmark_fixture := manifest.duplicate(true)
+	var optional_landmark_instance := _structure_instance(
+		optional_landmark_fixture,
+		STRUCTURE_INSTANCE_ID,
+	)
+	_assert(
+		not optional_landmark_instance.is_empty()
+		and not optional_landmark_instance.has("landmark_id"),
+		"Neutralny fixture struktury musi legalnie pomijać landmark_id.",
+	)
+	if not optional_landmark_instance.is_empty():
+		var optional_landmark_errors: PackedStringArray = compiler.call(
+			"validate_manifest_for_tests",
+			optional_landmark_fixture,
+		)
+		_assert(
+			optional_landmark_errors.is_empty(),
+			"Brak opcjonalnego landmark_id musi być legalny: %s"
+			% "; ".join(optional_landmark_errors),
+		)
+		optional_landmark_instance["landmark_id"] = "flooded_archive"
+		var valid_landmark_errors: PackedStringArray = compiler.call(
+			"validate_manifest_for_tests",
+			optional_landmark_fixture,
+		)
+		_assert(
+			valid_landmark_errors.is_empty(),
+			"Obecny landmark_id wskazujący istniejący landmark musi być legalny: %s"
+			% "; ".join(valid_landmark_errors),
+		)
+		optional_landmark_instance["landmark_id"] = "__missing_landmark__"
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			optional_landmark_fixture,
+			"landmark_id",
+			"Walidator musi odrzucać obecny landmark_id wskazujący nieznany landmark.",
+		)
+
+	var off_grid_fixture := manifest.duplicate(true)
+	var off_grid_instance := _structure_instance(off_grid_fixture, STRUCTURE_INSTANCE_ID)
+	if not off_grid_instance.is_empty():
+		var off_grid_origin: Array = (off_grid_instance.get("origin", []) as Array).duplicate()
+		off_grid_origin[0] = int(off_grid_origin[0]) + 1
+		off_grid_instance["origin"] = off_grid_origin
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			off_grid_fixture,
+			"wyrównana do rastra L05",
+			"Walidator musi odrzucać origin struktury poza siatką L05.",
+		)
+
+	var outside_socket_fixture := manifest.duplicate(true)
+	var outside_socket_instance := _structure_instance(outside_socket_fixture, STRUCTURE_INSTANCE_ID)
+	var tower_template := _structure_template(outside_socket_fixture, STRUCTURE_TEMPLATE_ID)
+	if not outside_socket_instance.is_empty() and not tower_template.is_empty():
+		var allowed_kinds: Array = tower_template.get("allowed_socket_kinds", [])
+		var socket_kind := str(allowed_kinds[0]) if not allowed_kinds.is_empty() else "entry_opening"
+		var sockets: Array = outside_socket_instance.get("sockets", [])
+		sockets.append({
+			"id": "test_socket",
+			"kind": socket_kind,
+			"local_rect": [0, 0, 80, 160],
+		})
+		var valid_socket_errors: PackedStringArray = compiler.call(
+			"validate_manifest_for_tests",
+			outside_socket_fixture,
+		)
+		_assert(
+			valid_socket_errors.is_empty(),
+			"Typowany socket wewnątrz bounds musi przechodzić walidację: %s"
+			% "; ".join(valid_socket_errors),
+		)
+		(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [1, 0, 80, 160]
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			outside_socket_fixture,
+			"wyrównany do rastra L05",
+			"Walidator musi odrzucać socket local_rect poza siatką L05.",
+		)
+		(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [0, 0, 80, 160]
+		var structure_size := _vector(outside_socket_instance.get("size", []))
+		(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [
+			int(structure_size.x) - 40,
+			int(structure_size.y) - 40,
+			80,
+			80,
+		]
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			outside_socket_fixture,
+			"local_rect",
+			"Walidator musi odrzucać socket local_rect wychodzący poza bounds struktury.",
+		)
+
+	var duplicate_socket_fixture := manifest.duplicate(true)
+	var duplicate_socket_instance := _structure_instance(duplicate_socket_fixture, STRUCTURE_INSTANCE_ID)
+	if not duplicate_socket_instance.is_empty():
+		var duplicate_sockets: Array = duplicate_socket_instance.get("sockets", [])
+		if not duplicate_sockets.is_empty():
+			duplicate_sockets.append((duplicate_sockets[0] as Dictionary).duplicate(true))
+			_assert_manifest_rejected_with_fragment(
+				compiler,
+				duplicate_socket_fixture,
+				"unikalnego lokalnie ID",
+				"Walidator musi odrzucać zduplikowane ID socketu.",
+			)
+
+	var bad_socket_kind_fixture := manifest.duplicate(true)
+	var bad_socket_kind_instance := _structure_instance(bad_socket_kind_fixture, STRUCTURE_INSTANCE_ID)
+	if not bad_socket_kind_instance.is_empty():
+		var bad_kind_sockets: Array = bad_socket_kind_instance.get("sockets", [])
+		if not bad_kind_sockets.is_empty():
+			(bad_kind_sockets[0] as Dictionary)["kind"] = "unsupported_socket_kind"
+			_assert_manifest_rejected_with_fragment(
+				compiler,
+				bad_socket_kind_fixture,
+				"kind nie jest dozwolony",
+				"Walidator musi odrzucać kind socketu spoza template.",
+			)
+
+	var stale_partition_fixture := manifest.duplicate(true)
+	var stale_partition_instance := _structure_instance(stale_partition_fixture, STRUCTURE_INSTANCE_ID)
+	if not stale_partition_instance.is_empty():
+		stale_partition_instance["partition_digest"] = "partition-v1:stale-fixture"
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			stale_partition_fixture,
+			"partition_digest",
+			"Walidator musi odrzucać strukturę ze starym partition_digest.",
+		)
+
+
+func _validate_visual_element_fixtures(compiler, manifest: Dictionary) -> void:
+	var bad_group_fixture := manifest.duplicate(true)
+	var bad_group_proxy := _ensure_proxy_fixture_asset(bad_group_fixture)
+	bad_group_proxy["group_id"] = "bad/group"
+	_assert_manifest_rejected_with_fragment(
+		compiler,
+		bad_group_fixture,
+		"group_id",
+		"Walidator musi odrzucać niebezpieczne group_id proxy.",
+	)
+
+	var sourced_proxy_fixture := manifest.duplicate(true)
+	var sourced_proxy := _ensure_proxy_fixture_asset(sourced_proxy_fixture)
+	sourced_proxy["path"] = "assets/visual/proxy-must-not-have-a-texture.png"
+	sourced_proxy["sha256"] = "0000000000000000000000000000000000000000000000000000000000000000"
+	_assert_manifest_rejected_with_fragment(
+		compiler,
+		sourced_proxy_fixture,
+		"proxy kompozycyjne",
+		"Walidator musi odrzucać proxy z path lub sha256.",
+	)
+
+	var resized_proxy_fixture := manifest.duplicate(true)
+	var resized_proxy := _ensure_proxy_fixture_asset(resized_proxy_fixture)
+	var resized_pixel_size: Array = (resized_proxy.get("pixel_size", []) as Array).duplicate()
+	resized_pixel_size[0] = int(resized_pixel_size[0]) + 1
+	resized_proxy["pixel_size"] = resized_pixel_size
+	_assert_manifest_rejected_with_fragment(
+		compiler,
+		resized_proxy_fixture,
+		"1:1 bez skalowania",
+		"Walidator musi odrzucać proxy o pixel_size innym niż world_rect.size.",
+	)
+
+
+func _ensure_proxy_fixture_asset(fixture: Dictionary) -> Dictionary:
+	var visual: Dictionary = fixture.get("visual", {})
+	var assets: Array = visual.get("assets", [])
+	for asset_value in assets:
+		if asset_value is Dictionary and str((asset_value as Dictionary).get("kind", "")) == COMPOSITION_PROXY_KIND:
+			return asset_value as Dictionary
+	var fixture_id := "__composition_proxy_fixture__"
+	while not _record_by_id(assets, fixture_id).is_empty():
+		fixture_id += "x"
+	var proxy := {
+		"id": fixture_id,
+		"layer_id": "L01",
+		"group_id": "Elements",
+		"kind": COMPOSITION_PROXY_KIND,
+		"path": "",
+		"sha256": "",
+		"pixel_size": [16, 16],
+		"world_rect": [0, 0, 16, 16],
+		"enabled": true,
+		"affordance": NONBLOCKING_BACKDROP_AFFORDANCE,
+		"topology_digest": "",
+	}
+	assets.append(proxy)
+	return proxy
 
 
 func _validate_exact_map_dimensions(compiler, manifest: Dictionary) -> void:
@@ -806,6 +1640,30 @@ func _assert_manifest_rejected(compiler, fixture: Dictionary, message: String) -
 		_assert(not (result as PackedStringArray).is_empty(), message)
 
 
+func _assert_manifest_rejected_with_fragment(
+	compiler,
+	fixture: Dictionary,
+	expected_fragment: String,
+	message: String,
+) -> void:
+	var result = compiler.call("validate_manifest_for_tests", fixture)
+	_assert(typeof(result) == TYPE_PACKED_STRING_ARRAY, "Walidator fixture musi zwracać PackedStringArray.")
+	if typeof(result) != TYPE_PACKED_STRING_ARRAY:
+		return
+	var errors := result as PackedStringArray
+	_assert(not errors.is_empty(), message)
+	var matching_error := false
+	var normalized_fragment := expected_fragment.to_lower()
+	for error in errors:
+		if str(error).to_lower().contains(normalized_fragment):
+			matching_error = true
+			break
+	_assert(
+		matching_error,
+		"%s Otrzymane błędy: %s" % [message, "; ".join(errors)],
+	)
+
+
 func _assert_scene_metadata(
 	map_root: Node,
 	map_record: Dictionary,
@@ -828,7 +1686,7 @@ func _assert_scene_metadata(
 		str(map_root.get_meta("manifest_sha256", "")).to_lower() == raw_manifest_sha,
 		"Scena musi publikować SHA surowych bajtów manifestu.",
 	)
-	_assert(int(map_root.get_meta("schema_version", 0)) == EXPECTED_SCHEMA_VERSION, "Scena musi publikować schema v2.")
+	_assert(int(map_root.get_meta("schema_version", 0)) == EXPECTED_SCHEMA_VERSION, "Scena musi publikować schema v5.")
 	_assert(
 		int(map_root.get_meta("source_version", 0)) == int(map_record.get("source_version", 0)),
 		"Scena musi wyprowadzać source_version z manifestu.",
@@ -870,6 +1728,326 @@ func _assert_scene_metadata(
 			str(map_root.get_meta("canonical_digest", "")) == str(collision.get("canonical_digest", "")),
 			"Scena musi publikować kanoniczny digest geometrii L05.",
 		)
+
+
+func _assert_structure_roots(
+	structure_roots_value,
+	manifest: Dictionary,
+	navigation_base: Dictionary,
+	owner_label: String,
+) -> void:
+	_assert(structure_roots_value is Node2D, "%s musi publikować top-level StructureRoots:Node2D." % owner_label)
+	if not structure_roots_value is Node2D:
+		return
+	var structure_roots := structure_roots_value as Node2D
+	_assert(
+		structure_roots.position == Vector2.ZERO
+		and is_zero_approx(structure_roots.rotation)
+		and structure_roots.scale == Vector2.ONE,
+		"%s/StructureRoots musi mieć identity transform." % owner_label,
+	)
+	var structures: Dictionary = manifest.get("structures", {})
+	var instances: Array = structures.get("instances", [])
+	var enabled_instances: Array[Dictionary] = []
+	for instance_value in instances:
+		if instance_value is Dictionary and bool((instance_value as Dictionary).get("enabled", false)):
+			enabled_instances.append(instance_value as Dictionary)
+	_assert(
+		structure_roots.get_child_count() == enabled_instances.size(),
+		"%s/StructureRoots musi zawierać dokładnie aktywne instancje manifestu." % owner_label,
+	)
+	var expected_boundary_sets := _expected_boundary_sets_by_owner(navigation_base)
+	for instance in enabled_instances:
+		var structure_id := str(instance.get("id", ""))
+		var structure_root := structure_roots.get_node_or_null(structure_id)
+		_assert(structure_root is Node2D, "%s/StructureRoots musi zawierać %s:Node2D." % [owner_label, structure_id])
+		if not structure_root is Node2D:
+			continue
+		_assert_structure_root_node(
+			structure_root as Node2D,
+			instance,
+			expected_boundary_sets.get(structure_id, {}) as Dictionary,
+			owner_label,
+		)
+
+
+func _assert_structure_root_node(
+	structure_root: Node2D,
+	instance: Dictionary,
+	expected_boundary_set: Dictionary,
+	owner_label: String,
+) -> void:
+	var structure_id := str(instance.get("id", ""))
+	var expected_children := PackedStringArray([
+		"InteriorVisual", "StructureVisual", "StaticCollision", "DynamicBodies", "Interactives",
+	])
+	var actual_children := PackedStringArray()
+	for child in structure_root.get_children():
+		actual_children.append(str(child.name))
+	_assert(actual_children == expected_children, "%s/%s musi mieć dokładną lokalną hierarchię struktury." % [owner_label, structure_id])
+	_assert(
+		structure_root.position == _vector(instance.get("origin", []))
+		and is_zero_approx(structure_root.rotation)
+		and structure_root.scale == Vector2.ONE,
+		"%s/%s musi używać wyłącznie origin manifestu na identity root." % [owner_label, structure_id],
+	)
+	_assert(structure_root.visible == bool(instance.get("enabled", false)), "%s/%s musi wyprowadzać visible z enabled." % [owner_label, structure_id])
+	_assert(str(structure_root.get_meta("structure_id", "")) == structure_id, "%s/%s musi publikować structure_id." % [owner_label, structure_id])
+	_assert(
+		_manifest_value_matches(instance, structure_root.get_meta("source", {})),
+		"%s/%s musi publikować rekord instancji 1:1." % [owner_label, structure_id],
+	)
+	var interior := structure_root.get_node_or_null("InteriorVisual") as Node2D
+	var structure_visual := structure_root.get_node_or_null("StructureVisual") as Node2D
+	var static_collision := structure_root.get_node_or_null("StaticCollision") as StaticBody2D
+	var dynamic_bodies := structure_root.get_node_or_null("DynamicBodies") as Node2D
+	var interactives := structure_root.get_node_or_null("Interactives") as Node2D
+	_assert(interior != null and interior.z_index == -20, "%s/%s/InteriorVisual musi być L04 z=-20." % [owner_label, structure_id])
+	_assert(structure_visual != null and structure_visual.z_index == 0, "%s/%s/StructureVisual musi być L05 z=0." % [owner_label, structure_id])
+	if interior != null:
+		_assert(str(interior.get_meta("logical_layer_id", "")) == "L04", "%s/%s/InteriorVisual musi publikować L04." % [owner_label, structure_id])
+	if structure_visual != null:
+		_assert(str(structure_visual.get_meta("logical_layer_id", "")) == "L05", "%s/%s/StructureVisual musi publikować L05." % [owner_label, structure_id])
+	_assert(static_collision != null, "%s/%s musi zawierać StaticCollision:StaticBody2D." % [owner_label, structure_id])
+	_assert(dynamic_bodies != null, "%s/%s musi zawierać DynamicBodies:Node2D." % [owner_label, structure_id])
+	_assert(interactives != null, "%s/%s musi zawierać Interactives:Node2D." % [owner_label, structure_id])
+	if dynamic_bodies != null:
+		_assert(dynamic_bodies.get_child_count() == 0, "%s/%s/DynamicBodies musi pozostać puste w neutralnym prototypie." % [owner_label, structure_id])
+	if interactives != null and structure_id == STRUCTURE_INSTANCE_ID:
+		_assert(interactives.get_child_count() == 0, "%s/%s/Interactives nie może zawierać obiektów kampanii Archiwum." % [owner_label, structure_id])
+	for local_root in [interior, structure_visual, static_collision, dynamic_bodies, interactives]:
+		if local_root is Node2D:
+			var local_root_2d := local_root as Node2D
+			_assert(
+				local_root_2d.position == Vector2.ZERO
+				and is_zero_approx(local_root_2d.rotation)
+				and local_root_2d.scale == Vector2.ONE,
+				"%s/%s child roots muszą mieć identity transform." % [owner_label, structure_id],
+			)
+	if static_collision != null:
+		_assert(static_collision.collision_layer != 0, "%s/%s/StaticCollision musi należeć do fizyki świata." % [owner_label, structure_id])
+		var collision_children := static_collision.get_children()
+		var collision_shapes: Array[CollisionShape2D] = []
+		for collision_child in collision_children:
+			if collision_child is CollisionShape2D:
+				collision_shapes.append(collision_child as CollisionShape2D)
+		_assert(collision_shapes.size() == 1, "%s/%s/StaticCollision musi mieć dokładnie jeden CollisionShape2D." % [owner_label, structure_id])
+		if owner_label == "scena":
+			_assert(collision_children.size() == 1, "%s/%s/StaticCollision nie może wypiekać dodatkowych dzieci runtime." % [owner_label, structure_id])
+		if collision_shapes.size() == 1:
+			var collision_shape := collision_shapes[0]
+			_assert(collision_shape != null, "%s/%s/StaticCollision child musi być CollisionShape2D." % [owner_label, structure_id])
+			if collision_shape != null:
+				_assert(
+					collision_shape.position == Vector2.ZERO
+					and is_zero_approx(collision_shape.rotation)
+					and collision_shape.scale == Vector2.ONE,
+					"%s/%s shape musi mieć identity transform." % [owner_label, structure_id],
+				)
+				_assert(collision_shape.shape is ConcavePolygonShape2D, "%s/%s shape musi być ConcavePolygonShape2D." % [owner_label, structure_id])
+				if collision_shape.shape is ConcavePolygonShape2D:
+					var actual_boundary_set := _world_segment_set_from_shape(
+						collision_shape,
+						collision_shape.shape as ConcavePolygonShape2D,
+					)
+					_assert_segment_sets_equal(
+						actual_boundary_set,
+						expected_boundary_set,
+						"%s/%s local collider" % [owner_label, structure_id],
+					)
+	_assert_structure_root_moves_as_group(structure_root, instance, static_collision, owner_label)
+
+
+func _assert_structure_root_moves_as_group(
+	structure_root: Node2D,
+	instance: Dictionary,
+	static_collision: StaticBody2D,
+	owner_label: String,
+) -> void:
+	var sockets: Array = instance.get("sockets", [])
+	if sockets.is_empty() or static_collision == null:
+		return
+	var collision_shape := static_collision.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if collision_shape == null or not collision_shape.shape is ConcavePolygonShape2D:
+		return
+	var segments := (collision_shape.shape as ConcavePolygonShape2D).segments
+	if segments.is_empty():
+		return
+	var first_socket := sockets[0] as Dictionary
+	var socket_center := _rect(first_socket.get("local_rect", [])).get_center()
+	var original_root_position := structure_root.position
+	var original_collision_point := collision_shape.to_global(segments[0])
+	var original_socket_center := structure_root.to_global(socket_center)
+	var child_transforms := {}
+	for child in structure_root.get_children():
+		if child is Node2D:
+			child_transforms[child] = (child as Node2D).transform
+	var delta := Vector2(80.0, -40.0)
+	structure_root.position += delta
+	_assert(
+		collision_shape.to_global(segments[0]).is_equal_approx(original_collision_point + delta),
+		"%s/%s collider musi przesuwać się dokładnie z rootem struktury."
+		% [owner_label, str(instance.get("id", ""))],
+	)
+	_assert(
+		structure_root.to_global(socket_center).is_equal_approx(original_socket_center + delta),
+		"%s/%s sockety muszą przesuwać się dokładnie z rootem struktury."
+		% [owner_label, str(instance.get("id", ""))],
+	)
+	for child_value in child_transforms:
+		var child := child_value as Node2D
+		_assert(
+			child.transform == child_transforms[child_value],
+			"%s/%s lokalne transformy dzieci nie mogą zmieniać się przy przesunięciu rootu."
+			% [owner_label, str(instance.get("id", ""))],
+		)
+	structure_root.position = original_root_position
+
+
+func _assert_runtime_structure_partition(
+	runtime: Node,
+	manifest: Dictionary,
+	navigation_base: Dictionary,
+) -> void:
+	var runtime_structure_roots := runtime.get_node_or_null("RuntimeDynamic/StructureRoots")
+	_assert_structure_roots(runtime_structure_roots, manifest, navigation_base, "runtime")
+	var expected_by_owner := _expected_boundary_sets_by_owner(navigation_base)
+	var expected_world: Dictionary = expected_by_owner.get(WORLD_COLLISION_OWNER_ID, {})
+	var expected_structure_union := {}
+	for owner_id in expected_by_owner:
+		if str(owner_id) in ["", WORLD_COLLISION_OWNER_ID]:
+			continue
+		_merge_segment_set(expected_structure_union, expected_by_owner[owner_id] as Dictionary)
+	var runtime_global := _runtime_global_segment_set(runtime)
+	_assert_segment_sets_equal(runtime_global, expected_world, "runtime global collision")
+	var runtime_local := {}
+	if runtime_structure_roots != null:
+		for collision_shape in runtime_structure_roots.find_children("*", "CollisionShape2D", true, false):
+			if collision_shape is CollisionShape2D and (collision_shape as CollisionShape2D).shape is ConcavePolygonShape2D:
+				_merge_segment_set(
+					runtime_local,
+					_world_segment_set_from_shape(
+						collision_shape as CollisionShape2D,
+						(collision_shape as CollisionShape2D).shape as ConcavePolygonShape2D,
+					),
+				)
+	_assert_segment_sets_equal(runtime_local, expected_structure_union, "runtime local structure collision")
+	for segment_key in runtime_local:
+		_assert(not runtime_global.has(segment_key), "Globalny i lokalny collider muszą mieć rozłączne segmenty: %s." % segment_key)
+	var runtime_union := runtime_global.duplicate()
+	_merge_segment_set(runtime_union, runtime_local)
+	var expected_union := {}
+	for owner_id in expected_by_owner:
+		if str(owner_id).is_empty():
+			continue
+		_merge_segment_set(expected_union, expected_by_owner[owner_id] as Dictionary)
+	_assert_segment_sets_equal(runtime_union, expected_union, "runtime union pełnych boundaries L05")
+	if runtime.has_method("collision_segment_count"):
+		_assert(int(runtime.call("collision_segment_count")) == expected_union.size(), "collision_segment_count musi obejmować dokładną unię global+structure.")
+
+
+func _expected_boundary_sets_by_owner(navigation_base: Dictionary) -> Dictionary:
+	var result := {}
+	var width := int(navigation_base.get("width", 0))
+	var height := int(navigation_base.get("height", 0))
+	var cell_scale: Vector2 = navigation_base.get("cell_scale", Vector2.ONE)
+	var cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
+	var owner_ids: PackedStringArray = navigation_base.get("owner_ids", PackedStringArray())
+	var owner_cells: PackedInt32Array = navigation_base.get("solid_owner_cells", PackedInt32Array())
+	for owner_id in owner_ids:
+		result[str(owner_id)] = {}
+	if not result.has(WORLD_COLLISION_OWNER_ID):
+		result[WORLD_COLLISION_OWNER_ID] = {}
+	if cells.size() != width * height or owner_cells.size() != cells.size():
+		return result
+	var directions := [
+		[Vector2i(0, -1), Vector2(0, 0), Vector2(1, 0)],
+		[Vector2i(1, 0), Vector2(1, 0), Vector2(1, 1)],
+		[Vector2i(0, 1), Vector2(1, 1), Vector2(0, 1)],
+		[Vector2i(-1, 0), Vector2(0, 1), Vector2(0, 0)],
+	]
+	for y in range(height):
+		for x in range(width):
+			var cell_index := y * width + x
+			if int(cells[cell_index]) == 0:
+				continue
+			for direction_value in directions:
+				var direction := direction_value[0] as Vector2i
+				var neighbor := Vector2i(x, y) + direction
+				var outside := neighbor.x < 0 or neighbor.y < 0 or neighbor.x >= width or neighbor.y >= height
+				var owner_index := WORLD_OWNER_INDEX
+				if not outside:
+					var neighbor_index := neighbor.y * width + neighbor.x
+					if int(cells[neighbor_index]) != 0:
+						continue
+					owner_index = int(owner_cells[neighbor_index])
+				if owner_index <= OPEN_WATER_OWNER_INDEX or owner_index >= owner_ids.size():
+					_assert(false, "Boundary L05 musi wskazywać poprawnego ownera.")
+					continue
+				var owner_id := str(owner_ids[owner_index])
+				var cell_origin := Vector2(x * cell_scale.x, y * cell_scale.y)
+				var from_point := cell_origin + (direction_value[1] as Vector2) * cell_scale
+				var to_point := cell_origin + (direction_value[2] as Vector2) * cell_scale
+				(result[owner_id] as Dictionary)[_segment_key(from_point, to_point)] = true
+	return result
+
+
+func _runtime_global_segment_set(runtime: Node) -> Dictionary:
+	var result := {}
+	var chunks_value = runtime.get("_collision_segments_by_chunk")
+	_assert(chunks_value is Dictionary, "Runtime musi przechowywać globalne boundary segments per chunk.")
+	if not chunks_value is Dictionary:
+		return result
+	for segments_value in (chunks_value as Dictionary).values():
+		if not segments_value is PackedVector2Array:
+			continue
+		var segments := segments_value as PackedVector2Array
+		_assert(segments.size() % 2 == 0, "Globalne segmenty kolizji muszą tworzyć pary.")
+		for index in range(0, segments.size() - 1, 2):
+			var segment_key := _segment_key(segments[index], segments[index + 1])
+			_assert(not result.has(segment_key), "Globalny segment kolizji nie może występować dwukrotnie: %s." % segment_key)
+			result[segment_key] = true
+	return result
+
+
+func _world_segment_set_from_shape(
+	collision_shape: CollisionShape2D,
+	shape: ConcavePolygonShape2D,
+) -> Dictionary:
+	var result := {}
+	var segments := shape.segments
+	_assert(segments.size() > 0 and segments.size() % 2 == 0, "ConcavePolygonShape2D musi publikować niepuste pary segmentów.")
+	for index in range(0, segments.size() - 1, 2):
+		var from_point := collision_shape.to_global(segments[index])
+		var to_point := collision_shape.to_global(segments[index + 1])
+		var segment_key := _segment_key(from_point, to_point)
+		_assert(not result.has(segment_key), "Lokalny shape nie może dublować segmentu %s." % segment_key)
+		result[segment_key] = true
+	return result
+
+
+func _segment_key(from_point: Vector2, to_point: Vector2) -> String:
+	var first := Vector2(roundf(from_point.x), roundf(from_point.y))
+	var second := Vector2(roundf(to_point.x), roundf(to_point.y))
+	if first.x > second.x or (is_equal_approx(first.x, second.x) and first.y > second.y):
+		var swap := first
+		first = second
+		second = swap
+	return "%d,%d|%d,%d" % [int(first.x), int(first.y), int(second.x), int(second.y)]
+
+
+func _merge_segment_set(target: Dictionary, source: Dictionary) -> void:
+	for segment_key in source:
+		_assert(not target.has(segment_key), "Segment kolizji nie może należeć do dwóch ownerów: %s." % segment_key)
+		target[segment_key] = true
+
+
+func _assert_segment_sets_equal(actual: Dictionary, expected: Dictionary, label: String) -> void:
+	_assert(actual.size() == expected.size(), "%s ma %d segmentów zamiast %d." % [label, actual.size(), expected.size()])
+	for segment_key in expected:
+		if not actual.has(segment_key):
+			_assert(false, "%s nie zawiera segmentu %s." % [label, segment_key])
+			return
 
 
 func _assert_generated_scene_records(map_root: Node, manifest: Dictionary) -> void:
@@ -942,9 +2120,10 @@ func _assert_generated_scene_records(map_root: Node, manifest: Dictionary) -> vo
 				"Kolekcja %s[%d] musi zachować rekord źródłowy 1:1." % [collection_name, index],
 			)
 			if source_record.has("position"):
+				var expected_world_position := _resolved_manifest_world_position(source_record, manifest)
 				_assert(
-					record_node is Node2D and (record_node as Node2D).position == _vector(source_record["position"]),
-					"Kolekcja %s[%d] musi zachować pozycję manifestu." % [collection_name, index],
+					record_node is Node2D and (record_node as Node2D).position == expected_world_position,
+					"Kolekcja %s[%d] musi publikować rozwiązaną pozycję świata." % [collection_name, index],
 				)
 	var actual_collection_count := 0
 	for child in markers_root.get_children():
@@ -984,6 +2163,11 @@ func _assert_blueprint_matches_manifest(
 	_assert_depth_profile(manifest["depth_profile"], blueprint.depth_profile_points)
 	_assert_record_sequence(manifest["regions"], blueprint.regions, "regions")
 	_assert_record_sequence(manifest["landmarks"], blueprint.landmarks, "landmarks")
+	_assert_record_sequence(
+		(manifest.get("structures", {}) as Dictionary).get("instances", []),
+		blueprint.structure_spawns,
+		"structures.instances",
+	)
 
 	var expected_loot: Array = (gameplay.get("loot_spawns", []) as Array).duplicate(true)
 	for pickup_value in gameplay.get("pickups", []):
@@ -1012,6 +2196,41 @@ func _assert_blueprint_matches_manifest(
 				blueprint.connection_lookup.has(str((connection_value as Dictionary).get("id", ""))),
 				"Blueprint index musi zawierać każde połączenie manifestu.",
 			)
+
+
+func _assert_archive_campaign_is_global(blueprint, manifest: Dictionary) -> void:
+	var source_archive := _record_by_id(
+		manifest.get("landmarks", []) as Array,
+		"flooded_archive",
+	)
+	_assert(not source_archive.is_empty(), "Manifest musi publikować flooded_archive.")
+	if not source_archive.is_empty():
+		_assert(_vector(source_archive.get("position", [])) == ARCHIVE_WORLD_POSITION, "flooded_archive musi zachować globalne position [6600,4400].")
+		_assert(_vector(source_archive.get("size", [])) == ARCHIVE_LANDMARK_SIZE, "flooded_archive musi zachować size [960,560].")
+		_assert(not source_archive.has("position_space"), "flooded_archive nie może dziedziczyć przestrzeni neutralnego prototypu.")
+		_assert(not source_archive.has("structure_id"), "flooded_archive nie może wskazywać neutralnego prototypu.")
+	var source_terminal := _record_by_id(
+		(manifest.get("gameplay", {}) as Dictionary).get("fixed_device_spawns", []) as Array,
+		"archive_terminal",
+	)
+	_assert(not source_terminal.is_empty(), "Manifest musi publikować archive_terminal.")
+	if not source_terminal.is_empty():
+		_assert(_vector(source_terminal.get("position", [])) == ARCHIVE_WORLD_POSITION, "archive_terminal musi zachować globalne position [6600,4400].")
+		_assert(not source_terminal.has("position_space"), "Globalny archive_terminal nie może publikować position_space override.")
+		_assert(not source_terminal.has("structure_id"), "archive_terminal nie może wskazywać neutralnego prototypu.")
+		_assert(not source_terminal.has("local_position"), "Manifest nie może utrzymywać drugiej lokalnej pozycji archive_terminal.")
+	var compiled_archive: Dictionary = blueprint.get_landmark("flooded_archive")
+	_assert(not compiled_archive.is_empty(), "Blueprint musi zawierać flooded_archive.")
+	if not compiled_archive.is_empty():
+		_assert(_vector(compiled_archive.get("position", [])) == ARCHIVE_WORLD_POSITION, "Blueprint musi zachować globalną pozycję flooded_archive.")
+	var compiled_terminal := _record_by_id(blueprint.fixed_device_spawns, "archive_terminal")
+	_assert(not compiled_terminal.is_empty(), "Blueprint musi zawierać archive_terminal.")
+	if compiled_terminal.is_empty():
+		return
+	_assert(str(compiled_terminal.get("position_space", "")) == "world", "Blueprint musi jawnie znormalizować archive_terminal do world.")
+	_assert(str(compiled_terminal.get("structure_id", "")).is_empty(), "Blueprint archive_terminal nie może wskazywać neutralnego prototypu.")
+	_assert(not compiled_terminal.has("local_position"), "Blueprint globalnego archive_terminal nie może tworzyć local_position.")
+	_assert(_vector(compiled_terminal.get("position", [])) == ARCHIVE_WORLD_POSITION, "Blueprint musi zachować globalną pozycję archive_terminal [6600,4400].")
 
 
 func _assert_depth_profile(source_value, compiled: PackedVector2Array) -> void:
@@ -1056,6 +2275,14 @@ func _assert_record_sequence(source_value, compiled_value, label: String) -> voi
 
 func _assert_manifest_fields_preserved(source: Dictionary, compiled: Dictionary, label: String) -> void:
 	for key in source.keys():
+		if key == "position" and str(source.get("position_space", "world")) == "structure_local":
+			_assert(compiled.has("local_position"), "%s nie zachował lokalnej pozycji manifestu." % label)
+			if compiled.has("local_position"):
+				_assert(
+					_manifest_value_matches(source[key], compiled["local_position"]),
+					"%s.local_position różni się od lokalnej pozycji manifestu." % label,
+				)
+			continue
 		_assert(compiled.has(key), "%s nie zachował pola manifestu %s." % [label, str(key)])
 		if not compiled.has(key):
 			continue
@@ -1180,56 +2407,123 @@ func _assert_visual_content_matches_manifest(
 				"%s landmark musi zachować pozycję manifestu." % owner_label,
 			)
 
-	var expected_assets_by_layer := {}
-	for layer_id in EXPECTED_LAYER_IDS:
-		expected_assets_by_layer[layer_id] = []
-	for asset_value in (manifest["visual"] as Dictionary).get("assets", []):
-		if asset_value is Dictionary:
-			var asset: Dictionary = asset_value
-			(expected_assets_by_layer[str(asset.get("layer_id", ""))] as Array).append(asset)
+	var expected_groups_by_layer := _expected_visual_groups_by_layer(manifest["visual"] as Dictionary)
 	for layer_id in EXPECTED_LAYER_IDS:
 		var layer_root := visual_layers.get_node_or_null(layer_id)
 		if layer_root == null:
 			continue
-		var asset_nodes := []
+		var group_nodes: Array[Node] = []
 		for child in layer_root.get_children():
-			if child.has_meta("asset_id"):
-				asset_nodes.append(child)
-		var expected_assets: Array = expected_assets_by_layer[layer_id]
+			if child.has_meta("group_id"):
+				group_nodes.append(child)
+		var expected_groups: Array = expected_groups_by_layer.get(layer_id, [])
 		_assert(
-			asset_nodes.size() == expected_assets.size(),
-			"%s/%s musi wyprowadzać liczbę assetów z globalnego visual.assets." % [owner_label, layer_id],
+			group_nodes.size() == expected_groups.size(),
+			"%s/%s musi wyprowadzać dokładnie grupy wynikające z visual.assets." % [owner_label, layer_id],
 		)
-		for index in range(mini(asset_nodes.size(), expected_assets.size())):
-			var asset_node: Node = asset_nodes[index]
-			var source_asset: Dictionary = expected_assets[index]
-			_assert(
-				str(asset_node.get_meta("asset_id", "")) == str(source_asset.get("id", "")),
-				"%s/%s musi zachować ID i kolejność assetów." % [owner_label, layer_id],
+		for group_index in range(mini(group_nodes.size(), expected_groups.size())):
+			var group_node := group_nodes[group_index]
+			var expected_group := expected_groups[group_index] as Dictionary
+			_assert_visual_group_node(
+				group_node,
+				layer_id,
+				str(expected_group.get("id", "")),
+				expected_group.get("assets", []) as Array,
+				owner_label,
 			)
-			_assert(
-				_manifest_value_matches(source_asset, asset_node.get_meta("source", {})),
-				"%s/%s asset musi zachować rekord source 1:1." % [owner_label, layer_id],
-			)
-			_assert_typed_asset_node(asset_node, source_asset, owner_label)
+
+
+func _expected_visual_groups_by_layer(visual: Dictionary) -> Dictionary:
+	var result := {}
+	for layer_id in EXPECTED_LAYER_IDS:
+		result[layer_id] = []
+	for asset_value in visual.get("assets", []):
+		if not asset_value is Dictionary:
+			continue
+		var asset := asset_value as Dictionary
+		var layer_id := str(asset.get("layer_id", ""))
+		var group_id := str(asset.get("group_id", ""))
+		if not result.has(layer_id):
+			continue
+		var groups := result[layer_id] as Array
+		var expected_group: Dictionary = {}
+		for group_value in groups:
+			if group_value is Dictionary and str((group_value as Dictionary).get("id", "")) == group_id:
+				expected_group = group_value as Dictionary
+				break
+		if expected_group.is_empty():
+			expected_group = {"id": group_id, "assets": []}
+			groups.append(expected_group)
+		(expected_group["assets"] as Array).append(asset)
+	return result
+
+
+func _assert_visual_group_node(
+	group_node: Node,
+	layer_id: String,
+	group_id: String,
+	expected_assets: Array,
+	owner_label: String,
+) -> void:
+	_assert(group_node is Node2D, "%s/%s/%s musi być neutralnym Node2D." % [owner_label, layer_id, group_id])
+	_assert(str(group_node.name) == group_id, "%s/%s musi zachować nazwę grupy %s." % [owner_label, layer_id, group_id])
+	_assert(not group_node.has_meta("asset_id"), "%s/%s/%s nie może udawać elementu." % [owner_label, layer_id, group_id])
+	_assert(
+		str(group_node.get_meta("group_id", "")) == group_id,
+		"%s/%s/%s musi publikować group_id manifestu." % [owner_label, layer_id, group_id],
+	)
+	_assert(
+		str(group_node.get_meta("layer_id", "")) == layer_id,
+		"%s/%s/%s musi publikować layer_id manifestu." % [owner_label, layer_id, group_id],
+	)
+	if group_node is Node2D:
+		var group_2d := group_node as Node2D
+		_assert(group_2d.position == Vector2.ZERO, "%s/%s/%s musi mieć pozycję identity." % [owner_label, layer_id, group_id])
+		_assert(group_2d.scale == Vector2.ONE, "%s/%s/%s nie może skalować elementów." % [owner_label, layer_id, group_id])
+	var asset_nodes := group_node.get_children()
+	_assert(
+		asset_nodes.size() == expected_assets.size(),
+		"%s/%s/%s musi zachować liczność elementów manifestu." % [owner_label, layer_id, group_id],
+	)
+	for index in range(mini(asset_nodes.size(), expected_assets.size())):
+		var asset_node := asset_nodes[index]
+		var source_asset := expected_assets[index] as Dictionary
+		_assert(
+			str(asset_node.get_meta("asset_id", "")) == str(source_asset.get("id", "")),
+			"%s/%s/%s musi zachować kolejność elementów manifestu." % [owner_label, layer_id, group_id],
+		)
+		_assert(
+			_manifest_value_matches(source_asset, asset_node.get_meta("source", {})),
+			"%s/%s/%s asset musi zachować rekord source 1:1." % [owner_label, layer_id, group_id],
+		)
+		_assert_typed_asset_node(asset_node, source_asset, owner_label)
 
 
 func _assert_typed_asset_node(asset_node: Node, source_asset: Dictionary, owner_label: String) -> void:
 	var asset_id := str(source_asset.get("id", ""))
 	var layer_id := str(source_asset.get("layer_id", ""))
+	var group_id := str(source_asset.get("group_id", ""))
 	var kind := str(source_asset.get("kind", ""))
 	var expected_rect := _rect(source_asset.get("world_rect", []))
-	_assert(asset_node is Control, "%s asset %s musi być węzłem Control." % [owner_label, asset_id])
-	if asset_node is Control:
-		var control := asset_node as Control
-		var actual_rect := Rect2(
-			Vector2(control.offset_left, control.offset_top),
-			Vector2(
-				control.offset_right - control.offset_left,
-				control.offset_bottom - control.offset_top,
-			),
+	var expected_pixel_size_value := _vector(source_asset.get("pixel_size", []))
+	var expected_pixel_size := Vector2i(int(expected_pixel_size_value.x), int(expected_pixel_size_value.y))
+	_assert(asset_node is Node2D, "%s asset %s musi mieć osobny root Node2D." % [owner_label, asset_id])
+	if asset_node is Node2D:
+		var element_root := asset_node as Node2D
+		_assert(
+			element_root.position == expected_rect.position,
+			"%s asset %s musi brać pozycję z world_rect manifestu." % [owner_label, asset_id],
 		)
-		_assert(actual_rect == expected_rect, "%s asset %s musi zachować world_rect 1:1." % [owner_label, asset_id])
+		_assert(
+			element_root.scale == Vector2.ONE,
+			"%s asset %s nie może używać transformu skali." % [owner_label, asset_id],
+		)
+		_assert(element_root.visible == bool(source_asset.get("enabled", true)), "%s asset %s musi zachować enabled." % [owner_label, asset_id])
+	_assert(str(asset_node.get_meta("layer_id", "")) == layer_id, "%s asset %s musi publikować layer_id." % [owner_label, asset_id])
+	_assert(str(asset_node.get_meta("group_id", "")) == group_id, "%s asset %s musi publikować group_id." % [owner_label, asset_id])
+	_assert(str(asset_node.get_meta("kind", "")) == kind, "%s asset %s musi publikować kind." % [owner_label, asset_id])
+	_assert(asset_node.get_meta("world_rect", Rect2()) == expected_rect, "%s asset %s musi publikować world_rect 1:1." % [owner_label, asset_id])
+	_assert(asset_node.get_meta("pixel_size", Vector2i.ZERO) == expected_pixel_size, "%s asset %s musi publikować pixel_size." % [owner_label, asset_id])
 	if kind == "texture_rect":
 		_assert(
 			layer_id in NONBLOCKING_TEXTURE_LAYER_IDS,
@@ -1241,40 +2535,186 @@ func _assert_typed_asset_node(asset_node: Node, source_asset: Dictionary, owner_
 			"%s asset %s na %s musi być nieblokującym tłem."
 			% [owner_label, asset_id, layer_id],
 		)
-		_assert(
-			asset_node is TextureRect,
-			"%s asset %s na %s musi być TextureRect."
-			% [owner_label, asset_id, layer_id],
-		)
-		if asset_node is TextureRect:
-			var texture_rect := asset_node as TextureRect
+		_assert(asset_node.get_child_count() == 1, "%s asset %s texture_rect musi mieć tylko child Bitmap." % [owner_label, asset_id])
+		var bitmap_node := asset_node.get_node_or_null("Bitmap")
+		_assert(bitmap_node is TextureRect, "%s asset %s na %s musi mieć child Bitmap:TextureRect." % [owner_label, asset_id, layer_id])
+		if bitmap_node is TextureRect:
+			var texture_rect := bitmap_node as TextureRect
+			_assert(texture_rect.scale == Vector2.ONE, "%s bitmapa %s nie może być skalowana." % [owner_label, asset_id])
+			_assert(
+				_control_local_rect(texture_rect) == Rect2(Vector2.ZERO, expected_rect.size),
+				"%s bitmapa %s musi zajmować natywny rect elementu." % [owner_label, asset_id],
+			)
 			_assert(texture_rect.texture != null, "%s asset %s musi mieć teksturę." % [owner_label, asset_id])
 			if texture_rect.texture != null:
+				_assert(
+					expected_rect.size == texture_rect.texture.get_size(),
+					"%s asset %s na %s musi mapować bitmapę natywnie 1 piksel = 1 jednostka świata."
+					% [owner_label, asset_id, layer_id],
+				)
 				_assert(
 					texture_rect.texture.get_size() == _vector(source_asset.get("pixel_size", [])),
 					"%s asset %s na %s musi zachować pixel_size źródła."
 					% [owner_label, asset_id, layer_id],
 				)
+				_assert_backdrop_alpha_contract(texture_rect.texture, asset_id, owner_label)
+	elif kind == COMPOSITION_PROXY_KIND:
+		_assert(layer_id in NONBLOCKING_TEXTURE_LAYER_IDS, "%s proxy %s może należeć tylko do L01 albo L02." % [owner_label, asset_id])
+		_assert(str(source_asset.get("path", "")).is_empty(), "%s proxy %s nie może mieć path." % [owner_label, asset_id])
+		_assert(str(source_asset.get("sha256", "")).is_empty(), "%s proxy %s nie może mieć sha256." % [owner_label, asset_id])
+		_assert(expected_rect.size == Vector2(expected_pixel_size), "%s proxy %s musi zachować rect 1:1." % [owner_label, asset_id])
+		_assert(asset_node.get_child_count() == 3, "%s proxy %s musi mieć wyłącznie Fill, Outline i Label." % [owner_label, asset_id])
+		var fill_node := asset_node.get_node_or_null("Fill")
+		var outline_node := asset_node.get_node_or_null("Outline")
+		var label_node := asset_node.get_node_or_null("Label")
+		_assert(fill_node is ColorRect, "%s proxy %s musi mieć Fill:ColorRect." % [owner_label, asset_id])
+		_assert(outline_node is Line2D, "%s proxy %s musi mieć Outline:Line2D." % [owner_label, asset_id])
+		_assert(label_node is Label, "%s proxy %s musi mieć Label:Label." % [owner_label, asset_id])
+		if fill_node is ColorRect:
+			var fill := fill_node as ColorRect
+			_assert(fill.scale == Vector2.ONE, "%s proxy %s nie może skalować Fill." % [owner_label, asset_id])
+			_assert(_control_local_rect(fill) == Rect2(Vector2.ZERO, expected_rect.size), "%s proxy %s Fill musi zachować rect 1:1." % [owner_label, asset_id])
+			_assert(fill.material == null, "%s proxy %s Fill nie może używać tekstury ani materiału." % [owner_label, asset_id])
+		if outline_node is Line2D:
+			var outline := outline_node as Line2D
+			var expected_outline := PackedVector2Array([
+				Vector2.ZERO,
+				Vector2(expected_rect.size.x, 0.0),
+				expected_rect.size,
+				Vector2(0.0, expected_rect.size.y),
+				Vector2.ZERO,
+			])
+			_assert(outline.scale == Vector2.ONE, "%s proxy %s nie może skalować Outline." % [owner_label, asset_id])
+			_assert(outline.points == expected_outline, "%s proxy %s Outline musi obrysowywać dokładny rect." % [owner_label, asset_id])
+			_assert(outline.texture == null, "%s proxy %s Outline nie może mieć tekstury." % [owner_label, asset_id])
+		if label_node is Label:
+			var proxy_label := label_node as Label
+			var expected_dimensions := "%d x %d" % [int(expected_rect.size.x), int(expected_rect.size.y)]
+			_assert(proxy_label.scale == Vector2.ONE, "%s proxy %s nie może skalować Label." % [owner_label, asset_id])
+			_assert(proxy_label.text.begins_with(asset_id) and proxy_label.text.contains(expected_dimensions), "%s proxy %s Label musi publikować ID i rozmiar." % [owner_label, asset_id])
+		for descendant in asset_node.find_children("*", "", true, false):
+			_assert(not descendant is TextureRect and not descendant is Sprite2D, "%s proxy %s nie może zawierać bitmapy." % [owner_label, asset_id])
 	elif kind == "collision_masked_material":
-		_assert(asset_node is ColorRect, "%s asset %s na L05 musi być ColorRect." % [owner_label, asset_id])
-		if not asset_node is ColorRect:
+		_assert(asset_node.get_child_count() == 1, "%s asset %s L05 musi mieć tylko child Material." % [owner_label, asset_id])
+		var material_node := asset_node.get_node_or_null("Material")
+		_assert(material_node is ColorRect, "%s asset %s na L05 musi mieć child Material:ColorRect." % [owner_label, asset_id])
+		if not material_node is ColorRect:
 			return
-		var color_rect := asset_node as ColorRect
+		var color_rect := material_node as ColorRect
+		_assert(color_rect.scale == Vector2.ONE, "%s materiał assetu %s nie może być skalowany." % [owner_label, asset_id])
+		_assert(_control_local_rect(color_rect) == Rect2(Vector2.ZERO, expected_rect.size), "%s materiał assetu %s musi zachować rect elementu." % [owner_label, asset_id])
 		var material := color_rect.material as ShaderMaterial
 		_assert(material != null and material.shader != null, "%s asset %s musi używać ShaderMaterial." % [owner_label, asset_id])
 		if material == null:
 			return
 		var topology_mask := material.get_shader_parameter("topology_mask") as Texture2D
 		var ground_texture := material.get_shader_parameter("ground_texture") as Texture2D
+		var texture_tiling_value: Variant = material.get_shader_parameter("texture_tiling")
 		_assert(topology_mask != null, "%s asset %s musi używać wygenerowanej maski L05." % [owner_label, asset_id])
 		_assert(ground_texture != null, "%s asset %s musi używać materiału gruntu." % [owner_label, asset_id])
 		if topology_mask != null:
 			_assert(topology_mask.get_size() == Vector2(L05_PIXEL_SIZE), "%s maska assetu %s musi mieć 576 x 324." % [owner_label, asset_id])
 		if ground_texture != null:
+			var expected_native_tiling := Vector2(
+				expected_rect.size.x / ground_texture.get_width(),
+				expected_rect.size.y / ground_texture.get_height(),
+			)
+			_assert(
+				texture_tiling_value is Vector2
+				and (texture_tiling_value as Vector2).is_equal_approx(expected_native_tiling),
+				"%s materiał assetu %s musi powtarzać teksturę w natywnej gęstości 1 piksel = 1 jednostka świata."
+				% [owner_label, asset_id],
+			)
 			_assert(
 				ground_texture.get_size() == _vector(source_asset.get("pixel_size", [])),
 				"%s materiał assetu %s musi odpowiadać pixel_size manifestu." % [owner_label, asset_id],
 			)
+	else:
+		_assert(false, "%s asset %s ma nieobsługiwany kind=%s." % [owner_label, asset_id, kind])
+
+
+func _control_local_rect(control: Control) -> Rect2:
+	return Rect2(
+		Vector2(control.offset_left, control.offset_top),
+		Vector2(
+			control.offset_right - control.offset_left,
+			control.offset_bottom - control.offset_top,
+		),
+	)
+
+
+func _assert_backdrop_alpha_contract(texture: Texture2D, asset_id: String, owner_label: String) -> void:
+	var image := texture.get_image()
+	_assert(image != null, "%s asset %s musi udostępniać obraz do kontroli alfy." % [owner_label, asset_id])
+	if image == null:
+		return
+	if image.is_compressed():
+		var decompress_error := image.decompress()
+		_assert(
+			decompress_error == OK,
+			"%s asset %s musi dać się zdekompresować do kontroli alfy." % [owner_label, asset_id],
+		)
+		if decompress_error != OK:
+			return
+	image.convert(Image.FORMAT_RGBA8)
+	var width := image.get_width()
+	var height := image.get_height()
+	var pixel_count := width * height
+	var data := image.get_data()
+	_assert(
+		data.size() == pixel_count * 4,
+		"%s asset %s musi dostarczać kompletne RGBA8." % [owner_label, asset_id],
+	)
+	if data.size() != pixel_count * 4:
+		return
+	var nonzero := 0
+	var opaque := 0
+	var partial := 0
+	var low_alpha := 0
+	var bottom_opaque := 0
+	var lowest_opaque_y := -1
+	for pixel_index in range(pixel_count):
+		var alpha := int(data[pixel_index * 4 + 3])
+		if alpha == 0:
+			continue
+		nonzero += 1
+		if alpha >= 250:
+			opaque += 1
+			var y := int(pixel_index / width)
+			lowest_opaque_y = maxi(lowest_opaque_y, y)
+			if y == height - 1:
+				bottom_opaque += 1
+		else:
+			partial += 1
+			if alpha <= 15:
+				low_alpha += 1
+	_assert(nonzero > 0 and opaque > 0, "%s asset %s musi zawierać kryjące budynki." % [owner_label, asset_id])
+	_assert(
+		nonzero < pixel_count,
+		"%s asset %s musi pozostawiać przezroczyste przerwy między budynkami." % [owner_label, asset_id],
+	)
+	if nonzero == 0:
+		return
+	_assert(
+		float(opaque) / float(nonzero) >= BACKDROP_MIN_OPAQUE_SHARE,
+		"%s asset %s nie może mieć półprzezroczystych brył budynków." % [owner_label, asset_id],
+	)
+	_assert(
+		float(partial) / float(pixel_count) <= BACKDROP_MAX_PARTIAL_CANVAS_SHARE,
+		"%s asset %s może używać częściowej alfy tylko na wąskiej krawędzi." % [owner_label, asset_id],
+	)
+	_assert(
+		float(low_alpha) / float(pixel_count) <= BACKDROP_MAX_LOW_ALPHA_CANVAS_SHARE,
+		"%s asset %s nie może zawierać szerokiego półprzezroczystego halo." % [owner_label, asset_id],
+	)
+	_assert(
+		lowest_opaque_y == height - 1,
+		"%s asset %s musi stykać się z dolną krawędzią bez szczeliny nad L05." % [owner_label, asset_id],
+	)
+	_assert(
+		float(bottom_opaque) / float(width) >= BACKDROP_MIN_BOTTOM_OPAQUE_SHARE,
+		"%s asset %s musi mieć kryjącą podstawę schowaną za L05." % [owner_label, asset_id],
+	)
 
 
 func _assert_layer_node_matches_record(node: Node, layer: Dictionary, owner_label: String) -> void:
@@ -1306,6 +2746,10 @@ func _assert_layer_node_matches_record(node: Node, layer: Dictionary, owner_labe
 	if node is Node2D:
 		_assert((node as Node2D).z_index == int(layer.get("z_index", 0)), "%s/%s musi zachować z_index." % [owner_label, layer_id])
 		_assert((node as Node2D).visible == bool(layer.get("enabled", true)), "%s/%s musi zachować enabled jako visible." % [owner_label, layer_id])
+		var expected_modulate := Color.from_string("#%s" % str(layer.get("rgb_modulate", "ffffff")), Color.WHITE)
+		_assert((node as Node2D).modulate == expected_modulate, "%s/%s musi zachować manifestowy rgb_modulate." % [owner_label, layer_id])
+		_assert(is_equal_approx(expected_modulate.a, 1.0), "%s/%s rgb_modulate nie może zmieniać alfy." % [owner_label, layer_id])
+		_assert(node.has_meta("rgb_modulate") and node.get_meta("rgb_modulate") == expected_modulate, "%s/%s musi publikować rgb_modulate w metadata." % [owner_label, layer_id])
 	if node is Parallax2D:
 		_assert((node as Parallax2D).scroll_scale == expected_scale, "%s/%s musi używać manifestowej scroll_scale." % [owner_label, layer_id])
 
@@ -1393,11 +2837,81 @@ func _assert_root_integration_remains_loadable() -> void:
 		dive_root.free()
 
 
+func _valid_visual_group_id(value: String) -> bool:
+	if value.is_empty() or not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".contains(value.left(1)):
+		return false
+	for index in range(1, value.length()):
+		if not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_".contains(value.substr(index, 1)):
+			return false
+	return true
+
+
 func _record_by_id(records: Array, record_id: String) -> Dictionary:
 	for value in records:
 		if value is Dictionary and str((value as Dictionary).get("id", "")) == record_id:
 			return value as Dictionary
 	return {}
+
+
+func _structure_template(manifest: Dictionary, template_id: String) -> Dictionary:
+	var structures_value = manifest.get("structures", null)
+	if not structures_value is Dictionary:
+		return {}
+	var templates_value = (structures_value as Dictionary).get("templates", null)
+	if not templates_value is Array:
+		return {}
+	return _record_by_id(templates_value as Array, template_id)
+
+
+func _structure_instance(manifest: Dictionary, structure_id: String) -> Dictionary:
+	var structures_value = manifest.get("structures", null)
+	if not structures_value is Dictionary:
+		return {}
+	var instances_value = (structures_value as Dictionary).get("instances", null)
+	if not instances_value is Array:
+		return {}
+	return _record_by_id(instances_value as Array, structure_id)
+
+
+func _resolved_manifest_world_position(record: Dictionary, manifest: Dictionary) -> Vector2:
+	var position := _vector(record.get("position", []))
+	if str(record.get("position_space", "world")) != "structure_local":
+		return position
+	var structure := _structure_instance(manifest, str(record.get("structure_id", "")))
+	if structure.is_empty():
+		return Vector2(INF, INF)
+	return _vector(structure.get("origin", [])) + position
+
+
+func _assert_exact_dictionary_keys(record: Dictionary, expected_keys: Array, label: String) -> void:
+	var actual := PackedStringArray()
+	for key in record.keys():
+		actual.append(str(key))
+	actual.sort()
+	var expected := PackedStringArray()
+	for key in expected_keys:
+		expected.append(str(key))
+	expected.sort()
+	_assert(
+		actual == expected,
+		"%s musi zawierać dokładnie pola [%s], otrzymano [%s]."
+		% [label, ", ".join(expected), ", ".join(actual)],
+	)
+
+
+func _assert_required_and_optional_dictionary_keys(
+	record: Dictionary,
+	required_keys: Array,
+	optional_keys: Array,
+	label: String,
+) -> void:
+	for key in required_keys:
+		_assert(record.has(key), "%s nie zawiera wymaganego pola %s." % [label, str(key)])
+	for key in record.keys():
+		_assert(
+			key in required_keys or key in optional_keys,
+			"%s zawiera niedozwolone pole %s." % [label, str(key)],
+		)
 
 
 func _landmark_reference_map(landmarks: Array) -> Dictionary:
@@ -1437,13 +2951,57 @@ func _direct_child_with_meta(parent: Node, meta_key: String, expected_value: Str
 	return null
 
 
+func _direct_child_with_any_meta(
+	parent: Node,
+	meta_keys: Array,
+	expected_value: String,
+) -> Node:
+	for child in parent.get_children():
+		for meta_key in meta_keys:
+			if str(child.get_meta(str(meta_key), "")) == expected_value:
+				return child
+	return null
+
+
+func _direct_child_with_property_value(
+	parent: Node,
+	property_name: String,
+	expected_value: String,
+) -> Node:
+	for child in parent.get_children():
+		for property_record in child.get_property_list():
+			if str((property_record as Dictionary).get("name", "")) != property_name:
+				continue
+			if str(child.get(property_name)) == expected_value:
+				return child
+			break
+	return null
+
+
+func _vector_is_grid_aligned(value: Vector2, grid_step: Vector2) -> bool:
+	if not value.is_finite() or grid_step.x <= 0.0 or grid_step.y <= 0.0:
+		return false
+	return (
+		is_equal_approx(value.x / grid_step.x, round(value.x / grid_step.x))
+		and is_equal_approx(value.y / grid_step.y, round(value.y / grid_step.y))
+	)
+
+
 func _vector(value) -> Vector2:
+	if value is Vector2:
+		return value as Vector2
+	if value is Vector2i:
+		return Vector2(value as Vector2i)
 	if not value is Array or (value as Array).size() != 2:
 		return Vector2(INF, INF)
 	return Vector2(float(value[0]), float(value[1]))
 
 
 func _rect(value) -> Rect2:
+	if value is Rect2:
+		return value as Rect2
+	if value is Rect2i:
+		return Rect2(value as Rect2i)
 	if not value is Array or (value as Array).size() != 4:
 		return Rect2(Vector2(INF, INF), Vector2(INF, INF))
 	return Rect2(float(value[0]), float(value[1]), float(value[2]), float(value[3]))
@@ -1460,5 +3018,5 @@ func _finish() -> void:
 	if _failed:
 		quit(1)
 		return
-	print("Underwater map smoke test passed: schema-v2 manifest, generated scene, blueprint and local runtime parity.")
+	print("Underwater map smoke test passed: schema-v5 structures, partitioned L05 collision, generated scene, blueprint and local runtime parity.")
 	quit(0)

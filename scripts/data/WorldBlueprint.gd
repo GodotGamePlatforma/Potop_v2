@@ -31,10 +31,12 @@ const MAXIMUM_DEPTH_METERS := 160.0
 @export var buoy_spawns: Array[Dictionary] = []
 @export var shortcut_spawns: Array[Dictionary] = []
 @export var fixed_device_spawns: Array[Dictionary] = []
+@export var structure_spawns: Array[Dictionary] = []
 @export var obstacle_spawns: Array[Dictionary] = []
 @export var decoration_spawns: Array[Dictionary] = []
 @export var landmark_lookup: Dictionary = {}
 @export var connection_lookup: Dictionary = {}
+@export var structure_lookup: Dictionary = {}
 @export var chunk_index: Dictionary = {}
 
 func clear() -> void:
@@ -57,10 +59,12 @@ func clear() -> void:
 	buoy_spawns.clear()
 	shortcut_spawns.clear()
 	fixed_device_spawns.clear()
+	structure_spawns.clear()
 	obstacle_spawns.clear()
 	decoration_spawns.clear()
 	landmark_lookup.clear()
 	connection_lookup.clear()
+	structure_lookup.clear()
 	chunk_index.clear()
 
 func depth_at(world_position: Vector2) -> float:
@@ -140,6 +144,10 @@ func rebuild_indexes() -> void:
 	for index in range(connections.size()):
 		var connection: Dictionary = connections[index]
 		connection_lookup[str(connection.get("id", ""))] = index
+	structure_lookup.clear()
+	for index in range(structure_spawns.size()):
+		var structure: Dictionary = structure_spawns[index]
+		structure_lookup[str(structure.get("id", ""))] = index
 
 func resolve_landmark_id(landmark_or_alias: String) -> String:
 	if landmark_lookup.has(landmark_or_alias):
@@ -168,6 +176,12 @@ func get_heavy_object(object_id: String) -> Dictionary:
 		if str(heavy_object.get("id", "")) == object_id:
 			return heavy_object
 	return {}
+
+func get_structure(structure_id: String) -> Dictionary:
+	var index := int(structure_lookup.get(structure_id, -1))
+	if index < 0 or index >= structure_spawns.size():
+		return {}
+	return structure_spawns[index]
 
 func get_region_at(world_position: Vector2) -> Dictionary:
 	var nearest: Dictionary = {}

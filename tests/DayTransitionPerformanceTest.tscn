@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/day_transition_performance_test.gd" id="1_day_transition_performance"]
+
+[node name="DayTransitionPerformanceTest" type="Node"]
+script = ExtResource("1_day_transition_performance")

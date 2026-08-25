@@ -51,6 +51,10 @@ var _runtime_dynamic: Node2D
 var _collision_segments_by_chunk: Dictionary = {}
 var _loaded_collision_chunks: Dictionary = {}
 var _collision_chunks_root: Node2D
+var _structure_roots_container: Node2D
+var _structure_roots_by_id: Dictionary = {}
+var _structure_collision_segments_by_id: Dictionary = {}
+var _collision_partition_active := false
 var _graphics_quality := "high"
 var _reduced_motion := false
 var _last_stream_radius := Vector2i(-1, -1)
@@ -120,6 +124,10 @@ func _runtime_add_child(node: Node) -> void:
 
 func _clear_runtime_dynamic() -> void:
 	_static_authored_visual_bindings.clear()
+	_structure_roots_by_id.clear()
+	_structure_collision_segments_by_id.clear()
+	_structure_roots_container = null
+	_collision_partition_active = false
 	var root := _runtime_root()
 	for child in root.get_children():
 		root.remove_child(child)
@@ -146,6 +154,21 @@ func reset_attempt() -> void:
 	for rescue_survivor in rescue_survivors:
 		if rescue_survivor != null and is_instance_valid(rescue_survivor):
 			rescue_survivor.reset_attempt()
+	_reset_structure_dynamic_bodies()
+
+
+func _reset_structure_dynamic_bodies() -> void:
+	for root_value in _structure_roots_by_id.values():
+		if not root_value is Node2D:
+			continue
+		var dynamic_bodies := (root_value as Node2D).get_node_or_null("DynamicBodies")
+		if dynamic_bodies == null:
+			continue
+		if dynamic_bodies.has_method("reset_attempt"):
+			dynamic_bodies.call("reset_attempt")
+		for descendant in dynamic_bodies.find_children("*", "", true, false):
+			if descendant.has_method("reset_attempt"):
+				descendant.call("reset_attempt")
 
 func start_position() -> Vector2:
 	return _start_position
@@ -780,10 +803,13 @@ func _rebuild_world() -> void:
 	_last_stream_chunk = Vector2i(-9999, -9999)
 	_last_stream_radius = Vector2i(-1, -1)
 	_collision_segments_by_chunk.clear()
+	_structure_collision_segments_by_id.clear()
 	_loaded_collision_chunks.clear()
 	_collision_chunks_root = null
+	_collision_partition_active = false
 	if not _snapshot_analysis_mode:
 		_build_source_visual_layers()
+		_build_source_structure_roots()
 	_build_navigation_from_source()
 	if not _snapshot_analysis_mode:
 		_build_authored_visual_prefabs()
@@ -799,6 +825,25 @@ func _build_source_visual_layers() -> void:
 		return
 	visual_layers.name = "VisualLayers"
 	_runtime_add_child(visual_layers)
+
+
+func _build_source_structure_roots() -> void:
+	var structure_roots := MapSceneCompilerScript.new().create_structure_roots()
+	if structure_roots == null:
+		push_error("Scena mapy nie zawiera kontenera StructureRoots.")
+		return
+	structure_roots.name = "StructureRoots"
+	_runtime_add_child(structure_roots)
+	_structure_roots_container = structure_roots
+	_structure_roots_by_id.clear()
+	for child in structure_roots.get_children():
+		if not child is Node2D:
+			continue
+		var structure_id := str(child.get_meta("structure_id", ""))
+		if structure_id.is_empty() or _structure_roots_by_id.has(structure_id):
+			push_error("StructureRoots zawiera niepoprawne lub powtórzone structure_id.")
+			continue
+		_structure_roots_by_id[structure_id] = child
 
 func _build_authored_visual_prefabs() -> void:
 	if _blueprint == null:
@@ -1007,15 +1052,21 @@ func _build_navigation_from_source() -> void:
 			push_error("Nie udało się odczytać scenowego makroterenu: %s" % base_error)
 		return
 	var obstacle_spawns: Array = _blueprint.obstacle_spawns if _blueprint != null else []
+	var partition_digest := str(base_raster.get("partition_digest", ""))
+	var navigation_cache_key := str(_blueprint.map_gameplay_signature) if _blueprint != null else ""
+	if not partition_digest.is_empty():
+		navigation_cache_key = "%s|partition=%s" % [navigation_cache_key, partition_digest]
 	var raster: Dictionary = MapNavigationRasterScript.build_from_cells_cached(
-		str(_blueprint.map_gameplay_signature) if _blueprint != null else "",
+		navigation_cache_key,
 		base_raster.get("cells", PackedByteArray()),
 		int(base_raster.get("width", 0)),
 		int(base_raster.get("height", 0)),
 		world_size(),
 		obstacle_spawns,
 		_blueprint.chunk_size if _blueprint != null else 512,
-		not _snapshot_analysis_mode
+		not _snapshot_analysis_mode,
+		base_raster.get("solid_owner_cells", PackedInt32Array()),
+		base_raster.get("owner_ids", PackedStringArray())
 	)
 	var raster_errors: PackedStringArray = raster.get("errors", PackedStringArray())
 	for raster_error in raster_errors:
@@ -1029,15 +1080,41 @@ func _build_navigation_from_source() -> void:
 	_nav_cells = compiled_cells.duplicate()
 	if _snapshot_analysis_mode:
 		_collision_segments_by_chunk.clear()
+		_structure_collision_segments_by_id.clear()
 		_collision_segment_count = 0
 	else:
-		_collision_segments_by_chunk = (raster.get("boundary_segments_by_chunk", {}) as Dictionary).duplicate(true)
-		_build_collision_segments(raster.get("boundary_segments", PackedVector2Array()))
+		_collision_partition_active = not partition_digest.is_empty()
+		var full_segments: PackedVector2Array = raster.get(
+			"boundary_segments",
+			PackedVector2Array()
+		)
+		_collision_segment_count = full_segments.size() / 2
+		if _collision_partition_active:
+			_collision_segments_by_chunk = (
+				raster.get("world_segments_by_chunk", {}) as Dictionary
+			).duplicate(true)
+			_structure_collision_segments_by_id = (
+				raster.get("structure_segments_by_id", {}) as Dictionary
+			).duplicate(true)
+		else:
+			_collision_segments_by_chunk = (
+				raster.get("boundary_segments_by_chunk", {}) as Dictionary
+			).duplicate(true)
+			_structure_collision_segments_by_id.clear()
+		_validate_collision_partition_count(full_segments)
+		_build_collision_segments(
+			PackedVector2Array() if _collision_partition_active else full_segments,
+			not _collision_partition_active
+		)
+		_configure_structure_collisions()
 
 
-func _build_collision_segments(cached_segments: PackedVector2Array = PackedVector2Array()) -> void:
+func _build_collision_segments(
+	cached_segments: PackedVector2Array = PackedVector2Array(),
+	allow_full_fallback: bool = true
+) -> void:
 	var segments := cached_segments.duplicate()
-	if segments.is_empty():
+	if segments.is_empty() and allow_full_fallback:
 		for y in range(_grid_height):
 			for x in range(_grid_width):
 				if not _is_open_cell(x, y):
@@ -1058,10 +1135,94 @@ func _build_collision_segments(cached_segments: PackedVector2Array = PackedVecto
 				if not _is_open_cell(x - 1, y):
 					segments.append(bottom_left)
 					segments.append(top_left)
-	_collision_segment_count = segments.size() / 2
 	_collision_chunks_root = Node2D.new()
 	_collision_chunks_root.name = "WorldMaskCollision"
 	_runtime_add_child(_collision_chunks_root)
+
+
+func _validate_collision_partition_count(full_segments: PackedVector2Array) -> void:
+	if not _collision_partition_active:
+		return
+	var partition_segment_count := 0
+	for chunk_segments_value in _collision_segments_by_chunk.values():
+		if chunk_segments_value is PackedVector2Array:
+			partition_segment_count += (chunk_segments_value as PackedVector2Array).size() / 2
+	for structure_segments_value in _structure_collision_segments_by_id.values():
+		if structure_segments_value is PackedVector2Array:
+			partition_segment_count += (structure_segments_value as PackedVector2Array).size() / 2
+	if partition_segment_count != full_segments.size() / 2:
+		push_error("Partycja kolizji runtime nie jest pełną unią segmentów L05.")
+
+
+func _configure_structure_collisions() -> void:
+	if not _collision_partition_active:
+		return
+	for structure_id_value in _structure_roots_by_id.keys():
+		var structure_id := str(structure_id_value)
+		var root := _structure_roots_by_id[structure_id] as Node2D
+		if root == null:
+			continue
+		var static_collision := root.get_node_or_null("StaticCollision") as StaticBody2D
+		var collision_shape := (
+			static_collision.get_node_or_null("CollisionShape2D") as CollisionShape2D
+			if static_collision != null
+			else null
+		)
+		if (
+			static_collision == null
+			or collision_shape == null
+			or not collision_shape.shape is ConcavePolygonShape2D
+		):
+			push_error("Struktura %s nie zawiera lokalnego ConcavePolygonShape2D." % structure_id)
+			continue
+		var actual_local_segments := (
+			collision_shape.shape as ConcavePolygonShape2D
+		).segments
+		var expected_global_segments: PackedVector2Array = (
+			_structure_collision_segments_by_id.get(
+				structure_id,
+				PackedVector2Array()
+			)
+		)
+		var expected_local_segments := PackedVector2Array()
+		for point in expected_global_segments:
+			expected_local_segments.append(root.to_local(to_global(point)))
+		if not _segment_sets_equal(actual_local_segments, expected_local_segments):
+			push_error("Lokalny kolider struktury %s nie odpowiada partycji L05." % structure_id)
+		TerrainOcclusionScript.attach_to(static_collision, actual_local_segments)
+	for structure_id_value in _structure_collision_segments_by_id.keys():
+		if not _structure_roots_by_id.has(structure_id_value):
+			push_error("Partycja L05 wskazuje brakujący korzeń struktury %s." % str(structure_id_value))
+
+
+func _segment_sets_equal(left: PackedVector2Array, right: PackedVector2Array) -> bool:
+	if left.size() != right.size() or left.size() % 2 != 0:
+		return false
+	var counts: Dictionary = {}
+	for index in range(0, left.size(), 2):
+		var key := _segment_key(left[index], left[index + 1])
+		counts[key] = int(counts.get(key, 0)) + 1
+	for index in range(0, right.size(), 2):
+		var key := _segment_key(right[index], right[index + 1])
+		if not counts.has(key):
+			return false
+		var remaining := int(counts[key]) - 1
+		if remaining <= 0:
+			counts.erase(key)
+		else:
+			counts[key] = remaining
+	return counts.is_empty()
+
+
+func _segment_key(from: Vector2, to: Vector2) -> Vector4:
+	var snapped_from := from.snapped(Vector2(0.001, 0.001))
+	var snapped_to := to.snapped(Vector2(0.001, 0.001))
+	if (
+		snapped_from.x < snapped_to.x
+		or (is_equal_approx(snapped_from.x, snapped_to.x) and snapped_from.y <= snapped_to.y)
+	):
+		return Vector4(snapped_from.x, snapped_from.y, snapped_to.x, snapped_to.y)
+	return Vector4(snapped_to.x, snapped_to.y, snapped_from.x, snapped_from.y)
 
 
 func _sync_collision_chunks(chunk_keys: Array[String]) -> void:
@@ -1446,9 +1607,25 @@ func _build_fixed_devices() -> void:
 			str(definition.get("interaction_action", "activate")),
 			float(definition.get("interaction_seconds", 1.5))
 		)
-		device.position = definition.get("position", Vector2.ZERO)
+		var device_parent: Node = _runtime_root()
+		if str(definition.get("position_space", "world")) == "structure_local":
+			var structure_id := str(definition.get("structure_id", ""))
+			var structure_root := _structure_roots_by_id.get(structure_id, null) as Node2D
+			var interactives_root := (
+				structure_root.get_node_or_null("Interactives") as Node2D
+				if structure_root != null
+				else null
+			)
+			if interactives_root == null:
+				push_error("Nie można zamontować urządzenia %s w strukturze %s." % [device_id, structure_id])
+				device.free()
+				continue
+			device_parent = interactives_root
+			device.position = definition.get("local_position", Vector2.ZERO)
+		else:
+			device.position = definition.get("position", Vector2.ZERO)
 		device.z_index = 6
-		_runtime_add_child(device)
+		device_parent.add_child(device)
 		_configure_interactable_presentation(device, definition, device_id)
 		_attach_authored_visual(device, definition)
 		persistent_interactables.append(device)

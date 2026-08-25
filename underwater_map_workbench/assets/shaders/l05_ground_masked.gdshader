@@ -2,7 +2,9 @@ shader_type canvas_item;
 
 uniform sampler2D topology_mask : filter_nearest, repeat_disable;
 uniform sampler2D ground_texture : source_color, filter_linear, repeat_enable;
-uniform vec2 texture_tiling = vec2(18.0, 5.0);
+// The generated scene overrides this with world_rect.size / texture pixel_size,
+// preserving exactly one source texel per world unit while repeating the material.
+uniform vec2 texture_tiling = vec2(1.0);
 uniform vec4 shallow_tint : source_color = vec4(0.66, 0.76, 0.78, 1.0);
 uniform vec4 deep_tint : source_color = vec4(0.28, 0.39, 0.43, 1.0);
 uniform float boundary_softness : hint_range(0.0, 0.49, 0.01) = 0.0;

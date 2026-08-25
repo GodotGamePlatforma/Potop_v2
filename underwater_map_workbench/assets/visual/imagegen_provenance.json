@@ -5,12 +5,25 @@
   "tool": "OpenAI image_gen",
   "model": "not_exposed_by_tool",
   "seed": "not_exposed_by_tool",
+  "local_path_policy": "Machine-local source paths are normalized to imagegen://generated_images/ and session-temp://; SHA-256 values remain the provenance identity.",
   "input_references": [
     {
-      "path": "D:/Dev/tmp/codex-clipboard-caad00e6-d454-47f3-a817-9a7caad42d09.png",
+      "path": "session-temp://codex-clipboard-caad00e6-d454-47f3-a817-9a7caad42d09.png",
       "sha256": "a5c7cb9d130c1de19c1efd1a39fbbee15f41ed224a6f5fea6bd43509ed1f0049",
       "role": "STYLE_ONLY",
       "use": "Czytelne pionowe proporcje wiezowcow i subtelna widocznosc elewacji; bez kopiowania kadru, wody, oswietlenia, mgly ani ukladu budynkow."
+    },
+    {
+      "path": "session-temp://codex-clipboard-7193cede-1d0b-4269-9026-980a85de5a3b.png",
+      "sha256": "e6db65f11175c4be113c57af9eaef30df798f7aac3a326cae87a4c23646b2bbe",
+      "role": "COMPOSITION_ONLY",
+      "use": "Zaakceptowany przez uzytkownika umiarkowany rytm gestosci i zroznicowanie wysokosci; bez kopiowania konkretnych budynkow."
+    },
+    {
+      "path": "session-temp://codex-clipboard-b10b9a54-7dea-42d9-8409-b9f9cbbf568c.png",
+      "sha256": "b3b21609cbf247f1cd8d501cef9494552793ef4db496f8198be2dc4b88a87cf7",
+      "role": "STYLE_AND_ORIENTATION",
+      "use": "Jawnie zaakceptowane ustawienie wiezowcow idealnie na wprost, proste dachy, czytelna elewacja i brak nadmiernej gestosci."
     }
   ],
   "research_references": [
@@ -31,77 +44,1143 @@
       "publisher": "Council on Tall Buildings and Urban Habitat",
       "accessed_at": "2026-08-25",
       "use": "Wiarygodne smukle proporcje wysokich budynkow; bez kopiowania konkretnej architektury."
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:Toronto_skyline_from_Western_Channel,_Billy_Bishop_Toronto_City_Airport_2017-05-17.jpg",
+      "publisher": "Wikimedia Commons / Kim Hansen",
+      "license": "CC BY-SA 4.0",
+      "accessed_at": "2026-08-25",
+      "use": "Referencja zroznicowania proporcji i rytmu wspolczesnej panoramy; bez kopiowania assetu."
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:Modern_skyscraper_facades_(Unsplash).jpg",
+      "publisher": "Wikimedia Commons / Justin Main",
+      "license": "CC0",
+      "accessed_at": "2026-08-25",
+      "use": "Referencja rodzin elewacji szklanych i betonowych; bez kopiowania assetu."
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:Toronto_Skyline_as_seen_from_Sheldon_Lookout_Near_High_Park.jpg",
+      "publisher": "Wikimedia Commons / Ravik",
+      "license": "Public domain",
+      "accessed_at": "2026-08-25",
+      "use": "Referencja miejsc oddechu miedzy grupami wysokosciowcow; bez kopiowania assetu."
+    },
+    {
+      "url": "https://docs.godotengine.org/en/stable/tutorials/2d/2d_parallax.html",
+      "publisher": "Godot Engine documentation",
+      "license": "CC BY 3.0",
+      "accessed_at": "2026-08-25",
+      "use": "Techniczna podstawa skladania jednej warstwy z wielu osobnych wezlow i rozroznienia ruchu scroll_scale od skali geometrycznej assetu."
+    },
+    {
+      "url": "https://www.som.com/projects/wenzhou-lucheng-plaza-landmark-tower/",
+      "publisher": "Skidmore, Owings & Merrill (SOM)",
+      "accessed_at": "2026-08-25",
+      "role": "STYLE_ONLY",
+      "authority": false,
+      "use": "Referencja smuklych proporcji, pionowych finow i rytmu elewacji; bez kopiowania budynku, geometrii ani ukladu."
+    },
+    {
+      "url": "https://www.som.com/projects/star-river-headquarters/",
+      "publisher": "Skidmore, Owings & Merrill (SOM)",
+      "accessed_at": "2026-08-25",
+      "role": "STYLE_ONLY",
+      "authority": false,
+      "use": "Referencja plisowanej elewacji, pionowego swiatlocienia i spokojnych proporcji; bez kopiowania budynku, geometrii ani ukladu."
+    },
+    {
+      "url": "https://global.ctbuh.org/resources/papers/download/2516-thinking-out-of-the-box-advanced-facade-design-and-technology.pdf",
+      "publisher": "Council on Tall Buildings and Urban Habitat (CTBUH)",
+      "accessed_at": "2026-08-25",
+      "role": "STYLE_ONLY",
+      "authority": false,
+      "use": "Referencja roznorodnosci wspolczesnych systemow fasadowych; bez kopiowania konkretnego projektu, geometrii ani ukladu."
+    },
+    {
+      "url": "https://oceanexplorer.noaa.gov/fact-sheet/light-and-color-fact-sheet/",
+      "publisher": "NOAA Ocean Exploration",
+      "accessed_at": "2026-08-25",
+      "role": "STYLE_ONLY",
+      "authority": false,
+      "use": "Referencja zachowania swiatla i koloru pod woda; bez wypiekania pola wody, mgly, promieni ani oswietlenia w assetach."
     }
   ],
   "rejected_outputs": [
     {
-      "path": "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e96c435a-6d4a-4d83-88fc-bfab20ba5c93.png",
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e96c435a-6d4a-4d83-88fc-bfab20ba5c93.png",
       "sha256": "5082c810f2e563d919bf2019d62605c2efe6050d210a44d7629209e97e9e2e02",
       "reason": "Odrzucone: zbyt rozlegle ruiny i zniszczenia dla niedawno zatopionego miasta; plik nie jest zrodlem aktywnego assetu."
     },
     {
-      "path": "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e30ce382-ac42-472a-af2c-a231e5c61495.png",
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e30ce382-ac42-472a-af2c-a231e5c61495.png",
       "sha256": "a814166a875eff3aeb5cc99fd052dd46f8c87d09e8c78e38970933f95f66c4ed",
       "reason": "Odrzucone: zbyt rozlegle ruiny i zniszczenia dla niedawno zatopionego miasta; plik nie jest zrodlem aktywnego assetu."
+    },
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-d2a8ac24-f028-48ec-8b3e-5609962e65e8.png",
+      "sha256": "3432b2c50536d7439b158a66ee8653559ddcb017c94c36e5ae4b7babd82e6424",
+      "reason": "Odrzucone: proba ekstrakcji L02 nadal miala szachownice wypieczona w RGB zamiast rzeczywistej alfy."
+    },
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-ae2df220-4183-40e8-aa84-fa6b10cc4f8e.png",
+      "sha256": "f2aabd9da68d96921746ecd956fe0219514f798661ac57964bab902e216ecc17",
+      "reason": "Odrzucone: generator wypiekl wzor szachownicy w RGB zamiast zwrocic jednolite tlo do deterministycznej ekstrakcji alfy."
+    },
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-f5951d19-df41-48e8-b064-4c4b448024e8.png",
+      "sha256": "d0f19cba01f10d981769f8e4ddb2f070065b4aa643c239048c2224530b5d6ccd",
+      "reason": "Odrzucone: edycja nadal pozostawila szachownice w RGB, wiec nie mogla byc zrodlem aktywnego assetu."
+    },
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-55f1c1f2-c2b0-46d2-88fa-84271d423c60.png",
+      "sha256": "b036c5d260da05920275fc9a6b383fb41ba759cc30e0dec4348a5da7f2280154",
+      "pixel_size": [1024, 1536],
+      "channels": "RGB",
+      "status": "rejected_baked_checkerboard_no_alpha",
+      "reason": "Odrzucone: edycja zwrocila szachownice wypieczona w RGB bez rzeczywistego kanalu alfa; plik nie jest zrodlem aktywnego assetu."
+    },
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-eee38eb3-a50f-41e1-817a-f65a5cb5def5.png",
+      "sha256": "156ffad8cc235c856269714ad8fb98cd7da0ecb920684f5195fae2197a53bc8a",
+      "pixel_size": [1024, 1536],
+      "channels": "RGBA",
+      "status": "rejected_nonorthographic_visible_three_quarter_side_wall",
+      "reason": "Odrzucone dla L02: widoczna boczna sciana tworzy ujecie trzy czwarte zamiast scislej ortograficznej elewacji frontowej."
+    },
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-d4324471-aa67-4706-8b21-99c179fcb2c4.png",
+      "sha256": "5468691f6119108282cb029ffc7bba5552f39bafa5ad38789160ee0f645b6313",
+      "pixel_size": [1024, 1536],
+      "channels": "RGBA",
+      "status": "rejected_arched_rounded_crown_not_rectilinear_front",
+      "reason": "Odrzucone dla L02: lukowa zaokraglona korona narusza wymagany prostokatny, scisle frontowy jezyk bryly."
+    }
+  ],
+  "unused_valid_outputs": [
+    {
+      "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-448f69e3-fa4f-4edd-8e93-cf669a1b8244.png",
+      "sha256": "47e08de3689b63a8fbf901922d7e75f7a9c6c7e1a04cf98677db8642814fe45b",
+      "pixel_size": [1217, 1293],
+      "channels": "RGBA",
+      "status": "unused_valid_not_referenced_by_manifest",
+      "reason": "Technicznie poprawny niezalezny wariant budynku RGBA, ale niewykorzystany w finalnym zestawie i nieprzywolany przez manifest."
     }
   ],
   "entries": [
     {
-      "id": "l01_distant_city",
+      "id": "l01_distant_city_native_panels",
+      "status": "inactive_rejected_visual_not_referenced_by_manifest",
       "role": "nonblocking_backdrop",
-      "prompt_summary": "Ultra-wide orthographic skyline of a recently submerged modern city. Office and residential towers remain 95-98 percent structurally intact, with complete facades, rectangular roofs and credible proportions; no domes, collapsed districts, post-apocalyptic ruins, terrain, water field, baked lighting or gameplay affordances. A restrained distant blue layer retains subtle facade detail and meets one shared ground line.",
+      "prompt_summary": "Six separate moderate-density sheets of recently submerged, 97-99 percent intact modern high-rises. Strict flat orthographic side-view presentation, facades facing the camera, varied rectangular proportions and facade families, simple flat roofs, no antennas, domes, ruins, perspective floors, water, fog, baked lighting, terrain or gameplay affordances. Dark navy and desaturated blue buildings were generated on a uniform white matte for deterministic alpha extraction.",
+      "generation_references": [
+        {
+          "path": "session-temp://codex-clipboard-7193cede-1d0b-4269-9026-980a85de5a3b.png",
+          "sha256": "e6db65f11175c4be113c57af9eaef30df798f7aac3a326cae87a4c23646b2bbe",
+          "role": "COMPOSITION_ONLY",
+          "use": "Moderate density and varied height rhythm only."
+        },
+        {
+          "path": "session-temp://codex-clipboard-b10b9a54-7dea-42d9-8409-b9f9cbbf568c.png",
+          "sha256": "b3b21609cbf247f1cd8d501cef9494552793ef4db496f8198be2dc4b88a87cf7",
+          "role": "STYLE_AND_ORIENTATION",
+          "use": "User-approved front-facing 2D orientation, flat roofs, readable facades and spacing."
+        }
+      ],
       "source_outputs": [
-        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-42321d9e-f5b6-4227-9359-f572521c76d9.png"
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-9c83b5d7-54bd-462a-8fab-17a098f9df3b.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-7500747c-21fb-4126-a42d-5d1521bf1b53.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-5c34a1b6-03b4-432c-b433-5a5f874fc395.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-c468da86-eb76-4cdc-a075-ac5bfd1360e1.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-114654ae-f535-4679-8569-495de92812d8.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-f42c2c19-1ea6-46eb-af59-42efb354ee4c.png"
       ],
       "source_output_sha256": [
-        "4c180a4929bbceafeaacbdbb87e8e7dadeb21012610364da54441b380f35c6e5"
+        "c10a565f414686c1e3209b966ad0a8a70f4c7d16f9b3bc653748f13a32e6be59",
+        "05d0ef5a4a92d7cd70120b9556b4a908ff100efb42e5ac334b727d7ef8850f7d",
+        "130f55570c2e9049753d985d172fc7ca6e7020e85023d77e3e8b03eb262f73aa",
+        "d34bc593b5c86c8abc809f276006854a1baf08e1b67dc095a0f40867f056ef0e",
+        "33f99b786083225df06ea2013c4c7edde7f26bfc505af6f597c5271fa0aa5274",
+        "1a6c9c6d4979c01e2f65705c18c55143994dde6350171fdbd465a2f2a1b5e856"
       ],
       "postprocess": {
         "operation_order": [
-          "derive_alpha_as_clamp((blue-red)/0.22)_to_remove_baked_neutral_background",
-          "exact_crop_2048x576_at_6_187_preserving_32x9_aspect",
-          "modulate_rgb_and_saturation_62_62_100",
-          "multiply_alpha_by_0.48",
-          "uniform_lanczos_resize_to_4096x1152_without_nonuniform_scaling"
+          "derive_binary_alpha_from_uniform_white_matte_with_grayscale_threshold_74_percent",
+          "set_rgb_to_black_only_where_alpha_is_zero",
+          "crop_only_fully_transparent_top_and_bottom_rows_without_resampling",
+          "write_rgba8_at_each_native_cropped_dimension",
+          "place_six_panels_side_by_side_at_cumulative_native_x_positions_and_bottom_anchor_at_world_y_6480",
+          "do_not_resize_resample_scale_flop_rotate_or_warp_any_panel"
         ],
-        "implementation": "ImageMagick 7.1.2-29 deterministic local composition"
+        "implementation": "OpenAI image_gen followed by deterministic ImageMagick 7.1.2-29 matte removal; no resampling"
       },
-      "supersedes_result_sha256": "272655e94380d74e1765acb3f24524cc8d76af99dbac1dee6678714ce8e4e8a1",
-      "result_path": "assets/visual/l01_distant_city.png",
-      "result_sha256": "0ef3a907a3dfb5dfb257fb8a99b0638728335c4a75f51a264af9fccbe70ea6ca",
+      "result_assets": [
+        {
+          "id": "l01_distant_city_a",
+          "path": "assets/visual/l01_distant_city.png",
+          "sha256": "c9aad163191e5895f1032ed44bd37a696e13889a1d35f6f788a669dc7a4daab8",
+          "pixel_size": [2060, 647],
+          "world_rect": [0, 5833, 2060, 647]
+        },
+        {
+          "id": "l01_distant_city_b",
+          "path": "assets/visual/l01_distant_city_b.png",
+          "sha256": "e35bf1044b6af10ee01d548f15d4d6ffce2fa659cdf50c9e83eca24bbf2d0601",
+          "pixel_size": [1942, 689],
+          "world_rect": [2060, 5791, 1942, 689]
+        },
+        {
+          "id": "l01_distant_city_c",
+          "path": "assets/visual/l01_distant_city_c.png",
+          "sha256": "913dc45f48eb53246df22e006bb203a331f34da47c0bb55afe443d7af98abfd7",
+          "pixel_size": [2060, 647],
+          "world_rect": [4002, 5833, 2060, 647]
+        },
+        {
+          "id": "l01_distant_city_d",
+          "path": "assets/visual/l01_distant_city_d.png",
+          "sha256": "aa057ce9842472cfcc6336216566f21bd664724837ced05b6bd4c227b7c66d1d",
+          "pixel_size": [2059, 612],
+          "world_rect": [6062, 5868, 2059, 612]
+        },
+        {
+          "id": "l01_distant_city_e",
+          "path": "assets/visual/l01_distant_city_e.png",
+          "sha256": "3e02735040f2d27cbe72d788cb9145e94019e584c46b16cf377a11e4a21f720f",
+          "pixel_size": [2057, 617],
+          "world_rect": [8121, 5863, 2057, 617]
+        },
+        {
+          "id": "l01_distant_city_f",
+          "path": "assets/visual/l01_distant_city_f.png",
+          "sha256": "da617dcd9535d7a52d40f6981c038f0d6f683ab6f86b67f55dca6adf9b262084",
+          "pixel_size": [1879, 667],
+          "world_rect": [10178, 5813, 1879, 667]
+        }
+      ],
+      "review_derivatives": [
+        {
+          "path": "assets/layout_guides/l01_native_panels_review.png",
+          "sha256": "63fb978c5ea2af2636f7308dad575e040e1cc26542bf9e23b63ef18e09413b0a",
+          "pixel_size": [12057, 900],
+          "role": "native_full_strip_with_l00_and_native_tiled_l05_for_visual_review_only"
+        },
+        {
+          "path": "assets/layout_guides/l01_native_gameplay_contact_sheet.png",
+          "sha256": "d51b0c098619283f83ac8cfa5f8ff087afefbe3c1a747dccdf22d28a5324abcd",
+          "pixel_size": [3840, 1440],
+          "role": "six_1280x720_native_crops_for_visual_review_only"
+        }
+      ]
+    },
+    {
+      "id": "l01_independent_city_assets",
+      "status": "active_referenced_by_manifest",
+      "role": "nonblocking_backdrop",
+      "generated_at": "2026-08-25",
+      "tool": "OpenAI built-in image_gen",
+      "model": "not_exposed_by_tool",
+      "seed": "not_exposed_by_tool",
+      "canonical_prompt_set": {
+        "capture_kind": "canonical_prompt_set_not_verbatim_tool_log",
+        "shared_prompt": "Create one isolated recently submerged modern city skyscraper as a realistic hand-painted 2D game background asset. Strict orthographic front elevation, camera perfectly straight-on, no perspective or three-quarter view. Intact contemporary [VARIANT] tower, dark blue-gray unlit facade with subtle architectural detail and a simple flat roof. Genuine transparent RGBA background; no checkerboard, sky, water, seabed, fog, haze, caustics, glow, cast shadow, frame, text, logo, or watermark. No antenna, spire, dome, ruins, broken silhouette, debris, vegetation, fish, interiors, doors, or gameplay affordances. Show the entire building from roof to base with safe transparent margins. Crisp non-pixel-art painterly realism.",
+        "variants": [
+          {
+            "asset_id": "l01_city_01",
+            "variant": "tall narrow civic"
+          },
+          {
+            "asset_id": "l01_city_02",
+            "variant": "broad modern office slab"
+          },
+          {
+            "asset_id": "l01_city_03",
+            "variant": "tall slender glass"
+          },
+          {
+            "asset_id": "l01_city_04",
+            "variant": "wide mid-rise corporate"
+          },
+          {
+            "asset_id": "l01_city_05",
+            "variant": "narrow residential balcony"
+          },
+          {
+            "asset_id": "l01_city_06",
+            "variant": "broad hotel slab"
+          },
+          {
+            "asset_id": "l01_city_07",
+            "variant": "mixed-use central-bay tower"
+          },
+          {
+            "asset_id": "l01_city_08",
+            "variant": "tall narrow office tower with vertical concrete fins"
+          },
+          {
+            "asset_id": "l01_city_09",
+            "variant": "broad administrative three-bay office slab"
+          },
+          {
+            "asset_id": "l01_city_10",
+            "variant": "tall slender glass tower with recessed central vertical stripe"
+          },
+          {
+            "asset_id": "l01_city_11",
+            "variant": "wide hotel-office horizontal-band slab"
+          },
+          {
+            "asset_id": "l01_city_12",
+            "variant": "medium-high rectilinear office tower with side fins"
+          }
+        ]
+      },
+      "style_research_urls": [
+        "https://www.som.com/projects/wenzhou-lucheng-plaza-landmark-tower/",
+        "https://www.som.com/projects/star-river-headquarters/",
+        "https://global.ctbuh.org/resources/papers/download/2516-thinking-out-of-the-box-advanced-facade-design-and-technology.pdf",
+        "https://oceanexplorer.noaa.gov/fact-sheet/light-and-color-fact-sheet/"
+      ],
+      "style_research_role": "STYLE_ONLY",
+      "style_research_authority": false,
+      "source_outputs": [
+        {
+          "asset_id": "l01_city_01",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-074d3355-171a-4a52-a7ba-bd308f5dfe59.png",
+          "sha256": "1e7ad9befa908ae22883d89f75e0fdc30a0a1c57c816c26d34cfc79da1ce6e1c",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_02",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-eb53e341-b5b7-4d89-83e5-75def51b023b.png",
+          "sha256": "27fca6b52f33f6ce1a696a3952c5ab77f8d67a002983fa64019700a3df7528c7",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_03",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-afac1c9d-fb0f-4583-a0ab-10bc838f6f6b.png",
+          "sha256": "e5fb4b35d718bff074d1619db17c834420975c5e10eb3c522307c91820854ff6",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_04",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-1ffead7d-f124-4d6c-bc46-20767ccf38a9.png",
+          "sha256": "d213c99d021853605d58357b511924e761f36288309686e7cfb6053bb7ae4f60",
+          "pixel_size": [1217, 1292],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_05",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-6a20ad70-0102-492b-8d3b-54a628f22e13.png",
+          "sha256": "8efb7f5a6a1697a849abf42b71063caa1c1c9d12610fdc8f32b714203c28cedc",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_06",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-b0adfe5d-bda2-4ca0-aad9-02d93610c0b1.png",
+          "sha256": "6db69155147d61a1682c5ce1d45dd8eae31a01568d63e286da4ba835417d0f70",
+          "pixel_size": [1355, 1161],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_07",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-ea9bc4a9-ba80-4873-a7aa-18f43f61f0ff.png",
+          "sha256": "4085387a205ac149b74da092e1b8e422b04efa30a0f8ccfe7d33283ec1bcd5c7",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_08",
+          "path": "imagegen://generated_images/01a039a5-47e8-76b3-8bfd-f708c8968c2a/exec-7a9621d5-10e0-4039-b037-5d22c9391468.png",
+          "sha256": "6f0fd17f853ab569a125e2ba259dab364627531b34178f4060e8e2ff9c05ba13",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_09",
+          "path": "imagegen://generated_images/01a039a5-47e8-76b3-8bfd-f708c8968c2a/exec-84f031f4-4164-4204-bbff-c0811621fd23.png",
+          "sha256": "0991c1fb17bb69e9274460e9e9805d5b6f6155bf5caf4abebe77068e2bca8cce",
+          "pixel_size": [1536, 1024],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_10",
+          "path": "imagegen://generated_images/01a039a5-47e8-76b3-8bfd-f708c8968c2a/exec-9a7858f3-02ec-4b79-a5fc-fb7dba9c88cd.png",
+          "sha256": "7c43599a92354b26818291b82142458e1053d3ec9ed7c037c7ce529e563bf8d3",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_11",
+          "path": "imagegen://generated_images/01a039a5-47e8-76b3-8bfd-f708c8968c2a/exec-a01f9c11-e45c-4ff5-873d-c70002bbe2bf.png",
+          "sha256": "3989332e154e27f9838a1afdad772c697d76b5b75cf34177d4c56b79a737d440",
+          "pixel_size": [1536, 1024],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l01_city_12",
+          "path": "imagegen://generated_images/01a039a5-47e8-76b3-8bfd-f708c8968c2a/exec-0ad16221-fd03-4322-8194-cfbe4d314c8e.png",
+          "sha256": "a832ea32cff246c889b0c47e74659a1895d8116a4236b005ab8daa5095cc7ac2",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        }
+      ],
+      "postprocess": {
+        "operation_order": [
+          "center_crop_or_pad_only_the_horizontal_canvas_to_the_manifest_width_on_the_native_pixel_grid_without_resampling",
+          "split_each_source_at_its_recorded_integer_module_start_y_and_module_height",
+          "append_the_recorded_number_of_additional_exact_module_copies_at_integer_pixel_offsets",
+          "threshold_alpha_at_50_percent_and_set_rgb_to_black_only_where_alpha_is_zero",
+          "translate_opaque_content_down_by_the_recorded_bottom_alignment_translation_y_inside_the_unchanged_canvas_without_resampling",
+          "write_noninterlaced_rgba8_at_the_manifest_pixel_size",
+          "do_not_resize_resample_scale_warp_rotate_or_flop_any_source_or_result"
+        ],
+        "implementation": "ImageMagick 7.1.2-29 Q16-HDRI for l01_city_01..07 and deterministic Pillow native-pixel integer module-repeat plus alpha cleanup for l01_city_08..12 after OpenAI built-in image_gen; no geometric resampling",
+        "asset_operations": [
+          {
+            "asset_id": "l01_city_01",
+            "module_start_y": 600,
+            "module_height": 149,
+            "additional_module_copies": 16,
+            "bottom_alignment_translation_y": 16
+          },
+          {
+            "asset_id": "l01_city_02",
+            "module_start_y": 640,
+            "module_height": 64,
+            "additional_module_copies": 16,
+            "bottom_alignment_translation_y": 44
+          },
+          {
+            "asset_id": "l01_city_03",
+            "module_start_y": 600,
+            "module_height": 203,
+            "additional_module_copies": 8,
+            "bottom_alignment_translation_y": 10,
+            "bottom_alignment_breakdown": {
+              "initial_translation_y": 9,
+              "additional_native_crop_and_realign_y": 1
+            }
+          },
+          {
+            "asset_id": "l01_city_04",
+            "module_start_y": 480,
+            "module_height": 217,
+            "additional_module_copies": 4,
+            "bottom_alignment_translation_y": 63
+          },
+          {
+            "asset_id": "l01_city_05",
+            "module_start_y": 600,
+            "module_height": 159,
+            "additional_module_copies": 16,
+            "bottom_alignment_translation_y": 25
+          },
+          {
+            "asset_id": "l01_city_06",
+            "module_start_y": 400,
+            "module_height": 59,
+            "additional_module_copies": 21,
+            "bottom_alignment_translation_y": 25
+          },
+          {
+            "asset_id": "l01_city_07",
+            "module_start_y": 600,
+            "module_height": 79,
+            "additional_module_copies": 16,
+            "bottom_alignment_translation_y": 17
+          },
+          {
+            "asset_id": "l01_city_08",
+            "module_start_y": 700,
+            "module_height": 129,
+            "additional_module_copies": 16,
+            "horizontal_canvas_operation": "center_crop_x:52",
+            "bottom_alignment_translation_y": 24
+          },
+          {
+            "asset_id": "l01_city_09",
+            "module_start_y": 400,
+            "module_height": 104,
+            "additional_module_copies": 14,
+            "horizontal_canvas_operation": "center_crop_x:28",
+            "bottom_alignment_translation_y": 86
+          },
+          {
+            "asset_id": "l01_city_10",
+            "module_start_y": 660,
+            "module_height": 223,
+            "additional_module_copies": 8,
+            "horizontal_canvas_operation": "center_crop_x:72",
+            "bottom_alignment_translation_y": 14
+          },
+          {
+            "asset_id": "l01_city_11",
+            "module_start_y": 407,
+            "module_height": 157,
+            "additional_module_copies": 8,
+            "horizontal_canvas_operation": "center_pad_x:32",
+            "bottom_alignment_translation_y": 85
+          },
+          {
+            "asset_id": "l01_city_12",
+            "module_start_y": 660,
+            "module_height": 188,
+            "additional_module_copies": 8,
+            "horizontal_canvas_operation": "center_pad_x:48",
+            "bottom_alignment_translation_y": 12
+          }
+        ]
+      },
+      "result_assets": [
+        {
+          "id": "l01_city_01",
+          "path": "assets/visual/l01_city_01.png",
+          "sha256": "d4d2525d77ff296c01f9381024790ad939bf03907e64616b1944a05256e55d97",
+          "pixel_size": [960, 3920],
+          "world_rect": [120, 2640, 960, 3920]
+        },
+        {
+          "id": "l01_city_02",
+          "path": "assets/visual/l01_city_02.png",
+          "sha256": "5af44c9164694c586f149c486a1fc9bb2170abdb0538b2de8bb85cf6d2684f92",
+          "pixel_size": [1120, 2560],
+          "world_rect": [1540, 4000, 1120, 2560]
+        },
+        {
+          "id": "l01_city_03",
+          "path": "assets/visual/l01_city_03.png",
+          "sha256": "47c9e35a5a248ba0e01868b859e50edbf840b8927ebe9f000a2f369b293cfe48",
+          "pixel_size": [800, 3160],
+          "world_rect": [3200, 3400, 800, 3160]
+        },
+        {
+          "id": "l01_city_04",
+          "path": "assets/visual/l01_city_04.png",
+          "sha256": "70086bc9bd1005ff3f44d2fe69cf60c63a37d2f86139d35e3e8ea729834bc363",
+          "pixel_size": [1360, 2160],
+          "world_rect": [4620, 4400, 1360, 2160]
+        },
+        {
+          "id": "l01_city_05",
+          "path": "assets/visual/l01_city_05.png",
+          "sha256": "35717cd0af3d171ba9b763dc3e2eb78ec3f14bce0e59519bfc400531603ee66c",
+          "pixel_size": [880, 4080],
+          "world_rect": [6460, 2480, 880, 4080]
+        },
+        {
+          "id": "l01_city_06",
+          "path": "assets/visual/l01_city_06.png",
+          "sha256": "5d958ad48c1650fbbda0239bd55bc340087c37737964ac42935093d380d141f0",
+          "pixel_size": [1760, 2400],
+          "world_rect": [7820, 4160, 1760, 2400]
+        },
+        {
+          "id": "l01_city_07",
+          "path": "assets/visual/l01_city_07.png",
+          "sha256": "1685cd2170567f0adabbb695defd1b8c5ed148aa54bb23ce789948c394c45a51",
+          "pixel_size": [1120, 2800],
+          "world_rect": [10640, 3760, 1120, 2800]
+        },
+        {
+          "id": "l01_city_08",
+          "path": "assets/visual/l01_city_08.png",
+          "sha256": "6f4af3370c75b352a0e9f0e9a689b3aaf051fbe48f510965a25c149d0e6efffc",
+          "pixel_size": [920, 3600],
+          "world_rect": [12320, 2960, 920, 3600]
+        },
+        {
+          "id": "l01_city_09",
+          "path": "assets/visual/l01_city_09.png",
+          "sha256": "3beca2db60abf2d728d37c2c900153834c8fb6584f2785f36ae8726ccc1e31af",
+          "pixel_size": [1480, 2480],
+          "world_rect": [13960, 4080, 1480, 2480]
+        },
+        {
+          "id": "l01_city_10",
+          "path": "assets/visual/l01_city_10.png",
+          "sha256": "71df43a2f562fbf076f3e84b71509ebf367353a64a79d1ae485463715f934f2d",
+          "pixel_size": [880, 3320],
+          "world_rect": [16060, 3240, 880, 3320]
+        },
+        {
+          "id": "l01_city_11",
+          "path": "assets/visual/l01_city_11.png",
+          "sha256": "e3a4390e9608ebf2590b45071363cf61051a9c36928651114d0d9531879b860e",
+          "pixel_size": [1600, 2280],
+          "world_rect": [17880, 4280, 1600, 2280]
+        },
+        {
+          "id": "l01_city_12",
+          "path": "assets/visual/l01_city_12.png",
+          "sha256": "4516c968e341e80563d3c6ff7008847d8baee0bddcfaa22711e36220606af10d",
+          "pixel_size": [1120, 3040],
+          "world_rect": [20080, 3520, 1120, 3040]
+        }
+      ]
+    },
+    {
+      "id": "l02_near_city",
+      "status": "inactive_legacy_provenance_not_referenced_by_manifest",
+      "role": "nonblocking_backdrop",
+      "prompt_summary": "Nearer L02 for the same recently submerged city, assembled from two distinct generated masters: larger intact modern towers and dense infill, sharper and clearer than L01 while remaining background. The overlapping panels form a continuous band whose limited roof gaps reveal L01, without domes, ruins, terrain, fog, water field, baked light or gameplay affordances.",
+      "generation_references": [
+        {
+          "path": "session-temp://codex-clipboard-caad00e6-d454-47f3-a817-9a7caad42d09.png",
+          "sha256": "a5c7cb9d130c1de19c1efd1a39fbbee15f41ed224a6f5fea6bd43509ed1f0049",
+          "role": "STYLE_ONLY",
+          "use": "Believable rectilinear skyscraper proportions only; no water, light, fog, color, crop or layout authority."
+        },
+        {
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e30dde6e-f6c5-409d-968c-c1e71269397d.png",
+          "sha256": "b446de7bbe605db29b4b59a1e3f32a5a070555162c1be54fcefb407899d7353b",
+          "role": "COMPOSITION_ONLY",
+          "use": "Overlap and complementary skyline rhythm only; no tracing, alignment or duplication of exact towers."
+        }
+      ],
+      "source_outputs": [
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-8d8ae2a5-bf09-409f-a890-1364a3980d10.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-633c841f-e07f-4381-bc66-56faca8ae57d.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-238e39a5-302a-4d29-9531-f22c514ab92a.png",
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-a7d18640-1dfd-4a23-b762-818f200e9bd2.png"
+      ],
+      "source_output_sha256": [
+        "86d2e32f9a23a0aad3e18ece543cf37264ba824348d1844eb0feaaf5d39eb0df",
+        "b6a96ebafacfd53aea21d5df239a992f7f6cf8679456fa378cad10e61742902e",
+        "483825bfabb7cee5dde737fc891f3a640f33b212db4cace7def21c5d7cae88b1",
+        "50aa7bae8c29d1f8747de08a7e27a7c005e6537ffe212ee73082c2ea70d21738"
+      ],
+      "postprocess": {
+        "operation_order": [
+          "replace_both_checkerboard_backgrounds_with_uniform_white_generation_mattes",
+          "remove_only_edge_connected_white_matte_with_floodfill_fuzz_5_percent_threshold_50_percent_erode_diamond_1_close_diamond_1",
+          "uniform_lanczos_scale_new_master_to_2700_width_and_previous_master_to_2600_width_without_axis_stretch",
+          "flop_previous_master_place_panels_at_x_0_and_1496_bottom_anchor_both_at_y_1152_and_overlap_into_continuous_band",
+          "modulate_new_master_70_82_100_and_previous_master_72_80_100",
+          "tighten_alpha_with_level_8_to_92_percent",
+          "rebuild_edge_rgb_from_eroded_opaque_core_with_dilate_diamond_3_to_remove_white_matte",
+          "copy_alpha_without_global_alpha_multiply_set_fully_transparent_rgb_to_black_and_write_rgba8_4096x1152"
+        ],
+        "implementation": "OpenAI image_gen matte correction followed by ImageMagick 7.1.2-29 deterministic two-master composition and alpha cleanup"
+      },
+      "supersedes_result_sha256": "206626160b2fe8804936ddcf79da049d097c45c37cd0dbe1dd382431864b84b9",
+      "result_path": "assets/visual/l02_near_city.png",
+      "result_sha256": "79a20ee189152ab22df221c99a25f3f718fd2b7384aa0072500a072779590c2a",
       "result_pixel_size": [
         4096,
         1152
       ]
     },
     {
-      "id": "l02_near_city",
+      "id": "l02_independent_city_assets",
+      "status": "active_referenced_by_manifest",
       "role": "nonblocking_backdrop",
-      "prompt_summary": "Complementary nearer skyline band for the same recently submerged modern city. Larger intact rectangular towers show slightly clearer facade rhythm while remaining dark, cool and atmospheric; no domes, collapsed buildings, rubble fields, water field, terrain, baked light shafts or gameplay affordances. All footprints share the same ground line as L01.",
-      "source_outputs": [
-        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-1d79b46e-e4df-45cb-bfbb-099a127385dd.png",
-        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-1ba1f954-cb44-40c6-8078-fbf91e3ce2d2.png"
+      "generated_at": "2026-08-25",
+      "tool": "OpenAI built-in image_gen",
+      "model": "not_exposed_by_tool",
+      "seed": "not_exposed_by_tool",
+      "canonical_prompt_set": {
+        "capture_kind": "canonical_prompt_set_not_verbatim_tool_log",
+        "shared_specification": "one isolated recently submerged modern city skyscraper, production-ready realistic hand-painted 2D, nearer L02, strict orthographic exact front elevation, intact contemporary, flat roof, dark blue-gray/unlit, true transparent RGBA, full building, no perspective/3D side, no sky/water/seabed/fog/caustics, no antenna/spire/dome/ruin/debris/signage/gameplay affordance",
+        "variants": [
+          {
+            "asset_id": "l02_city_01",
+            "variant": "broad institutional grid office"
+          },
+          {
+            "asset_id": "l02_city_02",
+            "variant": "tall broad corporate HQ stepped rectangular crown"
+          },
+          {
+            "asset_id": "l02_city_03",
+            "variant": "slender apartment regular recessed balconies, single flat roof"
+          },
+          {
+            "asset_id": "l02_city_04",
+            "variant": "wide hotel-office slab central straight glass bay + rectilinear wings, single flat roof, no curves"
+          },
+          {
+            "asset_id": "l02_city_05",
+            "variant": "tall mixed-use stacked rectangular frames/narrow side bays"
+          },
+          {
+            "asset_id": "l02_city_06",
+            "variant": "straight office tower with strong vertical facade ribs"
+          },
+          {
+            "asset_id": "l02_city_07",
+            "variant": "broad corporate tower with two shallow rectangular setbacks"
+          },
+          {
+            "asset_id": "l02_city_08",
+            "variant": "residential slab with regular recessed balcony grid"
+          },
+          {
+            "asset_id": "l02_city_09",
+            "variant": "tall glass office with central mullion band and massive side pillars"
+          },
+          {
+            "asset_id": "l02_city_10",
+            "variant": "lower administrative office with strong horizontal window bands"
+          },
+          {
+            "asset_id": "l02_city_11",
+            "variant": "very tall hotel with repeated rectangular recessed bays"
+          },
+          {
+            "asset_id": "l02_city_12",
+            "variant": "asymmetric frontal concrete-and-glass tower"
+          },
+          {
+            "asset_id": "l02_city_13",
+            "variant": "broad mixed-use tower with stacked rectangular frames"
+          },
+          {
+            "asset_id": "l02_city_14",
+            "variant": "very broad headquarters facade with orderly rectilinear frame divisions"
+          }
+        ]
+      },
+      "style_research_urls": [
+        "https://www.som.com/projects/wenzhou-lucheng-plaza-landmark-tower/",
+        "https://www.som.com/projects/star-river-headquarters/",
+        "https://global.ctbuh.org/resources/papers/download/2516-thinking-out-of-the-box-advanced-facade-design-and-technology.pdf",
+        "https://oceanexplorer.noaa.gov/fact-sheet/light-and-color-fact-sheet/"
       ],
-      "source_output_sha256": [
-        "eb454ed04955e6fa842ed026737600418698dcb41b8de3a282e4eb568b4c9232",
-        "f8d499b8a33c1bba470de3e63ffa2898bf1b7c12272a497c3f4dea262c5571cc"
+      "style_research_role": "STYLE_ONLY",
+      "style_research_authority": false,
+      "source_outputs": [
+        {
+          "asset_id": "l02_city_01",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-ad74d037-e73f-4b43-bc64-b1a4326079d9.png",
+          "sha256": "089585046f1f8acc4beb1ca61621ebcc898e7afb0f81422e04719617f2712231",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_02",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-7148db2e-d6d9-4f38-8a01-766eaf4b189c.png",
+          "sha256": "c5b18b5fe486ee588795cea980769766105c2e2a9ab3ec25472bfc91e0aa3520",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_03",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-2e3517a2-1f72-4131-ae9e-4634de73c08a.png",
+          "sha256": "835e04eaaa173805ec74fbefbde16e02f790bc54ce7f6d1777d9d7dfb138e8e0",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_04",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-ace97b94-60f1-4b5c-abc1-2a5049c374be.png",
+          "sha256": "efec9e2624890261569e65442e69a18217677a23542d33156ef2a43eccd0ae38",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_05",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-a45cb379-8975-43b4-9850-8e0d6ef2d60c.png",
+          "sha256": "0201e08c875568a75a76c2d30702f2876813f4594377add7a57633397c2aa9cc",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_06",
+          "path": "imagegen://generated_images/01a03994-f181-7cf2-b1f1-ac1672738f07/exec-47c8b30f-4df9-4caf-98fb-75fe9e429345.png",
+          "sha256": "f148d836c773fe28eeeaaa03a08c4662ebd24126c5b3639276d16273d549503e",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_07",
+          "path": "imagegen://generated_images/01a03994-f181-7cf2-b1f1-ac1672738f07/exec-12e6281a-b946-4e3f-9546-50ea68d35be3.png",
+          "sha256": "4601c5483526b98359470fa1f7e59f0867babadc74f0269d71dfeebce8239d3b",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_08",
+          "path": "imagegen://generated_images/01a03994-f181-7cf2-b1f1-ac1672738f07/exec-1fef7888-3e0e-41c0-a6c7-f9798999c9fa.png",
+          "sha256": "c731afd70efaf3cdedd7590c3d4fa9752d1cca7ad4b06766d9d5c0e3f7f6ac3d",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_09",
+          "path": "imagegen://generated_images/01a03994-a9fb-7c32-aa9e-d0287ef090c4/exec-e2e17392-bfb4-4dbb-a6fc-27ef4ece7598.png",
+          "sha256": "2c189ad9652803cf7dfa227a06de8a8ad5cc571d01ae728c13a92a0c593a06f4",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_10",
+          "path": "imagegen://generated_images/01a03994-a9fb-7c32-aa9e-d0287ef090c4/exec-86e423e1-219d-4b9d-aa6b-ac7a5e81a306.png",
+          "sha256": "eb27334a97ef3dc24b49fd00dced58d1aea27fdf207e42cf30c1526ca20ddae5",
+          "pixel_size": [1672, 941],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_11",
+          "path": "imagegen://generated_images/01a03994-a9fb-7c32-aa9e-d0287ef090c4/exec-a1e4491e-1c7a-4e17-bbf7-607ffa3bbd91.png",
+          "sha256": "3b6f2e7c8970a2f83f09dae8d7edaf8f9d2667ce4b14009b67d7d7510293e1f1",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_12",
+          "path": "imagegen://generated_images/01a03995-764c-7b10-94b2-ee719f0fc298/exec-f91272fb-0e0c-401b-b979-68f869e66132.png",
+          "sha256": "c341f3061a86e30d06085194ac2e99978b819f46320aa4f5ed28bf472ba91991",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_13",
+          "path": "imagegen://generated_images/01a03995-764c-7b10-94b2-ee719f0fc298/exec-3d8a2c0f-0553-4203-a228-ac0b937d836a.png",
+          "sha256": "2826b1996a217bb60375f8d0755c16a1412dcb479bfb83398be219d5bf19c9ae",
+          "pixel_size": [1024, 1536],
+          "channels": "RGBA"
+        },
+        {
+          "asset_id": "l02_city_14",
+          "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-ebec597a-3656-4af7-af4d-ea84354005dc.png",
+          "sha256": "0a224ce191d9e24279205941b87916406688d096a172d62aa5c103d0f6f0d41e",
+          "pixel_size": [1536, 1024],
+          "channels": "RGBA"
+        }
+      ],
+      "rejected_source_outputs": [
+        {
+          "asset_id": "l02_city_06",
+          "path": "imagegen://generated_images/01a03994-f181-7cf2-b1f1-ac1672738f07/exec-aeab6a7c-0e08-45f8-a5b6-f46adebf78ef.png",
+          "sha256": "45780283d680ae0dca52490feca3c6129e90253e78007ab20206370571efe434",
+          "pixel_size": [836, 1881],
+          "channels": "RGB",
+          "reason": "rejected_before_integration_missing_alpha_and_baked_checkerboard"
+        }
       ],
       "postprocess": {
         "operation_order": [
-          "derive_alpha_as_clamp((blue-red)/0.22)_for_each_source",
-          "bottom_crop_panel_a_to_1847x846_and_uniformly_resize_panel_b_to_1503x846",
-          "horizontal_append_then_exact_center_crop_3008x846_at_x171_preserving_32x9_aspect",
-          "modulate_rgb_and_saturation_72_68_100",
-          "multiply_alpha_by_0.62",
-          "uniform_lanczos_resize_to_4096x1152_without_nonuniform_scaling"
+          "crop_pad_or_assemble_the_recorded_horizontal_sections_only_by_native_pixel_copy_on_the_integer_pixel_grid",
+          "preserve_recorded_native_top_and_bottom_sections_and_extract_the_recorded_middle_facade_modules",
+          "assemble_exactly_the_recorded_single_modules_or_alternating_module_pairs_by_native_pixel_copy",
+          "crop_pad_and_translate_only_on_the_native_pixel_grid_to_the_manifest_canvas_then_shift_content_down_by_the_recorded_total_shift_y",
+          "set_alpha_less_than_or_equal_to_15_of_255_to_zero",
+          "set_rgb_to_zero_where_alpha_is_zero",
+          "write_noninterlaced_rgba8_at_the_manifest_pixel_size",
+          "do_not_resize_resample_scale_warp_rotate_or_flop_any_source_or_result"
         ],
-        "implementation": "ImageMagick 7.1.2-29 deterministic local composition"
+        "implementation": "ImageMagick 7.1.2-29 Q16-HDRI native-pixel copy, crop, pad, integer module-repeat, translation and terminal alpha cleanup after OpenAI built-in image_gen; no geometric resampling",
+        "asset_operations": [
+          {
+            "asset_id": "l02_city_01",
+            "module_start_y": 600,
+            "module_height": 47,
+            "total_module_count": 33,
+            "horizontal_canvas_operation": "center_pad_x",
+            "total_shift_down_y": 27
+          },
+          {
+            "asset_id": "l02_city_02",
+            "module_start_y": 700,
+            "module_height": 77,
+            "total_module_count": 33,
+            "horizontal_canvas_operation": "center_pad_x",
+            "total_shift_down_y": 12
+          },
+          {
+            "asset_id": "l02_city_03",
+            "module_start_y": 730,
+            "module_height": 436,
+            "total_module_count": 5,
+            "horizontal_canvas_operation": "center_pad_x",
+            "total_shift_down_y": 21
+          },
+          {
+            "asset_id": "l02_city_04",
+            "module_start_y": 888,
+            "module_height": 134,
+            "total_module_count": 17,
+            "horizontal_canvas_operation": "center_pad_x",
+            "total_shift_down_y": 73
+          },
+          {
+            "asset_id": "l02_city_05",
+            "module_start_y": 700,
+            "module_height": 119,
+            "total_module_count": 17,
+            "horizontal_canvas_operation": "center_pad_x",
+            "total_shift_down_y": 17
+          },
+          {
+            "asset_id": "l02_city_06",
+            "top_height": 200,
+            "module_slices": [[400, 148], [548, 148]],
+            "module_pair_count": 10,
+            "bottom_source_y": 1336,
+            "bottom_height": 200,
+            "horizontal_canvas_operation": "concat_source_crops_x45_w427_and_x552_w427_removing_80_native_center_pixels",
+            "total_shift_down_y": 9
+          },
+          {
+            "asset_id": "l02_city_07",
+            "top_height": 200,
+            "module_slices": [[400, 172], [572, 172]],
+            "module_pair_count": 10,
+            "bottom_source_y": 1336,
+            "bottom_height": 200,
+            "horizontal_canvas_operation": "concat_source_crops_x141_w371_x416_w192_x512_w371_then_center_pad_25_pixels_per_side",
+            "total_shift_down_y": 8
+          },
+          {
+            "asset_id": "l02_city_08",
+            "top_height": 200,
+            "module_slices": [[400, 136], [536, 136]],
+            "module_pair_count": 10,
+            "bottom_source_y": 1336,
+            "bottom_height": 200,
+            "horizontal_canvas_operation": "native_crop_x75_width874",
+            "total_shift_down_y": 6
+          },
+          {
+            "asset_id": "l02_city_09",
+            "top_height": 200,
+            "module_slices": [[400, 160], [560, 160]],
+            "module_pair_count": 10,
+            "bottom_source_y": 1336,
+            "bottom_height": 200,
+            "horizontal_canvas_operation": "native_crop_x60_width904",
+            "total_shift_down_y": 16
+          },
+          {
+            "asset_id": "l02_city_10",
+            "top_height": 160,
+            "module_slices": [[260, 128], [388, 128]],
+            "module_pair_count": 10,
+            "bottom_source_y": 781,
+            "bottom_height": 160,
+            "horizontal_canvas_operation": "concat_source_crops_x15_w134_x578_w516_x1523_w134",
+            "total_shift_down_y": 38
+          },
+          {
+            "asset_id": "l02_city_11",
+            "top_height": 200,
+            "module_slices": [[400, 150], [550, 150]],
+            "module_pair_count": 12,
+            "bottom_source_y": 1336,
+            "bottom_height": 200,
+            "horizontal_canvas_operation": "concat_source_crop_x336_w118_five_native_copies_of_x454_w116_and_x570_w118_then_center_pad_39_pixels_per_side",
+            "total_shift_down_y": 12
+          },
+          {
+            "asset_id": "l02_city_12",
+            "top_height": 216,
+            "module_slices": [[400, 140], [540, 140]],
+            "module_pair_count": 10,
+            "bottom_source_y": 1352,
+            "bottom_height": 184,
+            "horizontal_canvas_operation": "concat_source_crops_x162_w350_x400_w112_x512_w347",
+            "total_shift_down_y": 11
+          },
+          {
+            "asset_id": "l02_city_13",
+            "top_height": 200,
+            "module_slices": [[400, 140], [540, 140]],
+            "module_pair_count": 12,
+            "bottom_source_y": 1336,
+            "bottom_height": 200,
+            "horizontal_canvas_operation": "concat_source_crops_x24_w482_and_x520_w482_removing_14_native_center_pixels",
+            "total_shift_down_y": 20
+          },
+          {
+            "asset_id": "l02_city_14",
+            "top_height": 160,
+            "module_slices": [[300, 128], [428, 128]],
+            "module_pair_count": 12,
+            "bottom_source_y": 816,
+            "bottom_height": 208,
+            "horizontal_canvas_operation": "concat_source_crops_x0_w622_and_x914_w622_removing_292_native_center_pixels",
+            "total_shift_down_y": 25
+          }
+        ]
       },
-      "result_path": "assets/visual/l02_near_city.png",
-      "result_sha256": "084450b0b365223d9792d2c88625a26959a9beaa03667ec818f88c47cb456d56",
-      "result_pixel_size": [
-        4096,
-        1152
+      "result_assets": [
+        {
+          "id": "l02_city_01",
+          "path": "assets/visual/l02_city_01.png",
+          "sha256": "76156d85c30b6c83c91b352c60d83e9004d67df58d482daddb3e7528400c1459",
+          "pixel_size": [1280, 3040],
+          "world_rect": [1050, 3520, 1280, 3040]
+        },
+        {
+          "id": "l02_city_02",
+          "path": "assets/visual/l02_city_02.png",
+          "sha256": "6a60691acc57e2bfd9d7dc386531843736991edb4df45f5349afa92707a07301",
+          "pixel_size": [1600, 4000],
+          "world_rect": [4010, 2560, 1600, 4000]
+        },
+        {
+          "id": "l02_city_03",
+          "path": "assets/visual/l02_city_03.png",
+          "sha256": "9b4b5053f60b962cd92754202c17cc9403d99a382f0278a84d37c3a9f9b9291a",
+          "pixel_size": [1120, 3280],
+          "world_rect": [7110, 3280, 1120, 3280]
+        },
+        {
+          "id": "l02_city_04",
+          "path": "assets/visual/l02_city_04.png",
+          "sha256": "6eb0d2c5bcd04f7fbcddc72534634fae08b0b9d1c6b6c59706f8cadba7760cee",
+          "pixel_size": [1520, 3680],
+          "world_rect": [10030, 2880, 1520, 3680]
+        },
+        {
+          "id": "l02_city_05",
+          "path": "assets/visual/l02_city_05.png",
+          "sha256": "ca9ee9afa2f1c7063d36e9351eb2a40cc39e89e4c3960d57f67e21601974714a",
+          "pixel_size": [1360, 3440],
+          "world_rect": [13750, 3120, 1360, 3440]
+        },
+        {
+          "id": "l02_city_06",
+          "path": "assets/visual/l02_city_06.png",
+          "sha256": "93430970c58c61cc48b3fa1534f90a7bb3586a872604ada98357b6f9f7c327ee",
+          "pixel_size": [854, 3360],
+          "world_rect": [228, 3200, 854, 3360]
+        },
+        {
+          "id": "l02_city_07",
+          "path": "assets/visual/l02_city_07.png",
+          "sha256": "4f1d44a7d1bf924a947c2c312fec33490192106405b4575b8c2d227db72cf433",
+          "pixel_size": [984, 3840],
+          "world_rect": [2228, 2720, 984, 3840]
+        },
+        {
+          "id": "l02_city_08",
+          "path": "assets/visual/l02_city_08.png",
+          "sha256": "a3d3be245909ab9b212d530bd72931c48ecf2ebfa0d4276516920df5e637dd5c",
+          "pixel_size": [874, 3120],
+          "world_rect": [3408, 3440, 874, 3120]
+        },
+        {
+          "id": "l02_city_09",
+          "path": "assets/visual/l02_city_09.png",
+          "sha256": "045852887e9c14c06c11663470062769a30fbc96eca0fe100d58904d1638d265",
+          "pixel_size": [904, 3600],
+          "world_rect": [5298, 2960, 904, 3600]
+        },
+        {
+          "id": "l02_city_10",
+          "path": "assets/visual/l02_city_10.png",
+          "sha256": "cf17633c4c0cc3ca78a553a66388a1ed738b7a1e255f3394f82f8fc37077322c",
+          "pixel_size": [784, 2880],
+          "world_rect": [6398, 3680, 784, 2880]
+        },
+        {
+          "id": "l02_city_11",
+          "path": "assets/visual/l02_city_11.png",
+          "sha256": "2dabca6af64847606317a004465448290c6f2befb54060f5b6a3056636b041d1",
+          "pixel_size": [894, 4000],
+          "world_rect": [8138, 2560, 894, 4000]
+        },
+        {
+          "id": "l02_city_12",
+          "path": "assets/visual/l02_city_12.png",
+          "sha256": "0ad9590d7f4464a2663105f51c171e944653fd8b030c5af10b5768e1c9c61074",
+          "pixel_size": [809, 3200],
+          "world_rect": [9248, 3360, 809, 3200]
+        },
+        {
+          "id": "l02_city_13",
+          "path": "assets/visual/l02_city_13.png",
+          "sha256": "384ddd0af0dbb7d00042792e578bffc5834de3b993d934fd2b48fa8fa30c55d0",
+          "pixel_size": [964, 3760],
+          "world_rect": [11488, 2800, 964, 3760]
+        },
+        {
+          "id": "l02_city_14",
+          "path": "assets/visual/l02_city_14.png",
+          "sha256": "4117086efd4a0866606ef8db7af74c5d2a3bfe36e0c5c482cd31ceb8fe7276b6",
+          "pixel_size": [1244, 3440],
+          "world_rect": [12668, 3120, 1244, 3440]
+        }
+      ]
+    },
+    {
+      "id": "l02_city_15_to_19_right_fill",
+      "role": "nonblocking_near_city_backdrop_right_fill",
+      "brief": "Five separate L02 buildings approved first as exact composition proxies. They deliberately cover part of the open-water view on the right, including the parking-descent region, but are presentation only: they create no collision, entrance, floor, wall, route, or landmark authority.",
+      "shared_prompt_constraints": "One isolated recently submerged modern skyscraper; strict orthographic front elevation for a 2D side-scrolling game; transparent RGBA background; simple flat roof; dark, unlit blue-gray façade; crisp restrained hand-painted detail; no water, seabed, fog, glow, sky, cityscape, labels, HUD, character, antenna, dome, ruin, perspective, or shadow outside the building.",
+      "variants": [
+        {
+          "asset_id": "l02_city_15",
+          "design": "tall narrow office tower with vertical fins and restrained horizontal window bands",
+          "source_output": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-ce1818a6-5b13-45f7-ad8a-03f9f4cbed80.png",
+          "source_sha256": "9e4830384e5695a4e9dbb683e19d3aef3d45bdd25a767b31f1b45a34830fe006",
+          "source_pixel_size": [1024, 1536],
+          "source_alpha_bbox_at_50_percent": [627, 1518, 0, 0]
+        },
+        {
+          "asset_id": "l02_city_16",
+          "design": "tall residential high-rise with a balcony rhythm",
+          "source_output": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-cabed302-a84f-40b0-b92e-636675e3b0f8.png",
+          "source_sha256": "6d6618f16151eda9ebd1cdd5d7f81f0bbe61248687642d4acf1b3826055e649a",
+          "source_pixel_size": [1024, 1536],
+          "source_alpha_bbox_at_50_percent": [576, 1519, 0, 0]
+        },
+        {
+          "asset_id": "l02_city_17",
+          "design": "wide corporate-administration tower with three façade bays",
+          "source_output": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-1aa12f33-7231-43a7-834a-f6568459cbf7.png",
+          "source_sha256": "08d09c1e1ed1d18a4f81c5452881a8f7729cee0826292e49b89eed4715c18723",
+          "source_pixel_size": [1024, 1536],
+          "source_alpha_bbox_at_50_percent": [935, 1512, 0, 0]
+        },
+        {
+          "asset_id": "l02_city_18",
+          "design": "tall civic modular high-rise with a darker central core",
+          "source_output": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-cd6a6d65-4dab-4529-bc89-72332e3f9747.png",
+          "source_sha256": "dba25305afca0bdd0cfcdb79af29d01a0b57e5d30d691c4a3a75a72f67a870b5",
+          "source_pixel_size": [1024, 1536],
+          "source_alpha_bbox_at_50_percent": [925, 1518, 0, 0]
+        },
+        {
+          "asset_id": "l02_city_19",
+          "design": "medium-height commercial tower with horizontal façade bands",
+          "source_output": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-83db4754-64fb-4294-a8ed-9c5b2c5c7f21.png",
+          "source_sha256": "e4098b6635e53ac2c8065f95a18a08cb55871533e01c9db58f1e56a7ea6ca050",
+          "source_pixel_size": [1024, 1536],
+          "source_alpha_bbox_at_50_percent": [961, 1517, 0, 0]
+        }
+      ],
+      "postprocess": {
+        "rule": "native_pixels_only_no_scaling_or_resampling",
+        "operation_order": [
+          "extract_alpha",
+          "threshold_alpha_at_50_percent_and_apply_as_binary_alpha",
+          "set_RGB_to_black_where_alpha_is_zero_without_changing_any_opaque_pixel",
+          "trim_transparent_bounds_without_resampling",
+          "assemble_target_width_from_native_center_facade_module_copies",
+          "assemble_target_height_from_native_facade_module_copies",
+          "write_srgba_png_without_resize_rotation_warp_or_transform"
+        ],
+        "vertical_module_assembly": [
+          {"asset_id": "l02_city_15", "source_height": 1518, "top_height": 500, "module_height": 62, "additional_native_module_copies": 31},
+          {"asset_id": "l02_city_16", "source_height": 1518, "top_height": 450, "module_height": 118, "additional_native_module_copies": 19},
+          {"asset_id": "l02_city_17", "source_height": 1512, "top_height": 450, "module_height": 251, "additional_native_module_copies": 8},
+          {"asset_id": "l02_city_18", "source_height": 1516, "top_height": 450, "module_height": 138, "additional_native_module_copies": 18},
+          {"asset_id": "l02_city_19", "source_height": 1517, "top_height": 450, "module_height": 309, "additional_native_module_copies": 7}
+        ]
+      },
+      "result_assets": [
+        {"id": "l02_city_15", "path": "assets/visual/l02_city_15.png", "sha256": "8a95bd77d6252e9219d59b086ed2895cf210f13637de8514d6b3eb05ccd6f092", "pixel_size": [960, 3440], "world_rect": [15360, 3120, 960, 3440]},
+        {"id": "l02_city_16", "path": "assets/visual/l02_city_16.png", "sha256": "ac38700a4f2615f32a119085a25d53aefece73f46df02975082fac38bc31c08c", "pixel_size": [960, 3760], "world_rect": [17040, 2800, 960, 3760]},
+        {"id": "l02_city_17", "path": "assets/visual/l02_city_17.png", "sha256": "b1320e78f5e0a175c00a53a2fc65e79bfa94af17dc16e47836deb8f0bf93c50e", "pixel_size": [1280, 3520], "world_rect": [19120, 3040, 1280, 3520]},
+        {"id": "l02_city_18", "path": "assets/visual/l02_city_18.png", "sha256": "c7068edbac78e37c007f992216a6ec14e121c3bce9e7cd545eb27460a11256b5", "pixel_size": [1040, 4000], "world_rect": [20640, 2560, 1040, 4000]},
+        {"id": "l02_city_19", "path": "assets/visual/l02_city_19.png", "sha256": "61f54a9d91a3b9640ab5c5549ab38a21935246e87f919c6a169dc786674981c5", "pixel_size": [1020, 3680], "world_rect": [21920, 2880, 1020, 3680]}
       ]
     },
     {
@@ -109,13 +1188,18 @@
       "role": "exact_solid_surface_material_only",
       "prompt_summary": "Square edge-to-edge visually tileable realistic hand-painted underwater material made from compact dark soil, fractured concrete, shale, small stones and muted rust traces; neutral lighting; no holes, tunnels, doors, walls, buildings, labels, HUD or authored passage geometry.",
       "source_outputs": [
-        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-3353ad48-e163-41a3-8aa2-b7196b30cc6d.png"
+        "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-3353ad48-e163-41a3-8aa2-b7196b30cc6d.png"
       ],
       "postprocess": {
         "operation_order": [
           "copy_without_geometric_edit"
         ],
         "implementation": "byte_preserving_copy"
+      },
+      "runtime_mapping": {
+        "mode": "native_repeat",
+        "texture_tiling": [18.373205741626795, 10.334928229665072],
+        "contract": "one_source_texel_per_world_unit_without_tile_stretch"
       },
       "result_path": "assets/visual/l05_ground_material.png",
       "result_sha256": "63c20e320cf357cba849012657d4ace81f85b3d49efd99bc3d04fa7578c8bf1b",

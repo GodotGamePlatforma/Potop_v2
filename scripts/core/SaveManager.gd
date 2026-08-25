@@ -6,7 +6,6 @@ const SAVE_PATH := "user://ostatni_pomost_campaign.tres"
 const TEMP_SAVE_PATH := "user://ostatni_pomost_campaign.pending.tres"
 const BACKUP_SAVE_PATH := "user://ostatni_pomost_campaign.backup.tres"
 const GameStateScript := preload("res://scripts/data/GameState.gd")
-const PersistenceValidatorScript := preload("res://scripts/data/GameStatePersistenceValidator.gd")
 
 var persistence_enabled: bool = true
 var save_path: String = SAVE_PATH
@@ -28,15 +27,9 @@ func save_game(state) -> Error:
 
 	if not (state is Resource) or state.get_script() != GameStateScript:
 		return _reject_save(PackedStringArray(["Korzeń zapisu nie jest dokładnym GameState."]))
-	var preflight_errors := PersistenceValidatorScript.preflight_errors(state)
-	if not preflight_errors.is_empty():
-		return _reject_save(preflight_errors)
 	var load_errors: PackedStringArray = state.load_validation_errors()
 	if not load_errors.is_empty():
 		return _reject_save(load_errors)
-	var validation_errors: PackedStringArray = state.persistence_validation_errors()
-	if not validation_errors.is_empty():
-		return _reject_save(validation_errors)
 	last_validation_errors = PackedStringArray()
 	var save_candidate = state.duplicate(true)
 	if save_candidate == null or save_candidate.get_script() != GameStateScript:
@@ -145,17 +138,9 @@ func _load_valid_state(path: String):
 	if not (loaded is Resource) or loaded.get_script() != GameStateScript:
 		_record_load_rejection(path, PackedStringArray(["Korzeń kandydata nie jest dokładnym GameState."]))
 		return null
-	var preflight_errors := PersistenceValidatorScript.preflight_errors(loaded)
-	if not preflight_errors.is_empty():
-		_record_load_rejection(path, preflight_errors)
-		return null
 	var load_errors: PackedStringArray = loaded.load_validation_errors()
 	if not load_errors.is_empty():
 		_record_load_rejection(path, load_errors)
-		return null
-	var validation_errors: PackedStringArray = loaded.persistence_validation_errors()
-	if not validation_errors.is_empty():
-		_record_load_rejection(path, validation_errors)
 		return null
 	return loaded
 

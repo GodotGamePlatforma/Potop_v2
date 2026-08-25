@@ -121,7 +121,9 @@ func load_validation_errors() -> PackedStringArray:
 	var map_errors := UnderwaterMapSceneCompilerScript.new().ensure_world_is_current(underwater_world)
 	if not map_errors.is_empty():
 		return map_errors
-	return persistence_validation_errors()
+	# The map refresh above already compiled and compared the authoritative source.
+	# Continue with the aggregate checks without compiling that source a second time.
+	return PersistenceValidatorScript.validation_errors_after_map_refresh(self)
 
 
 func archive_end_day_report(report) -> bool:

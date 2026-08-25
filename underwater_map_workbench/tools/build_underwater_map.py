@@ -43,6 +43,15 @@ PARALLAX_LAYER_IDS = frozenset(("L01", "L02", "L08", "L09"))
 NONBLOCKING_TEXTURE_LAYER_IDS = frozenset(("L01", "L02"))
 GROUND_ANCHORED_BACKDROP_LAYER_IDS = frozenset(("L01", "L02"))
 NONBLOCKING_BACKDROP_AFFORDANCE = "nonblocking_backdrop"
+COMPOSITION_PROXY_KIND = "composition_proxy"
+COMPOSITION_PROXY_FILL_COLOR = "164c6652"
+COMPOSITION_PROXY_OUTLINE_COLOR = "ff7a18e6"
+COMPOSITION_PROXY_LABEL_COLOR = "fff1dcff"
+SAFE_VISUAL_GROUP_ID = re.compile(r"[A-Za-z][A-Za-z0-9_]*\Z")
+BACKDROP_MIN_OPAQUE_SHARE = 0.95
+BACKDROP_MAX_PARTIAL_CANVAS_SHARE = 0.03
+BACKDROP_MAX_LOW_ALPHA_CANVAS_SHARE = 0.0025
+BACKDROP_MIN_BOTTOM_OPAQUE_SHARE = 0.01
 LAYER_KEYS = frozenset(
     (
         "id",
@@ -50,6 +59,7 @@ LAYER_KEYS = frozenset(
         "space",
         "z_index",
         "parallax_scale",
+        "rgb_modulate",
         "enabled",
         "reserved",
         "affordance_policy",
@@ -60,6 +70,7 @@ VISUAL_ASSET_KEYS = frozenset(
     (
         "id",
         "layer_id",
+        "group_id",
         "kind",
         "path",
         "sha256",
@@ -71,7 +82,7 @@ VISUAL_ASSET_KEYS = frozenset(
     )
 )
 L05_MODE = "l05_mask_v1"
-L05_SOURCE_FORMAT = "l05_rect_ops_v1"
+L05_SOURCE_FORMAT = "l05_owned_rect_ops_v2"
 L05_PIXEL_SIZE = (576, 324)
 L05_WORLD_UNITS_PER_PIXEL = (40.0, 40.0)
 L05_MAPPING = {
@@ -81,6 +92,39 @@ L05_MAPPING = {
     "pixel_reference": "pixel_edge",
     "rounding": "floor",
 }
+STRUCTURE_ROOT_KEYS = frozenset(("templates", "instances"))
+STRUCTURE_TEMPLATE_KEYS = frozenset(
+    (
+        "id",
+        "kind",
+        "interior_layer_id",
+        "collider_layer_id",
+        "allowed_socket_kinds",
+    )
+)
+STRUCTURE_INSTANCE_REQUIRED_KEYS = frozenset(
+    (
+        "id",
+        "template_id",
+        "origin",
+        "size",
+        "enabled",
+        "topology_digest",
+        "partition_digest",
+        "sockets",
+    )
+)
+STRUCTURE_INSTANCE_OPTIONAL_KEYS = frozenset(("landmark_id",))
+STRUCTURE_SOCKET_KEYS = frozenset(("id", "kind", "local_rect"))
+ENTERABLE_TOWER_SOCKET_KINDS = (
+    "entry_opening",
+    "moving_elevator",
+    "dynamic_door",
+    "fixed_interactable",
+)
+STRUCTURE_INTERIOR_COLOR = "06131cff"
+STRUCTURE_SOLID_COLOR = "274956ff"
+STRUCTURE_LABEL_COLOR = "d9edf2ff"
 REQUIRED_GAMEPLAY_COLLECTIONS = (
     "loot_spawns",
     "shortcut_spawns",
@@ -97,6 +141,7 @@ REQUIRED_GAMEPLAY_COLLECTIONS = (
 )
 NON_SPATIAL_COLLECTIONS = frozenset(("connections",))
 NO_BLOCKING_POLICY = "no_visual_blockage_in_protected_water"
+OPEN_WATER_BACKDROP_POLICY = "nonblocking_backdrop_may_overlap_open_water"
 MAP_SOURCE_VERSION = 5
 REQUIRED_GRID_SIZE = (12, 12)
 REQUIRED_GRID_CELL_SIZE = (1920.0, 1080.0)
@@ -274,6 +319,165 @@ def _png_dimensions(raw: bytes, label: str) -> tuple[int, int]:
     return width, height
 
 
+def _paeth_predictor(left: int, above: int, upper_left: int) -> int:
+    prediction = left + above - upper_left
+    left_distance = abs(prediction - left)
+    above_distance = abs(prediction - above)
+    upper_left_distance = abs(prediction - upper_left)
+    if left_distance <= above_distance and left_distance <= upper_left_distance:
+        return left
+    if above_distance <= upper_left_distance:
+        return above
+    return upper_left
+
+
+def _decode_png_rgba8(
+    raw: bytes,
+    label: str,
+    width: int,
+    height: int,
+) -> bytes:
+    bit_depth, color_type, compression, filter_method, interlace = raw[24:29]
+    if (
+        bit_depth != 8
+        or color_type != 6
+        or compression != 0
+        or filter_method != 0
+        or interlace != 0
+    ):
+        raise ManifestError(
+            f"{label} must be a non-interlaced RGBA8 PNG"
+        )
+
+    idat = bytearray()
+    offset = 8
+    found_iend = False
+    while offset + 12 <= len(raw):
+        chunk_length = struct.unpack(">I", raw[offset : offset + 4])[0]
+        chunk_end = offset + 12 + chunk_length
+        if chunk_end > len(raw):
+            raise ManifestError(f"{label} contains a truncated PNG chunk")
+        chunk_type = raw[offset + 4 : offset + 8]
+        payload = raw[offset + 8 : offset + 8 + chunk_length]
+        expected_crc = struct.unpack(">I", raw[offset + 8 + chunk_length : chunk_end])[0]
+        actual_crc = zlib.crc32(chunk_type)
+        actual_crc = zlib.crc32(payload, actual_crc) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise ManifestError(f"{label} contains a PNG chunk with a stale CRC")
+        if chunk_type == b"IDAT":
+            idat.extend(payload)
+        elif chunk_type == b"IEND":
+            found_iend = True
+            break
+        offset = chunk_end
+    if not idat or not found_iend:
+        raise ManifestError(f"{label} is missing PNG image data")
+
+    try:
+        scanlines = zlib.decompress(bytes(idat))
+    except zlib.error as error:
+        raise ManifestError(f"{label} contains invalid compressed PNG data") from error
+    bytes_per_pixel = 4
+    row_width = width * bytes_per_pixel
+    expected_size = (row_width + 1) * height
+    if len(scanlines) != expected_size:
+        raise ManifestError(f"{label} has an unexpected PNG scanline size")
+
+    decoded = bytearray(width * height * bytes_per_pixel)
+    previous = bytearray(row_width)
+    source_offset = 0
+    target_offset = 0
+    for _ in range(height):
+        filter_type = scanlines[source_offset]
+        source_offset += 1
+        source_row = scanlines[source_offset : source_offset + row_width]
+        source_offset += row_width
+        reconstructed = bytearray(row_width)
+        for index, value in enumerate(source_row):
+            left = reconstructed[index - bytes_per_pixel] if index >= bytes_per_pixel else 0
+            above = previous[index]
+            upper_left = previous[index - bytes_per_pixel] if index >= bytes_per_pixel else 0
+            if filter_type == 0:
+                predictor = 0
+            elif filter_type == 1:
+                predictor = left
+            elif filter_type == 2:
+                predictor = above
+            elif filter_type == 3:
+                predictor = (left + above) // 2
+            elif filter_type == 4:
+                predictor = _paeth_predictor(left, above, upper_left)
+            else:
+                raise ManifestError(f"{label} uses an unsupported PNG row filter")
+            reconstructed[index] = (value + predictor) & 0xFF
+        decoded[target_offset : target_offset + row_width] = reconstructed
+        target_offset += row_width
+        previous = reconstructed
+    return bytes(decoded)
+
+
+def _validate_ground_anchored_backdrop_png(
+    filesystem_path: Path,
+    pixel_size: tuple[int, int],
+    label: str,
+) -> None:
+    raw = filesystem_path.read_bytes()
+    width, height = pixel_size
+    pixels = _decode_png_rgba8(raw, label, width, height)
+    total = width * height
+    nonzero = 0
+    opaque = 0
+    partial = 0
+    low_alpha = 0
+    bottom_opaque = 0
+    highest_opaque_y = -1
+    transparent_rgb_is_black = True
+    partial_rgb_has_white_matte = False
+
+    for pixel_index in range(total):
+        offset = pixel_index * 4
+        red, green, blue, alpha = pixels[offset : offset + 4]
+        if alpha == 0:
+            if red != 0 or green != 0 or blue != 0:
+                transparent_rgb_is_black = False
+            continue
+        nonzero += 1
+        if alpha >= 250:
+            opaque += 1
+            y = pixel_index // width
+            highest_opaque_y = max(highest_opaque_y, y)
+            if y == height - 1:
+                bottom_opaque += 1
+        else:
+            partial += 1
+            if alpha <= 15:
+                low_alpha += 1
+            if red >= 235 and green >= 235 and blue >= 235:
+                partial_rgb_has_white_matte = True
+
+    if nonzero == 0 or opaque == 0 or nonzero == total:
+        raise ManifestError(
+            f"{label} must contain both transparent background and opaque buildings"
+        )
+    if opaque / nonzero < BACKDROP_MIN_OPAQUE_SHARE:
+        raise ManifestError(
+            f"{label} has translucent building bodies; at least "
+            f"{BACKDROP_MIN_OPAQUE_SHARE:.0%} of visible pixels must be opaque"
+        )
+    if partial / total > BACKDROP_MAX_PARTIAL_CANVAS_SHARE:
+        raise ManifestError(f"{label} has an excessively wide antialias band")
+    if low_alpha / total > BACKDROP_MAX_LOW_ALPHA_CANVAS_SHARE:
+        raise ManifestError(f"{label} contains a broad near-transparent halo")
+    if highest_opaque_y != height - 1:
+        raise ManifestError(f"{label} must meet the bottom edge without a visible gap")
+    if bottom_opaque / width < BACKDROP_MIN_BOTTOM_OPAQUE_SHARE:
+        raise ManifestError(f"{label} needs a visible opaque footing on the bottom edge")
+    if not transparent_rgb_is_black:
+        raise ManifestError(f"{label} transparent pixels must use black RGB")
+    if partial_rgb_has_white_matte:
+        raise ManifestError(f"{label} antialias edge still contains the white production matte")
+
+
 def _read_hashed_png(
     path_value: Any,
     sha_value: Any,
@@ -365,6 +569,7 @@ def _topology_identity_projection(manifest: dict[str, Any]) -> dict[str, Any]:
         "collision_source": {
             "format": collision.get("format"),
             "canonical_digest": collision.get("canonical_digest"),
+            "partition_digest": collision.get("partition_digest"),
             "pixel_size": copy.deepcopy(collision.get("pixel_size")),
             "world_units_per_pixel": copy.deepcopy(
                 collision.get("world_units_per_pixel")
@@ -401,6 +606,7 @@ def _gameplay_signature(manifest: dict[str, Any]) -> str:
             }
             for landmark in manifest["landmarks"]
         ],
+        "structures": copy.deepcopy(manifest["structures"]),
         "gameplay": _gameplay_semantic_projection(manifest["gameplay"]),
         "campaign": copy.deepcopy(manifest["campaign"]),
     }
@@ -417,6 +623,7 @@ def _presentation_fingerprint(manifest: dict[str, Any]) -> str:
         },
         "regions": copy.deepcopy(manifest["regions"]),
         "landmarks": copy.deepcopy(manifest["landmarks"]),
+        "structures": copy.deepcopy(manifest["structures"]),
         "topology": _topology_identity_projection(manifest),
         "gameplay": copy.deepcopy(manifest["gameplay"]),
         "campaign": copy.deepcopy(manifest["campaign"]),
@@ -626,6 +833,14 @@ def _validate_visual(
             layer["parallax_scale"],
             f"{label}.parallax_scale",
         )
+        rgb_modulate = _color(
+            layer["rgb_modulate"],
+            f"{label}.rgb_modulate",
+        )
+        if len(rgb_modulate) != 6:
+            raise ManifestError(
+                f"{label}.rgb_modulate must be an opaque RGB hex color"
+            )
         if min(parallax_scale) <= 0.0:
             raise ManifestError(f"{label}.parallax_scale must be positive")
         if expected_id in PARALLAX_LAYER_IDS:
@@ -656,6 +871,11 @@ def _validate_visual(
                 raise ManifestError("L05 must be the collider authority")
             if not layer["enabled"] or layer["reserved"]:
                 raise ManifestError("L05 must be enabled and not reserved")
+        elif expected_id in NONBLOCKING_TEXTURE_LAYER_IDS:
+            if layer["affordance_policy"] != OPEN_WATER_BACKDROP_POLICY:
+                raise ManifestError(
+                    f"{expected_id} must use the open-water backdrop policy"
+                )
         elif expected_id == "L10":
             if layer["enabled"] or not layer["reserved"]:
                 raise ManifestError("L10 must be disabled and reserved")
@@ -675,6 +895,7 @@ def _validate_visual(
 
     assets = _array(visual["assets"], "visual.assets")
     asset_ids: set[str] = set()
+    element_node_keys: set[tuple[str, str, str]] = set()
     for index, asset_value in enumerate(assets):
         label = f"visual.assets[{index}]"
         asset = _object(asset_value, label)
@@ -688,24 +909,33 @@ def _validate_visual(
             raise ManifestError(f"{label}.id must be unique")
         asset_ids.add(asset_id)
         layer_id = _non_empty_string(asset["layer_id"], f"{label}.layer_id")
+        group_id = _non_empty_string(asset["group_id"], f"{label}.group_id")
+        if SAFE_VISUAL_GROUP_ID.fullmatch(group_id) is None:
+            raise ManifestError(
+                f"{label}.group_id must start with a letter and contain only "
+                "ASCII letters, digits and underscores"
+            )
         kind = _non_empty_string(asset["kind"], f"{label}.kind")
         if (layer_id, kind) not in {
             ("L01", "texture_rect"),
+            ("L01", COMPOSITION_PROXY_KIND),
             ("L02", "texture_rect"),
+            ("L02", COMPOSITION_PROXY_KIND),
             ("L05", "collision_masked_material"),
         }:
             raise ManifestError(
-                f"{label} must be L01-L02/texture_rect "
+                f"{label} must be L01-L02/texture_rect|{COMPOSITION_PROXY_KIND} "
                 "or L05/collision_masked_material"
             )
+        element_node_key = (layer_id, group_id, _safe_node_name(asset_id))
+        if element_node_key in element_node_keys:
+            raise ManifestError(
+                f"{label}.id collides with another generated node name in "
+                f"VisualLayers/{layer_id}/{group_id}"
+            )
+        element_node_keys.add(element_node_key)
         _boolean(asset["enabled"], f"{label}.enabled")
         _non_empty_string(asset["affordance"], f"{label}.affordance")
-        _, _, pixel_size = _read_hashed_png(
-            asset["path"],
-            asset["sha256"],
-            asset["pixel_size"],
-            label,
-        )
         world_rect = _rect(asset["world_rect"], f"{label}.world_rect")
         if (
             world_rect[0] < 0.0
@@ -719,7 +949,48 @@ def _validate_visual(
         topology_digest = asset["topology_digest"]
         if not isinstance(topology_digest, str):
             raise ManifestError(f"{label}.topology_digest must be a string")
+        if kind == COMPOSITION_PROXY_KIND:
+            if asset["path"] != "" or asset["sha256"] != "":
+                raise ManifestError(
+                    f"{label} composition proxy requires empty path and sha256"
+                )
+            declared_size = _pair(asset["pixel_size"], f"{label}.pixel_size")
+            if any(
+                not component.is_integer() or component <= 0
+                for component in declared_size
+            ):
+                raise ManifestError(
+                    f"{label}.pixel_size must contain positive integers"
+                )
+            pixel_size = (int(declared_size[0]), int(declared_size[1]))
+            if topology_digest != "":
+                raise ManifestError(
+                    f"{label} composition proxy requires an empty topology_digest"
+                )
+            if asset["affordance"] != NONBLOCKING_BACKDROP_AFFORDANCE:
+                raise ManifestError(
+                    f"{label} composition proxy requires "
+                    f"affordance={NONBLOCKING_BACKDROP_AFFORDANCE}"
+                )
+            if world_rect[2:] != (float(pixel_size[0]), float(pixel_size[1])):
+                raise ManifestError(
+                    f"{label}.world_rect size must equal pixel_size exactly "
+                    "(one planned source pixel per world unit; no resizing)"
+                )
+            continue
+
+        _, filesystem_path, pixel_size = _read_hashed_png(
+            asset["path"],
+            asset["sha256"],
+            asset["pixel_size"],
+            label,
+        )
         if layer_id in NONBLOCKING_TEXTURE_LAYER_IDS:
+            _validate_ground_anchored_backdrop_png(
+                filesystem_path,
+                pixel_size,
+                label,
+            )
             if topology_digest != "":
                 raise ManifestError(
                     f"{label} on {layer_id} requires an empty topology_digest"
@@ -729,10 +1000,10 @@ def _validate_visual(
                     f"{label} on {layer_id} requires "
                     f"affordance={NONBLOCKING_BACKDROP_AFFORDANCE}"
                 )
-            if pixel_size[0] * world_rect[3] != pixel_size[1] * world_rect[2]:
+            if world_rect[2:] != (float(pixel_size[0]), float(pixel_size[1])):
                 raise ManifestError(
-                    f"{label}.pixel_size aspect ratio must match world_rect "
-                    "to prevent non-uniform stretching"
+                    f"{label}.world_rect size must equal pixel_size exactly "
+                    "(one source pixel per world unit; no resizing)"
                 )
         elif layer_id == "L05":
             if topology_build.get("mode") != L05_MODE:
@@ -752,9 +1023,198 @@ def _validate_visual(
                 raise ManifestError(f"missing L05 shader: {L05_SHADER_PATH}")
 
 
+def _validate_structures(
+    manifest: dict[str, Any],
+    world_size: tuple[float, float],
+) -> dict[str, Any]:
+    structures = _object(manifest["structures"], "structures")
+    if set(structures) != STRUCTURE_ROOT_KEYS:
+        raise ManifestError("structures must contain exactly templates and instances")
+
+    templates = _array(structures["templates"], "structures.templates")
+    instances = _array(structures["instances"], "structures.instances")
+    templates_by_id: dict[str, dict[str, Any]] = {}
+    for index, template_value in enumerate(templates):
+        label = f"structures.templates[{index}]"
+        template = _object(template_value, label)
+        if set(template) != STRUCTURE_TEMPLATE_KEYS:
+            raise ManifestError(
+                f"{label} must contain exactly: "
+                + ", ".join(sorted(STRUCTURE_TEMPLATE_KEYS))
+            )
+        template_id = _non_empty_string(template["id"], f"{label}.id")
+        if template_id in templates_by_id:
+            raise ManifestError(f"{label}.id must be unique")
+        if template["kind"] != "enterable_tower":
+            raise ManifestError(f"{label}.kind must be enterable_tower")
+        if template["interior_layer_id"] != "L04":
+            raise ManifestError(f"{label}.interior_layer_id must be L04")
+        if template["collider_layer_id"] != "L05":
+            raise ManifestError(f"{label}.collider_layer_id must be L05")
+        socket_kinds = _array(
+            template["allowed_socket_kinds"],
+            f"{label}.allowed_socket_kinds",
+        )
+        if socket_kinds != list(ENTERABLE_TOWER_SOCKET_KINDS):
+            raise ManifestError(
+                f"{label}.allowed_socket_kinds must exactly match the "
+                "enterable tower socket contract"
+            )
+        templates_by_id[template_id] = template
+
+    instances_by_id: dict[str, dict[str, Any]] = {}
+    resolved_instances: list[dict[str, Any]] = []
+    generated_node_names: set[str] = set()
+    for index, instance_value in enumerate(instances):
+        label = f"structures.instances[{index}]"
+        instance = _object(instance_value, label)
+        instance_keys = set(instance)
+        allowed_instance_keys = (
+            STRUCTURE_INSTANCE_REQUIRED_KEYS | STRUCTURE_INSTANCE_OPTIONAL_KEYS
+        )
+        if (
+            not STRUCTURE_INSTANCE_REQUIRED_KEYS.issubset(instance_keys)
+            or not instance_keys.issubset(allowed_instance_keys)
+        ):
+            raise ManifestError(
+                f"{label} must contain required fields: "
+                + ", ".join(sorted(STRUCTURE_INSTANCE_REQUIRED_KEYS))
+                + "; optional field: landmark_id"
+            )
+        instance_id = _non_empty_string(instance["id"], f"{label}.id")
+        if instance_id in instances_by_id or instance_id in templates_by_id:
+            raise ManifestError(f"{label}.id must be globally unique")
+        node_name = _safe_node_name(instance_id)
+        if node_name in generated_node_names:
+            raise ManifestError(f"{label}.id collides with a generated node name")
+        generated_node_names.add(node_name)
+        template_id = _non_empty_string(
+            instance["template_id"],
+            f"{label}.template_id",
+        )
+        template = templates_by_id.get(template_id)
+        if template is None:
+            raise ManifestError(f"{label}.template_id references an unknown template")
+        if "landmark_id" in instance:
+            _non_empty_string(instance["landmark_id"], f"{label}.landmark_id")
+        origin = _pair(instance["origin"], f"{label}.origin")
+        size = _pair(instance["size"], f"{label}.size")
+        if min(size) <= 0.0:
+            raise ManifestError(f"{label}.size must be positive")
+        if (
+            origin[0] < 0.0
+            or origin[1] < 0.0
+            or origin[0] + size[0] > world_size[0]
+            or origin[1] + size[1] > world_size[1]
+        ):
+            raise ManifestError(f"{label} lies outside the map")
+        enabled = _boolean(instance["enabled"], f"{label}.enabled")
+        topology_digest = instance["topology_digest"]
+        partition_digest = instance["partition_digest"]
+        if not isinstance(topology_digest, str) or re.fullmatch(
+            r"topology-v1:[0-9a-f]{64}", topology_digest
+        ) is None:
+            raise ManifestError(f"{label}.topology_digest must be topology-v1:<sha256>")
+        if not isinstance(partition_digest, str) or re.fullmatch(
+            r"partition-v1:[0-9a-f]{64}", partition_digest
+        ) is None:
+            raise ManifestError(f"{label}.partition_digest must be partition-v1:<sha256>")
+
+        sockets = _array(instance["sockets"], f"{label}.sockets")
+        socket_ids: set[str] = set()
+        for socket_index, socket_value in enumerate(sockets):
+            socket_label = f"{label}.sockets[{socket_index}]"
+            socket = _object(socket_value, socket_label)
+            if set(socket) != STRUCTURE_SOCKET_KEYS:
+                raise ManifestError(
+                    f"{socket_label} must contain exactly id, kind and local_rect"
+                )
+            socket_id = _non_empty_string(socket["id"], f"{socket_label}.id")
+            if socket_id in socket_ids:
+                raise ManifestError(f"{socket_label}.id must be unique within its structure")
+            socket_ids.add(socket_id)
+            socket_kind = _non_empty_string(socket["kind"], f"{socket_label}.kind")
+            if socket_kind not in template["allowed_socket_kinds"]:
+                raise ManifestError(f"{socket_label}.kind is not allowed by its template")
+            local_rect = _rect(socket["local_rect"], f"{socket_label}.local_rect")
+            if (
+                local_rect[0] < 0.0
+                or local_rect[1] < 0.0
+                or local_rect[2] <= 0.0
+                or local_rect[3] <= 0.0
+                or local_rect[0] + local_rect[2] > size[0]
+                or local_rect[1] + local_rect[3] > size[1]
+            ):
+                raise ManifestError(f"{socket_label}.local_rect lies outside the structure")
+            for component, step in zip(
+                local_rect,
+                L05_WORLD_UNITS_PER_PIXEL + L05_WORLD_UNITS_PER_PIXEL,
+            ):
+                quotient = component / step
+                if not math.isclose(
+                    quotient,
+                    round(quotient),
+                    rel_tol=0.0,
+                    abs_tol=1.0e-9,
+                ):
+                    raise ManifestError(
+                        f"{socket_label}.local_rect must align to the L05 40 x 40 grid"
+                    )
+
+        resolved = {
+            "source": instance,
+            "id": instance_id,
+            "template": template,
+            "origin": origin,
+            "size": size,
+            "enabled": enabled,
+        }
+        instances_by_id[instance_id] = resolved
+        resolved_instances.append(resolved)
+
+    return {
+        "source": structures,
+        "templates": templates,
+        "instances": resolved_instances,
+        "templates_by_id": templates_by_id,
+        "instances_by_id": instances_by_id,
+    }
+
+
+def _validate_structure_bindings(
+    structure_build: dict[str, Any],
+    landmark_ids: set[str],
+    region_ids: set[str],
+    topology_build: dict[str, Any],
+) -> None:
+    expected_topology_digest = str(topology_build.get("canonical_digest", ""))
+    expected_partition_digest = str(topology_build.get("partition_digest", ""))
+    for instance in structure_build["instances"]:
+        source: dict[str, Any] = instance["source"]
+        instance_id = str(instance["id"])
+        if instance_id in landmark_ids or instance_id in region_ids or instance_id == "exit":
+            raise ManifestError(
+                f"structure instance ID {instance_id} collides with another manifest ID"
+            )
+        landmark_id = source.get("landmark_id")
+        if landmark_id is not None and landmark_id not in landmark_ids:
+            raise ManifestError(
+                f"structure instance {instance_id} references an unknown landmark"
+            )
+        if source["topology_digest"] != expected_topology_digest:
+            raise ManifestError(
+                f"structure instance {instance_id}.topology_digest is stale"
+            )
+        if source["partition_digest"] != expected_partition_digest:
+            raise ManifestError(
+                f"structure instance {instance_id}.partition_digest is stale"
+            )
+
+
 def _validate_topology(
     manifest: dict[str, Any],
     world_size: tuple[float, float],
+    structure_build: dict[str, Any],
     *,
     verify_declarations: bool = True,
 ) -> dict[str, Any]:
@@ -784,7 +1244,7 @@ def _validate_topology(
     expected_collision_keys = (
         base_collision_keys
         if mode == "open_world"
-        else base_collision_keys | {"canonical_digest", "mapping"}
+        else base_collision_keys | {"canonical_digest", "partition_digest", "mapping"}
     )
     if set(collision) != expected_collision_keys:
         raise ManifestError(
@@ -837,13 +1297,18 @@ def _validate_topology(
 
     topology_build: dict[str, Any]
     if mode == "open_world":
+        if any(instance["enabled"] for instance in structure_build["instances"]):
+            raise ManifestError("enabled structures require an owned L05 collision source")
         if source_format != "none":
             raise ManifestError("open_world requires collision_source.format none")
         if collision["path"] != "" or collision["sha256"] != "":
             raise ManifestError("a none collision source must have empty path and sha256")
         if pixel_size != (0.0, 0.0) or world_units_per_pixel != (0.0, 0.0):
             raise ManifestError("a none collision source must have zero sizes")
-        topology_build = {"mode": "open_world"}
+        topology_build = {
+            "mode": "open_world",
+            "structure_build": structure_build,
+        }
     else:
         if source_format != L05_SOURCE_FORMAT:
             raise ManifestError(
@@ -906,18 +1371,81 @@ def _validate_topology(
             raise ManifestError(
                 "L05 payload must contain exactly schema_version, base and operations"
             )
-        if payload["schema_version"] != 1:
-            raise ManifestError("L05 payload schema_version must be 1")
+        if payload["schema_version"] != 2:
+            raise ManifestError("L05 payload schema_version must be 2")
         if payload["base"] != "open_water":
             raise ManifestError("L05 payload base must be open_water")
+
+        mapping_origin = _pair(
+            mapping["world_origin"],
+            "topology.collision_source.mapping.world_origin",
+        )
+        enabled_instances = [
+            instance
+            for instance in structure_build["instances"]
+            if instance["enabled"]
+        ]
+        owner_ids = ["", "world", *(str(instance["id"]) for instance in enabled_instances)]
+        owner_index_by_id = {
+            owner_id: owner_index for owner_index, owner_id in enumerate(owner_ids)
+        }
+        for instance in structure_build["instances"]:
+            label = f"structure instance {instance['id']}"
+            origin = instance["origin"]
+            size = instance["size"]
+            origin_px_float = (
+                (origin[0] - mapping_origin[0]) / world_units_per_pixel[0],
+                (origin[1] - mapping_origin[1]) / world_units_per_pixel[1],
+            )
+            size_px_float = (
+                size[0] / world_units_per_pixel[0],
+                size[1] / world_units_per_pixel[1],
+            )
+            if any(
+                not component.is_integer()
+                for component in (*origin_px_float, *size_px_float)
+            ):
+                raise ManifestError(f"{label} must align exactly to the L05 pixel grid")
+            origin_px = (int(origin_px_float[0]), int(origin_px_float[1]))
+            size_px = (int(size_px_float[0]), int(size_px_float[1]))
+            if (
+                origin_px[0] < 0
+                or origin_px[1] < 0
+                or size_px[0] <= 0
+                or size_px[1] <= 0
+                or origin_px[0] + size_px[0] > L05_PIXEL_SIZE[0]
+                or origin_px[1] + size_px[1] > L05_PIXEL_SIZE[1]
+            ):
+                raise ManifestError(f"{label} raster bounds lie outside L05")
+            instance["origin_px"] = origin_px
+            instance["size_px"] = size_px
+
         operations = _array(payload["operations"], "L05 payload.operations")
         cells = bytearray([open_water]) * (L05_PIXEL_SIZE[0] * L05_PIXEL_SIZE[1])
+        solid_owner_cells = [0] * (L05_PIXEL_SIZE[0] * L05_PIXEL_SIZE[1])
         operation_ids: set[str] = set()
         for index, operation_value in enumerate(operations):
             label = f"L05 payload.operations[{index}]"
             operation = _object(operation_value, label)
-            if set(operation) != {"id", "op", "rect_px"}:
-                raise ManifestError(f"{label} must contain exactly id, op and rect_px")
+            space = operation.get("space")
+            if space == "world_px":
+                expected_operation_keys = {"id", "op", "space", "rect_px"}
+            elif space == "structure_local_px":
+                expected_operation_keys = {
+                    "id",
+                    "op",
+                    "space",
+                    "structure_id",
+                    "rect_px",
+                }
+            else:
+                raise ManifestError(
+                    f"{label}.space must be world_px or structure_local_px"
+                )
+            if set(operation) != expected_operation_keys:
+                raise ManifestError(
+                    f"{label} has an invalid exact key set for space={space}"
+                )
             operation_id = _non_empty_string(operation["id"], f"{label}.id")
             if operation_id in operation_ids:
                 raise ManifestError(f"{label}.id must be unique")
@@ -937,13 +1465,50 @@ def _validate_topology(
             x, y, width, height = rect_value
             if x < 0 or y < 0 or width <= 0 or height <= 0:
                 raise ManifestError(f"{label}.rect_px must be a positive raster rectangle")
-            if x + width > L05_PIXEL_SIZE[0] or y + height > L05_PIXEL_SIZE[1]:
-                raise ManifestError(f"{label}.rect_px lies outside the L05 raster")
-            value = solid if operation_kind == "solid_rect" else open_water
+            solid_owner_index: int
+            if space == "world_px":
+                world_x = x
+                world_y = y
+                if x + width > L05_PIXEL_SIZE[0] or y + height > L05_PIXEL_SIZE[1]:
+                    raise ManifestError(f"{label}.rect_px lies outside the L05 raster")
+                solid_owner_index = owner_index_by_id["world"]
+            else:
+                structure_id = _non_empty_string(
+                    operation["structure_id"],
+                    f"{label}.structure_id",
+                )
+                instance = structure_build["instances_by_id"].get(structure_id)
+                if instance is None:
+                    raise ManifestError(f"{label}.structure_id references an unknown structure")
+                if not instance["enabled"]:
+                    raise ManifestError(f"{label}.structure_id references a disabled structure")
+                size_px = instance["size_px"]
+                if x + width > size_px[0] or y + height > size_px[1]:
+                    raise ManifestError(f"{label}.rect_px lies outside its structure")
+                world_x = instance["origin_px"][0] + x
+                world_y = instance["origin_px"][1] + y
+                solid_owner_index = owner_index_by_id[structure_id]
+
+            is_solid = operation_kind == "solid_rect"
+            value = solid if is_solid else open_water
+            owner_value = solid_owner_index if is_solid else 0
             row_bytes = bytes([value]) * width
-            for row in range(y, y + height):
-                start = row * L05_PIXEL_SIZE[0] + x
+            owner_row = [owner_value] * width
+            for row in range(world_y, world_y + height):
+                start = row * L05_PIXEL_SIZE[0] + world_x
                 cells[start : start + width] = row_bytes
+                solid_owner_cells[start : start + width] = owner_row
+
+        for cell_index, value in enumerate(cells):
+            owner_index = solid_owner_cells[cell_index]
+            if value == solid and owner_index == 0:
+                raise ManifestError(
+                    f"L05 solid cell {cell_index} does not have a collision owner"
+                )
+            if value == open_water and owner_index != 0:
+                raise ManifestError(
+                    f"L05 open-water cell {cell_index} retains a collision owner"
+                )
         digest_payload = {
             "mapping": copy.deepcopy(mapping),
             "encoding": copy.deepcopy(encoding),
@@ -951,7 +1516,13 @@ def _validate_topology(
             "cells_hex": bytes(cells).hex(),
         }
         canonical_digest = f"topology-v1:{_canonical_sha256(digest_payload)}"
+        partition_payload = {
+            "owner_ids": owner_ids,
+            "solid_owner_cells": solid_owner_cells,
+        }
+        partition_digest = f"partition-v1:{_canonical_sha256(partition_payload)}"
         declared_digest = collision["canonical_digest"]
+        declared_partition_digest = collision["partition_digest"]
         if verify_declarations:
             if (
                 not isinstance(declared_digest, str)
@@ -965,16 +1536,36 @@ def _validate_topology(
                     "topology.collision_source.canonical_digest is stale; "
                     f"expected {canonical_digest}"
                 )
+            if (
+                not isinstance(declared_partition_digest, str)
+                or not re.fullmatch(
+                    r"partition-v1:[0-9a-f]{64}",
+                    declared_partition_digest,
+                )
+            ):
+                raise ManifestError(
+                    "topology.collision_source.partition_digest must be "
+                    "partition-v1:<sha256>"
+                )
+            if declared_partition_digest != partition_digest:
+                raise ManifestError(
+                    "topology.collision_source.partition_digest is stale; "
+                    f"expected {partition_digest}"
+                )
         topology_build = {
             "mode": L05_MODE,
             "payload_path": package_path,
             "payload_sha256": actual_payload_sha,
             "canonical_digest": canonical_digest,
+            "partition_digest": partition_digest,
             "pixel_size": L05_PIXEL_SIZE,
             "world_units_per_pixel": L05_WORLD_UNITS_PER_PIXEL,
             "mapping": copy.deepcopy(mapping),
             "encoding": copy.deepcopy(encoding),
             "cells": bytes(cells),
+            "owner_ids": owner_ids,
+            "solid_owner_cells": solid_owner_cells,
+            "structure_build": structure_build,
         }
 
     corridors = _array(
@@ -1091,12 +1682,56 @@ def _ordered_subsequence(needle: list[str], haystack: list[str]) -> bool:
     return position == len(needle)
 
 
+def _resolve_gameplay_position(
+    record: dict[str, Any],
+    label: str,
+    world_size: tuple[float, float],
+    structure_build: dict[str, Any],
+) -> tuple[float, float]:
+    position_space = record.get("position_space", "world")
+    if position_space == "world":
+        if "structure_id" in record:
+            raise ManifestError(
+                f"{label}.structure_id is allowed only with position_space=structure_local"
+            )
+        return _validate_position(record["position"], f"{label}.position", world_size)
+    if position_space != "structure_local":
+        raise ManifestError(
+            f"{label}.position_space must be world or structure_local"
+        )
+    structure_id = _non_empty_string(
+        record.get("structure_id"),
+        f"{label}.structure_id",
+    )
+    instance = structure_build["instances_by_id"].get(structure_id)
+    if instance is None:
+        raise ManifestError(f"{label}.structure_id references an unknown structure")
+    if not instance["enabled"]:
+        raise ManifestError(f"{label}.structure_id references a disabled structure")
+    local_position = _pair(record["position"], f"{label}.position")
+    size = instance["size"]
+    if (
+        local_position[0] < 0.0
+        or local_position[1] < 0.0
+        or local_position[0] >= size[0]
+        or local_position[1] >= size[1]
+    ):
+        raise ManifestError(f"{label}.position lies outside its structure")
+    origin = instance["origin"]
+    resolved = [
+        origin[0] + local_position[0],
+        origin[1] + local_position[1],
+    ]
+    return _validate_position(resolved, f"{label}.resolved_position", world_size)
+
+
 def _validate_gameplay(
     manifest: dict[str, Any],
     world_size: tuple[float, float],
     landmarks_by_id: dict[str, dict[str, Any]],
     landmark_ids: set[str],
     region_ids: set[str],
+    structure_build: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
     gameplay = _object(manifest["gameplay"], "gameplay")
     _require_keys(
@@ -1123,7 +1758,11 @@ def _validate_gameplay(
 
     records_by_id: dict[str, dict[str, Any]] = {}
     collection_by_id: dict[str, str] = {}
-    all_ids = set(landmark_ids) | region_ids
+    all_ids = (
+        set(landmark_ids)
+        | region_ids
+        | set(structure_build["instances_by_id"])
+    )
     all_ids.add("exit")
     for collection_name, records in _iter_gameplay_collections(gameplay):
         for index, value in enumerate(records):
@@ -1151,7 +1790,16 @@ def _validate_gameplay(
                         world_size,
                     )
             if "position" in record:
-                _validate_position(record["position"], f"{label}.position", world_size)
+                _resolve_gameplay_position(
+                    record,
+                    label,
+                    world_size,
+                    structure_build,
+                )
+            elif "position_space" in record or "structure_id" in record:
+                raise ManifestError(
+                    f"{label} cannot declare position_space or structure_id without position"
+                )
             if "contents" in record:
                 _validate_item_contents(record["contents"], f"{label}.contents")
 
@@ -1403,26 +2051,34 @@ def load_and_validate_manifest() -> tuple[
             "entry",
             "exit",
             "landmarks",
+            "structures",
             "gameplay",
             "campaign",
         ),
         "manifest",
     )
-    if manifest["schema_version"] != 2:
-        raise ManifestError("schema_version must be 2")
+    if manifest["schema_version"] != 5:
+        raise ManifestError("schema_version must be 5")
     if "region" in manifest:
-        raise ManifestError("schema_version 2 uses regions; legacy region is not allowed")
+        raise ManifestError("schema_version 5 uses regions; legacy region is not allowed")
 
     _validate_revision(manifest)
     world_size = _validate_map(manifest)
     region_bounds = _validate_regions(manifest, world_size)
-    topology_build = _validate_topology(manifest, world_size)
+    structure_build = _validate_structures(manifest, world_size)
+    topology_build = _validate_topology(manifest, world_size, structure_build)
     _validate_visual(manifest, world_size, topology_build)
     _validate_depth_profile(manifest)
     landmarks_by_id, landmark_ids = _validate_landmarks(
         manifest,
         world_size,
         region_bounds,
+    )
+    _validate_structure_bindings(
+        structure_build,
+        landmark_ids,
+        set(region_bounds),
+        topology_build,
     )
     _validate_entry_exit(manifest, world_size, landmark_ids)
     _validate_gameplay(
@@ -1431,6 +2087,7 @@ def load_and_validate_manifest() -> tuple[
         landmarks_by_id,
         landmark_ids,
         set(region_bounds),
+        structure_build,
     )
     _validate_campaign(manifest, landmarks_by_id)
 
@@ -1623,6 +2280,39 @@ def _render_l05_artifacts(
             "path": path.relative_to(WORKBENCH_DIR).as_posix(),
             "sha256": hashlib.sha256(artifacts[path]).hexdigest(),
         }
+    owner_ids: list[str] = topology_build["owner_ids"]
+    solid_owner_cells: list[int] = topology_build["solid_owner_cells"]
+    owner_cell_counts = [
+        {
+            "owner_id": owner_id,
+            "cell_count": solid_owner_cells.count(owner_index),
+        }
+        for owner_index, owner_id in enumerate(owner_ids)
+    ]
+    structure_cards = []
+    for instance in topology_build["structure_build"]["instances"]:
+        source: dict[str, Any] = instance["source"]
+        origin_px = instance["origin_px"]
+        size_px = instance["size_px"]
+        structure_card = {
+            "id": instance["id"],
+            "template_id": source["template_id"],
+            "enabled": instance["enabled"],
+            "origin": list(instance["origin"]),
+            "size": list(instance["size"]),
+            "pixel_rect": [
+                origin_px[0],
+                origin_px[1],
+                size_px[0],
+                size_px[1],
+            ],
+            "topology_digest": source["topology_digest"],
+            "partition_digest": source["partition_digest"],
+            "sockets": copy.deepcopy(source["sockets"]),
+        }
+        if "landmark_id" in source:
+            structure_card["landmark_id"] = source["landmark_id"]
+        structure_cards.append(structure_card)
     truth_package = {
         "generated": True,
         "authority": False,
@@ -1630,12 +2320,16 @@ def _render_l05_artifacts(
         "payload_path": topology_build["payload_path"],
         "payload_sha256": topology_build["payload_sha256"],
         "canonical_digest": topology_build["canonical_digest"],
+        "partition_digest": topology_build["partition_digest"],
         "pixel_size": list(topology_build["pixel_size"]),
         "world_units_per_pixel": list(topology_build["world_units_per_pixel"]),
         "mapping": copy.deepcopy(topology_build["mapping"]),
         "encoding": copy.deepcopy(topology_build["encoding"]),
         "solid_cell_count": sum(value == solid_value for value in cells),
         "open_water_cell_count": sum(value == open_water_value for value in cells),
+        "owner_ids": owner_ids,
+        "owner_cell_counts": owner_cell_counts,
+        "structures": structure_cards,
         "artifacts": artifact_records,
     }
     artifacts[L05_GENERATED_PATHS["truth_package"]] = (
@@ -1656,6 +2350,138 @@ def _safe_node_name(value: str) -> str:
     return sanitized or "Record"
 
 
+def _merged_structure_owner_rectangles(
+    topology_build: dict[str, Any],
+    instance: dict[str, Any],
+) -> list[tuple[int, int, int, int]]:
+    grid_width = int(topology_build["pixel_size"][0])
+    owner_ids: list[str] = topology_build["owner_ids"]
+    owner_index = owner_ids.index(str(instance["id"]))
+    owner_cells: list[int] = topology_build["solid_owner_cells"]
+    origin_x, origin_y = instance["origin_px"]
+    width, height = instance["size_px"]
+    active: dict[tuple[int, int], list[int]] = {}
+    merged: list[tuple[int, int, int, int]] = []
+    for local_y in range(height):
+        runs: list[tuple[int, int]] = []
+        local_x = 0
+        while local_x < width:
+            global_index = (origin_y + local_y) * grid_width + origin_x + local_x
+            if owner_cells[global_index] != owner_index:
+                local_x += 1
+                continue
+            run_start = local_x
+            local_x += 1
+            while local_x < width:
+                global_index = (
+                    (origin_y + local_y) * grid_width + origin_x + local_x
+                )
+                if owner_cells[global_index] != owner_index:
+                    break
+                local_x += 1
+            runs.append((run_start, local_x - run_start))
+        run_keys = set(runs)
+        for key in list(active):
+            if key not in run_keys:
+                x, y, run_width, run_height = active.pop(key)
+                merged.append((x, y, run_width, run_height))
+        for run_start, run_width in runs:
+            key = (run_start, run_width)
+            if key in active:
+                active[key][3] += 1
+            else:
+                active[key] = [run_start, local_y, run_width, 1]
+    for x, y, run_width, run_height in active.values():
+        merged.append((x, y, run_width, run_height))
+    merged.sort(key=lambda rect: (rect[1], rect[0], rect[3], rect[2]))
+    return merged
+
+
+def _structure_owner_boundary_segments(
+    topology_build: dict[str, Any],
+    instance: dict[str, Any],
+) -> list[tuple[float, float]]:
+    grid_width, grid_height = topology_build["pixel_size"]
+    owner_ids: list[str] = topology_build["owner_ids"]
+    owner_index = owner_ids.index(str(instance["id"]))
+    owner_cells: list[int] = topology_build["solid_owner_cells"]
+    cells: bytes = topology_build["cells"]
+    solid_value = int(topology_build["encoding"]["solid"])
+    origin_x, origin_y = instance["origin_px"]
+    width, height = instance["size_px"]
+    pixel_width, pixel_height = topology_build["world_units_per_pixel"]
+    segments: list[tuple[float, float]] = []
+
+    def is_owned_by_structure(global_x: int, global_y: int) -> bool:
+        return (
+            0 <= global_x < grid_width
+            and 0 <= global_y < grid_height
+            and owner_cells[global_y * grid_width + global_x] == owner_index
+        )
+
+    def is_solid(global_x: int, global_y: int) -> bool:
+        return (
+            0 <= global_x < grid_width
+            and 0 <= global_y < grid_height
+            and cells[global_y * grid_width + global_x] == solid_value
+        )
+
+    for local_y in range(height):
+        global_y = origin_y + local_y
+        for local_x in range(width):
+            global_x = origin_x + local_x
+            if not is_owned_by_structure(global_x, global_y):
+                continue
+            left = local_x * pixel_width
+            top = local_y * pixel_height
+            right = (local_x + 1) * pixel_width
+            bottom = (local_y + 1) * pixel_height
+            if not is_solid(global_x, global_y - 1):
+                segments.extend(((left, top), (right, top)))
+            if not is_solid(global_x + 1, global_y):
+                segments.extend(((right, top), (right, bottom)))
+            if not is_solid(global_x, global_y + 1):
+                segments.extend(((right, bottom), (left, bottom)))
+            if not is_solid(global_x - 1, global_y):
+                segments.extend(((left, bottom), (left, top)))
+    return segments
+
+
+def _scene_structure_resources(
+    topology_build: dict[str, Any],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    if topology_build.get("mode") != L05_MODE:
+        return [], []
+    sub_resources: list[str] = []
+    bindings: list[dict[str, Any]] = []
+    enabled_instances = [
+        instance
+        for instance in topology_build["structure_build"]["instances"]
+        if instance["enabled"]
+    ]
+    for index, instance in enumerate(enabled_instances):
+        binding = {
+            "instance": instance,
+            "rectangles_px": _merged_structure_owner_rectangles(
+                topology_build,
+                instance,
+            ),
+        }
+        segments = _structure_owner_boundary_segments(topology_build, instance)
+        if segments:
+            shape_id = f"ConcavePolygonShape2D_structure_{index:04d}"
+            binding["shape_id"] = shape_id
+            sub_resources.extend(
+                (
+                    "",
+                    f'[sub_resource type="ConcavePolygonShape2D" id="{shape_id}"]',
+                    f"segments = {_gd_points(segments)}",
+                )
+            )
+        bindings.append(binding)
+    return sub_resources, bindings
+
+
 def _append_layer_root(lines: list[str], layer: dict[str, Any]) -> None:
     layer_id = str(layer["id"])
     node_type = "Parallax2D" if layer["space"] == "parallax" else "Node2D"
@@ -1666,6 +2492,7 @@ def _append_layer_root(lines: list[str], layer: dict[str, Any]) -> None:
             f'[node name="{layer_id}" type="{node_type}" parent="VisualLayers"]',
             f"z_index = {int(layer['z_index'])}",
             f"visible = {'true' if layer['enabled'] else 'false'}",
+            f"modulate = {_gd_color(layer['rgb_modulate'], f'{scale_label}.rgb_modulate', 255)}",
         )
     )
     if node_type == "Parallax2D":
@@ -1678,6 +2505,7 @@ def _append_layer_root(lines: list[str], layer: dict[str, Any]) -> None:
             f"metadata/role = {_gd_string(layer['role'])}",
             f"metadata/space = {_gd_string(layer['space'])}",
             f"metadata/parallax_scale = {_gd_vector(layer['parallax_scale'], scale_label)}",
+            f"metadata/rgb_modulate = {_gd_color(layer['rgb_modulate'], f'{scale_label}.rgb_modulate', 255)}",
             f"metadata/enabled = {'true' if layer['enabled'] else 'false'}",
             f"metadata/reserved = {'true' if layer['reserved'] else 'false'}",
             f"metadata/affordance_policy = {_gd_string(layer['affordance_policy'])}",
@@ -1704,6 +2532,13 @@ def _scene_visual_asset_resources(
             )
         )
     for index, asset in enumerate(assets):
+        binding: dict[str, Any] = {
+            "asset": asset,
+            "index": index,
+        }
+        if asset["kind"] == COMPOSITION_PROXY_KIND:
+            bindings.append(binding)
+            continue
         texture_id = f"Texture_asset_{index:04d}"
         resource_path = (
             "res://underwater_map_workbench/" + str(asset["path"])
@@ -1711,14 +2546,22 @@ def _scene_visual_asset_resources(
         ext_resources.append(
             f'[ext_resource type="Texture2D" path="{resource_path}" id="{texture_id}"]'
         )
-        binding: dict[str, Any] = {
-            "asset": asset,
-            "index": index,
-            "texture_id": texture_id,
-        }
+        binding["texture_id"] = texture_id
         if asset["kind"] == "collision_masked_material":
             material_id = f"ShaderMaterial_asset_{index:04d}"
             binding["material_id"] = material_id
+            _, _, world_width, world_height = _rect(
+                asset["world_rect"],
+                f"visual.assets[{index}].world_rect",
+            )
+            pixel_width, pixel_height = _pair(
+                asset["pixel_size"],
+                f"visual.assets[{index}].pixel_size",
+            )
+            native_texture_tiling = [
+                world_width / pixel_width,
+                world_height / pixel_height,
+            ]
             sub_resources.extend(
                 (
                     "",
@@ -1726,64 +2569,301 @@ def _scene_visual_asset_resources(
                     'shader = ExtResource("Shader_l05_ground")',
                     'shader_parameter/topology_mask = ExtResource("Texture_l05_solid")',
                     f'shader_parameter/ground_texture = ExtResource("{texture_id}")',
+                    "shader_parameter/texture_tiling = "
+                    + _gd_vector(
+                        native_texture_tiling,
+                        f"visual.assets[{index}].native_texture_tiling",
+                    ),
                 )
             )
         bindings.append(binding)
     return ext_resources, sub_resources, bindings
 
 
+def _append_visual_asset_groups(
+    lines: list[str],
+    bindings: list[dict[str, Any]],
+) -> None:
+    emitted: set[tuple[str, str]] = set()
+    for binding in bindings:
+        asset: dict[str, Any] = binding["asset"]
+        layer_id = str(asset["layer_id"])
+        group_id = str(asset["group_id"])
+        key = (layer_id, group_id)
+        if key in emitted:
+            continue
+        emitted.add(key)
+        lines.extend(
+            (
+                "",
+                f'[node name="{group_id}" type="Node2D" parent="VisualLayers/{layer_id}"]',
+                "scale = Vector2(1, 1)",
+                f"metadata/group_id = {_gd_string(group_id)}",
+                f"metadata/layer_id = {_gd_string(layer_id)}",
+            )
+        )
+
+
 def _append_visual_assets(
     lines: list[str],
     bindings: list[dict[str, Any]],
 ) -> None:
+    _append_visual_asset_groups(lines, bindings)
     for binding in bindings:
         asset: dict[str, Any] = binding["asset"]
         index = int(binding["index"])
         asset_id = str(asset["id"])
         layer_id = str(asset["layer_id"])
+        group_id = str(asset["group_id"])
         x, y, width, height = _rect(
             asset["world_rect"],
             f"visual.assets[{index}].world_rect",
         )
-        node_name = f"Asset{index:04d}_{_safe_node_name(asset_id)}"
+        pixel_width, pixel_height = _pair(
+            asset["pixel_size"],
+            f"visual.assets[{index}].pixel_size",
+        )
+        node_name = _safe_node_name(asset_id)
+        group_path = f"VisualLayers/{layer_id}/{group_id}"
+        element_path = f"{group_path}/{node_name}"
+        lines.extend(
+            (
+                "",
+                f'[node name="{node_name}" type="Node2D" parent="{group_path}"]',
+                f"position = Vector2({_gd_number(x)}, {_gd_number(y)})",
+                "scale = Vector2(1, 1)",
+                f"visible = {'true' if asset['enabled'] else 'false'}",
+                f"metadata/asset_id = {_gd_string(asset_id)}",
+                f"metadata/layer_id = {_gd_string(layer_id)}",
+                f"metadata/group_id = {_gd_string(group_id)}",
+                f"metadata/kind = {_gd_string(asset['kind'])}",
+                "metadata/world_rect = Rect2("
+                f"{_gd_number(x)}, {_gd_number(y)}, "
+                f"{_gd_number(width)}, {_gd_number(height)})",
+                "metadata/pixel_size = Vector2i("
+                f"{int(pixel_width)}, {int(pixel_height)})",
+                f"metadata/source = {_gd_variant(asset)}",
+            )
+        )
         if asset["kind"] == "texture_rect":
             lines.extend(
                 (
                     "",
-                    f'[node name="{node_name}" type="TextureRect" parent="VisualLayers/{layer_id}"]',
-                    f"offset_left = {_gd_number(x)}",
-                    f"offset_top = {_gd_number(y)}",
-                    f"offset_right = {_gd_number(x + width)}",
-                    f"offset_bottom = {_gd_number(y + height)}",
+                    f'[node name="Bitmap" type="TextureRect" parent="{element_path}"]',
+                    "offset_left = 0.0",
+                    "offset_top = 0.0",
+                    f"offset_right = {_gd_number(width)}",
+                    f"offset_bottom = {_gd_number(height)}",
                     f'texture = ExtResource("{binding["texture_id"]}")',
                     "expand_mode = 1",
                     "stretch_mode = 0",
                     "mouse_filter = 2",
-                    f"visible = {'true' if asset['enabled'] else 'false'}",
+                )
+            )
+        elif asset["kind"] == COMPOSITION_PROXY_KIND:
+            lines.extend(
+                (
+                    "",
+                    f'[node name="Fill" type="ColorRect" parent="{element_path}"]',
+                    "offset_left = 0.0",
+                    "offset_top = 0.0",
+                    f"offset_right = {_gd_number(width)}",
+                    f"offset_bottom = {_gd_number(height)}",
+                    f"color = {_gd_color(COMPOSITION_PROXY_FILL_COLOR, 'composition_proxy.fill')}",
+                    "mouse_filter = 2",
+                    "",
+                    f'[node name="Outline" type="Line2D" parent="{element_path}"]',
+                    "points = "
+                    + _gd_points(
+                        (
+                            (0.0, 0.0),
+                            (width, 0.0),
+                            (width, height),
+                            (0.0, height),
+                            (0.0, 0.0),
+                        )
+                    ),
+                    "width = 12.0",
+                    f"default_color = {_gd_color(COMPOSITION_PROXY_OUTLINE_COLOR, 'composition_proxy.outline')}",
+                    "antialiased = true",
+                    "",
+                    f'[node name="Label" type="Label" parent="{element_path}"]',
+                    "offset_left = 24.0",
+                    "offset_top = 24.0",
+                    f"text = {_gd_string(f'{asset_id}  {int(width)} x {int(height)}')}",
+                    f"theme_override_colors/font_color = {_gd_color(COMPOSITION_PROXY_LABEL_COLOR, 'composition_proxy.label')}",
+                    "theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)",
+                    "theme_override_constants/outline_size = 6",
+                    "theme_override_font_sizes/font_size = 48",
+                    "mouse_filter = 2",
                 )
             )
         else:
             lines.extend(
                 (
                     "",
-                    f'[node name="{node_name}" type="ColorRect" parent="VisualLayers/{layer_id}"]',
-                    f"offset_left = {_gd_number(x)}",
-                    f"offset_top = {_gd_number(y)}",
-                    f"offset_right = {_gd_number(x + width)}",
-                    f"offset_bottom = {_gd_number(y + height)}",
+                    f'[node name="Material" type="ColorRect" parent="{element_path}"]',
+                    "offset_left = 0.0",
+                    "offset_top = 0.0",
+                    f"offset_right = {_gd_number(width)}",
+                    f"offset_bottom = {_gd_number(height)}",
                     f'material = SubResource("{binding["material_id"]}")',
                     "mouse_filter = 2",
-                    f"visible = {'true' if asset['enabled'] else 'false'}",
+                )
+            )
+
+
+def _append_structure_roots(
+    lines: list[str],
+    bindings: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    topology_build: dict[str, Any],
+) -> None:
+    lines.extend(
+        (
+            "",
+            '[node name="StructureRoots" type="Node2D" parent="."]',
+            "position = Vector2(0, 0)",
+            "scale = Vector2(1, 1)",
+        )
+    )
+    pixel_width, pixel_height = topology_build["world_units_per_pixel"]
+    local_interactives: dict[str, list[tuple[str, int, dict[str, Any]]]] = {}
+    for collection_name, records in _iter_gameplay_collections(manifest["gameplay"]):
+        for record_index, record in enumerate(records):
+            if record.get("position_space") != "structure_local":
+                continue
+            structure_id = str(record.get("structure_id", ""))
+            local_interactives.setdefault(structure_id, []).append(
+                (collection_name, record_index, record)
+            )
+
+    for binding in bindings:
+        instance: dict[str, Any] = binding["instance"]
+        if not instance["enabled"]:
+            continue
+        source: dict[str, Any] = instance["source"]
+        instance_id = str(instance["id"])
+        node_name = _safe_node_name(instance_id)
+        root_path = f"StructureRoots/{node_name}"
+        size_width, size_height = instance["size"]
+        lines.extend(
+            (
+                "",
+                f'[node name="{node_name}" type="Node2D" parent="StructureRoots"]',
+                f"position = {_gd_vector(source['origin'], f'structures.instances.{instance_id}.origin')}",
+                "scale = Vector2(1, 1)",
+                f"visible = {'true' if instance['enabled'] else 'false'}",
+                f"metadata/structure_id = {_gd_string(instance_id)}",
+                f"metadata/template_id = {_gd_string(source['template_id'])}",
+                f"metadata/landmark_id = {_gd_variant(source.get('landmark_id'))}",
+                f"metadata/origin = {_gd_vector(source['origin'], f'structures.instances.{instance_id}.origin')}",
+                f"metadata/size = {_gd_vector(source['size'], f'structures.instances.{instance_id}.size')}",
+                f"metadata/topology_digest = {_gd_string(source['topology_digest'])}",
+                f"metadata/partition_digest = {_gd_string(source['partition_digest'])}",
+                f"metadata/source = {_gd_variant(source)}",
+                "",
+                f'[node name="InteriorVisual" type="Node2D" parent="{root_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
+                "z_index = -20",
+                'metadata/logical_layer_id = "L04"',
+                "",
+                f'[node name="Backwall" type="ColorRect" parent="{root_path}/InteriorVisual"]',
+                "offset_left = 0.0",
+                "offset_top = 0.0",
+                f"offset_right = {_gd_number(size_width)}",
+                f"offset_bottom = {_gd_number(size_height)}",
+                f"color = {_gd_color(STRUCTURE_INTERIOR_COLOR, 'structure.interior')}",
+                "mouse_filter = 2",
+                "",
+                f'[node name="Label" type="Label" parent="{root_path}/InteriorVisual"]',
+                "offset_left = 40.0",
+                "offset_top = 40.0",
+                'text = "PROXY"',
+                f"theme_override_colors/font_color = {_gd_color(STRUCTURE_LABEL_COLOR, 'structure.label')}",
+                "theme_override_colors/font_outline_color = Color(0, 0, 0, 1)",
+                "theme_override_constants/outline_size = 8",
+                "theme_override_font_sizes/font_size = 64",
+                "mouse_filter = 2",
+                "",
+                f'[node name="StructureVisual" type="Node2D" parent="{root_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
+                "z_index = 0",
+                'metadata/logical_layer_id = "L05"',
+            )
+        )
+        for rectangle_index, rectangle in enumerate(binding["rectangles_px"]):
+            x, y, width, height = rectangle
+            left = x * pixel_width
+            top = y * pixel_height
+            right = (x + width) * pixel_width
+            bottom = (y + height) * pixel_height
+            lines.extend(
+                (
+                    "",
+                    f'[node name="Solid{rectangle_index:04d}" type="ColorRect" parent="{root_path}/StructureVisual"]',
+                    f"offset_left = {_gd_number(left)}",
+                    f"offset_top = {_gd_number(top)}",
+                    f"offset_right = {_gd_number(right)}",
+                    f"offset_bottom = {_gd_number(bottom)}",
+                    f"color = {_gd_color(STRUCTURE_SOLID_COLOR, 'structure.solid')}",
+                    "mouse_filter = 2",
+                    f"metadata/owner_id = {_gd_string(instance_id)}",
+                    "metadata/pixel_rect = Rect2i("
+                    f"{x}, {y}, {width}, {height})",
+                )
+            )
+
+        lines.extend(
+            (
+                "",
+                f'[node name="StaticCollision" type="StaticBody2D" parent="{root_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
+                "collision_layer = 1",
+                "collision_mask = 0",
+            )
+        )
+        if "shape_id" in binding:
+            lines.extend(
+                (
+                    "",
+                    f'[node name="CollisionShape2D" type="CollisionShape2D" parent="{root_path}/StaticCollision"]',
+                    "position = Vector2(0, 0)",
+                    "scale = Vector2(1, 1)",
+                    f"shape = SubResource({_gd_string(binding['shape_id'])})",
                 )
             )
         lines.extend(
             (
-                f"metadata/asset_id = {_gd_string(asset_id)}",
-                f"metadata/layer_id = {_gd_string(layer_id)}",
-                f"metadata/kind = {_gd_string(asset['kind'])}",
-                f"metadata/source = {_gd_variant(asset)}",
+                "",
+                f'[node name="DynamicBodies" type="Node2D" parent="{root_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
+                "",
+                f'[node name="Interactives" type="Node2D" parent="{root_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
             )
         )
+        for collection_name, record_index, record in local_interactives.get(
+            instance_id,
+            [],
+        ):
+            marker_name = _safe_node_name(str(record["id"]))
+            lines.extend(
+                (
+                    "",
+                    f'[node name="{marker_name}" type="Marker2D" parent="{root_path}/Interactives"]',
+                    f"position = {_gd_vector(record['position'], f'gameplay.{collection_name}[{record_index}].position')}",
+                    "scale = Vector2(1, 1)",
+                    f"metadata/object_id = {_gd_string(record['id'])}",
+                    f"metadata/kind = {_gd_string(collection_name)}",
+                    f"metadata/source = {_gd_variant(record)}",
+                )
+            )
 
 
 def _append_l00_content(
@@ -1810,10 +2890,6 @@ def _append_l00_content(
             '[node name="Water" type="Polygon2D" parent="VisualLayers/L00"]',
             f"polygon = {_gd_points(full_world)}",
             f'color = {_gd_color(visual["water_color"], "visual.water_color")}',
-            "",
-            '[node name="DeepWater" type="Polygon2D" parent="VisualLayers/L00"]',
-            f"polygon = {_gd_points([(0.0, world_height * 0.58), (world_width, world_height * 0.58), (world_width, world_height), (0.0, world_height)])}",
-            f'color = {_gd_color(visual["deep_water_color"], "visual.deep_water_color", 0xB8)}',
         )
     )
     if not bool(visual.get("diagnostic_grid_enabled", True)):
@@ -1950,7 +3026,11 @@ def _append_manifest_regions(lines: list[str], manifest: dict[str, Any]) -> None
         )
 
 
-def _append_manifest_markers(lines: list[str], manifest: dict[str, Any]) -> None:
+def _append_manifest_markers(
+    lines: list[str],
+    manifest: dict[str, Any],
+    structure_build: dict[str, Any],
+) -> None:
     lines.extend(
         (
             "",
@@ -1968,6 +3048,7 @@ def _append_manifest_markers(lines: list[str], manifest: dict[str, Any]) -> None
             'metadata/kind = "exit"',
         )
     )
+    world_size = _pair(manifest["map"]["world_size"], "map.world_size")
     gameplay = manifest["gameplay"]
     for collection_index, (collection_name, records) in enumerate(
         _iter_gameplay_collections(gameplay)
@@ -1997,8 +3078,14 @@ def _append_manifest_markers(lines: list[str], manifest: dict[str, Any]) -> None
                 )
             )
             if "position" in record:
+                resolved_position = _resolve_gameplay_position(
+                    record,
+                    f"gameplay.{collection_name}[{record_index}]",
+                    world_size,
+                    structure_build,
+                )
                 lines.append(
-                    f"position = {_gd_vector(record['position'], f'gameplay.{collection_name}[{record_index}].position')}"
+                    f"position = {_gd_vector(list(resolved_position), f'gameplay.{collection_name}[{record_index}].resolved_position')}"
                 )
 
 
@@ -2019,6 +3106,10 @@ def render_scene(
     ext_resources, sub_resources, asset_bindings = _scene_visual_asset_resources(
         manifest
     )
+    structure_sub_resources, structure_bindings = _scene_structure_resources(
+        topology_build
+    )
+    sub_resources.extend(structure_sub_resources)
     load_steps = 1 + len(ext_resources) + sum(
         1 for line in sub_resources if line.startswith("[sub_resource")
     )
@@ -2053,6 +3144,7 @@ def render_scene(
         f'metadata/navigation_cell_size = {_gd_vector(map_record["navigation_cell_size"], "map.navigation_cell_size")}',
         f"metadata/world_size = Vector2({_gd_number(world_width)}, {_gd_number(world_height)})",
         f"metadata/topology = {_gd_variant(manifest['topology'])}",
+        f"metadata/structures = {_gd_variant(manifest['structures'])}",
         f"metadata/campaign = {_gd_variant(manifest['campaign'])}",
     ])
     if topology_build.get("mode") == L05_MODE:
@@ -2060,6 +3152,7 @@ def render_scene(
             (
                 f"metadata/payload_sha256 = {_gd_string(topology_build['payload_sha256'])}",
                 f"metadata/canonical_digest = {_gd_string(topology_build['canonical_digest'])}",
+                f"metadata/partition_digest = {_gd_string(topology_build['partition_digest'])}",
             )
         )
     lines.extend(("", '[node name="VisualLayers" type="Node2D" parent="."]'))
@@ -2077,8 +3170,13 @@ def render_scene(
         elif layer_id == "L05" and topology_build.get("mode") == "open_world":
             _append_world_border(lines, manifest, world_size)
     _append_visual_assets(lines, asset_bindings)
+    _append_structure_roots(lines, structure_bindings, manifest, topology_build)
     _append_manifest_regions(lines, manifest)
-    _append_manifest_markers(lines, manifest)
+    _append_manifest_markers(
+        lines,
+        manifest,
+        topology_build["structure_build"],
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -2121,11 +3219,13 @@ def _refresh_l05_source() -> None:
     if topology.get("mode") != L05_MODE:
         raise ManifestError(
             f"--refresh-l05-source requires topology.mode={L05_MODE}"
-        )
+    )
     world_size = _validate_map(manifest)
+    structure_build = _validate_structures(manifest, world_size)
     topology_build = _validate_topology(
         manifest,
         world_size,
+        structure_build,
         verify_declarations=False,
     )
     collision = _object(
@@ -2145,6 +3245,7 @@ def _refresh_l05_source() -> None:
         )
     actual_sha = str(topology_build["payload_sha256"])
     canonical_digest = str(topology_build["canonical_digest"])
+    partition_digest = str(topology_build["partition_digest"])
     changed = False
     if collision.get("sha256") != actual_sha:
         collision["sha256"] = actual_sha
@@ -2152,6 +3253,17 @@ def _refresh_l05_source() -> None:
     if collision.get("canonical_digest") != canonical_digest:
         collision["canonical_digest"] = canonical_digest
         changed = True
+    if collision.get("partition_digest") != partition_digest:
+        collision["partition_digest"] = partition_digest
+        changed = True
+    for instance in structure_build["instances"]:
+        source: dict[str, Any] = instance["source"]
+        if source.get("topology_digest") != canonical_digest:
+            source["topology_digest"] = canonical_digest
+            changed = True
+        if source.get("partition_digest") != partition_digest:
+            source["partition_digest"] = partition_digest
+            changed = True
     active_l05_asset = active_l05_assets[0]
     if active_l05_asset.get("topology_digest") != canonical_digest:
         active_l05_asset["topology_digest"] = canonical_digest
@@ -2163,7 +3275,7 @@ def _refresh_l05_source() -> None:
             raise ManifestError("no-op refresh unexpectedly changed map_manifest.json")
         print(
             "L05 source declarations are current; map_manifest.json unchanged "
-            f"({actual_sha}, {canonical_digest})"
+            f"({actual_sha}, {canonical_digest}, {partition_digest})"
         )
         return
 
@@ -2185,7 +3297,7 @@ def _refresh_l05_source() -> None:
         ) from error
     print(
         "Refreshed L05 source declarations in map_manifest.json "
-        f"({actual_sha}, {canonical_digest})"
+        f"({actual_sha}, {canonical_digest}, {partition_digest})"
     )
 
 
@@ -2197,7 +3309,10 @@ def main() -> int:
     mode.add_argument(
         "--refresh-l05-source",
         action="store_true",
-        help="refresh L05 payload SHA and canonical digest in the manifest",
+        help=(
+            "refresh L05 payload SHA, canonical digest and partition digest "
+            "in the manifest"
+        ),
     )
     args = parser.parse_args()
     if args.refresh_l05_source:

@@ -208,6 +208,7 @@ $fullHeadlessFlowScenes = @(
     "BaseOptionalPanelsFlowTest.tscn"
     "BasePortraitBindingTest.tscn"
     "BuildingSlotMotionTest.tscn"
+    "DayTransitionPerformanceTest.tscn"
     "DiverPresentationTest.tscn"
     "IntroFlowTest.tscn"
     "MorningEventFlowTest.tscn"
