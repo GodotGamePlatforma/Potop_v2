@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dfqv6lhpq2mrp"
-path="res://.godot/imported/return_line.png-a2c594a6f6358215114cab41cc9a7fd9.ctex"
+path="res://.godot/imported/return_line.png-de087b25060596633a55aea9f5a95cb8.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://underwater_map_workbench/assets/gameplay/interactables/return_line.png"
-dest_files=["res://.godot/imported/return_line.png-a2c594a6f6358215114cab41cc9a7fd9.ctex"]
+dest_files=["res://.godot/imported/return_line.png-de087b25060596633a55aea9f5a95cb8.ctex"]
 
 [params]
 

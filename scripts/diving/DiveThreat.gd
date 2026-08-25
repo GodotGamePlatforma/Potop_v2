@@ -95,7 +95,6 @@ func _build_visual() -> void:
 	if _sprite == null:
 		_sprite = Sprite2D.new()
 		_sprite.name = "ThreatSprite"
-		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
 	_sprite.texture = visual_texture()
 	_update_visual_state()

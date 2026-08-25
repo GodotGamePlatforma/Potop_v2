@@ -1,0 +1,50 @@
+{
+  "artifacts": {
+    "boundary_mask": {
+      "path": "assets/generated/l05/boundary_mask.png",
+      "sha256": "0ed7d69e3ff6ca13c04e05349bc90b3af850615a7d7556d63242eb8a592188ef"
+    },
+    "full_map_guide": {
+      "path": "assets/generated/l05/full_map_guide.png",
+      "sha256": "ab54918c771d0205ed7d9ee49165ee380b3d6acf0348805dee65ecae3e8a417f"
+    },
+    "open_water_mask": {
+      "path": "assets/generated/l05/open_water_mask.png",
+      "sha256": "5d8f2c6248befdbec0d23f3ea3463f64173b75b59c698bdb8df3a4089d925599"
+    },
+    "solid_mask": {
+      "path": "assets/generated/l05/solid_mask.png",
+      "sha256": "bd1ac2f5a4d91941db8653bfa45c152a719dbae5053881fc5625ea6bcd59d0a8"
+    }
+  },
+  "authority": false,
+  "canonical_digest": "topology-v1:848fb14246567ab4396e4207be0bc0effdf7744594cf8495478c00597d49c672",
+  "encoding": {
+    "open_water": 255,
+    "solid": 0
+  },
+  "generated": true,
+  "manifest_sha256": "b3173afb48588997c0dbaec76e1bd9e7931efe2e5c935a576d9268e6b8b6db06",
+  "mapping": {
+    "pixel_reference": "pixel_edge",
+    "rounding": "floor",
+    "world_origin": [
+      0,
+      0
+    ],
+    "x_axis": "right",
+    "y_axis": "down"
+  },
+  "open_water_cell_count": 171072,
+  "payload_path": "assets/topology/l05_ground_mask_source.json",
+  "payload_sha256": "e3f2e8bfc31c2ce5a72771149c3b29396d85a2bafa63290540df5d3fbed7a876",
+  "pixel_size": [
+    576,
+    324
+  ],
+  "solid_cell_count": 15552,
+  "world_units_per_pixel": [
+    40.0,
+    40.0
+  ]
+}

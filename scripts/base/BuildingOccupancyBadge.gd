@@ -27,7 +27,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	focus_mode = Control.FOCUS_NONE
 	clip_contents = true
-	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_theme_stylebox_override("panel", _panel_style(PANEL_COLOR, PANEL_BORDER_COLOR, 1, 4))
 	_rebuild()
 

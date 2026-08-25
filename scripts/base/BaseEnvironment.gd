@@ -107,9 +107,8 @@ func build() -> void:
 	_viewport_container.name = "BaseWorldViewportContainer"
 	_viewport_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_viewport_container.stretch = true
-	# The project-wide nearest filter is useful for UI atlases, but it visibly
-	# pixelates the half-resolution 3D preset. This container always presents a
-	# photographic render target and therefore owns an explicit linear filter.
+	# This container presents a render target and owns an explicit linear filter.
+	# In particular, the low profile upscales a half-resolution 3D image.
 	_viewport_container.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_viewport_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_viewport_container)

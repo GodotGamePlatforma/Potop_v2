@@ -7,6 +7,7 @@ const WeatherStateScript := preload("res://scripts/data/WeatherState.gd")
 const TILT_AUDIT_WIND := Vector2(0.3746066, 0.9271839)
 const DIRECTIONAL_SCATTERING_WIND := Vector2(0.8, 0.6)
 const BUILDING_HIGHLIGHT_VISUAL_LAYER := 20
+const PROJECT_CANVAS_FILTER_LINEAR := 1
 
 # Side order is the public BaseWorld3D contact contract: front, right, back,
 # left. Vector2.y represents world +Z for these XZ-plane normals.
@@ -57,8 +58,13 @@ func _run() -> void:
 	_assert(environment.building_layer != null and environment.building_layer.get_parent() == environment.platform_board, "Warstwa prezentacji budynkow musi dziedziczyc projekcje platformy.")
 	_assert(environment.slot_layer != null and environment.slot_layer.get_parent() == environment.platform_board, "Klikalne sloty musza dziedziczyc ten sam ruch co projekcja.")
 	_assert(environment.get_node_or_null("BaseWorldViewportContainer") is SubViewportContainer, "Aktywna baza musi renderowac prawdziwy swiat 3D w osobnym viewportcie.")
+	_assert(
+		int(ProjectSettings.get_setting("rendering/textures/canvas_textures/default_texture_filter", -1))
+		== PROJECT_CANVAS_FILTER_LINEAR,
+		"Widoczna grafika 2D musi dziedziczyc jeden projektowy filtr Linear.",
+	)
 	var viewport_container := environment.get_node_or_null("BaseWorldViewportContainer") as SubViewportContainer
-	_assert(viewport_container.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR, "Render 3D musi byc skalowany liniowo, niezaleznie od globalnego nearest przeznaczonego dla UI.")
+	_assert(viewport_container.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR, "Render target swiata 3D musi zachowac jawne skalowanie liniowe.")
 	_assert(environment.world_viewport is SubViewport and environment.world_viewport.gui_disable_input, "Viewport 3D nie moze przechwytywac wejscia nalezacego do slotow 2D.")
 	_assert(not environment.world_viewport.transparent_bg, "Nieprzezroczysty viewport jest wymagany dla stabilnego PBR, glebi i odbicia proceduralnego nieba.")
 	_assert(environment.world_3d != null and environment.world_3d.camera is Camera3D, "Swiat bazy musi miec jawna kamere 3D.")

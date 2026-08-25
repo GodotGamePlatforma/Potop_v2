@@ -19,7 +19,6 @@ var _resolved_texture: Texture2D
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	clip_contents = true
 	_resolve_texture()
 	queue_redraw()

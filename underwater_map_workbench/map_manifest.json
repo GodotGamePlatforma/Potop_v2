@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
   "revision": {
-    "revision_id": "reset-a-common-line-v1",
-    "topology_revision": "open-world-1",
-    "presentation_revision": "campaign-markers-1"
+    "revision_id": "recent-city-two-depth-layers-v3",
+    "topology_revision": "l05-ground-band-three-openings-v1",
+    "presentation_revision": "recently-submerged-l01-l02-v3"
   },
   "map": {
     "id": "underwater_map_clean_12x12",
@@ -25,6 +25,7 @@
     "station_color": "d7c382",
     "grid_width": 3.0,
     "border_width": 12.0,
+    "diagnostic_grid_enabled": false,
     "layers": [
       {
         "id": "L00",
@@ -39,10 +40,10 @@
       },
       {
         "id": "L01",
-        "role": "far_atmosphere",
+        "role": "far_city_silhouette",
         "space": "parallax",
         "z_index": -90,
-        "parallax_scale": [0.2, 0.2],
+        "parallax_scale": [0.2, 1.0],
         "enabled": true,
         "reserved": false,
         "affordance_policy": "no_visual_blockage_in_protected_water",
@@ -50,10 +51,10 @@
       },
       {
         "id": "L02",
-        "role": "far_silhouette",
+        "role": "far_depth_detail",
         "space": "parallax",
         "z_index": -80,
-        "parallax_scale": [0.45, 0.45],
+        "parallax_scale": [0.45, 1.0],
         "enabled": true,
         "reserved": false,
         "affordance_policy": "no_visual_blockage_in_protected_water",
@@ -148,7 +149,44 @@
         "geometry_role": "none"
       }
     ],
-    "assets": []
+    "assets": [
+      {
+        "id": "l01_distant_city",
+        "layer_id": "L01",
+        "kind": "texture_rect",
+        "path": "assets/visual/l01_distant_city.png",
+        "sha256": "0ef3a907a3dfb5dfb257fb8a99b0638728335c4a75f51a264af9fccbe70ea6ca",
+        "pixel_size": [4096, 1152],
+        "world_rect": [0, 0, 23040, 6480],
+        "enabled": true,
+        "affordance": "nonblocking_backdrop",
+        "topology_digest": ""
+      },
+      {
+        "id": "l02_near_city",
+        "layer_id": "L02",
+        "kind": "texture_rect",
+        "path": "assets/visual/l02_near_city.png",
+        "sha256": "084450b0b365223d9792d2c88625a26959a9beaa03667ec818f88c47cb456d56",
+        "pixel_size": [4096, 1152],
+        "world_rect": [0, 0, 23040, 6480],
+        "enabled": true,
+        "affordance": "nonblocking_backdrop",
+        "topology_digest": ""
+      },
+      {
+        "id": "l05_ground_material",
+        "layer_id": "L05",
+        "kind": "collision_masked_material",
+        "path": "assets/visual/l05_ground_material.png",
+        "sha256": "63c20e320cf357cba849012657d4ace81f85b3d49efd99bc3d04fa7578c8bf1b",
+        "pixel_size": [1254, 1254],
+        "world_rect": [0, 0, 23040, 12960],
+        "enabled": true,
+        "affordance": "exact_solid_surface",
+        "topology_digest": "topology-v1:848fb14246567ab4396e4207be0bc0effdf7744594cf8495478c00597d49c672"
+      }
+    ]
   },
   "depth_profile": [
     [0.0, 8.0],
@@ -188,14 +226,22 @@
     }
   ],
   "topology": {
-    "mode": "open_world",
+    "mode": "l05_mask_v1",
     "authority_layer": "L05",
     "collision_source": {
-      "format": "none",
-      "path": "",
-      "sha256": "",
-      "pixel_size": [0, 0],
-      "world_units_per_pixel": [0, 0],
+      "format": "l05_rect_ops_v1",
+      "path": "assets/topology/l05_ground_mask_source.json",
+      "sha256": "e3f2e8bfc31c2ce5a72771149c3b29396d85a2bafa63290540df5d3fbed7a876",
+      "canonical_digest": "topology-v1:848fb14246567ab4396e4207be0bc0effdf7744594cf8495478c00597d49c672",
+      "pixel_size": [576, 324],
+      "world_units_per_pixel": [40, 40],
+      "mapping": {
+        "world_origin": [0, 0],
+        "x_axis": "right",
+        "y_axis": "down",
+        "pixel_reference": "pixel_edge",
+        "rounding": "floor"
+      },
       "encoding": {
         "solid": 0,
         "open_water": 255

@@ -167,7 +167,6 @@ func _build_visual() -> void:
 	if _sprite == null:
 		_sprite = Sprite2D.new()
 		_sprite.name = "ContainerSprite"
-		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
 	if _mounting_overlay == null:
 		_mounting_overlay = Node2D.new()

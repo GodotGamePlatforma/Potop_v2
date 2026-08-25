@@ -60,6 +60,12 @@ Filary projektu:
 - porażka ma konsekwencje, ale pojedyncza śmierć nurka nie może bezwarunkowo zablokować kampanii;
 - systemy pokazują graczowi prawdziwe liczby i powody, zamiast ukrywać drugi model balansu.
 
+[AKTYWNE] — KIERUNEK WIZUALNY BEZ PIXEL ARTU
+
+Widoczna oprawa używa spójnego, malarskiego lub realistycznego języka 2D, czytelnego interfejsu oraz przestrzennej prezentacji 3D tam, gdzie już należy ona do świata. Pixel art, celowa pikseloza i poszarpane skalowanie bitmap nie są częścią stylu gry. Obrazy zachowują swoje proporcje i gładką prezentację przy zmianie skali; techniczne maski danych nie są widoczną warstwą stylistyczną.
+
+Odwołania: ARD-0103; architektura, sekcja 12.0.
+
 [AKTYWNE] — CZYTELNY I PRZYJAZNY INTERFEJS
 
 Interfejs zachowuje sztormowy charakter świata, lecz rozdziela ciemną ramę nawigacyjną od spokojniejszej powierzchni decyzji. Górny HUD oraz boczne szyny są grafitowo-morskie, a środek otwartego zarządzania budynkiem jest jasną, ciepłą powierzchnią przypominającą czytelną kartę roboczą. Grafit zastępuje jednolitą czerń, tekst zachowuje wysoki kontrast, a bursztyn wskazuje bieżącą decyzję zamiast ozdabiać wszystkie elementy. Turkus oznacza informację lub bezpieczny stan, a koral i czerwień są zarezerwowane dla realnego zagrożenia.

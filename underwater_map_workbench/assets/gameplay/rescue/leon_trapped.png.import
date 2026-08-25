@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://rrcse6d6uj85"
-path="res://.godot/imported/leon_trapped.png-77880e60e9362c99f3971e2e4371a49a.ctex"
+path="res://.godot/imported/leon_trapped.png-ae5562aca1ad4e3c4c319786fc1d8892.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://underwater_map_workbench/assets/gameplay/rescue/leon_trapped.png"
-dest_files=["res://.godot/imported/leon_trapped.png-77880e60e9362c99f3971e2e4371a49a.ctex"]
+dest_files=["res://.godot/imported/leon_trapped.png-ae5562aca1ad4e3c4c319786fc1d8892.ctex"]
 
 [params]
 

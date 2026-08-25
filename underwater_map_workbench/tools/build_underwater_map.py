@@ -10,9 +10,11 @@ import json
 import math
 import os
 import re
+import struct
 import sys
 import tempfile
 import unicodedata
+import zlib
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -20,9 +22,27 @@ from typing import Any, Iterable
 WORKBENCH_DIR = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = WORKBENCH_DIR / "map_manifest.json"
 SCENE_PATH = WORKBENCH_DIR / "UnderwaterMap.tscn"
+L05_GENERATED_DIR = WORKBENCH_DIR / "assets" / "generated" / "l05"
+L05_GENERATED_PATHS = {
+    "solid_mask": L05_GENERATED_DIR / "solid_mask.png",
+    "open_water_mask": L05_GENERATED_DIR / "open_water_mask.png",
+    "boundary_mask": L05_GENERATED_DIR / "boundary_mask.png",
+    "full_map_guide": L05_GENERATED_DIR / "full_map_guide.png",
+    "truth_package": L05_GENERATED_DIR / "truth_package.json",
+}
+L05_SHADER_PATH = "assets/shaders/l05_ground_masked.gdshader"
+L05_SOLID_MASK_RESOURCE_PATH = (
+    "res://underwater_map_workbench/assets/generated/l05/solid_mask.png"
+)
+L05_SHADER_RESOURCE_PATH = (
+    "res://underwater_map_workbench/assets/shaders/l05_ground_masked.gdshader"
+)
 
 EXPECTED_LAYER_IDS = tuple(f"L{index:02d}" for index in range(11))
 PARALLAX_LAYER_IDS = frozenset(("L01", "L02", "L08", "L09"))
+NONBLOCKING_TEXTURE_LAYER_IDS = frozenset(("L01", "L02"))
+GROUND_ANCHORED_BACKDROP_LAYER_IDS = frozenset(("L01", "L02"))
+NONBLOCKING_BACKDROP_AFFORDANCE = "nonblocking_backdrop"
 LAYER_KEYS = frozenset(
     (
         "id",
@@ -36,6 +56,31 @@ LAYER_KEYS = frozenset(
         "geometry_role",
     )
 )
+VISUAL_ASSET_KEYS = frozenset(
+    (
+        "id",
+        "layer_id",
+        "kind",
+        "path",
+        "sha256",
+        "pixel_size",
+        "world_rect",
+        "enabled",
+        "affordance",
+        "topology_digest",
+    )
+)
+L05_MODE = "l05_mask_v1"
+L05_SOURCE_FORMAT = "l05_rect_ops_v1"
+L05_PIXEL_SIZE = (576, 324)
+L05_WORLD_UNITS_PER_PIXEL = (40.0, 40.0)
+L05_MAPPING = {
+    "world_origin": [0, 0],
+    "x_axis": "right",
+    "y_axis": "down",
+    "pixel_reference": "pixel_edge",
+    "rounding": "floor",
+}
 REQUIRED_GAMEPLAY_COLLECTIONS = (
     "loot_spawns",
     "shortcut_spawns",
@@ -202,6 +247,60 @@ def _require_keys(record: dict[str, Any], keys: Iterable[str], label: str) -> No
         raise ManifestError(f"{label} misses: {', '.join(missing)}")
 
 
+def _package_asset_path(value: Any, label: str) -> tuple[str, Path]:
+    path = _non_empty_string(value, label)
+    if "\\" in path or not path.startswith("assets/"):
+        raise ManifestError(f"{label} must be a package-relative assets/... path")
+    parts = Path(path).parts
+    if Path(path).is_absolute() or ".." in parts or "." in parts:
+        raise ManifestError(f"{label} must not escape the workbench package")
+    resolved = (WORKBENCH_DIR / Path(path)).resolve()
+    try:
+        resolved.relative_to(WORKBENCH_DIR.resolve())
+    except ValueError as error:
+        raise ManifestError(f"{label} must remain inside the workbench") from error
+    return path, resolved
+
+
+def _png_dimensions(raw: bytes, label: str) -> tuple[int, int]:
+    if len(raw) < 24 or raw[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ManifestError(f"{label} must be a PNG file")
+    chunk_length = struct.unpack(">I", raw[8:12])[0]
+    if raw[12:16] != b"IHDR" or chunk_length != 13 or len(raw) < 33:
+        raise ManifestError(f"{label} has an invalid PNG IHDR")
+    width, height = struct.unpack(">II", raw[16:24])
+    if width <= 0 or height <= 0:
+        raise ManifestError(f"{label} must have positive PNG dimensions")
+    return width, height
+
+
+def _read_hashed_png(
+    path_value: Any,
+    sha_value: Any,
+    pixel_size_value: Any,
+    label: str,
+) -> tuple[str, Path, tuple[int, int]]:
+    package_path, filesystem_path = _package_asset_path(path_value, f"{label}.path")
+    if not filesystem_path.is_file():
+        raise ManifestError(f"{label}.path does not exist: {package_path}")
+    expected_sha = _sha256(sha_value, f"{label}.sha256")
+    raw = filesystem_path.read_bytes()
+    actual_sha = hashlib.sha256(raw).hexdigest()
+    if actual_sha != expected_sha:
+        raise ManifestError(
+            f"{label}.sha256 is stale; expected {actual_sha} for {package_path}"
+        )
+    declared_size = _pair(pixel_size_value, f"{label}.pixel_size")
+    if any(not component.is_integer() or component <= 0 for component in declared_size):
+        raise ManifestError(f"{label}.pixel_size must contain positive integers")
+    actual_size = _png_dimensions(raw, package_path)
+    if actual_size != (int(declared_size[0]), int(declared_size[1])):
+        raise ManifestError(
+            f"{label}.pixel_size does not match PNG dimensions {actual_size}"
+        )
+    return package_path, filesystem_path, actual_size
+
+
 def _validate_position(
     position: Any,
     label: str,
@@ -255,6 +354,28 @@ def _normalize_canonical_numbers(value: Any) -> Any:
     return value
 
 
+def _topology_identity_projection(manifest: dict[str, Any]) -> dict[str, Any]:
+    topology = _object(manifest.get("topology"), "topology")
+    if topology.get("mode") != L05_MODE:
+        return copy.deepcopy(topology)
+    collision = _object(topology.get("collision_source"), "topology.collision_source")
+    return {
+        "mode": topology.get("mode"),
+        "authority_layer": topology.get("authority_layer"),
+        "collision_source": {
+            "format": collision.get("format"),
+            "canonical_digest": collision.get("canonical_digest"),
+            "pixel_size": copy.deepcopy(collision.get("pixel_size")),
+            "world_units_per_pixel": copy.deepcopy(
+                collision.get("world_units_per_pixel")
+            ),
+            "mapping": copy.deepcopy(collision.get("mapping")),
+            "encoding": copy.deepcopy(collision.get("encoding")),
+        },
+        "protected_corridors": copy.deepcopy(topology.get("protected_corridors")),
+    }
+
+
 def _gameplay_signature(manifest: dict[str, Any]) -> str:
     payload = {
         "map": copy.deepcopy(manifest["map"]),
@@ -268,7 +389,7 @@ def _gameplay_signature(manifest: dict[str, Any]) -> str:
             }
             for region in manifest["regions"]
         ],
-        "topology": copy.deepcopy(manifest["topology"]),
+        "topology": _topology_identity_projection(manifest),
         "entry": copy.deepcopy(manifest["entry"]),
         "exit": copy.deepcopy(manifest["exit"]),
         "landmarks": [
@@ -296,7 +417,7 @@ def _presentation_fingerprint(manifest: dict[str, Any]) -> str:
         },
         "regions": copy.deepcopy(manifest["regions"]),
         "landmarks": copy.deepcopy(manifest["landmarks"]),
-        "topology": copy.deepcopy(manifest["topology"]),
+        "topology": _topology_identity_projection(manifest),
         "gameplay": copy.deepcopy(manifest["gameplay"]),
         "campaign": copy.deepcopy(manifest["campaign"]),
         "visual": copy.deepcopy(manifest["visual"]),
@@ -438,6 +559,7 @@ def _validate_regions(
 def _validate_visual(
     manifest: dict[str, Any],
     world_size: tuple[float, float],
+    topology_build: dict[str, Any],
 ) -> None:
     visual = _object(manifest["visual"], "visual")
     _require_keys(
@@ -465,6 +587,15 @@ def _validate_visual(
         _color(visual[key], f"visual.{key}")
     _positive_number(visual["grid_width"], "visual.grid_width")
     _positive_number(visual["border_width"], "visual.border_width")
+    if "diagnostic_grid_enabled" in visual:
+        _boolean(
+            visual["diagnostic_grid_enabled"],
+            "visual.diagnostic_grid_enabled",
+        )
+    elif topology_build.get("mode") == L05_MODE:
+        raise ManifestError(
+            "visual.diagnostic_grid_enabled is required for l05_mask_v1"
+        )
 
     layers = _array(visual["layers"], "visual.layers")
     if len(layers) != len(EXPECTED_LAYER_IDS):
@@ -502,6 +633,14 @@ def _validate_visual(
                 raise ManifestError(f"{label}.space must be parallax")
             if parallax_scale == (1.0, 1.0):
                 raise ManifestError(f"{label}.parallax_scale must be differential")
+            if (
+                expected_id in GROUND_ANCHORED_BACKDROP_LAYER_IDS
+                and parallax_scale[1] != 1.0
+            ):
+                raise ManifestError(
+                    f"{label}.parallax_scale.y must be exactly 1 "
+                    "for a ground-anchored backdrop"
+                )
         else:
             if layer["space"] != "world_locked":
                 raise ManifestError(f"{label}.space must be world_locked")
@@ -535,16 +674,90 @@ def _validate_visual(
                 )
 
     assets = _array(visual["assets"], "visual.assets")
-    if assets:
-        raise ManifestError(
-            "visual.assets must remain empty until the typed visual renderer is implemented"
+    asset_ids: set[str] = set()
+    for index, asset_value in enumerate(assets):
+        label = f"visual.assets[{index}]"
+        asset = _object(asset_value, label)
+        if set(asset) != VISUAL_ASSET_KEYS:
+            raise ManifestError(
+                f"{label} must contain exactly: "
+                + ", ".join(sorted(VISUAL_ASSET_KEYS))
+            )
+        asset_id = _non_empty_string(asset["id"], f"{label}.id")
+        if asset_id in asset_ids:
+            raise ManifestError(f"{label}.id must be unique")
+        asset_ids.add(asset_id)
+        layer_id = _non_empty_string(asset["layer_id"], f"{label}.layer_id")
+        kind = _non_empty_string(asset["kind"], f"{label}.kind")
+        if (layer_id, kind) not in {
+            ("L01", "texture_rect"),
+            ("L02", "texture_rect"),
+            ("L05", "collision_masked_material"),
+        }:
+            raise ManifestError(
+                f"{label} must be L01-L02/texture_rect "
+                "or L05/collision_masked_material"
+            )
+        _boolean(asset["enabled"], f"{label}.enabled")
+        _non_empty_string(asset["affordance"], f"{label}.affordance")
+        _, _, pixel_size = _read_hashed_png(
+            asset["path"],
+            asset["sha256"],
+            asset["pixel_size"],
+            label,
         )
+        world_rect = _rect(asset["world_rect"], f"{label}.world_rect")
+        if (
+            world_rect[0] < 0.0
+            or world_rect[1] < 0.0
+            or world_rect[2] <= 0.0
+            or world_rect[3] <= 0.0
+            or world_rect[0] + world_rect[2] > world_size[0]
+            or world_rect[1] + world_rect[3] > world_size[1]
+        ):
+            raise ManifestError(f"{label}.world_rect lies outside the map")
+        topology_digest = asset["topology_digest"]
+        if not isinstance(topology_digest, str):
+            raise ManifestError(f"{label}.topology_digest must be a string")
+        if layer_id in NONBLOCKING_TEXTURE_LAYER_IDS:
+            if topology_digest != "":
+                raise ManifestError(
+                    f"{label} on {layer_id} requires an empty topology_digest"
+                )
+            if asset["affordance"] != NONBLOCKING_BACKDROP_AFFORDANCE:
+                raise ManifestError(
+                    f"{label} on {layer_id} requires "
+                    f"affordance={NONBLOCKING_BACKDROP_AFFORDANCE}"
+                )
+            if pixel_size[0] * world_rect[3] != pixel_size[1] * world_rect[2]:
+                raise ManifestError(
+                    f"{label}.pixel_size aspect ratio must match world_rect "
+                    "to prevent non-uniform stretching"
+                )
+        elif layer_id == "L05":
+            if topology_build.get("mode") != L05_MODE:
+                raise ManifestError(
+                    f"{label} requires topology.mode={L05_MODE}"
+                )
+            if topology_digest != topology_build.get("canonical_digest"):
+                raise ManifestError(
+                    f"{label}.topology_digest must match collision_source.canonical_digest"
+                )
+            if world_rect != (0.0, 0.0, world_size[0], world_size[1]):
+                raise ManifestError(
+                    f"{label}.world_rect must cover the complete world"
+                )
+            shader_path = WORKBENCH_DIR / L05_SHADER_PATH
+            if not shader_path.is_file():
+                raise ManifestError(f"missing L05 shader: {L05_SHADER_PATH}")
 
 
 def _validate_topology(
     manifest: dict[str, Any],
     world_size: tuple[float, float],
-) -> None:
+    *,
+    verify_declarations: bool = True,
+) -> dict[str, Any]:
     topology = _object(manifest["topology"], "topology")
     _require_keys(
         topology,
@@ -552,24 +765,32 @@ def _validate_topology(
         "topology",
     )
     mode = _non_empty_string(topology["mode"], "topology.mode")
-    if mode != "open_world":
-        raise ManifestError("the foundation supports only topology.mode open_world")
+    if mode not in ("open_world", L05_MODE):
+        raise ManifestError(
+            f"topology.mode must be open_world or {L05_MODE}"
+        )
     if topology["authority_layer"] != "L05":
         raise ManifestError("topology.authority_layer must be L05")
 
     collision = _object(topology["collision_source"], "topology.collision_source")
-    _require_keys(
-        collision,
-        (
-            "format",
-            "path",
-            "sha256",
-            "pixel_size",
-            "world_units_per_pixel",
-            "encoding",
-        ),
-        "topology.collision_source",
+    base_collision_keys = {
+        "format",
+        "path",
+        "sha256",
+        "pixel_size",
+        "world_units_per_pixel",
+        "encoding",
+    }
+    expected_collision_keys = (
+        base_collision_keys
+        if mode == "open_world"
+        else base_collision_keys | {"canonical_digest", "mapping"}
     )
+    if set(collision) != expected_collision_keys:
+        raise ManifestError(
+            "topology.collision_source must contain exactly: "
+            + ", ".join(sorted(expected_collision_keys))
+        )
     source_format = _non_empty_string(
         collision["format"],
         "topology.collision_source.format",
@@ -588,7 +809,10 @@ def _validate_topology(
         collision["encoding"],
         "topology.collision_source.encoding",
     )
-    _require_keys(encoding, ("solid", "open_water"), "topology.collision_source.encoding")
+    if set(encoding) != {"solid", "open_water"}:
+        raise ManifestError(
+            "topology.collision_source.encoding must contain exactly solid and open_water"
+        )
     solid = encoding["solid"]
     open_water = encoding["open_water"]
     if (
@@ -606,18 +830,152 @@ def _validate_topology(
             "topology.collision_source.encoding must use distinct 8-bit values"
         )
 
-    if source_format != "none":
-        raise ManifestError(
-            "the foundation supports only topology.collision_source.format none"
-        )
-    if collision["path"] != "" or collision["sha256"] != "":
-        raise ManifestError("a none collision source must have empty path and sha256")
-    if pixel_size != (0.0, 0.0) or world_units_per_pixel != (0.0, 0.0):
-        raise ManifestError("a none collision source must have zero sizes")
     if solid != 0 or open_water != 255:
         raise ManifestError(
-            "the foundation collision encoding must use solid=0 and open_water=255"
+            "collision encoding must use solid=0 and open_water=255"
         )
+
+    topology_build: dict[str, Any]
+    if mode == "open_world":
+        if source_format != "none":
+            raise ManifestError("open_world requires collision_source.format none")
+        if collision["path"] != "" or collision["sha256"] != "":
+            raise ManifestError("a none collision source must have empty path and sha256")
+        if pixel_size != (0.0, 0.0) or world_units_per_pixel != (0.0, 0.0):
+            raise ManifestError("a none collision source must have zero sizes")
+        topology_build = {"mode": "open_world"}
+    else:
+        if source_format != L05_SOURCE_FORMAT:
+            raise ManifestError(
+                f"{L05_MODE} requires collision_source.format={L05_SOURCE_FORMAT}"
+            )
+        if pixel_size != tuple(float(value) for value in L05_PIXEL_SIZE):
+            raise ManifestError(
+                f"{L05_SOURCE_FORMAT} requires pixel_size={list(L05_PIXEL_SIZE)}"
+            )
+        if world_units_per_pixel != L05_WORLD_UNITS_PER_PIXEL:
+            raise ManifestError(
+                f"{L05_SOURCE_FORMAT} requires world_units_per_pixel="
+                f"{list(L05_WORLD_UNITS_PER_PIXEL)}"
+            )
+        navigation_cell_size = _pair(
+            _object(manifest["map"], "map")["navigation_cell_size"],
+            "map.navigation_cell_size",
+        )
+        if navigation_cell_size != L05_WORLD_UNITS_PER_PIXEL:
+            raise ManifestError(
+                "map.navigation_cell_size must match the L05 40 x 40 pixel mapping"
+            )
+        if (
+            pixel_size[0] * world_units_per_pixel[0],
+            pixel_size[1] * world_units_per_pixel[1],
+        ) != world_size:
+            raise ManifestError("L05 pixel mapping must cover the complete world")
+        mapping = _object(
+            collision.get("mapping"),
+            "topology.collision_source.mapping",
+        )
+        if mapping != L05_MAPPING:
+            raise ManifestError(
+                "topology.collision_source.mapping must exactly match the L05 v1 mapping"
+            )
+        package_path, payload_path = _package_asset_path(
+            collision["path"],
+            "topology.collision_source.path",
+        )
+        if not payload_path.is_file():
+            raise ManifestError(f"L05 payload does not exist: {package_path}")
+        payload_raw = payload_path.read_bytes()
+        actual_payload_sha = hashlib.sha256(payload_raw).hexdigest()
+        if verify_declarations:
+            expected_payload_sha = _sha256(
+                collision["sha256"],
+                "topology.collision_source.sha256",
+            )
+            if actual_payload_sha != expected_payload_sha:
+                raise ManifestError(
+                    "topology.collision_source.sha256 is stale; "
+                    f"expected {actual_payload_sha} for {package_path}"
+                )
+        try:
+            payload = json.loads(payload_raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ManifestError(f"invalid L05 payload JSON: {error}") from error
+        payload = _object(payload, "L05 payload")
+        if set(payload) != {"schema_version", "base", "operations"}:
+            raise ManifestError(
+                "L05 payload must contain exactly schema_version, base and operations"
+            )
+        if payload["schema_version"] != 1:
+            raise ManifestError("L05 payload schema_version must be 1")
+        if payload["base"] != "open_water":
+            raise ManifestError("L05 payload base must be open_water")
+        operations = _array(payload["operations"], "L05 payload.operations")
+        cells = bytearray([open_water]) * (L05_PIXEL_SIZE[0] * L05_PIXEL_SIZE[1])
+        operation_ids: set[str] = set()
+        for index, operation_value in enumerate(operations):
+            label = f"L05 payload.operations[{index}]"
+            operation = _object(operation_value, label)
+            if set(operation) != {"id", "op", "rect_px"}:
+                raise ManifestError(f"{label} must contain exactly id, op and rect_px")
+            operation_id = _non_empty_string(operation["id"], f"{label}.id")
+            if operation_id in operation_ids:
+                raise ManifestError(f"{label}.id must be unique")
+            operation_ids.add(operation_id)
+            operation_kind = operation["op"]
+            if operation_kind not in ("solid_rect", "open_rect"):
+                raise ManifestError(
+                    f"{label}.op must be solid_rect or open_rect"
+                )
+            rect_value = operation["rect_px"]
+            if (
+                not isinstance(rect_value, list)
+                or len(rect_value) != 4
+                or any(isinstance(value, bool) or not isinstance(value, int) for value in rect_value)
+            ):
+                raise ManifestError(f"{label}.rect_px must contain four integers")
+            x, y, width, height = rect_value
+            if x < 0 or y < 0 or width <= 0 or height <= 0:
+                raise ManifestError(f"{label}.rect_px must be a positive raster rectangle")
+            if x + width > L05_PIXEL_SIZE[0] or y + height > L05_PIXEL_SIZE[1]:
+                raise ManifestError(f"{label}.rect_px lies outside the L05 raster")
+            value = solid if operation_kind == "solid_rect" else open_water
+            row_bytes = bytes([value]) * width
+            for row in range(y, y + height):
+                start = row * L05_PIXEL_SIZE[0] + x
+                cells[start : start + width] = row_bytes
+        digest_payload = {
+            "mapping": copy.deepcopy(mapping),
+            "encoding": copy.deepcopy(encoding),
+            "pixel_size": list(L05_PIXEL_SIZE),
+            "cells_hex": bytes(cells).hex(),
+        }
+        canonical_digest = f"topology-v1:{_canonical_sha256(digest_payload)}"
+        declared_digest = collision["canonical_digest"]
+        if verify_declarations:
+            if (
+                not isinstance(declared_digest, str)
+                or not re.fullmatch(r"topology-v1:[0-9a-f]{64}", declared_digest)
+            ):
+                raise ManifestError(
+                    "topology.collision_source.canonical_digest must be topology-v1:<sha256>"
+                )
+            if declared_digest != canonical_digest:
+                raise ManifestError(
+                    "topology.collision_source.canonical_digest is stale; "
+                    f"expected {canonical_digest}"
+                )
+        topology_build = {
+            "mode": L05_MODE,
+            "payload_path": package_path,
+            "payload_sha256": actual_payload_sha,
+            "canonical_digest": canonical_digest,
+            "pixel_size": L05_PIXEL_SIZE,
+            "world_units_per_pixel": L05_WORLD_UNITS_PER_PIXEL,
+            "mapping": copy.deepcopy(mapping),
+            "encoding": copy.deepcopy(encoding),
+            "cells": bytes(cells),
+        }
 
     corridors = _array(
         topology["protected_corridors"],
@@ -642,6 +1000,7 @@ def _validate_topology(
                 world_size,
             )
         _positive_number(corridor["clearance"], f"{label}.clearance")
+    return topology_build
 
 
 def _validate_depth_profile(manifest: dict[str, Any]) -> None:
@@ -1021,7 +1380,9 @@ def _validate_entry_exit(
     _validate_position(exit_record["position"], "exit.position", world_size)
 
 
-def load_and_validate_manifest() -> tuple[dict[str, Any], str, str, str]:
+def load_and_validate_manifest() -> tuple[
+    dict[str, Any], str, str, str, dict[str, Any]
+]:
     raw = MANIFEST_PATH.read_bytes()
     try:
         manifest = json.loads(raw.decode("utf-8"))
@@ -1055,8 +1416,8 @@ def load_and_validate_manifest() -> tuple[dict[str, Any], str, str, str]:
     _validate_revision(manifest)
     world_size = _validate_map(manifest)
     region_bounds = _validate_regions(manifest, world_size)
-    _validate_visual(manifest, world_size)
-    _validate_topology(manifest, world_size)
+    topology_build = _validate_topology(manifest, world_size)
+    _validate_visual(manifest, world_size, topology_build)
     _validate_depth_profile(manifest)
     landmarks_by_id, landmark_ids = _validate_landmarks(
         manifest,
@@ -1079,6 +1440,7 @@ def load_and_validate_manifest() -> tuple[dict[str, Any], str, str, str]:
         manifest_sha,
         _gameplay_signature(manifest),
         _presentation_fingerprint(manifest),
+        topology_build,
     )
 
 
@@ -1142,6 +1504,152 @@ def _gd_variant(value: Any) -> str:
     raise ManifestError(f"cannot serialize {type(value).__name__} to a scene variant")
 
 
+def _png_chunk(chunk_type: bytes, payload: bytes) -> bytes:
+    checksum = zlib.crc32(chunk_type)
+    checksum = zlib.crc32(payload, checksum) & 0xFFFFFFFF
+    return (
+        struct.pack(">I", len(payload))
+        + chunk_type
+        + payload
+        + struct.pack(">I", checksum)
+    )
+
+
+def _encode_png_gray8(width: int, height: int, pixels: bytes) -> bytes:
+    if len(pixels) != width * height:
+        raise ManifestError("grayscale PNG payload has an invalid size")
+    rows = bytearray()
+    for y in range(height):
+        rows.append(0)
+        start = y * width
+        rows.extend(pixels[start : start + width])
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", header)
+        + _png_chunk(b"IDAT", zlib.compress(bytes(rows), level=9))
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def _encode_png_rgba8(width: int, height: int, pixels: bytes) -> bytes:
+    if len(pixels) != width * height * 4:
+        raise ManifestError("RGBA PNG payload has an invalid size")
+    rows = bytearray()
+    row_width = width * 4
+    for y in range(height):
+        rows.append(0)
+        start = y * row_width
+        rows.extend(pixels[start : start + row_width])
+    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", header)
+        + _png_chunk(b"IDAT", zlib.compress(bytes(rows), level=9))
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def _l05_boundary_mask(cells: bytes, width: int, height: int) -> bytes:
+    boundary = bytearray(width * height)
+    for y in range(height):
+        for x in range(width):
+            index = y * width + x
+            value = cells[index]
+            for neighbor_x, neighbor_y in (
+                (x - 1, y),
+                (x + 1, y),
+                (x, y - 1),
+                (x, y + 1),
+            ):
+                if (
+                    0 <= neighbor_x < width
+                    and 0 <= neighbor_y < height
+                    and cells[neighbor_y * width + neighbor_x] != value
+                ):
+                    boundary[index] = 255
+                    break
+    return bytes(boundary)
+
+
+def _render_l05_artifacts(
+    topology_build: dict[str, Any],
+    manifest_sha: str,
+) -> dict[Path, bytes]:
+    if topology_build.get("mode") != L05_MODE:
+        return {}
+    width, height = topology_build["pixel_size"]
+    cells: bytes = topology_build["cells"]
+    solid_value = int(topology_build["encoding"]["solid"])
+    open_water_value = int(topology_build["encoding"]["open_water"])
+    solid_mask = bytes(255 if value == solid_value else 0 for value in cells)
+    open_water_mask = bytes(
+        255 if value == open_water_value else 0 for value in cells
+    )
+    boundary_mask = _l05_boundary_mask(cells, width, height)
+    guide = bytearray(width * height * 4)
+    for index, value in enumerate(cells):
+        if boundary_mask[index] == 255:
+            color = (255, 0, 255, 255)
+        elif value == solid_value:
+            color = (0, 0, 0, 255)
+        else:
+            color = (0, 255, 255, 255)
+        start = index * 4
+        guide[start : start + 4] = bytes(color)
+    artifacts = {
+        L05_GENERATED_PATHS["solid_mask"]: _encode_png_gray8(
+            width, height, solid_mask
+        ),
+        L05_GENERATED_PATHS["open_water_mask"]: _encode_png_gray8(
+            width, height, open_water_mask
+        ),
+        L05_GENERATED_PATHS["boundary_mask"]: _encode_png_gray8(
+            width, height, boundary_mask
+        ),
+        L05_GENERATED_PATHS["full_map_guide"]: _encode_png_rgba8(
+            width, height, bytes(guide)
+        ),
+    }
+    artifact_records = {}
+    for name in (
+        "solid_mask",
+        "open_water_mask",
+        "boundary_mask",
+        "full_map_guide",
+    ):
+        path = L05_GENERATED_PATHS[name]
+        artifact_records[name] = {
+            "path": path.relative_to(WORKBENCH_DIR).as_posix(),
+            "sha256": hashlib.sha256(artifacts[path]).hexdigest(),
+        }
+    truth_package = {
+        "generated": True,
+        "authority": False,
+        "manifest_sha256": manifest_sha,
+        "payload_path": topology_build["payload_path"],
+        "payload_sha256": topology_build["payload_sha256"],
+        "canonical_digest": topology_build["canonical_digest"],
+        "pixel_size": list(topology_build["pixel_size"]),
+        "world_units_per_pixel": list(topology_build["world_units_per_pixel"]),
+        "mapping": copy.deepcopy(topology_build["mapping"]),
+        "encoding": copy.deepcopy(topology_build["encoding"]),
+        "solid_cell_count": sum(value == solid_value for value in cells),
+        "open_water_cell_count": sum(value == open_water_value for value in cells),
+        "artifacts": artifact_records,
+    }
+    artifacts[L05_GENERATED_PATHS["truth_package"]] = (
+        json.dumps(
+            truth_package,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n"
+    ).encode("utf-8")
+    return artifacts
+
+
 def _safe_node_name(value: str) -> str:
     ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     sanitized = re.sub(r"[^A-Za-z0-9_]+", "_", ascii_value).strip("_")
@@ -1178,6 +1686,106 @@ def _append_layer_root(lines: list[str], layer: dict[str, Any]) -> None:
     )
 
 
+def _scene_visual_asset_resources(
+    manifest: dict[str, Any],
+) -> tuple[list[str], list[str], list[dict[str, Any]]]:
+    assets: list[dict[str, Any]] = manifest["visual"]["assets"]
+    if not assets:
+        return [], [], []
+    ext_resources: list[str] = []
+    sub_resources: list[str] = []
+    bindings: list[dict[str, Any]] = []
+    has_l05 = any(asset["layer_id"] == "L05" for asset in assets)
+    if has_l05:
+        ext_resources.extend(
+            (
+                f'[ext_resource type="Shader" path="{L05_SHADER_RESOURCE_PATH}" id="Shader_l05_ground"]',
+                f'[ext_resource type="Texture2D" path="{L05_SOLID_MASK_RESOURCE_PATH}" id="Texture_l05_solid"]',
+            )
+        )
+    for index, asset in enumerate(assets):
+        texture_id = f"Texture_asset_{index:04d}"
+        resource_path = (
+            "res://underwater_map_workbench/" + str(asset["path"])
+        )
+        ext_resources.append(
+            f'[ext_resource type="Texture2D" path="{resource_path}" id="{texture_id}"]'
+        )
+        binding: dict[str, Any] = {
+            "asset": asset,
+            "index": index,
+            "texture_id": texture_id,
+        }
+        if asset["kind"] == "collision_masked_material":
+            material_id = f"ShaderMaterial_asset_{index:04d}"
+            binding["material_id"] = material_id
+            sub_resources.extend(
+                (
+                    "",
+                    f'[sub_resource type="ShaderMaterial" id="{material_id}"]',
+                    'shader = ExtResource("Shader_l05_ground")',
+                    'shader_parameter/topology_mask = ExtResource("Texture_l05_solid")',
+                    f'shader_parameter/ground_texture = ExtResource("{texture_id}")',
+                )
+            )
+        bindings.append(binding)
+    return ext_resources, sub_resources, bindings
+
+
+def _append_visual_assets(
+    lines: list[str],
+    bindings: list[dict[str, Any]],
+) -> None:
+    for binding in bindings:
+        asset: dict[str, Any] = binding["asset"]
+        index = int(binding["index"])
+        asset_id = str(asset["id"])
+        layer_id = str(asset["layer_id"])
+        x, y, width, height = _rect(
+            asset["world_rect"],
+            f"visual.assets[{index}].world_rect",
+        )
+        node_name = f"Asset{index:04d}_{_safe_node_name(asset_id)}"
+        if asset["kind"] == "texture_rect":
+            lines.extend(
+                (
+                    "",
+                    f'[node name="{node_name}" type="TextureRect" parent="VisualLayers/{layer_id}"]',
+                    f"offset_left = {_gd_number(x)}",
+                    f"offset_top = {_gd_number(y)}",
+                    f"offset_right = {_gd_number(x + width)}",
+                    f"offset_bottom = {_gd_number(y + height)}",
+                    f'texture = ExtResource("{binding["texture_id"]}")',
+                    "expand_mode = 1",
+                    "stretch_mode = 0",
+                    "mouse_filter = 2",
+                    f"visible = {'true' if asset['enabled'] else 'false'}",
+                )
+            )
+        else:
+            lines.extend(
+                (
+                    "",
+                    f'[node name="{node_name}" type="ColorRect" parent="VisualLayers/{layer_id}"]',
+                    f"offset_left = {_gd_number(x)}",
+                    f"offset_top = {_gd_number(y)}",
+                    f"offset_right = {_gd_number(x + width)}",
+                    f"offset_bottom = {_gd_number(y + height)}",
+                    f'material = SubResource("{binding["material_id"]}")',
+                    "mouse_filter = 2",
+                    f"visible = {'true' if asset['enabled'] else 'false'}",
+                )
+            )
+        lines.extend(
+            (
+                f"metadata/asset_id = {_gd_string(asset_id)}",
+                f"metadata/layer_id = {_gd_string(layer_id)}",
+                f"metadata/kind = {_gd_string(asset['kind'])}",
+                f"metadata/source = {_gd_variant(asset)}",
+            )
+        )
+
+
 def _append_l00_content(
     lines: list[str],
     manifest: dict[str, Any],
@@ -1206,6 +1814,12 @@ def _append_l00_content(
             '[node name="DeepWater" type="Polygon2D" parent="VisualLayers/L00"]',
             f"polygon = {_gd_points([(0.0, world_height * 0.58), (world_width, world_height * 0.58), (world_width, world_height), (0.0, world_height)])}",
             f'color = {_gd_color(visual["deep_water_color"], "visual.deep_water_color", 0xB8)}',
+        )
+    )
+    if not bool(visual.get("diagnostic_grid_enabled", True)):
+        return
+    lines.extend(
+        (
             "",
             '[node name="Grid" type="Node2D" parent="VisualLayers/L00"]',
         )
@@ -1393,6 +2007,7 @@ def render_scene(
     manifest_sha: str,
     gameplay_signature: str,
     presentation_fingerprint: str,
+    topology_build: dict[str, Any],
 ) -> str:
     map_record = manifest["map"]
     grid = map_record["grid"]
@@ -1401,11 +2016,27 @@ def render_scene(
     cell_width, cell_height = _pair(grid["cell_size"], "map.grid.cell_size")
     world_size = _pair(map_record["world_size"], "map.world_size")
     world_width, world_height = world_size
+    ext_resources, sub_resources, asset_bindings = _scene_visual_asset_resources(
+        manifest
+    )
+    load_steps = 1 + len(ext_resources) + sum(
+        1 for line in sub_resources if line.startswith("[sub_resource")
+    )
+    scene_header = (
+        f"[gd_scene load_steps={load_steps} format=3]"
+        if ext_resources or sub_resources
+        else "[gd_scene format=3]"
+    )
     lines = [
         "; Generated by underwater_map_workbench/tools/build_underwater_map.py.",
         "; Edit map_manifest.json, never this file by hand.",
-        "[gd_scene format=3]",
-        "",
+        scene_header,
+    ]
+    if ext_resources or sub_resources:
+        lines.extend(("", *ext_resources, *sub_resources, ""))
+    else:
+        lines.append("")
+    lines.extend([
         '[node name="UnderwaterMap" type="Node2D"]',
         'metadata/manifest_path = "res://underwater_map_workbench/map_manifest.json"',
         f'metadata/manifest_sha256 = "{manifest_sha}"',
@@ -1423,9 +2054,15 @@ def render_scene(
         f"metadata/world_size = Vector2({_gd_number(world_width)}, {_gd_number(world_height)})",
         f"metadata/topology = {_gd_variant(manifest['topology'])}",
         f"metadata/campaign = {_gd_variant(manifest['campaign'])}",
-        "",
-        '[node name="VisualLayers" type="Node2D" parent="."]',
-    ]
+    ])
+    if topology_build.get("mode") == L05_MODE:
+        lines.extend(
+            (
+                f"metadata/payload_sha256 = {_gd_string(topology_build['payload_sha256'])}",
+                f"metadata/canonical_digest = {_gd_string(topology_build['canonical_digest'])}",
+            )
+        )
+    lines.extend(("", '[node name="VisualLayers" type="Node2D" parent="."]'))
     layers_by_id = {
         str(layer["id"]): layer
         for layer in manifest["visual"]["layers"]
@@ -1437,36 +2074,119 @@ def render_scene(
             _append_l00_content(lines, manifest, world_size)
         elif layer_id == "L03":
             _append_landmarks(lines, manifest)
-        elif layer_id == "L05":
+        elif layer_id == "L05" and topology_build.get("mode") == "open_world":
             _append_world_border(lines, manifest, world_size)
+    _append_visual_assets(lines, asset_bindings)
     _append_manifest_regions(lines, manifest)
     _append_manifest_markers(lines, manifest)
     return "\n".join(lines) + "\n"
 
 
-def _write_scene_atomically(content: str) -> None:
-    descriptor, temporary_name = tempfile.mkstemp(
-        dir=SCENE_PATH.parent,
-        prefix=f".{SCENE_PATH.name}.",
-        suffix=".tmp",
-    )
-    temporary_path = Path(temporary_name)
+def _write_outputs_atomically(outputs: dict[Path, bytes]) -> None:
+    temporary_paths: list[tuple[Path, Path]] = []
     try:
-        stream = os.fdopen(descriptor, "w", encoding="utf-8", newline="\n")
-        descriptor = -1
-        with stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary_path, SCENE_PATH)
+        for destination, content in outputs.items():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+            )
+            temporary_path = Path(temporary_name)
+            temporary_paths.append((temporary_path, destination))
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+        for temporary_path, destination in temporary_paths:
+            os.replace(temporary_path, destination)
     except BaseException:
-        if descriptor >= 0:
-            os.close(descriptor)
-        try:
-            temporary_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        for temporary_path, _destination in temporary_paths:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         raise
+
+
+def _refresh_l05_source() -> None:
+    original_raw = MANIFEST_PATH.read_bytes()
+    original_sha = hashlib.sha256(original_raw).hexdigest()
+    try:
+        manifest = json.loads(original_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"invalid JSON: {error}") from error
+    manifest = _object(manifest, "manifest")
+    topology = _object(manifest.get("topology"), "topology")
+    if topology.get("mode") != L05_MODE:
+        raise ManifestError(
+            f"--refresh-l05-source requires topology.mode={L05_MODE}"
+        )
+    world_size = _validate_map(manifest)
+    topology_build = _validate_topology(
+        manifest,
+        world_size,
+        verify_declarations=False,
+    )
+    collision = _object(
+        topology.get("collision_source"),
+        "topology.collision_source",
+    )
+    visual = _object(manifest.get("visual"), "visual")
+    assets = _array(visual.get("assets"), "visual.assets")
+    active_l05_assets: list[dict[str, Any]] = []
+    for index, asset_value in enumerate(assets):
+        asset = _object(asset_value, f"visual.assets[{index}]")
+        if asset.get("layer_id") == "L05" and asset.get("enabled") is True:
+            active_l05_assets.append(asset)
+    if len(active_l05_assets) != 1:
+        raise ManifestError(
+            "--refresh-l05-source requires exactly one enabled L05 visual asset"
+        )
+    actual_sha = str(topology_build["payload_sha256"])
+    canonical_digest = str(topology_build["canonical_digest"])
+    changed = False
+    if collision.get("sha256") != actual_sha:
+        collision["sha256"] = actual_sha
+        changed = True
+    if collision.get("canonical_digest") != canonical_digest:
+        collision["canonical_digest"] = canonical_digest
+        changed = True
+    active_l05_asset = active_l05_assets[0]
+    if active_l05_asset.get("topology_digest") != canonical_digest:
+        active_l05_asset["topology_digest"] = canonical_digest
+        changed = True
+
+    if not changed:
+        load_and_validate_manifest()
+        if hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest() != original_sha:
+            raise ManifestError("no-op refresh unexpectedly changed map_manifest.json")
+        print(
+            "L05 source declarations are current; map_manifest.json unchanged "
+            f"({actual_sha}, {canonical_digest})"
+        )
+        return
+
+    updated_raw = (
+        json.dumps(
+            manifest,
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n"
+    ).encode("utf-8")
+    _write_outputs_atomically({MANIFEST_PATH: updated_raw})
+    try:
+        load_and_validate_manifest()
+    except (OSError, ManifestError) as error:
+        _write_outputs_atomically({MANIFEST_PATH: original_raw})
+        raise ManifestError(
+            f"refreshed L05 declarations failed full validation: {error}"
+        ) from error
+    print(
+        "Refreshed L05 source declarations in map_manifest.json "
+        f"({actual_sha}, {canonical_digest})"
+    )
 
 
 def main() -> int:
@@ -1474,39 +2194,57 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--build", action="store_true", help="write the deterministic scene")
     mode.add_argument("--check", action="store_true", help="verify that the scene is current")
+    mode.add_argument(
+        "--refresh-l05-source",
+        action="store_true",
+        help="refresh L05 payload SHA and canonical digest in the manifest",
+    )
     args = parser.parse_args()
+    if args.refresh_l05_source:
+        try:
+            _refresh_l05_source()
+        except (OSError, ManifestError) as error:
+            print(f"underwater map manifest error: {error}", file=sys.stderr)
+            return 1
+        return 0
     try:
         (
             manifest,
             manifest_sha,
             gameplay_signature,
             presentation_fingerprint,
+            topology_build,
         ) = load_and_validate_manifest()
         expected = render_scene(
             manifest,
             manifest_sha,
             gameplay_signature,
             presentation_fingerprint,
+            topology_build,
         )
+        expected_outputs = _render_l05_artifacts(topology_build, manifest_sha)
+        expected_outputs[SCENE_PATH] = expected.encode("utf-8")
     except (OSError, ManifestError) as error:
         print(f"underwater map manifest error: {error}", file=sys.stderr)
         return 1
     if args.check:
-        if not SCENE_PATH.exists():
-            print(f"generated scene is missing: {SCENE_PATH}", file=sys.stderr)
-            return 1
-        if SCENE_PATH.read_text(encoding="utf-8") != expected:
-            print("UnderwaterMap.tscn is stale; run with --build", file=sys.stderr)
-            return 1
+        for output_path, expected_bytes in expected_outputs.items():
+            if not output_path.exists():
+                print(f"generated output is missing: {output_path}", file=sys.stderr)
+                return 1
+            if output_path.read_bytes() != expected_bytes:
+                relative_path = output_path.relative_to(WORKBENCH_DIR)
+                print(f"{relative_path} is stale; run with --build", file=sys.stderr)
+                return 1
         print(
-            "UnderwaterMap.tscn is current "
+            "UnderwaterMap.tscn and generated L05 outputs are current "
             f"({manifest_sha}, {gameplay_signature}, {presentation_fingerprint})"
         )
         return 0
     try:
-        _write_scene_atomically(expected)
+        _write_outputs_atomically(expected_outputs)
     except OSError as error:
-        print(f"cannot write generated scene atomically: {error}", file=sys.stderr)
+        print(f"cannot write generated outputs atomically: {error}", file=sys.stderr)
         return 1
     print(
         f"Built {SCENE_PATH} from {MANIFEST_PATH} "

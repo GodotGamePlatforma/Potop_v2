@@ -8,17 +8,17 @@ Ten katalog zawiera cały aktywny pakiet konkretnej mapy nurkowania. Projekt God
 2. Przeczytaj kolejno `AGENTS.md`, `.ai/PROJECT_CONTEXT.md`, `.ai/DECISIONS.md` i ten plik. Migawka mówi, co naprawdę działa; decyzje mówią, jaki kontrakt ma obowiązywać.
 3. Potwierdź `..\project.godot` i uruchom niedestrukcyjny `--check` z sekcji Komendy.
 4. Zaklasyfikuj zmianę jako: semantyka/pozycja, topologia L05, grafika strukturalna, grafika nieblokująca albo dynamiczny gameplay.
-5. Przed ImageGen sprawdź bramkę w `AGENTS.md`. Brak payloadu, masek, świeżej karty socketu lub renderera oznacza STOP dla produkcyjnej grafiki strukturalnej.
+5. Przed ImageGen sprawdź bramkę w `AGENTS.md`. Aktywny pipeline obsługuje obecnie L01 i L02 jako dwa nieblokujące plany miasta oraz L05 jako materiał maskowany koliderem; nie otwiera to automatycznie produkcji landmarków ani pozostałych slotów.
 
 ## Jeden łańcuch prawdy
 
 | Element | Znaczenie |
 |---|---|
 | `map_manifest.json` | Jedyne semantyczne authority pozycji, stable ID, relacji, rewizji, topologii i przypisań warstw. |
-| Payload L05 | `[DOCELOWE]` Jedno źródło pikselowego podziału `solid/open_water`, wskazane ścieżką i SHA przez manifest. |
+| `assets/topology/l05_ground_mask_source.json` | Edytowalny payload L05: jedno źródło pikselowego podziału `solid/open_water`, wskazane ścieżką, SHA i canonical digestem przez manifest. Nie jest ilustracją. |
 | Źródła grafiki | Grafika strukturalna jest przypisana do kanonicznego digestu L05, socketu i finalnego transformu; jawnie nieblokujące tło do rewizji prezentacji. Nigdy nie są źródłem fizyki. |
 | `UnderwaterMap.tscn` | Jedyna scena używana przez runtime; byte-exact pochodna buildera, bez ręcznych poprawek. |
-| Kolizja, nawigacja, maski, SDF/okludery, prowadnice i socket cards | Pochodne manifestu i payloadu L05; regenerowane, nie poprawiane ręcznie. |
+| `assets/generated/l05/` oraz kolizja runtime | Maski, prowadnica, pakiet prawdy, raster i segmenty fizyki są pochodnymi manifestu i payloadu L05; regenerowane, nie poprawiane ręcznie. |
 
 „Jeden manifest i jedna scena” nie oznacza jednego pliku graficznego. Oznacza brak drugiego katalogu pozycji, alternatywnego manifestu, sceny-kandydata i równoległej wersji mapy. Wszystkie aktywne pliki źródłowe wskazuje ten sam manifest.
 
@@ -28,9 +28,15 @@ Ten katalog zawiera cały aktywny pakiet konkretnej mapy nurkowania. Projekt God
 
 Pełnomapowa prowadnica jest deterministyczną pochodną payloadu używaną offline, nie domyślnie jedną teksturą runtime. Builder odczytuje pełne odwzorowanie: `world_units_per_pixel`, origin świata, kierunek osi, konwencję `pixel_center/pixel_edge` i regułę zaokrąglania; jednostki świata nie są automatycznie pikselami. Jeżeli obraz przekracza limit importu lub budżet tekstury, renderer używa deterministycznych socketów/chunków zachowujących dokładnie to odwzorowanie i overlap.
 
-## Stan a kontrakt docelowy
+## Bieżąca zdolność pipeline'u
 
-Aktualne możliwości i luki są zapisane tylko w `.ai/PROJECT_CONTEXT.md`. Jeżeli migawka nadal podaje `topology.mode = open_world`, `collision_source.format = none`, brak pakietu prowadnic albo wymagane puste `visual.assets`, pipeline jest foundationem, a nie gotowym authoringiem grafiki 1:1. Wtedy właściwym następnym zadaniem jest wybranie produkcyjnego formatu payloadu w schema, dodanie jego walidacji i deterministycznego generatora pakietu prawdy do buildera oraz test z rzeczywistym payloadem — nie generowanie finalnych ścian, budynków lub landmarków. Obecnie nie istnieje zatwierdzona komenda authoringu L05.
+Aktywna mapa używa `topology.mode = l05_mask_v1` i payloadu `l05_rect_ops_v1`. Builder waliduje jego zawartość, surowy SHA, mapowanie piksel–świat i canonical digest, generuje pakiet prawdy, kompiluje scenę oraz obsługuje typowane assety `L01/texture_rect`, `L02/texture_rect` i world-locked `L05/collision_masked_material`. L00 pozostaje proceduralnym kolorem wody. Dokładne rewizje, hashe, aktywne assety i status odbioru są wyłącznie w `.ai/PROJECT_CONTEXT.md` oraz manifeście.
+
+To jest celowo wąski etap. L03-L04 i L06-L10 mogą istnieć jako stabilne sloty, ale bieżący renderer nie przyjmuje dla nich nowych bitmap. Landmark, wejście, budynek albo inna grafika komunikująca geometrię wymaga osobnego, świeżego socketu i rozszerzenia walidowanego typu; nie wolno przemycić jej do L01 ani L02.
+
+## Grafika bez pixel artu
+
+Widoczna grafika tej mapy jest realistycznym/rysunkowym 2D. Zwykłe bitmapy prezentacyjne dziedziczą projektowy globalny `Linear` i zachowują proporcję finalnego `world_rect`; builder nie zapisuje równoważnego filtra na każdym nodzie, a grafiki nie wolno dopasowywać przez niezależne ściskanie osi. Semantyczne maski L05 są technicznym wyjątkiem próbkowanym `nearest`, aby nie rozmyć granicy kolidera; własny sampler widocznego materiału gruntu pozostaje jawnie liniowy.
 
 ## Warstwy L00-L10
 
@@ -48,11 +54,15 @@ Stos zawiera dziesięć aktywnych slotów `L00-L09` i jeden wyłączony slot rez
 
 ### 1. Zmiana pozycji lub zawartości mapy
 
-Najpierw zmień manifest i `revision_id`. Pozycja landmarku, urządzenia lub wejścia nigdy nie pochodzi ze screenshotu ani promptu. Regeneruj scenę, odpowiednie karty socketów oraz wszystkie grafiki zależne od zmienionego położenia.
+Najpierw zmień manifest i `revision_id`. Pozycja landmarku, urządzenia lub wejścia nigdy nie pochodzi ze screenshotu ani promptu. Regeneruj scenę i wszystkie pochodne zależne od zmienionego położenia; kartę socketu generuj dopiero dla typu jawnie obsługiwanego przez bieżący builder.
 
 ### 2. Zmiana kolidera L05
 
-Po wdrożeniu adaptera zmień źródłowy payload i jego rekord w manifeście. Gdy zmieniła się zdekodowana geometria lub odwzorowanie, podnieś `topology_revision`, przelicz surowy SHA i kanoniczny digest oraz wygeneruj od nowa fizykę, nawigację, maski, pas graniczny, prowadnicę i sockety. Wszystkie grafiki strukturalne starego digestu są nieaktualne; nieblokujące tło przechodzi ponowną kontrolę kompozytu. Ponowny zapis identycznej geometrii zmienia tylko surowy SHA, nie podpis gameplayu. Po build/check i kontrolach technicznych użytkownik ręcznie przepływa J-7 -> Archiwum -> R-3 -> C-4; nie dodawaj blokującego BFS.
+Edytuj wyłącznie `assets/topology/l05_ground_mask_source.json`. `solid_rect` dodaje grunt, `open_rect` wycina wodę, a operacje są wykonywane od góry do dołu, więc późniejsza operacja wygrywa. Przesunięcie, poszerzenie, zwężenie, usunięcie albo dodanie przejścia jest zwykłą zmianą `rect_px`; nie wymaga stałej liczby tuneli.
+
+Jeżeli zmienia się geometria, najpierw podnieś `revision_id` i `topology_revision` w manifeście, potem uruchom `--refresh-l05-source`. Ta komenda atomowo synchronizuje wyłącznie surowy SHA payloadu, canonical digest i digest aktywnego assetu L05; celowo nie zgaduje nazw rewizji. Następnie wykonaj build, `--check` i smoke. Builder odtwarza `solid_mask.png`, `open_water_mask.png`, `boundary_mask.png`, `full_map_guide.png` i `truth_package.json`; runtime wyprowadza z tego samego rastra segmenty fizyki. Nie poprawiaj żadnej z tych pochodnych ręcznie.
+
+Wszystkie grafiki strukturalne starego digestu stają się nieaktualne. Jawnie nieblokujące L01 i L02 wymagają ponownej kontroli kompozytu, ale nie definiują kolizji. Po kontroli technicznej użytkownik ręcznie przepływa J-7 -> Archiwum -> R-3 -> C-4; nie dodawaj blokującego BFS.
 
 ### 3. Landmark lub grafika strukturalna
 
@@ -60,7 +70,7 @@ Użyj jednego świeżego pakietu prawdy opisanego w `AGENTS.md`: pełna prowadni
 
 ### 4. Poprawka wyglądu bez zmiany topologii
 
-Edytuj najmniejszy potrzebny obszar aktualnego zaakceptowanego źródła, zachowując socket, skalę i sąsiadów. Podnieś `presentation_revision`, nie podpis gameplayu. Ponownie sprawdź maski, pełny kompozyt i kadry gameplayowe.
+L01, L02 i materiał tekstury gruntu w `assets/visual/` są źródłami prezentacji. Edytuj najmniejszy potrzebny obszar, zachowując world rect, skalę i rolę assetu; zaktualizuj SHA rekordu oraz `presentation_revision`, nie `topology_revision`. `VisualLayers/L05` nie jest koliderem: shader nakłada materiał wyłącznie tam, gdzie wygenerowana maska mówi `solid`, dlatego obraz materiału nie może zawierać własnych tuneli, drzwi ani ścian. Ponownie sprawdź maskę, pełny kompozyt i kadry gameplayowe.
 
 ### 5. Dynamiczna brama lub przeszkoda
 
@@ -75,6 +85,12 @@ Builder i smoke sprawdzają strukturę, unikalność i referencje, ale nie certy
 ## Pliki
 
 - `map_manifest.json` — semantyczne authority;
+- `assets/topology/l05_ground_mask_source.json` — jedyne ręcznie edytowalne źródło statycznego `solid/open_water`;
+- `assets/visual/l01_distant_city.png` — aktualne nieblokujące tło L01;
+- `assets/visual/l02_near_city.png` — bliższy, nadal nieblokujący plan miasta L02;
+- `assets/visual/l05_ground_material.png` — aktualny materiał wizualny gruntu, maskowany L05;
+- `assets/visual/imagegen_provenance.json` — techniczny zapis narzędzia, promptów, źródeł i operacji; `authority = false`;
+- `assets/generated/l05/` — deterministyczne maski i pakiet prawdy; nie edytuj ręcznie;
 - `UnderwaterMap.tscn` — wygenerowana scena runtime;
 - `tools/build_underwater_map.py` — build i niedestrukcyjny check;
 - `tests/underwater_map_smoke_test.gd` — techniczny smoke pakietu;
@@ -90,6 +106,7 @@ Z `D:\Dev\Game\Game\underwater_map_workbench`:
 Test-Path ..\project.godot
 git -C .. rev-parse --show-toplevel
 python .\tools\build_underwater_map.py --check
+python .\tools\build_underwater_map.py --refresh-l05-source
 python .\tools\build_underwater_map.py --build
 python .\tools\build_underwater_map.py --check
 ..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
@@ -97,7 +114,7 @@ git -C .. diff --name-only
 git -C .. status --short
 ```
 
-`--check` nie może zapisywać. Po zmianie źródła obowiązuje kolejność build -> check -> smoke; dodatkowe testy root dobieraj proporcjonalnie do integracji. `ERROR` lub `SCRIPT ERROR` oznacza porażkę także przy kodzie wyjścia 0.
+`--check` nie może zapisywać. `--refresh-l05-source` uruchamiaj tylko po zmianie payloadu L05 i ręcznym podbiciu właściwych rewizji; dla aktualnego payloadu jest byte-no-op. Po zmianie topologii obowiązuje kolejność refresh -> build -> check -> smoke. Po samej zmianie manifestu lub grafiki pomiń refresh i wykonaj build -> check -> smoke. Dodatkowe testy root dobieraj proporcjonalnie do integracji. `ERROR` lub `SCRIPT ERROR` oznacza porażkę także przy kodzie wyjścia 0.
 
 Nie twórz plików `candidate`, `final`, drugiej sceny ani drugiego manifestu. `schema_version` jest wersją formatu wewnątrz tego samego pliku, nie nazwą wariantu. Odrzucone próby i pliki tymczasowe nie należą do aktywnego pakietu.
 

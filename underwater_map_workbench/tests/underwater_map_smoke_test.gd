@@ -9,6 +9,9 @@ const EXPECTED_SCHEMA_VERSION := 2
 const EXPECTED_LAYER_IDS := [
 	"L00", "L01", "L02", "L03", "L04", "L05", "L06", "L07", "L08", "L09", "L10",
 ]
+const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
+const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
+const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
 const BLUEPRINT_GAMEPLAY_ARRAYS := {
 	"connections": "connections",
 	"current_zones": "current_zones",
@@ -22,6 +25,10 @@ const BLUEPRINT_GAMEPLAY_ARRAYS := {
 	"decoration_spawns": "decoration_spawns",
 }
 const CAMPAIGN_SEED := 73_331
+const L05_TOPOLOGY_MODE := "l05_mask_v1"
+const L05_SOURCE_FORMAT := "l05_rect_ops_v1"
+const L05_PIXEL_SIZE := Vector2i(576, 324)
+const L05_CELL_SIZE := Vector2(40.0, 40.0)
 
 var _failed := false
 
@@ -71,6 +78,9 @@ func _initialize() -> void:
 		compiler.generated_scene_is_current(),
 		"UnderwaterMap.tscn musi być bieżącym deterministycznym wynikiem manifestu.",
 	)
+	_assert_source_dependencies(compiler, manifest)
+	var navigation_base: Dictionary = compiler.navigation_base_raster()
+	_assert_l05_navigation_base(navigation_base, topology)
 	_validate_manifest_fixtures_if_supported(compiler, manifest)
 
 	var packed_map := ResourceLoader.load(
@@ -156,6 +166,7 @@ func _initialize() -> void:
 		navigation.grid_size == expected_navigation_size,
 		"Raster nawigacji musi wyprowadzać rozmiar z manifestu.",
 	)
+	_assert(runtime.collision_segment_count() > 0, "Runtime musi zbudować fizyczne segmenty z authority L05.")
 	var runtime_visual_layers := runtime.get_node_or_null("RuntimeDynamic/VisualLayers") as Node2D
 	_assert(runtime_visual_layers != null, "Lokalny runtime musi zamontować VisualLayers.")
 	if runtime_visual_layers != null:
@@ -253,7 +264,10 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 	)
 
 	var topology := topology_value as Dictionary
-	_assert(str(topology.get("mode", "")) == "open_world", "Topologia v2 musi używać mode=open_world.")
+	_assert(
+		str(topology.get("mode", "")) in ["open_world", L05_TOPOLOGY_MODE],
+		"Topologia v2 musi używać open_world albo edytowalnego l05_mask_v1.",
+	)
 	_assert(
 		topology.get("collision_source", null) is Dictionary,
 		"Topologia musi jawnie publikować collision_source.",
@@ -262,6 +276,15 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 		topology.get("protected_corridors", null) is Array,
 		"Topologia musi publikować protected_corridors jako tablicę.",
 	)
+	if str(topology.get("mode", "")) == L05_TOPOLOGY_MODE:
+		var collision: Dictionary = topology.get("collision_source", {})
+		_assert(str(collision.get("format", "")) == L05_SOURCE_FORMAT, "L05 musi używać l05_rect_ops_v1.")
+		_assert(_vector(collision.get("pixel_size", [])) == Vector2(L05_PIXEL_SIZE), "L05 musi mieć raster 576 x 324.")
+		_assert(_vector(collision.get("world_units_per_pixel", [])) == L05_CELL_SIZE, "L05 musi mapować piksel na 40 x 40 jednostek.")
+		_assert(
+			str(collision.get("canonical_digest", "")).begins_with("topology-v1:"),
+			"L05 musi publikować kanoniczny digest geometrii.",
+		)
 
 	var visual := visual_value as Dictionary
 	var layers_value = visual.get("layers", null)
@@ -321,12 +344,118 @@ func _assert_layer_policy_records(layers: Array, assets: Array, topology: Dictio
 		_assert(layer_id != "L10", "Zarezerwowane L10 nie może zawierać assetów.")
 
 
+func _assert_source_dependencies(compiler, manifest: Dictionary) -> void:
+	var dependencies: PackedStringArray = compiler.source_dependency_paths()
+	_assert(dependencies.has(CompilerScript.MANIFEST_PATH), "Zależności muszą zawierać jedyny manifest.")
+	_assert(dependencies.has(CompilerScript.MAP_SCENE_PATH), "Zależności muszą zawierać scenę pochodną.")
+	var topology: Dictionary = manifest.get("topology", {})
+	if str(topology.get("mode", "")) == L05_TOPOLOGY_MODE:
+		var collision: Dictionary = topology.get("collision_source", {})
+		var payload_path := "res://underwater_map_workbench/%s" % str(collision.get("path", ""))
+		_assert(dependencies.has(payload_path), "Zależności muszą zawierać edytowalny payload L05.")
+		_assert(
+			dependencies.has("res://underwater_map_workbench/assets/generated/l05/solid_mask.png"),
+			"Zależności muszą zawierać pochodną maskę renderującą L05.",
+		)
+		_assert(
+			dependencies.has("res://underwater_map_workbench/assets/shaders/l05_ground_masked.gdshader"),
+			"Zależności muszą zawierać shader spinający materiał z maską L05.",
+		)
+	for asset_value in (manifest.get("visual", {}) as Dictionary).get("assets", []):
+		if asset_value is Dictionary:
+			var asset_path := "res://underwater_map_workbench/%s" % str((asset_value as Dictionary).get("path", ""))
+			_assert(dependencies.has(asset_path), "Zależności muszą zawierać każdy typowany asset wizualny.")
+
+
+func _assert_l05_navigation_base(navigation_base: Dictionary, topology: Dictionary) -> void:
+	var errors: PackedStringArray = navigation_base.get("errors", PackedStringArray())
+	_assert(errors.is_empty(), "Bazowy raster L05 musi kompilować się bez błędów: %s" % "; ".join(errors))
+	if not errors.is_empty() or str(topology.get("mode", "")) != L05_TOPOLOGY_MODE:
+		return
+	_assert(int(navigation_base.get("width", 0)) == L05_PIXEL_SIZE.x, "Raster L05 musi mieć szerokość 576.")
+	_assert(int(navigation_base.get("height", 0)) == L05_PIXEL_SIZE.y, "Raster L05 musi mieć wysokość 324.")
+	_assert(navigation_base.get("cell_scale", Vector2.ZERO) == L05_CELL_SIZE, "Raster L05 musi używać skali 40 x 40.")
+	var expected_cells := _rasterize_l05_payload(topology)
+	var runtime_cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
+	_assert(runtime_cells.size() == expected_cells.size(), "Runtime i payload L05 muszą mieć identyczną liczbę komórek.")
+	var solid_count := 0
+	var open_count := 0
+	var comparable_count := mini(runtime_cells.size(), expected_cells.size())
+	for index in range(comparable_count):
+		if int(expected_cells[index]) == 0:
+			solid_count += 1
+		else:
+			open_count += 1
+		if int(runtime_cells[index]) != int(expected_cells[index]):
+			_assert(false, "Runtime L05 różni się od payloadu przy komórce %d." % index)
+			break
+	_assert(solid_count > 0, "Bieżący payload L05 musi zawierać grunt stały.")
+	_assert(open_count > 0, "Bieżący payload L05 musi pozostawiać otwartą wodę.")
+
+
+func _rasterize_l05_payload(topology: Dictionary) -> PackedByteArray:
+	var collision: Dictionary = topology.get("collision_source", {})
+	var package_path := str(collision.get("path", ""))
+	var resource_path := "res://underwater_map_workbench/%s" % package_path
+	_assert(FileAccess.file_exists(resource_path), "Źródłowy payload L05 musi istnieć.")
+	if not FileAccess.file_exists(resource_path):
+		return PackedByteArray()
+	_assert(
+		FileAccess.get_sha256(resource_path).to_lower() == str(collision.get("sha256", "")),
+		"SHA źródłowego payloadu L05 musi odpowiadać manifestowi.",
+	)
+	var file := FileAccess.open(resource_path, FileAccess.READ)
+	_assert(file != null, "Test musi móc otworzyć payload L05.")
+	if file == null:
+		return PackedByteArray()
+	var parsed = JSON.parse_string(file.get_as_text())
+	_assert(parsed is Dictionary, "Payload L05 musi być obiektem JSON.")
+	if not parsed is Dictionary:
+		return PackedByteArray()
+	var payload := parsed as Dictionary
+	_assert(str(payload.get("base", "")) == "open_water", "Payload L05 musi zaczynać od otwartej wody.")
+	var cells := PackedByteArray()
+	cells.resize(L05_PIXEL_SIZE.x * L05_PIXEL_SIZE.y)
+	cells.fill(1)
+	var operations_value = payload.get("operations", null)
+	_assert(operations_value is Array, "Payload L05 musi publikować edytowalną tablicę operations.")
+	if not operations_value is Array:
+		return PackedByteArray()
+	var operation_ids := {}
+	for operation_value in operations_value as Array:
+		_assert(operation_value is Dictionary, "Każda operacja L05 musi być obiektem.")
+		if not operation_value is Dictionary:
+			continue
+		var operation := operation_value as Dictionary
+		var operation_id := str(operation.get("id", ""))
+		_assert(not operation_id.is_empty() and not operation_ids.has(operation_id), "Operacje L05 muszą mieć unikalne ID.")
+		operation_ids[operation_id] = true
+		var rect_value = operation.get("rect_px", [])
+		_assert(rect_value is Array and (rect_value as Array).size() == 4, "Operacja L05 wymaga rect_px.")
+		if not rect_value is Array or (rect_value as Array).size() != 4:
+			continue
+		var rect := rect_value as Array
+		var x := int(rect[0])
+		var y := int(rect[1])
+		var width := int(rect[2])
+		var height := int(rect[3])
+		var value := 0 if str(operation.get("op", "")) == "solid_rect" else 1
+		for row in range(y, y + height):
+			for column in range(x, x + width):
+				cells[row * L05_PIXEL_SIZE.x + column] = value
+	return cells
+
+
 func _validate_manifest_fixtures_if_supported(compiler, manifest: Dictionary) -> void:
 	_assert(compiler.has_method("validate_manifest_for_tests"), "Compiler musi publikować validate_manifest_for_tests.")
 	_assert(compiler.has_method("compile_from_manifest_for_tests"), "Compiler musi publikować compile_from_manifest_for_tests.")
 	if not compiler.has_method("validate_manifest_for_tests") or not compiler.has_method("compile_from_manifest_for_tests"):
 		return
 	_validate_exact_map_dimensions(compiler, manifest)
+	for layer_id: String in _active_nonblocking_texture_layer_ids(manifest):
+		_validate_backdrop_aspect_ratio(compiler, manifest, layer_id)
+		if layer_id in GROUND_ANCHORED_BACKDROP_LAYER_IDS:
+			_validate_backdrop_ground_anchor(compiler, manifest, layer_id)
 	_validate_manifest_owned_campaign_landmark(compiler, manifest)
 	var baseline_compilation: Dictionary = {}
 	if compiler.has_method("compile_from_manifest_for_tests"):
@@ -484,6 +613,24 @@ func _validate_manifest_fixtures_if_supported(compiler, manifest: Dictionary) ->
 			)
 
 
+func _active_nonblocking_texture_layer_ids(manifest: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	var visual: Dictionary = manifest.get("visual", {})
+	for asset_value in visual.get("assets", []):
+		if not asset_value is Dictionary:
+			continue
+		var asset := asset_value as Dictionary
+		var layer_id := str(asset.get("layer_id", ""))
+		if (
+			bool(asset.get("enabled", true))
+			and str(asset.get("kind", "")) == "texture_rect"
+			and layer_id in NONBLOCKING_TEXTURE_LAYER_IDS
+			and not result.has(layer_id)
+		):
+			result.append(layer_id)
+	return result
+
+
 func _validate_exact_map_dimensions(compiler, manifest: Dictionary) -> void:
 	for axis in ["columns", "rows"]:
 		for delta in [-1, 1]:
@@ -524,6 +671,68 @@ func _validate_exact_map_dimensions(compiler, manifest: Dictionary) -> void:
 			world_fixture,
 			"world_size musi dokładnie odpowiadać gridowi i kontraktowi 12 x 12.",
 		)
+
+
+func _validate_backdrop_aspect_ratio(
+	compiler,
+	manifest: Dictionary,
+	layer_id: String,
+) -> void:
+	var fixture := manifest.duplicate(true)
+	var visual: Dictionary = fixture.get("visual", {})
+	var assets: Array = visual.get("assets", [])
+	for asset_value in assets:
+		if not asset_value is Dictionary:
+			continue
+		var asset := asset_value as Dictionary
+		if (
+			str(asset.get("layer_id", "")) != layer_id
+			or str(asset.get("kind", "")) != "texture_rect"
+		):
+			continue
+		var world_rect: Array = (asset.get("world_rect", []) as Array).duplicate()
+		if world_rect.size() != 4:
+			_assert(false, "Fixture proporcji %s wymaga poprawnego world_rect." % layer_id)
+			return
+		world_rect[3] = float(world_rect[3]) - 40.0
+		asset["world_rect"] = world_rect
+		_assert_manifest_rejected(
+			compiler,
+			fixture,
+			"%s musi odrzucać world_rect o proporcji innej niż pixel_size źródła."
+			% layer_id,
+		)
+		return
+	_assert(false, "Fixture proporcji wymaga aktywnego texture_rect na %s." % layer_id)
+
+
+func _validate_backdrop_ground_anchor(
+	compiler,
+	manifest: Dictionary,
+	layer_id: String,
+) -> void:
+	var fixture := manifest.duplicate(true)
+	var visual: Dictionary = fixture.get("visual", {})
+	var layers: Array = visual.get("layers", [])
+	for layer_value in layers:
+		if not layer_value is Dictionary:
+			continue
+		var layer := layer_value as Dictionary
+		if str(layer.get("id", "")) != layer_id:
+			continue
+		var parallax_scale: Array = (layer.get("parallax_scale", []) as Array).duplicate()
+		if parallax_scale.size() != 2:
+			_assert(false, "Fixture kotwicy %s wymaga poprawnej parallax_scale." % layer_id)
+			return
+		parallax_scale[1] = 0.5
+		layer["parallax_scale"] = parallax_scale
+		_assert_manifest_rejected(
+			compiler,
+			fixture,
+			"%s musi odrzucać pionowe odklejenie tła od gruntu." % layer_id,
+		)
+		return
+	_assert(false, "Fixture kotwicy wymaga aktywnej warstwy %s." % layer_id)
 
 
 func _validate_manifest_owned_campaign_landmark(compiler, manifest: Dictionary) -> void:
@@ -651,6 +860,16 @@ func _assert_scene_metadata(
 	)
 	_assert(gameplay_signature != raw_manifest_sha, "Gameplay signature nie może być aliasem surowego SHA manifestu.")
 	_assert(presentation_fingerprint != raw_manifest_sha, "Presentation fingerprint nie może być aliasem surowego SHA manifestu.")
+	if str(topology.get("mode", "")) == L05_TOPOLOGY_MODE:
+		var collision: Dictionary = topology.get("collision_source", {})
+		_assert(
+			str(map_root.get_meta("payload_sha256", "")) == str(collision.get("sha256", "")),
+			"Scena musi publikować SHA edytowalnego payloadu L05.",
+		)
+		_assert(
+			str(map_root.get_meta("canonical_digest", "")) == str(collision.get("canonical_digest", "")),
+			"Scena musi publikować kanoniczny digest geometrii L05.",
+		)
 
 
 func _assert_generated_scene_records(map_root: Node, manifest: Dictionary) -> void:
@@ -991,6 +1210,70 @@ func _assert_visual_content_matches_manifest(
 			_assert(
 				_manifest_value_matches(source_asset, asset_node.get_meta("source", {})),
 				"%s/%s asset musi zachować rekord source 1:1." % [owner_label, layer_id],
+			)
+			_assert_typed_asset_node(asset_node, source_asset, owner_label)
+
+
+func _assert_typed_asset_node(asset_node: Node, source_asset: Dictionary, owner_label: String) -> void:
+	var asset_id := str(source_asset.get("id", ""))
+	var layer_id := str(source_asset.get("layer_id", ""))
+	var kind := str(source_asset.get("kind", ""))
+	var expected_rect := _rect(source_asset.get("world_rect", []))
+	_assert(asset_node is Control, "%s asset %s musi być węzłem Control." % [owner_label, asset_id])
+	if asset_node is Control:
+		var control := asset_node as Control
+		var actual_rect := Rect2(
+			Vector2(control.offset_left, control.offset_top),
+			Vector2(
+				control.offset_right - control.offset_left,
+				control.offset_bottom - control.offset_top,
+			),
+		)
+		_assert(actual_rect == expected_rect, "%s asset %s musi zachować world_rect 1:1." % [owner_label, asset_id])
+	if kind == "texture_rect":
+		_assert(
+			layer_id in NONBLOCKING_TEXTURE_LAYER_IDS,
+			"%s asset %s texture_rect może należeć wyłącznie do L01 albo L02."
+			% [owner_label, asset_id],
+		)
+		_assert(
+			str(source_asset.get("affordance", "")) == NONBLOCKING_BACKDROP_AFFORDANCE,
+			"%s asset %s na %s musi być nieblokującym tłem."
+			% [owner_label, asset_id, layer_id],
+		)
+		_assert(
+			asset_node is TextureRect,
+			"%s asset %s na %s musi być TextureRect."
+			% [owner_label, asset_id, layer_id],
+		)
+		if asset_node is TextureRect:
+			var texture_rect := asset_node as TextureRect
+			_assert(texture_rect.texture != null, "%s asset %s musi mieć teksturę." % [owner_label, asset_id])
+			if texture_rect.texture != null:
+				_assert(
+					texture_rect.texture.get_size() == _vector(source_asset.get("pixel_size", [])),
+					"%s asset %s na %s musi zachować pixel_size źródła."
+					% [owner_label, asset_id, layer_id],
+				)
+	elif kind == "collision_masked_material":
+		_assert(asset_node is ColorRect, "%s asset %s na L05 musi być ColorRect." % [owner_label, asset_id])
+		if not asset_node is ColorRect:
+			return
+		var color_rect := asset_node as ColorRect
+		var material := color_rect.material as ShaderMaterial
+		_assert(material != null and material.shader != null, "%s asset %s musi używać ShaderMaterial." % [owner_label, asset_id])
+		if material == null:
+			return
+		var topology_mask := material.get_shader_parameter("topology_mask") as Texture2D
+		var ground_texture := material.get_shader_parameter("ground_texture") as Texture2D
+		_assert(topology_mask != null, "%s asset %s musi używać wygenerowanej maski L05." % [owner_label, asset_id])
+		_assert(ground_texture != null, "%s asset %s musi używać materiału gruntu." % [owner_label, asset_id])
+		if topology_mask != null:
+			_assert(topology_mask.get_size() == Vector2(L05_PIXEL_SIZE), "%s maska assetu %s musi mieć 576 x 324." % [owner_label, asset_id])
+		if ground_texture != null:
+			_assert(
+				ground_texture.get_size() == _vector(source_asset.get("pixel_size", [])),
+				"%s materiał assetu %s musi odpowiadać pixel_size manifestu." % [owner_label, asset_id],
 			)
 
 

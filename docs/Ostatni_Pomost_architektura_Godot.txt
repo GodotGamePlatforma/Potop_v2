@@ -657,18 +657,18 @@ Ogólne PD obsady pochodzą z zamrożonej listy zdolnych pracowników aktywnego 
 
 Kontrakt source-v5 opisuje prostokąt o logicznej siatce `12 × 12`, Stację Nurkową, punkt startu i aktywnej linii wyjścia, prowadzoną trasę tutorialu oraz osiągalną sekwencję urządzeń Wspólnej Linii. Dokładne identyfikatory instancji i landmarków, współrzędne, liczba rekordów, podział stref oraz szczegółowa topologia są odczytywane wyłącznie z manifestu i nie mają drugiej kopii w dokumentacji technicznej. `campaign_seed` nie zmienia semantyki manifestu.
 
-Manifest przechowuje wersję źródła i schematu, osie rewizji, wymiary, rozmiar pola logicznego, granice, strefy, landmarki, wejście, wyjście, obiekty gameplayowe, ich stabilne ID, role semantyczne, przypisania do landmarków, pozycje, prezentację oraz wymaganą kolejność tutorialu i urządzeń kampanii. Nazwy nodów i struktura sceny pochodnej służą wyłącznie integracji Godot. Typowane definicje itemów, interakcji i kampanii pozostają w ogólnych systemach korzenia; manifest wskazuje ich użycie i rozmieszczenie, ale nie kopiuje ich reguł.
+Manifest przechowuje wersję źródła i schematu, osie rewizji, wymiary, rozmiar pola logicznego, granice, strefy, landmarki, wejście, wyjście, obiekty gameplayowe, ich stabilne ID, role semantyczne, przypisania do landmarków, pozycje, prezentację oraz wymaganą kolejność tutorialu i urządzeń kampanii. Typowany `topology.collision_source` wskazuje jeden lokalny payload przez format, ścieżkę, surowy SHA-256, encoding, rozmiar, odwzorowanie piksel–świat i kanoniczny digest; rekordy `visual.assets` wskazują lokalne źródła prezentacji wraz z rolą, ścieżką, hashem, rozmiarem i finalnym `world_rect`. Nazwy nodów i struktura sceny pochodnej służą wyłącznie integracji Godot. Typowane definicje itemów, interakcji i kampanii pozostają w ogólnych systemach korzenia; manifest wskazuje ich użycie i rozmieszczenie, ale nie kopiuje ich reguł.
 
 Mapa source-v5 nie dziedziczy starego inwentarza czterech regionów, 27 landmarków, masek, wariantów ani assetów V1-V7. Manifest schema-v2 definiuje prezentacyjne sloty `L00-L10`, lecz ich bieżąca obsada i liczności wynikają wyłącznie z rewizji manifestu; globalna architektura nie utrzymuje ich drugiego inwentarza. Shadery środowiska znajdują się w `underwater_map_workbench/assets/shaders/`, a potrzebne, wielokrotnego użytku grafiki nurka, interakcji, przedmiotów i zagrożeń w `underwater_map_workbench/assets/gameplay/`; ich pozycje w konkretnej mapie nadal należą wyłącznie do manifestu. Brak rekordu pozycyjnego oznacza brak instancji na mapie, nie usunięcie ogólnej mechaniki lub jej assetu. Warsztat nie przechowuje wariantów ani biblioteki fallbacków starego świata. Szczegółowy kontrakt pipeline'u prezentacyjnego należy do lokalnego MAP-ARD-0013.
 
-Przechodnia przestrzeń, granice wewnętrzne i relacje osiągalności wynikają z topologii manifestu. Scenowe wyspy, makroteren, raster PNG, SDF, shader ani grafika nie mogą stanowić równoległego authority; każda przeszkoda lub teren otrzymuje jednoznaczny rekord manifestu i deterministyczne odwzorowanie w scenie pochodnej.
+Przechodnia przestrzeń i granice wewnętrzne wynikają z wybranego przez manifest, hash-pinned payloadu topologii L05; statyczny teren nie wymaga osobnego rekordu dla każdego piksela ani prostokąta źródłowego. Dynamiczna brama lub obiekt gameplayowy nadal otrzymuje jednoznaczny rekord manifestu. Scenowe wyspy, raster pochodny, SDF, shader ani grafika nie mogą stanowić równoległego authority, a rzeczywista osiągalność tras pozostaje przedmiotem ręcznego playtestu zamiast automatycznej certyfikacji.
 
 9.1.1. Authoring z manifestu warsztatu
 --------------------------------------------------------------------------------
 
 [AKTYWNE]
 
-Projektant edytuje wyłącznie `underwater_map_workbench/map_manifest.json`. `tools/build_underwater_map.py --build` generuje lokalne `UnderwaterMap.tscn`, a `--check` porównuje oczekiwany deterministyczny wynik z plikiem bez ustanawiania drugiego źródła. Ręczna poprawka sceny jest dryfem i musi zostać odrzucona albo odtworzona przez zmianę manifestu.
+Projektant edytuje semantykę konkretnej mapy wyłącznie w `underwater_map_workbench/map_manifest.json`. Payload L05 i bitmapy prezentacji są osobnymi, typowanymi źródłami wskazanymi i hash-pinned przez ten manifest; nie przechowują pozycji, relacji ani reguł kampanii. Po zmianie payloadu `--refresh-l05-source` synchronizuje jego deklarowane hashe i digest, `tools/build_underwater_map.py --build` generuje lokalne `UnderwaterMap.tscn` oraz pochodne L05, a `--check` porównuje oczekiwany deterministyczny wynik bez ustanawiania drugiego semantycznego źródła. Ręczna poprawka sceny lub pliku w `assets/generated/l05/` jest dryfem i musi zostać odrzucona albo odtworzona przez zmianę właściwego źródła.
 
 Builder przyjmuje jedną ścieżkę wejścia i jedną ścieżkę wyjścia. Waliduje schemat i osie rewizji, wymagane pola, typy, skończone współrzędne, unikalność ID, wymiary produktu, spójność wejścia i wyjścia, integralność referencji, przypisania ról semantycznych do istniejących landmarków oraz strukturę prezentacji zadeklarowaną przez bieżący manifest. Nie wykonuje automatycznej oceny osiągalności ani jakości trasy i nie blokuje generowania sceny wynikiem BFS. Nie utrzymuje w kodzie ani dokumentacji drugiej listy instancji, pozycji, liczności ani obsady slotów. Asset mapowy może być wskazany tylko pod lokalnym `assets/`; odwołanie poza pakiet albo nieużywany plik nie może wejść do sceny.
 
@@ -847,10 +847,23 @@ Normalizacja może wyłącznie kanonizować poprawny stan rewizji 2 bez zmiany j
 12. UI I PREZENTACJA
 ================================================================================
 
+12.0. Filtrowanie tekstur 2D
+--------------------------------------------------------------------------------
+
 [AKTYWNE]
+
+`project.godot` utrzymuje jedno projektowe źródło domyślnego próbkowania widocznych tekstur `CanvasItem`: `rendering/textures/canvas_textures/default_texture_filter = 1`, czyli `Linear`. Zwykłe `TextureRect`, `Sprite2D`, `AnimatedSprite2D`, światła 2D oraz bitmapy tworzone przez kontrolki dziedziczą ten domyślny filtr; scena, skrypt i builder nie powtarzają `TEXTURE_FILTER_LINEAR`, jeżeli nie zmienia to kontraktu konsumenta.
+
+Jawne ustawienie pozostaje wyłącznie na granicy o innej semantyce. `SubViewportContainer` i tekstury wieloprzebiegowych render targetów zachowują lokalny `Linear`, aby ich skalowanie nie zależało od przyszłej zmiany stylu zwykłych assetów. `LINEAR_WITH_MIPMAPS` wymaga jednocześnie importu z wygenerowanymi mipmapami i rzeczywistego pomniejszania; aktywne arkusze animacji nurka spełniają oba warunki, natomiast bitmapa bez mipmap dziedziczy zwykły `Linear` albo otrzymuje poprawiony import. Własny `sampler2D` deklaruje filtr w shaderze, ponieważ projektowy domyślny filtr wbudowanej tekstury `CanvasItem` nie zastępuje kontraktu samplera.
+
+Dyskretne dane techniczne zachowują `Nearest` u konsumenta. Dotyczy to między innymi maski `solid/open_water` L05, której interpolacja przesuwałaby granicę semantyczną; widoczny materiał gruntu próbkowany przez ten sam shader pozostaje liniowy. Globalny filtr canvas nie steruje teksturami świata 3D, których próbkowanie nadal wynika z importu i materiału.
+
+Weryfikacja kontraktu łączy test projektowej wartości domyślnej i wyjątku render targetu ze statycznym audytem rzeczywistych mipmap, masek danych oraz deklaracji samplerów. Test sceny mapy nie utrzymuje listy wszystkich widocznych bitmap ani nie wymaga lokalnego override na każdym wygenerowanym nodzie. Kontrakt decyzji: ARD-0103; kierunek produktu: `docs/OgolnyZarys.txt`, sekcja 1.
 
 12.1. Powłoka, intro i ustawienia
 --------------------------------------------------------------------------------
+
+[AKTYWNE]
 
 `MainMenu` udostępnia nową kampanię, profile trudności, konfigurator `custom`, bezpośrednią kontynuację oraz `SettingsOverlay`. `KONTYNUUJ` jest aktywne tylko wtedy, gdy `SaveManager.has_save()` znajduje poprawnego kandydata bieżącej rewizji, i prowadzi bez selektora do jego zapisanej fazy. `NOWA GRA` wymaga potwierdzenia, jeżeli istnieje dowolny plik bieżącego namespace, a po zatwierdzeniu usuwa primary/pending/backup przed utworzeniem nowej kampanii.
 

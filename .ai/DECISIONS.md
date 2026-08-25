@@ -1351,3 +1351,18 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 - D10. Dokumenty korzeniowe opisuja przekrojowa konsekwencje dla produktu, architektury, zapisu i integracji, a krotkie dokumenty warsztatu sa operacyjnym wejsciem dla calego pakietu konkretnej mapy. Lokalny `MAP-ARD-0013` jest wlascicielem schema-v2, osi rewizji oraz prezentacyjnego pipeline'u `L00-L10`; uszczegolawia ten kontrakt bez przejmowania globalnych regul gameplayu, persistence i testow domenowych.
 - Powod i skutek: jedna mapa i jeden manifest usuwaja sprzeczne wersje oraz rozproszone authority, zachowujac kompletna os aktywnej kampanii jako kontrakt promocji zamiast zamrazac przejsciowa migawke odbudowy. Cena jest swiadomy brak kompatybilnosci pozycyjnej ze starym swiatem oraz ponowne authorowanie rozmieszczenia od zera.
 - Odwolania: ARD-0013; ARD-0077; ARD-0092; ARD-0100/D1,D4; ARD-0101/D1-D2; underwater_map_workbench/.ai/DECISIONS.md; docs/OgolnyZarys.txt - sekcje 6-7; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2, 9, 11 i 13.
+
+## ARD-0103 - Liniowe filtrowanie jest domyslem widocznej grafiki 2D
+
+- Domena: prezentacja 2D, assety i rendering
+- Status / aktywny zakres: Obowiazuje; D1-D6
+- Zatwierdzenie: 2026-08-25
+- Relacje: Zastepuje: brak | Zastapiona przez: brak
+- D1. Projektowy domyslny filtr tekstur `CanvasItem` jest liniowy. Widoczne bitmapy 2D nie uzywaja pixel artu ani filtrowania `nearest` jako wspolnego jezyka prezentacji.
+- D2. Zwykly `CanvasItem` dziedziczy projektowy domysl zamiast powielac lokalny override. Jawny filtr jest dozwolony tylko wtedy, gdy konsument ma odmienny kontrakt probkowania, w szczegolnosci render target, rzeczywiste mipmapy albo wlasny sampler shadera.
+- D3. Dyskretna maska techniczna, raster semantyczny lub lookup zachowuje `nearest` u swojego konsumenta, jezeli interpolacja zmienialaby granice albo znaczenie danych. Taki wyjatek nie ustanawia stylu widocznej grafiki.
+- D4. Parametry `sampler2D` deklaruja filtr zgodny z rola probkowanej tekstury. Tekstury 3D nadal podlegaja ustawieniom importu i materialu, a nie globalnemu filtrowi canvas.
+- D5. Mipmapowy filtr jest poprawny tylko dla zasobu, ktory rzeczywiscie ma mipmapy i jest pomniejszany w sposob uzasadniajacy ten koszt; brak mipmap oznacza zwykle filtrowanie liniowe albo korekte importu, nie fikcyjny override.
+- D6. Pokrycie chroni projektowy domysl i semantycznie odmienne wyjatki. Testy scen i buildery nie wymagaja lokalnego `Linear` na kazdej bitmapie i nie tworza drugiej listy wezlow prezentacyjnych.
+- Powod i skutek: jeden globalny kontrakt usuwa pozostalosci pixel-artowego skalowania i lokalne obejscia, zachowujac precyzje masek danych oraz jawne wymagania render targetow, shaderow i mipmap.
+- Odwolania: docs/OgolnyZarys.txt - sekcja 1; docs/Ostatni_Pomost_architektura_Godot.txt - sekcja 12.0; underwater_map_workbench/.ai/DECISIONS.md.

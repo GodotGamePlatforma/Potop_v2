@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "authority": false,
+  "created_at": "2026-08-25",
+  "tool": "OpenAI image_gen",
+  "model": "not_exposed_by_tool",
+  "seed": "not_exposed_by_tool",
+  "input_references": [
+    {
+      "path": "D:/Dev/tmp/codex-clipboard-caad00e6-d454-47f3-a817-9a7caad42d09.png",
+      "sha256": "a5c7cb9d130c1de19c1efd1a39fbbee15f41ed224a6f5fea6bd43509ed1f0049",
+      "role": "STYLE_ONLY",
+      "use": "Czytelne pionowe proporcje wiezowcow i subtelna widocznosc elewacji; bez kopiowania kadru, wody, oswietlenia, mgly ani ukladu budynkow."
+    }
+  ],
+  "research_references": [
+    {
+      "url": "https://oceanservice.noaa.gov/facts/oceanblue.html",
+      "publisher": "NOAA National Ocean Service",
+      "accessed_at": "2026-08-25",
+      "use": "Niebiesko-zielona paleta wynikajaca z absorpcji dluzszych fal przez wode; bez kopiowania assetow."
+    },
+    {
+      "url": "https://oceanexplorer.noaa.gov/ocean-fact/light-distributed/",
+      "publisher": "NOAA Ocean Exploration",
+      "accessed_at": "2026-08-25",
+      "use": "Stopniowe oslabienie kontrastu i detalu wraz z odlegloscia; bez kopiowania assetow."
+    },
+    {
+      "url": "https://www.skyscrapercenter.com/criteria",
+      "publisher": "Council on Tall Buildings and Urban Habitat",
+      "accessed_at": "2026-08-25",
+      "use": "Wiarygodne smukle proporcje wysokich budynkow; bez kopiowania konkretnej architektury."
+    }
+  ],
+  "rejected_outputs": [
+    {
+      "path": "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e96c435a-6d4a-4d83-88fc-bfab20ba5c93.png",
+      "sha256": "5082c810f2e563d919bf2019d62605c2efe6050d210a44d7629209e97e9e2e02",
+      "reason": "Odrzucone: zbyt rozlegle ruiny i zniszczenia dla niedawno zatopionego miasta; plik nie jest zrodlem aktywnego assetu."
+    },
+    {
+      "path": "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e30ce382-ac42-472a-af2c-a231e5c61495.png",
+      "sha256": "a814166a875eff3aeb5cc99fd052dd46f8c87d09e8c78e38970933f95f66c4ed",
+      "reason": "Odrzucone: zbyt rozlegle ruiny i zniszczenia dla niedawno zatopionego miasta; plik nie jest zrodlem aktywnego assetu."
+    }
+  ],
+  "entries": [
+    {
+      "id": "l01_distant_city",
+      "role": "nonblocking_backdrop",
+      "prompt_summary": "Ultra-wide orthographic skyline of a recently submerged modern city. Office and residential towers remain 95-98 percent structurally intact, with complete facades, rectangular roofs and credible proportions; no domes, collapsed districts, post-apocalyptic ruins, terrain, water field, baked lighting or gameplay affordances. A restrained distant blue layer retains subtle facade detail and meets one shared ground line.",
+      "source_outputs": [
+        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-42321d9e-f5b6-4227-9359-f572521c76d9.png"
+      ],
+      "source_output_sha256": [
+        "4c180a4929bbceafeaacbdbb87e8e7dadeb21012610364da54441b380f35c6e5"
+      ],
+      "postprocess": {
+        "operation_order": [
+          "derive_alpha_as_clamp((blue-red)/0.22)_to_remove_baked_neutral_background",
+          "exact_crop_2048x576_at_6_187_preserving_32x9_aspect",
+          "modulate_rgb_and_saturation_62_62_100",
+          "multiply_alpha_by_0.48",
+          "uniform_lanczos_resize_to_4096x1152_without_nonuniform_scaling"
+        ],
+        "implementation": "ImageMagick 7.1.2-29 deterministic local composition"
+      },
+      "supersedes_result_sha256": "272655e94380d74e1765acb3f24524cc8d76af99dbac1dee6678714ce8e4e8a1",
+      "result_path": "assets/visual/l01_distant_city.png",
+      "result_sha256": "0ef3a907a3dfb5dfb257fb8a99b0638728335c4a75f51a264af9fccbe70ea6ca",
+      "result_pixel_size": [
+        4096,
+        1152
+      ]
+    },
+    {
+      "id": "l02_near_city",
+      "role": "nonblocking_backdrop",
+      "prompt_summary": "Complementary nearer skyline band for the same recently submerged modern city. Larger intact rectangular towers show slightly clearer facade rhythm while remaining dark, cool and atmospheric; no domes, collapsed buildings, rubble fields, water field, terrain, baked light shafts or gameplay affordances. All footprints share the same ground line as L01.",
+      "source_outputs": [
+        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-1d79b46e-e4df-45cb-bfbb-099a127385dd.png",
+        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-1ba1f954-cb44-40c6-8078-fbf91e3ce2d2.png"
+      ],
+      "source_output_sha256": [
+        "eb454ed04955e6fa842ed026737600418698dcb41b8de3a282e4eb568b4c9232",
+        "f8d499b8a33c1bba470de3e63ffa2898bf1b7c12272a497c3f4dea262c5571cc"
+      ],
+      "postprocess": {
+        "operation_order": [
+          "derive_alpha_as_clamp((blue-red)/0.22)_for_each_source",
+          "bottom_crop_panel_a_to_1847x846_and_uniformly_resize_panel_b_to_1503x846",
+          "horizontal_append_then_exact_center_crop_3008x846_at_x171_preserving_32x9_aspect",
+          "modulate_rgb_and_saturation_72_68_100",
+          "multiply_alpha_by_0.62",
+          "uniform_lanczos_resize_to_4096x1152_without_nonuniform_scaling"
+        ],
+        "implementation": "ImageMagick 7.1.2-29 deterministic local composition"
+      },
+      "result_path": "assets/visual/l02_near_city.png",
+      "result_sha256": "084450b0b365223d9792d2c88625a26959a9beaa03667ec818f88c47cb456d56",
+      "result_pixel_size": [
+        4096,
+        1152
+      ]
+    },
+    {
+      "id": "l05_ground_material",
+      "role": "exact_solid_surface_material_only",
+      "prompt_summary": "Square edge-to-edge visually tileable realistic hand-painted underwater material made from compact dark soil, fractured concrete, shale, small stones and muted rust traces; neutral lighting; no holes, tunnels, doors, walls, buildings, labels, HUD or authored passage geometry.",
+      "source_outputs": [
+        "C:/Users/Piotr/.codex/generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-3353ad48-e163-41a3-8aa2-b7196b30cc6d.png"
+      ],
+      "postprocess": {
+        "operation_order": [
+          "copy_without_geometric_edit"
+        ],
+        "implementation": "byte_preserving_copy"
+      },
+      "result_path": "assets/visual/l05_ground_material.png",
+      "result_sha256": "63c20e320cf357cba849012657d4ace81f85b3d49efd99bc3d04fa7578c8bf1b",
+      "result_pixel_size": [
+        1254,
+        1254
+      ]
+    }
+  ]
+}

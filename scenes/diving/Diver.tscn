@@ -70,7 +70,6 @@ position_smoothing_enabled = true
 position_smoothing_speed = 7.0
 
 [node name="DiveLight" type="PointLight2D" parent="." unique_id=55747028]
-texture_filter = 2
 position = Vector2(62, 0)
 enabled = false
 energy = 0.95

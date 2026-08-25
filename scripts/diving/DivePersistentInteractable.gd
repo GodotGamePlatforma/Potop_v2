@@ -162,7 +162,6 @@ func _build_visual() -> void:
 	if _sprite == null:
 		_sprite = Sprite2D.new()
 		_sprite.name = "InteractableSprite"
-		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
 	_refresh_visual()
 

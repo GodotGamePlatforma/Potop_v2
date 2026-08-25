@@ -82,7 +82,6 @@ func _build_visual() -> void:
 		_sprite = Sprite2D.new()
 		_sprite.name = "ExitLineSprite"
 		_sprite.position = Vector2(0, -64)
-		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
 	_refresh_visual()
 

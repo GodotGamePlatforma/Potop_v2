@@ -141,7 +141,6 @@ func _build_visual() -> void:
 	if _sprite == null:
 		_sprite = Sprite2D.new()
 		_sprite.name = "PickupSprite"
-		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
 	_sprite.texture = pickup_texture
 	_sprite.scale = Vector2.ONE * 0.88

@@ -23,24 +23,26 @@ Przed każdym produkcyjnym użyciem ImageGen sprawdź faktyczne możliwości bui
 - topologia nadal używa `open_world` albo `collision_source.format = none`;
 - plik payloadu L05 nie jest weryfikowany przez zawartość, SHA-256, rozmiar, encoding i odwzorowanie piksel-świat;
 - nie istnieją deterministyczne maski `solid`, `open_water`, pas graniczny, pełnomapowa prowadnica i aktualna karta socketu;
-- builder odrzuca niepuste `visual.assets` albo runtime nie renderuje ich typowanego rekordu;
-- pakiet wejściowy ma inne rewizje, SHA lub transform niż aktywny manifest.
+- żądany typ assetu lub slot nie jest jawnie obsługiwany i walidowany przez builder, kompilator oraz smoke;
+- pakiet wejściowy ma inne rewizje, SHA lub transform niż aktywny manifest;
 - dla szerokiej grafiki nie istnieje jeden zaakceptowany brief wizualny i master kompozycji związany z aktualną prowadnicą.
 
 W takim stanie wolno poprawiać manifest, implementować pipeline i robić wyraźnie oznaczone próby stylu, ale próba nie trafia do aktywnego manifestu/sceny i nie jest przedstawiana jako grafika zgodna z koliderem. Prompt ani atrakcyjny obraz nie otwierają tej bramki.
 
-Obecnie nie istnieje zatwierdzony format produkcyjnego payloadu ani komenda generująca pakiet prawdy. Następne zadanie implementacyjne musi najpierw wybrać i zwalidować format w schema, dodać deterministyczną obsługę do buildera oraz test z rzeczywistym payloadem. Nie wymyślaj ręcznej karty socketu ani tymczasowej konwencji tylko po to, aby ominąć STOP.
+Aktywny pipeline obsługuje `l05_mask_v1/l05_rect_ops_v1`, proceduralne L00, nieblokujące `L01/texture_rect` i `L02/texture_rect` oraz maskowany `L05/collision_masked_material`. Nie oznacza to zgody na produkcję landmarków L03, budynków komunikujących kolizję ani assetów innych slotów. Najpierw rozszerz typowany kontrakt, builder, kompilator i smoke; nie wymyślaj ręcznej karty socketu ani tymczasowej konwencji tylko po to, aby ominąć STOP.
 
 ## Słownik authority
 
 | Element | Rola | Czy wolno edytować ręcznie? |
 |---|---|---|
 | `map_manifest.json` | Jedyne semantyczne authority: rewizje, stable ID, pozycje, relacje, role warstw oraz ścieżki/hashe aktywnych źródeł. | Tak, jako źródło semantyki. |
-| Payload topologii L05 | `[DOCELOWE]` Jedno maszynowe źródło statycznego podziału `solid/open_water`, wskazane i hash-pinned przez manifest. Nie jest ilustracją. | Tylko przez zatwierdzony authoring topologii, nigdy przez edycję pochodnej. |
+| `assets/topology/l05_ground_mask_source.json` | Aktywny payload topologii L05: jedno maszynowe źródło statycznego podziału `solid/open_water`, wskazane i hash-pinned przez manifest. Nie jest ilustracją. | Tak, przez operacje `solid_rect/open_rect`, potem synchronizację deklaracji i rebuild. |
 | Zaakceptowane źródła grafiki | Grafika strukturalna jest związana z socketem, transformem i kanonicznym digestem L05. Jawnie nieblokujące tło wiąże się z rewizją prezentacji i podlega rewalidacji po zmianie topologii. Żadna grafika nie definiuje fizyki. | Tak, przez kontrolowany workflow grafiki. |
 | `UnderwaterMap.tscn` | Jedyna scena mapy runtime, deterministycznie kompilowana ze źródeł wskazanych przez manifest. | Nie. |
 | Kolizja, raster nawigacji, SDF/okludery, maski, prowadnice, karty socketów i chunki | Pochodne jednego payloadu i manifestu. | Nie; regeneruj. |
 | `VisualLayers/L05` | World-locked korzeń prezentacyjny/diagnostyczny. Sama nazwa nie czyni go payloadem ani fizyką. | Wyłącznie przez builder/renderer zgodnie z manifestem. |
+
+Edytowalne źródła bieżącego etapu to manifest, payload L05 oraz wskazane przez manifest PNG L01, L02 i materiału L05. `assets/generated/l05/`, scena, raster nawigacji, segmenty fizyki i okludery pozostają pochodnymi. L00 jest generowane proceduralnie z rekordu warstwy. L01 ani L02 nigdy nie otrzymują ściany, podłogi, drzwi, wejścia ani landmarku; wizualne L05 otrzymuje tylko materiał, a jego alfa pochodzi dokładnie z maski payloadu.
 
 Jeden manifest i jedna scena nie oznaczają jednego pliku w całym projekcie. Oznaczają brak drugiego katalogu pozycji, wariantu mapy, alternatywnej sceny lub konkurencyjnego manifestu. Pliki payloadu i grafiki są źródłami wskazanymi przez ten sam manifest.
 
@@ -63,7 +65,8 @@ Pełnomapowa prowadnica jest deterministyczną pochodną payloadu używaną w au
 | Pozycja, stable ID, landmark, urządzenie lub relacja | manifest | odpowiednie markery, sockety i grafiki zależne od pozycji | `revision_id`, podpis gameplayu, build/check; dla socketu ponowny odbiór lokalny i pełny |
 | Zdekodowany kształt `solid/open_water`, znaczenie encodingu lub odwzorowanie payloadu | manifest + źródłowy payload L05 | cała fizyka, nawigacja, maski, prowadnice, sockety i wszystkie grafiki strukturalne starego digestu | `topology_revision`, surowy SHA, kanoniczny digest i podpis gameplayu; rebuild, pełny odbiór i ręczne przepłynięcie |
 | Inne bajty pliku, lecz identyczna kanoniczna geometria | źródłowy payload + jego surowy SHA | świeżość pliku i ewentualne byte-derived cache | build/check; bez zmiany podpisu gameplayu i bez automatycznej invalidacji grafiki strukturalnej |
-| Grafika strukturalna bez zmiany topologii | zaakceptowane źródło grafiki + rekord assetu | jego pochodne i fingerprint prezentacji | `presentation_revision`; kontrole masek w obie strony i pełny kompozyt |
+| Materiał wizualnego `VisualLayers/L05` bez zmiany payloadu | źródłowa tekstura materiału + rekord assetu | scena i fingerprint prezentacji | `presentation_revision`; kontrola, że shader nadal bierze alfę wyłącznie z aktualnej maski |
+| Inna grafika strukturalna bez zmiany topologii | zaakceptowane źródło grafiki + rekord assetu | jego pochodne i fingerprint prezentacji | `presentation_revision`; kontrole masek w obie strony i pełny kompozyt |
 | Nieblokujące tło, kolor lub atmosfera | źródło prezentacji + rekord warstwy | pochodne prezentacji | `presentation_revision`; odbiór wizualny, bez zmiany podpisu gameplayu |
 | Dynamiczna brama lub obiekt gameplayowy | manifest i właściwy zasób obiektu | stan runtime oraz zależne testy integracyjne | podpis gameplayu; sprawdzenie obu stanów i ręczny playtest |
 
@@ -84,6 +87,14 @@ Grafika strukturalna lub landmark może powstać dopiero z jednego, świeżego p
 9. krótki brief zadania z osobnymi listami `ZMIEŃ`, `ZACHOWAJ` i `NIE DODAWAJ`.
 
 Identyfikuj rolę każdego obrazu wejściowego. Master prowadzi kompozycję, ale pozostaje prezentacją nałożoną na prowadnicę L05 i nie może jej zmieniać. Dla poprawki lokalnej edytuj aktualne zaakceptowane źródło w najmniejszym wystarczającym sockecie zamiast ponownie generować całą mapę. Wynik zachowuje dokładny kadr, skalę, zatwierdzony kierunek perspektywy i przezroczystość wymaganą przez kompozycję. ImageGen tworzy detal i styl; deterministyczny crop, maska i transform utrzymują geometrię.
+
+## Grafika bez pixel artu
+
+- Stosuj aktywny zakres MAP-ARD-0015, MAP-ARD-0016 oraz globalny ARD-0103: widoczne bitmapy mapy są realistycznym/rysunkowym 2D, nie pixel artem.
+- Zwykły węzeł wyświetlający bitmapę dziedziczy projektowy `Linear`; nie dopisuj równoważnego override do buildera ani sceny pochodnej. Własny sampler shadera deklaruje filtr zgodny z rolą tekstury.
+- Semantyczne maski L05 i raster danych pozostają `nearest`, ponieważ interpolacja zmieniałaby granicę kolidera; ten wyjątek nie jest stylem wizualnym.
+- Przed przyjęciem źródła porównaj jego proporcję pikselową z finalnym `world_rect`. Dopuszczalny jest wyłącznie jednolity resize/crop/overscan; odrzuć niezależne ściskanie osi X/Y, widoczną pikselozę i skalowanie „na oko”.
+- Panorama, której podstawy mają spotykać L05, zachowuje pionowe zakotwiczenie w świecie. Tło nie zawiera własnego pola wody, wypieczonej mgły, promieni ani jasnych plam.
 
 ## Bramka zgodności grafiki z koliderem
 

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "base": "open_water",
+  "operations": [
+    {
+      "id": "city_ground_band",
+      "op": "solid_rect",
+      "rect_px": [0, 162, 576, 36]
+    },
+    {
+      "id": "return_west",
+      "op": "open_rect",
+      "rect_px": [56, 162, 32, 36]
+    },
+    {
+      "id": "return_central",
+      "op": "open_rect",
+      "rect_px": [328, 162, 64, 36]
+    },
+    {
+      "id": "parking_descent_east",
+      "op": "open_rect",
+      "rect_px": [480, 162, 48, 36]
+    }
+  ]
+}

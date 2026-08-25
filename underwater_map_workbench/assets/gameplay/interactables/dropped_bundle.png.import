@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cvajpea2gftte"
-path="res://.godot/imported/dropped_bundle.png-95b9565a27f933b81a4c2f7558dba968.ctex"
+path="res://.godot/imported/dropped_bundle.png-cae9abbd2d758c7862256bb5c2477e30.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://underwater_map_workbench/assets/gameplay/interactables/dropped_bundle.png"
-dest_files=["res://.godot/imported/dropped_bundle.png-95b9565a27f933b81a4c2f7558dba968.ctex"]
+dest_files=["res://.godot/imported/dropped_bundle.png-cae9abbd2d758c7862256bb5c2477e30.ctex"]
 
 [params]
 

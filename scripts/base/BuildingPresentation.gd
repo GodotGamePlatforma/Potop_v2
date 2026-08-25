@@ -183,7 +183,6 @@ func _build_blueprint_layer() -> void:
 	_blueprint_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_blueprint_layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_blueprint_layer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_blueprint_layer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_blueprint_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_blueprint_layer.z_index = -1
 	_blueprint_material = ShaderMaterial.new()
