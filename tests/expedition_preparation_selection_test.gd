@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_selection_guards_and_automatic_clearing()
 	_test_preferred_diver_survives_temporary_blockers_and_death()
 	_test_station_support_uses_the_work_gate()
+	_test_blueprint_entry_drives_target_and_operator_support()
 	_test_candidate_list_delegates_to_the_domain()
 	if _failed:
 		quit(1)
@@ -140,6 +141,46 @@ func _test_station_support_uses_the_work_gate() -> void:
 	var blocked_analysis := preparation.analyze(state, station, STATION_DEFINITION)
 	_assert(not bool(blocked_analysis.station_support_assigned) and is_equal_approx(float(blocked_analysis.station_staffed_carry_multiplier), 1.0), "Support must disappear when the first Station worker no longer passes the ordinary work gate.")
 	_assert(is_equal_approx(float(setup.station_staffed_carry_multiplier), 1.05) and is_equal_approx(float(setup.diver_carry_capacity), personal_carry * 1.05), "Later roster incapacity must not alter the already frozen setup.")
+
+
+func _test_blueprint_entry_drives_target_and_operator_support() -> void:
+	var fixture := _fixture()
+	var state = fixture.state
+	var station = fixture.station
+	station.level = 4
+	var assignments = WorkerAssignmentSystemScript.new()
+	var preparation = ExpeditionPreparationSystemScript.new()
+	_assert(assignments.assign_worker_to_slot(state, station.id, 0, "mira", 3), "The main-entry fixture needs ordinary Station support.")
+	_assert(assignments.assign_worker_to_slot(state, station.id, 1, "anka", 3), "The main-entry fixture needs a distinct Operator.")
+	_assert(preparation.select_diver(state, station, STATION_DEFINITION, "igor"), "The main-entry fixture needs a free diver.")
+
+	var blueprint = state.underwater_world.blueprint
+	var main_landmark: Dictionary = blueprint.landmarks[0].duplicate(true)
+	main_landmark["id"] = "fixture_main_entry"
+	main_landmark["display_name"] = "Główna lina fixture"
+	blueprint.landmarks[0] = main_landmark
+	blueprint.entry_landmark_id = "fixture_main_entry"
+	blueprint.rebuild_indexes()
+	var main_analysis: Dictionary = preparation.analyze(state, station, STATION_DEFINITION)
+	_assert(str(main_analysis.get("selected_entry_point", "")) == blueprint.entry_landmark_id, "The selected main entry must come from the current blueprint.")
+	_assert(bool(main_analysis.get("operator_assigned", false)) and bool(main_analysis.get("operator_rescue_available", false)), "A capable Operator must support the blueprint's main entry without a production landmark literal.")
+	var setup = preparation.build_setup(state, station, STATION_DEFINITION)
+	_assert(setup != null and setup.target_sector == blueprint.entry_landmark_id, "The setup death-location fallback must snapshot the blueprint's main entry.")
+
+	blueprint.landmarks.append({
+		"id": "fixture_buoy_entry",
+		"display_name": "Boja fixture",
+		"position": Vector2(1400.0, 900.0),
+	})
+	blueprint.buoy_spawns.append({
+		"id": "fixture_buoy",
+		"entry_landmark_id": "fixture_buoy_entry",
+	})
+	blueprint.rebuild_indexes()
+	state.underwater_world.placed_buoys.append("fixture_buoy")
+	_assert(state.current_day_plan.select_expedition_entry("fixture_buoy_entry"), "The fixture must select its authored buoy entry.")
+	var buoy_analysis: Dictionary = preparation.analyze(state, station, STATION_DEFINITION)
+	_assert(bool(buoy_analysis.get("operator_assigned", false)) and not bool(buoy_analysis.get("operator_rescue_available", true)), "The same Operator must remain assigned but provide no rescue away from the blueprint's main entry.")
 
 
 func _test_candidate_list_delegates_to_the_domain() -> void:

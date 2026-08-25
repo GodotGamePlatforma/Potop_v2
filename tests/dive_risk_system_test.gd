@@ -3,8 +3,6 @@ extends SceneTree
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const DiveSessionStateScript := preload("res://scripts/data/DiveSessionState.gd")
 const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
-const UnderwaterWorldStateScript := preload("res://scripts/data/UnderwaterWorldState.gd")
-const MapCompilerScript := preload("res://scripts/diving/UnderwaterMapSceneCompiler.gd")
 const SuitSystemScript := preload("res://scripts/diving/SuitSystem.gd")
 const TemperatureSystemScript := preload("res://scripts/diving/TemperatureSystem.gd")
 const NoiseSystemScript := preload("res://scripts/diving/NoiseSystem.gd")
@@ -69,7 +67,7 @@ func _initialize() -> void:
 		is_equal_approx(stimulated_composed_alert, stimulated_baseline_alert),
 		"Composure must not reduce or otherwise alter alert growth while a threat has an active stimulus."
 	)
-	_assert(threat_definition.world_texture != null and threat_definition.world_texture.resource_path == "res://assets/diving/threats/noise_eel.png" and threat_definition.world_texture.get_size() == Vector2(256, 128), "The first threat definition should carry its production world sprite.")
+	_assert(threat_definition.world_texture != null and threat_definition.world_texture.resource_path == "res://underwater_map_workbench/assets/gameplay/threats/noise_eel.png" and threat_definition.world_texture.get_size() == Vector2(256, 128), "The first threat definition should carry its production world sprite.")
 	var threat = DiveThreatScript.new()
 	threat.configure("risk_test_eel", threat_definition)
 	threat.position = Vector2(12, 0)
@@ -283,18 +281,6 @@ func _initialize() -> void:
 	risk.populate_result(session, result)
 	_assert(result.cold_exposure == 75.0 and result.diver_injuries.has("hypothermia"), "DiveResult should carry hypothermia from local session state.")
 	_assert(result.risk_events.has("threat_attack:risk_test_eel") and result.noise_events.has("repair"), "DiveResult should preserve risk and noise reasons for reports.")
-
-	var world = UnderwaterWorldStateScript.new()
-	world.setup(8128)
-	var map_errors: PackedStringArray = MapCompilerScript.new().generate(world, 8128)
-	_assert(map_errors.is_empty(), "Scena mapy musi być dostępna dla testu ryzyka: %s" % "; ".join(map_errors))
-	_assert(not world.blueprint.threat_spawns.is_empty(), "Scena mapy powinna zawierać co najmniej jedno zagrożenie.")
-	var risky_locker: Dictionary = {}
-	for loot in world.blueprint.loot_spawns:
-		if str(loot.get("id", "")) == "tutorial_service_locker":
-			risky_locker = loot
-			break
-	_assert(risky_locker.get("required_tool", "") == "crowbar" and risky_locker.get("interaction_action", "") == "pry", "The optional risky locker should declare its contextual crowbar action in blueprint data.")
 
 	threat.queue_free()
 	if _failed:

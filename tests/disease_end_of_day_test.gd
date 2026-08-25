@@ -16,6 +16,8 @@ const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
 const InfirmaryDefinition := preload("res://data/buildings/infirmary.tres")
 
+const DIVE_HAZARD_SOURCE_ID := "contaminated_salvage"
+
 var _failures := 0
 var _definitions := {"flood_fever": FloodFever}
 
@@ -227,7 +229,7 @@ func _test_central_death_and_dive_cleanup() -> void:
 	var dive_report = ReportStateScript.new()
 	resolver._apply_diver_death(dive_state, dive_result, dive_report)
 	_assert(diver.status == SurvivorStateScript.Status.DEAD and diver.disease_cases.is_empty(), "Expedition death must also clear typed cases after recording its cause.")
-	var exposure = DiseaseExposureStateScript.create("flood_fever", "anka", "dive", "R1-06", 3, 1)
+	var exposure = DiseaseExposureStateScript.create("flood_fever", "anka", "dive", DIVE_HAZARD_SOURCE_ID, 3, 1)
 	dive_result.disease_exposures.append(exposure)
 	resolver._append_dive_disease_exposures(dive_state, dive_result, dive_report)
 	_assert(dive_state.disease_campaign.pending_exposures.size() == 1 and dive_state.disease_campaign.pending_exposures[0] != exposure, "DiveResult exposure must enter the night campaign boundary as a detached pending copy.")

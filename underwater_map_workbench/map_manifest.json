@@ -1,0 +1,415 @@
+{
+  "schema_version": 2,
+  "revision": {
+    "revision_id": "reset-a-common-line-v1",
+    "topology_revision": "open-world-1",
+    "presentation_revision": "campaign-markers-1"
+  },
+  "map": {
+    "id": "underwater_map_clean_12x12",
+    "source_version": 5,
+    "grid": {
+      "columns": 12,
+      "rows": 12,
+      "cell_size": [1920, 1080]
+    },
+    "navigation_cell_size": [40, 40],
+    "world_size": [23040, 12960],
+    "chunk_size": 512
+  },
+  "visual": {
+    "water_color": "071d2a",
+    "deep_water_color": "031019",
+    "grid_color": "21485a",
+    "border_color": "62a8b8",
+    "station_color": "d7c382",
+    "grid_width": 3.0,
+    "border_width": 12.0,
+    "layers": [
+      {
+        "id": "L00",
+        "role": "water_base",
+        "space": "world_locked",
+        "z_index": -100,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L01",
+        "role": "far_atmosphere",
+        "space": "parallax",
+        "z_index": -90,
+        "parallax_scale": [0.2, 0.2],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L02",
+        "role": "far_silhouette",
+        "space": "parallax",
+        "z_index": -80,
+        "parallax_scale": [0.45, 0.45],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L03",
+        "role": "landmark_midground",
+        "space": "world_locked",
+        "z_index": -30,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L04",
+        "role": "near_backdrop",
+        "space": "world_locked",
+        "z_index": -20,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L05",
+        "role": "collider_authority",
+        "space": "world_locked",
+        "z_index": 0,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "collider_authority",
+        "geometry_role": "collider_authority"
+      },
+      {
+        "id": "L06",
+        "role": "terrain_facade",
+        "space": "world_locked",
+        "z_index": 10,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L07",
+        "role": "surface_detail",
+        "space": "world_locked",
+        "z_index": 20,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L08",
+        "role": "water_decor",
+        "space": "parallax",
+        "z_index": 30,
+        "parallax_scale": [1.03, 1.03],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L09",
+        "role": "foreground_occluder",
+        "space": "parallax",
+        "z_index": 40,
+        "parallax_scale": [1.08, 1.08],
+        "enabled": true,
+        "reserved": false,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      },
+      {
+        "id": "L10",
+        "role": "reserved_future",
+        "space": "world_locked",
+        "z_index": 50,
+        "parallax_scale": [1.0, 1.0],
+        "enabled": false,
+        "reserved": true,
+        "affordance_policy": "no_visual_blockage_in_protected_water",
+        "geometry_role": "none"
+      }
+    ],
+    "assets": []
+  },
+  "depth_profile": [
+    [0.0, 8.0],
+    [0.237, 35.0],
+    [0.401, 70.0],
+    [0.607, 115.0],
+    [1.0, 160.0]
+  ],
+  "regions": [
+    {
+      "id": "approach",
+      "display_name": "Strefa podejścia",
+      "bounds": [0, 0, 5760, 12960],
+      "water_color": "071d2a",
+      "accent_color": "62a8b8"
+    },
+    {
+      "id": "archive_sector",
+      "display_name": "Sektor zalanego archiwum",
+      "bounds": [5760, 0, 5760, 12960],
+      "water_color": "081b29",
+      "accent_color": "7aa7b8"
+    },
+    {
+      "id": "r3_sector",
+      "display_name": "Sektor generatora R-3",
+      "bounds": [11520, 0, 5760, 12960],
+      "water_color": "071825",
+      "accent_color": "7f9f8a"
+    },
+    {
+      "id": "c4_sector",
+      "display_name": "Sektor rozdzielni C-4",
+      "bounds": [17280, 0, 5760, 12960],
+      "water_color": "061522",
+      "accent_color": "9c866a"
+    }
+  ],
+  "topology": {
+    "mode": "open_world",
+    "authority_layer": "L05",
+    "collision_source": {
+      "format": "none",
+      "path": "",
+      "sha256": "",
+      "pixel_size": [0, 0],
+      "world_units_per_pixel": [0, 0],
+      "encoding": {
+        "solid": 0,
+        "open_water": 255
+      }
+    },
+    "protected_corridors": []
+  },
+  "campaign": {
+    "contract_id": "common_line_v1",
+    "stages": [
+      {
+        "id": "j7",
+        "landmark_id": "dive_station",
+        "fixed_device_ids": ["junction_j7"]
+      },
+      {
+        "id": "archive",
+        "landmark_id": "flooded_archive",
+        "fixed_device_ids": ["archive_terminal"]
+      },
+      {
+        "id": "r3",
+        "landmark_id": "generator_r3",
+        "fixed_device_ids": ["r3_diagnostic_panel", "r3_generator"]
+      },
+      {
+        "id": "c4",
+        "landmark_id": "switchboard_c4",
+        "fixed_device_ids": ["c4_switchboard", "c4_splitter_mount"]
+      }
+    ]
+  },
+  "entry": {
+    "landmark_id": "dive_station",
+    "position": [2880, 1400]
+  },
+  "exit": {
+    "position": [2880, 1400]
+  },
+  "landmarks": [
+    {
+      "id": "dive_station",
+      "display_name": "Stacja Nurkowa",
+      "short_name": "Stacja Nurkowa",
+      "region_id": "approach",
+      "position": [2880, 1400],
+      "size": [720, 420],
+      "role": "dive_station"
+    },
+    {
+      "id": "flooded_archive",
+      "display_name": "Zalane Archiwum",
+      "short_name": "Archiwum",
+      "region_id": "archive_sector",
+      "position": [8640, 4400],
+      "size": [960, 560],
+      "role": "campaign_archive"
+    },
+    {
+      "id": "generator_r3",
+      "display_name": "Generator R-3",
+      "short_name": "R-3",
+      "region_id": "r3_sector",
+      "position": [14400, 7400],
+      "size": [1080, 620],
+      "role": "campaign_generator"
+    },
+    {
+      "id": "switchboard_c4",
+      "display_name": "Rozdzielnia C-4",
+      "short_name": "C-4",
+      "region_id": "c4_sector",
+      "position": [20160, 10100],
+      "size": [1200, 700],
+      "role": "campaign_switchboard"
+    }
+  ],
+  "gameplay": {
+    "tutorial_enabled": true,
+    "tutorial_route": [
+      "dive_station",
+      "tutorial_market_crate",
+      "tutorial_workshop_case",
+      "SC-01",
+      "junction_j7",
+      "exit"
+    ],
+    "loot_spawns": [
+      {
+        "id": "tutorial_market_crate",
+        "display_name": "Skrzynia z żywnością",
+        "position": [2400, 2200],
+        "landmark_id": "dive_station",
+        "contents": {
+          "food": 6
+        },
+        "mandatory_order": 0,
+        "required_tool": "",
+        "interaction_action": "open",
+        "interaction_seconds": 1.15,
+        "difficulty_scaled_contents": true
+      },
+      {
+        "id": "tutorial_workshop_case",
+        "display_name": "Skrzynia warsztatowa",
+        "position": [3360, 2700],
+        "landmark_id": "dive_station",
+        "contents": {
+          "fabric_rubber": 2,
+          "planks": 4,
+          "scrap": 3
+        },
+        "mandatory_order": 1,
+        "required_tool": "",
+        "interaction_action": "open",
+        "interaction_seconds": 1.15,
+        "difficulty_scaled_contents": true
+      }
+    ],
+    "shortcut_spawns": [
+      {
+        "id": "SC-01",
+        "connection_id": "",
+        "display_name": "Blokada kabla",
+        "position": [2880, 3300],
+        "rotation": 0.0,
+        "width": 220.0,
+        "required_tool": "knife",
+        "interaction_action": "cut",
+        "interaction_seconds": 1.4
+      }
+    ],
+    "fixed_device_spawns": [
+      {
+        "id": "junction_j7",
+        "display_name": "Węzeł J-7",
+        "position": [2880, 3900],
+        "landmark_id": "dive_station",
+        "device_role": "tutorial_action_target",
+        "available_from_day": 3,
+        "required_tool": "",
+        "interaction_action": "activate",
+        "interaction_seconds": 1.5,
+        "prerequisite_device_ids": []
+      },
+      {
+        "id": "archive_terminal",
+        "display_name": "Terminal Archiwum",
+        "position": [8640, 4400],
+        "landmark_id": "flooded_archive",
+        "device_role": "campaign_action_target",
+        "available_from_day": 4,
+        "required_tool": "",
+        "interaction_action": "activate",
+        "interaction_seconds": 1.5,
+        "prerequisite_device_ids": ["junction_j7"]
+      },
+      {
+        "id": "r3_diagnostic_panel",
+        "display_name": "Panel diagnostyczny R-3",
+        "position": [13920, 7200],
+        "landmark_id": "generator_r3",
+        "device_role": "campaign_action_target",
+        "available_from_day": 4,
+        "required_tool": "r3_diagnostic_access",
+        "interaction_action": "diagnose",
+        "interaction_seconds": 1.5,
+        "prerequisite_device_ids": ["archive_terminal"]
+      },
+      {
+        "id": "r3_generator",
+        "display_name": "Generator główny R-3",
+        "position": [14880, 7600],
+        "landmark_id": "generator_r3",
+        "device_role": "campaign_action_target",
+        "available_from_day": 4,
+        "required_tool": "r3_regulator",
+        "interaction_action": "install",
+        "interaction_seconds": 1.5,
+        "prerequisite_device_ids": ["r3_diagnostic_panel"]
+      },
+      {
+        "id": "c4_switchboard",
+        "display_name": "Rozdzielnia główna C-4",
+        "position": [19680, 9900],
+        "landmark_id": "switchboard_c4",
+        "device_role": "campaign_action_target",
+        "available_from_day": 4,
+        "required_tool": "c4_control_access",
+        "interaction_action": "activate",
+        "interaction_seconds": 1.5,
+        "prerequisite_device_ids": ["r3_generator"]
+      },
+      {
+        "id": "c4_splitter_mount",
+        "display_name": "Mocowanie splittera C-4",
+        "position": [20520, 10300],
+        "landmark_id": "switchboard_c4",
+        "device_role": "campaign_action_target",
+        "available_from_day": 4,
+        "required_tool": "common_line_splitter",
+        "interaction_action": "install",
+        "interaction_seconds": 1.5,
+        "prerequisite_device_ids": ["c4_switchboard"]
+      }
+    ],
+    "connections": [],
+    "pickups": [],
+    "current_zones": [],
+    "threat_spawns": [],
+    "heavy_object_spawns": [],
+    "rescue_spawns": [],
+    "buoy_spawns": [],
+    "obstacle_spawns": [],
+    "decoration_spawns": []
+  }
+}

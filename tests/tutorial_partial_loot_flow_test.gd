@@ -262,6 +262,9 @@ func _run() -> void:
 	if blockage != null:
 		dive._complete_persistent_interaction(blockage)
 	if junction != null:
+		# Interakcja odbywa się przy celu. Stary fixture wywoływał ją zdalnie ze
+		# startu, co po zrównaniu stacji, spawnu i liny dawało zerowy kierunek.
+		dive.diver.global_position = junction.global_position + Vector2(80.0, 0.0)
 		dive._complete_persistent_interaction(junction)
 	dive._update_ui()
 	_assert(dive.tutorial_step() == TutorialStateScript.Step.FINAL_RETURN_TO_LINE, "Aktywacja J-7 musi natychmiast zmienić lokalny cel na bezpieczny powrót.")

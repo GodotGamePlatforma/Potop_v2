@@ -156,17 +156,23 @@ func expedition_guidance(state) -> Dictionary:
 		if definition == null:
 			continue
 		for objective in definition.objectives:
-			if objective == null or str(objective.target_landmark_id).is_empty():
+			if objective == null:
+				continue
+			var placement := _mission_objective_target_placement(state, mission_id, objective)
+			if not bool(placement.get("available", false)):
 				continue
 			var objective_state := _evaluate_objective(state, objective)
 			if bool(objective_state.get("complete", false)) or bool(objective_state.get("failed", false)):
+				continue
+			var landmark_id := str(placement.get("landmark_id", ""))
+			if landmark_id.is_empty() and mission_id != OLD_SIGNAL:
 				continue
 			return {
 				"mission_id": mission_id,
 				"title": str(definition.title),
 				"guidance": str(objective.guidance) if not str(objective.guidance).is_empty() else str(definition.summary),
-				"landmark_id": str(objective.target_landmark_id),
-				"landmark_label": str(objective.landmark_label),
+				"landmark_id": landmark_id,
+				"landmark_label": str(placement.get("landmark_label", "")),
 			}
 	return {}
 
@@ -241,6 +247,8 @@ func _canonicalize_progress(progress) -> bool:
 
 
 func _can_activate(state, progress, definition) -> bool:
+	if not _definition_targets_are_available(state, definition):
+		return false
 	for prerequisite_id in definition.prerequisite_mission_ids:
 		if not progress.is_completed(_canonical_id(str(prerequisite_id))):
 			return false
@@ -262,13 +270,112 @@ func _can_activate(state, progress, definition) -> bool:
 
 
 func _should_reactivate(state, definition) -> bool:
-	if not bool(definition.repeatable):
+	if not bool(definition.repeatable) or not _definition_targets_are_available(state, definition):
 		return false
 	match str(definition.unlock_kind):
 		"crisis_active", "crisis_started":
 			var story = _story(state)
 			return story != null and bool(story.crisis_active)
 	return false
+
+
+func _definition_targets_are_available(state, definition) -> bool:
+	var mission_id := str(definition.id)
+	for objective in definition.objectives:
+		if objective == null:
+			continue
+		if not bool(_mission_objective_target_placement(state, mission_id, objective).get("available", false)):
+			return false
+	return true
+
+
+func _mission_objective_target_placement(state, mission_id: String, objective) -> Dictionary:
+	var placement := _objective_target_placement(state, objective)
+	if bool(placement.get("available", false)):
+		return placement
+	if (
+		mission_id == OLD_SIGNAL
+		and objective != null
+		and str(objective.kind) == "fixed_device_activated"
+		and str(objective.target_id) == CampaignProgressionSystemScript.ARCHIVE_TERMINAL_DEVICE_ID
+	):
+		return {
+			"available": true,
+			"landmark_id": "",
+			"landmark_label": str(objective.landmark_label),
+		}
+	return placement
+
+
+func _objective_target_placement(state, objective) -> Dictionary:
+	if objective == null:
+		return {"available": false}
+	var blueprint = _blueprint_for(state)
+	var authored_landmark_id := str(objective.target_landmark_id).strip_edges()
+	if not authored_landmark_id.is_empty():
+		return _landmark_placement(blueprint, authored_landmark_id, str(objective.landmark_label))
+	match str(objective.kind):
+		"fixed_device_activated":
+			return _record_placement(blueprint, _record_with_id(blueprint, "fixed_device_spawns", str(objective.target_id)))
+		"rescue_outcome":
+			return _record_placement(blueprint, _record_with_id(blueprint, "rescue_spawns", str(objective.target_id)))
+		"buoy_count":
+			return _record_placement(blueprint, _first_record(blueprint, "buoy_spawns"))
+		"shortcut_count":
+			return _record_placement(blueprint, _first_record(blueprint, "shortcut_spawns"))
+		"heavy_recovered_count":
+			return _record_placement(blueprint, _first_record(blueprint, "heavy_object_spawns"))
+	return {"available": true, "landmark_id": "", "landmark_label": ""}
+
+
+func _blueprint_for(state):
+	if state == null or not ("underwater_world" in state) or state.underwater_world == null:
+		return null
+	return state.underwater_world.blueprint
+
+
+func _record_with_id(blueprint, property_name: String, target_id: String) -> Dictionary:
+	if blueprint == null or target_id.is_empty() or not (property_name in blueprint):
+		return {}
+	for record in blueprint.get(property_name):
+		if record is Dictionary and str(record.get("id", "")) == target_id:
+			return record
+	return {}
+
+
+func _first_record(blueprint, property_name: String) -> Dictionary:
+	if blueprint == null or not (property_name in blueprint):
+		return {}
+	for record in blueprint.get(property_name):
+		if record is Dictionary and not str(record.get("id", "")).is_empty():
+			return record
+	return {}
+
+
+func _record_placement(blueprint, record: Dictionary) -> Dictionary:
+	if blueprint == null or record.is_empty():
+		return {"available": false}
+	var landmark_id := str(record.get("landmark_id", record.get("entry_landmark_id", ""))).strip_edges()
+	if landmark_id.is_empty():
+		return {"available": false}
+	return _landmark_placement(blueprint, landmark_id, str(record.get("display_name", "")))
+
+
+func _landmark_placement(blueprint, landmark_id: String, preferred_label: String = "") -> Dictionary:
+	if blueprint == null or not blueprint.has_method("resolve_landmark_id"):
+		return {"available": false}
+	var resolved_id := str(blueprint.resolve_landmark_id(landmark_id))
+	if resolved_id.is_empty():
+		return {"available": false}
+	var landmark: Dictionary = blueprint.get_landmark(resolved_id) if blueprint.has_method("get_landmark") else {}
+	var label := preferred_label.strip_edges()
+	if label.is_empty():
+		label = str(landmark.get("display_name", ""))
+	return {
+		"available": true,
+		"landmark_id": resolved_id,
+		"landmark_label": label,
+	}
 
 
 func _mission_outcome(state, definition) -> String:
@@ -373,6 +480,7 @@ func _build_mission_view(state, progress, definition) -> Dictionary:
 	var ready := false
 	for objective in definition.objectives:
 		var objective_state := _evaluate_objective(state, objective)
+		var placement := _mission_objective_target_placement(state, mission_id, objective)
 		var objective_current := int(objective_state.get("current", 0))
 		var objective_required := maxi(int(objective_state.get("required", 1)), 1)
 		current += mini(objective_current, objective_required)
@@ -387,9 +495,9 @@ func _build_mission_view(state, progress, definition) -> Dictionary:
 			"description": str(objective.description),
 			"target_id": str(objective.target_id),
 			"target_ids": objective.target_ids.duplicate(),
-			"target_landmark_id": str(objective.target_landmark_id),
-			"landmark_id": str(objective.target_landmark_id),
-			"landmark_label": str(objective.landmark_label),
+			"target_landmark_id": str(placement.get("landmark_id", "")),
+			"landmark_id": str(placement.get("landmark_id", "")),
+			"landmark_label": str(placement.get("landmark_label", "")),
 			"guidance": str(objective.guidance),
 			"current": objective_current,
 			"required": objective_required,

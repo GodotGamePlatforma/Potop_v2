@@ -2,6 +2,7 @@ class_name DiveNavigationSnapshot
 extends RefCounted
 
 
+const WorldBlueprintScript := preload("res://scripts/data/WorldBlueprint.gd")
 const DEFAULT_DIVER_CLEARANCE := 35.0
 const SHORTCUT_GATE_HEIGHT := 28.0
 const MAX_BASE_CLEARANCE_CACHE_ENTRIES := 8
@@ -19,7 +20,7 @@ var exit_position: Vector2 = Vector2.ZERO
 var open_cells := PackedByteArray()
 var clear_cells := PackedByteArray()
 var current_zones: Array[Dictionary] = []
-var depth_regions: Array[Dictionary] = []
+var depth_profile_points := PackedVector2Array()
 var closed_shortcut_gates: Array[Dictionary] = []
 var targets: Array[Dictionary] = []
 var threats: Array[Dictionary] = []
@@ -34,7 +35,7 @@ func configure(
 	resolved_start_position: Vector2,
 	resolved_exit_position: Vector2,
 	source_current_zones: Array,
-	source_depth_regions: Array,
+	source_depth_profile_points: PackedVector2Array,
 	source_closed_shortcut_gates: Array,
 	source_targets: Array,
 	source_threats: Array = []
@@ -47,7 +48,7 @@ func configure(
 	exit_position = resolved_exit_position
 	open_cells = source_open_cells.duplicate()
 	_copy_dictionary_array(source_current_zones, current_zones)
-	_copy_dictionary_array(source_depth_regions, depth_regions)
+	depth_profile_points = source_depth_profile_points.duplicate()
 	_copy_dictionary_array(source_closed_shortcut_gates, closed_shortcut_gates)
 	_copy_dictionary_array(source_targets, targets)
 	_copy_dictionary_array(source_threats, threats)
@@ -64,6 +65,7 @@ func is_valid() -> bool:
 		and cell_scale.y > 0.0
 		and open_cells.size() == grid_size.x * grid_size.y
 		and clear_cells.size() == open_cells.size()
+		and WorldBlueprintScript.depth_profile_validation_errors(depth_profile_points).is_empty()
 	)
 
 
@@ -132,7 +134,13 @@ func is_segment_clear(from_position: Vector2, to_position: Vector2) -> bool:
 	var t_delta_x := cell_scale.x / absf(delta.x) if step_x != 0 else INF
 	var t_delta_y := cell_scale.y / absf(delta.y) if step_y != 0 else INF
 	while cell != end_cell:
-		if is_equal_approx(t_max_x, t_max_y):
+		if cell.x == end_cell.x:
+			cell.y += step_y
+			t_max_y += t_delta_y
+		elif cell.y == end_cell.y:
+			cell.x += step_x
+			t_max_x += t_delta_x
+		elif is_equal_approx(t_max_x, t_max_y):
 			var horizontal := cell + Vector2i(step_x, 0)
 			var vertical := cell + Vector2i(0, step_y)
 			if not is_cell_clear(horizontal) or not is_cell_clear(vertical):
@@ -253,21 +261,11 @@ static func _scout_candidate_precedes(candidate: Dictionary, current_best: Dicti
 
 
 func depth_at(world_position: Vector2) -> float:
-	var region := _region_at(world_position)
-	if region.is_empty():
-		return lerpf(
-			8.0,
-			160.0,
-			clampf(world_position.y / maxf(world_size.y, 1.0), 0.0, 1.0)
-		)
-	var bounds: Rect2 = region.get("bounds", Rect2(Vector2.ZERO, world_size))
-	var depth_range: Vector2 = region.get("depth_range", Vector2(8.0, 160.0))
-	var local_ratio := clampf(
-		(world_position.y - bounds.position.y) / maxf(bounds.size.y, 1.0),
-		0.0,
-		1.0
+	return WorldBlueprintScript.depth_at_world_y(
+		depth_profile_points,
+		world_size.y,
+		world_position.y
 	)
-	return lerpf(depth_range.x, depth_range.y, local_ratio)
 
 
 func target_descriptors() -> Array[Dictionary]:
@@ -418,20 +416,6 @@ func _mask_closed_gate(gate: Dictionary) -> void:
 				and absf(local_position.y) <= expanded_half_size.y
 			):
 				clear_cells[_cell_index(cell)] = 0
-
-
-func _region_at(world_position: Vector2) -> Dictionary:
-	var nearest: Dictionary = {}
-	var nearest_distance := INF
-	for region in depth_regions:
-		var bounds: Rect2 = region.get("bounds", Rect2())
-		if not bounds.has_point(world_position):
-			continue
-		var center_distance := world_position.distance_squared_to(bounds.get_center())
-		if center_distance < nearest_distance:
-			nearest = region
-			nearest_distance = center_distance
-	return nearest
 
 
 func _cell_index(cell: Vector2i) -> int:

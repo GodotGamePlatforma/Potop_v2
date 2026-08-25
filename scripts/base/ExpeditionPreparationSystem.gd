@@ -2,6 +2,7 @@ class_name ExpeditionPreparationSystem
 extends RefCounted
 
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
+const CampaignProgressionSystemScript := preload("res://scripts/base/CampaignProgressionSystem.gd")
 const DivingEquipmentSystemScript := preload("res://scripts/base/DivingEquipmentSystem.gd")
 const MissionSystemScript := preload("res://scripts/base/MissionSystem.gd")
 const SuitSystemScript := preload("res://scripts/diving/SuitSystem.gd")
@@ -104,7 +105,7 @@ func analyze(state, station, definition) -> Dictionary:
 			result.technician_assignment_reason = _support_worker_reason(state, station, 2, str(diver.id), "Technik")
 		result.operator_survivor_id = str(operator.id) if result.operator_assigned else ""
 		result.technician_survivor_id = str(technician.id) if result.technician_assigned else ""
-		result.operator_rescue_available = result.operator_assigned and _operator_rescue_supported_at_entry(str(result.selected_entry_point))
+		result.operator_rescue_available = result.operator_assigned and _operator_rescue_supported_at_entry(state, str(result.selected_entry_point))
 		result.operator_rescue_effective_chance = float(result.operator_rescue_chance) if result.operator_rescue_available else 0.0
 		if result.technician_assigned:
 			var technician_multiplier := float(capabilities.get("technician_suit_damage_multiplier", 0.9))
@@ -194,7 +195,7 @@ func build_setup(state, station, definition, item_definitions: Dictionary = {}):
 	setup.can_mark_heavy_objects = bool(capabilities.get("heavy_marking_enabled", false))
 	setup.buoy_charges = 1 if setup.can_place_buoys else 0
 	setup.start_entry_point = str(analysis.selected_entry_point)
-	setup.target_sector = "dead_city_rooftops_001"
+	setup.target_sector = _main_entry_landmark_id(state)
 	setup.tutorial_mode = state.tutorial != null and state.tutorial.is_active()
 	if setup.tutorial_mode:
 		setup.tutorial_baseline_step = int(state.tutorial.step)
@@ -209,6 +210,8 @@ func build_setup(state, station, definition, item_definitions: Dictionary = {}):
 			setup.objective_target_label = str(campaign_guidance.get("landmark_label", ""))
 		else:
 			var mission_guidance: Dictionary = _mission_system.expedition_guidance(state)
+			if not _guidance_target_is_available(state, mission_guidance):
+				mission_guidance = {}
 			var mission_id := str(mission_guidance.get("mission_id", ""))
 			setup.selected_objective = mission_id if not mission_id.is_empty() else "basic_scavenge"
 			setup.objective_title = str(mission_guidance.get("title", ""))
@@ -286,46 +289,92 @@ func _common_line_expedition_guidance(state) -> Dictionary:
 	):
 		return {}
 	if bool(story.junction_j7_active) and not bool(story.archive_map_transmitted):
-		return {
+		return _fixed_device_guidance(state, CampaignProgressionSystemScript.ARCHIVE_TERMINAL_DEVICE_ID, {
 			"objective_id": "common_line_archive",
 			"title": "MAPA WSPÓLNEJ LINII",
-			"guidance": "Dotrzyj do Zalanego Archiwum R1-09, uruchom terminal, prześlij mapę i wróć do aktywnej liny.",
-			"landmark_id": "R1-09",
+			"guidance": "Dotrzyj do Zalanego Archiwum, uruchom terminal, prześlij mapę i wróć do aktywnej liny.",
 			"landmark_label": "Zalane Archiwum",
-		}
+		})
 	if bool(story.archive_map_transmitted) and not bool(story.r3_diagnosed):
-		return {
+		return _fixed_device_guidance(state, CampaignProgressionSystemScript.R3_DIAGNOSTIC_DEVICE_ID, {
 			"objective_id": "common_line_r3_diagnostic",
 			"title": "DIAGNOSTYKA GENERATORA R-3",
-			"guidance": "Dotrzyj do Elektrowni R3-04, otwórz panel diagnostyczny Generatora R-3 i wróć do aktywnej liny.",
-			"landmark_id": "R3-04",
-			"landmark_label": "Elektrownia R-3",
-		}
+			"guidance": "Dotrzyj do Generatora R-3, otwórz panel diagnostyczny i wróć do aktywnej liny.",
+			"landmark_label": "Generator R-3",
+		})
 	if bool(story.r3_regulator_ready) and not bool(story.r3_generator_active):
-		return {
+		return _fixed_device_guidance(state, CampaignProgressionSystemScript.R3_GENERATOR_DEVICE_ID, {
 			"objective_id": "common_line_r3_activation",
 			"title": "URUCHOM GENERATOR R-3",
-			"guidance": "Wróć do Elektrowni R3-04, zamontuj Regulator R-3, uruchom generator i wróć do aktywnej liny.",
-			"landmark_id": "R3-04",
-			"landmark_label": "Elektrownia R-3",
-		}
+			"guidance": "Wróć do Generatora R-3, zamontuj Regulator R-3, uruchom urządzenie i wróć do aktywnej liny.",
+			"landmark_label": "Generator R-3",
+		})
 	if bool(story.r3_generator_active) and not bool(story.c4_switchboard_active):
-		return {
+		return _fixed_device_guidance(state, CampaignProgressionSystemScript.C4_SWITCHBOARD_DEVICE_ID, {
 			"objective_id": "common_line_c4_activation",
 			"title": "URUCHOM ROZDZIELNIĘ C-4",
-			"guidance": "Dotrzyj do Serca R4-06, uruchom awaryjny panel Rozdzielni C-4 i wróć do aktywnej liny.",
-			"landmark_id": "R4-06",
-			"landmark_label": "Serce — Rozdzielnia C-4",
-		}
+			"guidance": "Dotrzyj do Rozdzielni C-4, uruchom panel awaryjny i wróć do aktywnej liny.",
+			"landmark_label": "Rozdzielnia C-4",
+		})
 	if bool(story.common_line_splitter_ready) and not bool(story.common_line_splitter_installed):
-		return {
+		return _fixed_device_guidance(state, CampaignProgressionSystemScript.COMMON_LINE_SPLITTER_DEVICE_ID, {
 			"objective_id": "common_line_splitter_installation",
 			"title": "ZAMONTUJ ROZDZIELACZ",
-			"guidance": "Wróć do Serca R4-06, zamontuj Rozdzielacz przy Rozdzielni C-4 i wróć do aktywnej liny.",
-			"landmark_id": "R4-06",
-			"landmark_label": "Serce — Rozdzielnia C-4",
+			"guidance": "Wróć do Rozdzielni C-4, zamontuj Rozdzielacz Wspólnej Linii i wróć do aktywnej liny.",
+			"landmark_label": "Rozdzielnia C-4",
+		})
+	return {}
+
+func _fixed_device_guidance(state, device_id: String, guidance: Dictionary) -> Dictionary:
+	var result := guidance.duplicate(true)
+	result["landmark_id"] = ""
+	var placement := _fixed_device_placement(state, device_id)
+	if placement.is_empty():
+		return result
+	result["landmark_id"] = str(placement.get("landmark_id", ""))
+	result["landmark_label"] = str(placement.get("landmark_label", ""))
+	return result
+
+func _guidance_target_is_available(state, guidance: Dictionary) -> bool:
+	return _landmark_is_available(state, str(guidance.get("landmark_id", "")))
+
+func _fixed_device_placement(state, device_id: String) -> Dictionary:
+	var blueprint = _blueprint_for(state)
+	if blueprint == null or device_id.is_empty():
+		return {}
+	for record in blueprint.fixed_device_spawns:
+		if not (record is Dictionary) or str(record.get("id", "")) != device_id:
+			continue
+		var landmark_id := str(record.get("landmark_id", "")).strip_edges()
+		if landmark_id.is_empty():
+			return {}
+		var resolved_id := str(blueprint.resolve_landmark_id(landmark_id)) if blueprint.has_method("resolve_landmark_id") else ""
+		if resolved_id.is_empty():
+			return {}
+		var landmark: Dictionary = blueprint.get_landmark(resolved_id) if blueprint.has_method("get_landmark") else {}
+		return {
+			"landmark_id": resolved_id,
+			"landmark_label": str(record.get("display_name", landmark.get("display_name", ""))),
 		}
 	return {}
+
+func _blueprint_for(state):
+	if state == null or not ("underwater_world" in state) or state.underwater_world == null:
+		return null
+	return state.underwater_world.blueprint
+
+func _main_entry_landmark_id(state) -> String:
+	var blueprint = _blueprint_for(state)
+	return str(blueprint.entry_landmark_id) if blueprint != null else ""
+
+func _landmark_is_available(state, landmark_id: String) -> bool:
+	var normalized_id := landmark_id.strip_edges()
+	if normalized_id.is_empty():
+		return true
+	var blueprint = _blueprint_for(state)
+	if blueprint == null or not blueprint.has_method("resolve_landmark_id"):
+		return false
+	return not str(blueprint.resolve_landmark_id(normalized_id)).is_empty()
 
 func _capable_support_worker(state, station, slot_index: int, diver_id: String):
 	if not _support_worker_reason(state, station, slot_index, diver_id, "Wsparcie").is_empty():
@@ -360,8 +409,9 @@ func _is_isolated_in_plan(state, survivor_id: String) -> bool:
 		and survivor_id in state.current_day_plan.isolated_survivor_ids
 	)
 
-func _operator_rescue_supported_at_entry(entry_point_id: String) -> bool:
-	return entry_point_id in ["R1-00", "dead_city_rooftops_001"]
+func _operator_rescue_supported_at_entry(state, entry_point_id: String) -> bool:
+	var main_entry_id := _main_entry_landmark_id(state)
+	return not main_entry_id.is_empty() and entry_point_id == main_entry_id
 
 func _available_entry_points(state, capabilities: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []

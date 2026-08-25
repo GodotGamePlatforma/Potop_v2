@@ -226,40 +226,6 @@ func _ready() -> void:
 		return
 
 	base._close_building_panel()
-	station.level = 4
-	state.underwater_world.placed_buoys.append("B-01")
-	base.bind(null, state)
-	await get_tree().process_frame
-	base.get_node("BaseEnvironment/PlatformBoard/BuildingSlots/Slot_bottom_right").emit_signal("pressed")
-	await get_tree().process_frame
-	await get_tree().process_frame
-	var entry_picker := base.find_child("EntryPointPicker", true, false) as OptionButton
-	if entry_picker == null or entry_picker.item_count != 2:
-		push_error("Diving Station level four should expose the main line and every persisted buoy entry.")
-		get_tree().quit(1)
-		return
-	var buoy_entry_index := -1
-	for item_index in range(entry_picker.item_count):
-		if str(entry_picker.get_item_metadata(item_index)) == "R2-02":
-			buoy_entry_index = item_index
-			break
-	if buoy_entry_index < 0:
-		push_error("The persisted B-01 buoy should resolve to landmark R2-02 in the entry picker.")
-		get_tree().quit(1)
-		return
-	entry_picker.select(buoy_entry_index)
-	entry_picker.emit_signal("item_selected", buoy_entry_index)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	entry_picker = base.find_child("EntryPointPicker", true, false) as OptionButton
-	if state.current_day_plan.expedition_entry_point != "R2-02" or entry_picker == null or str(entry_picker.get_selected_metadata()) != "R2-02":
-		push_error("Selecting a buoy entry should update DayPlanState and survive the panel rebuild.")
-		get_tree().quit(1)
-		return
-	if not _save_snapshot("base_diving_persistent_exploration.png"):
-		return
-
-	base._close_building_panel()
 	station.level = 2
 	base.bind(null, state)
 	await get_tree().process_frame

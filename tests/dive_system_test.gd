@@ -12,7 +12,7 @@ const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")
 const DiverScene := preload("res://scenes/diving/Diver.tscn")
-const DiverSpriteFrames := preload("res://assets/diving/diver/diver_sprite_frames.tres")
+const DiverSpriteFrames := preload("res://underwater_map_workbench/assets/gameplay/diver/diver_sprite_frames.tres")
 const DiveCurrentVisualScript := preload("res://scripts/diving/DiveCurrentVisual.gd")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
@@ -46,8 +46,8 @@ func _run() -> void:
 	_assert(session.add_item(ResourceIdsScript.FOOD, 2) == 2, "Existing stacks should not consume another slot.")
 	_assert(session.add_item(ResourceIdsScript.PLANKS, 4) == 4, "Second resource should use the second slot.")
 	_assert(session.add_item(ResourceIdsScript.SCRAP, 3) == 0, "A full backpack should reject a new resource type.")
-	session.opened_containers.append("tutorial_market_crate")
-	session.collected_world_item_ids.append("tutorial_market_crate:food")
+	session.opened_containers.append("fixture_container")
+	session.collected_world_item_ids.append("fixture_container:food")
 	session.reset_attempt()
 	_assert(session.carried_items.is_empty(), "Retry should discard all loot from the failed attempt.")
 	_assert(session.opened_containers.is_empty(), "Retry should restore containers opened during the attempt.")
@@ -222,6 +222,49 @@ func _run() -> void:
 		and is_equal_approx(float(skilled_motion.velocity.x), 201.25),
 		"Swimming III must raise the real DiverController ordinary movement target from 175 to 201.25."
 	)
+	var contact_reports: Array = []
+	diver.surface_contacts_reported.connect(func(contacts: Array) -> void:
+		contact_reports.append(contacts)
+	)
+	diver.set_physics_process(false)
+	var contact_wall := StaticBody2D.new()
+	contact_wall.collision_layer = 1
+	contact_wall.collision_mask = 0
+	contact_wall.position = Vector2(90.0, 0.0)
+	var contact_shape_node := CollisionShape2D.new()
+	var contact_shape := RectangleShape2D.new()
+	contact_shape.size = Vector2(20.0, 240.0)
+	contact_shape_node.shape = contact_shape
+	contact_wall.add_child(contact_shape_node)
+	root.add_child(contact_wall)
+	await physics_frame
+	diver.reset_at(Vector2.ZERO)
+	var contact_motion: Dictionary = {"collided": false}
+	for _contact_tick in range(60):
+		contact_motion = diver.simulate_motion_tick(
+			Vector2.RIGHT,
+			false,
+			Vector2.ZERO,
+			1.0,
+			1.0 / 60.0
+		)
+		if bool(contact_motion.get("collided", false)):
+			break
+		await physics_frame
+	_assert(bool(contact_motion.get("collided", false)), "Realny tick ruchu nurka musi nadal rozwiązać kontakt przez move_and_slide().")
+	_assert(contact_reports.size() == 1, "Jeden tick z prostą ścianą musi zgłosić dokładnie jeden synchroniczny pakiet kontaktów prezentacyjnych.")
+	if contact_reports.size() == 1:
+		var reported_contacts: Array = contact_reports[0]
+		_assert(reported_contacts.size() == 1, "Prosta ściana musi dostarczyć dokładnie jeden skopiowany kontakt powierzchni.")
+		if reported_contacts.size() == 1:
+			var reported_contact: Dictionary = reported_contacts[0]
+			var reported_position: Vector2 = reported_contact.get("position", Vector2(INF, INF))
+			var reported_normal: Vector2 = reported_contact.get("normal", Vector2.ZERO)
+			_assert(reported_contact.get("collider", null) == contact_wall, "Kontakt prezentacyjny musi zachować rzeczywiste ciało fizyczne do filtrowania przez świat.")
+			_assert(reported_position.is_finite() and reported_normal.is_normalized(), "Kontakt prezentacyjny musi kopiować skończony punkt i znormalizowaną normalną.")
+			_assert(float(reported_contact.get("opposition_speed", 0.0)) > 0.0, "Kontakt prezentacyjny musi zachować dodatnią prędkość skierowaną w ścianę.")
+	root.remove_child(contact_wall)
+	contact_wall.free()
 	diver.animated_sprite = diver.get_node("AnimatedSprite2D")
 	diver.movement_input = Vector2.UP
 	diver._update_visual(1.0)
@@ -249,23 +292,23 @@ func _run() -> void:
 	_assert(is_zero_approx(non_diver_oxygen_bonus) and is_equal_approx(non_diver_oxygen_multiplier, 1.0), "A resident without the diving profession should not receive either specialist oxygen bonus.")
 	_assert(is_equal_approx(non_diver.get_expedition_oxygen_capacity(100.0, non_diver_oxygen_bonus, non_diver_oxygen_multiplier), 100.0), "A non-diver should retain the ordinary level-one Station oxygen capacity.")
 	returning_diver.experience = 95
-	state.underwater_world.remaining_container_contents["tutorial_market_crate"] = {ResourceIdsScript.FOOD: 1}
+	state.underwater_world.remaining_container_contents["fixture_full_container"] = {ResourceIdsScript.FOOD: 1}
 	var returned = DiveResultScript.new()
 	returned.diver_id = "igor"
 	returned.oxygen_remaining = 31.0
 	returned.health_remaining = 83
 	returned.experience_gained = 10
-	returned.opened_containers.append("tutorial_market_crate")
-	returned.collected_world_item_ids.append("tutorial_market_crate:food")
-	returned.collected_world_item_ids.append("pickup_r1_food_01")
-	returned.remaining_container_contents["partial_supply_crate"] = {ResourceIdsScript.PLANKS: 2}
+	returned.opened_containers.append("fixture_full_container")
+	returned.collected_world_item_ids.append("fixture_full_container:food")
+	returned.collected_world_item_ids.append("fixture_pickup")
+	returned.remaining_container_contents["fixture_partial_container"] = {ResourceIdsScript.PLANKS: 2}
 	returned.add_item(ResourceIdsScript.FOOD, 6)
 	EndOfDayResolverScript.new().resolve(state, returned, false)
-	_assert(state.underwater_world.opened_containers.has("tutorial_market_crate"), "Successful return should persist opened containers.")
-	_assert(state.underwater_world.collected_items.has("tutorial_market_crate:food"), "Successful return should persist removed world loot.")
-	_assert(state.underwater_world.collected_items.has("pickup_r1_food_01"), "Successful return should persist a removed freestanding pickup by stable ID.")
-	_assert(not state.underwater_world.remaining_container_contents.has("tutorial_market_crate"), "A fully emptied container should clear an older persisted remainder.")
-	_assert(state.underwater_world.remaining_container_contents.get("partial_supply_crate", {}).get(ResourceIdsScript.PLANKS, 0) == 2, "A partial container should persist the loot that the diver could not carry.")
+	_assert(state.underwater_world.opened_containers.has("fixture_full_container"), "Successful return should persist opened containers.")
+	_assert(state.underwater_world.collected_items.has("fixture_full_container:food"), "Successful return should persist removed world loot.")
+	_assert(state.underwater_world.collected_items.has("fixture_pickup"), "Successful return should persist a removed freestanding pickup by stable ID.")
+	_assert(not state.underwater_world.remaining_container_contents.has("fixture_full_container"), "A fully emptied container should clear an older persisted remainder.")
+	_assert(state.underwater_world.remaining_container_contents.get("fixture_partial_container", {}).get(ResourceIdsScript.PLANKS, 0) == 2, "A partial container should persist the loot that the diver could not carry.")
 	_assert(returning_diver.health == 83, "A safe return should persist the session health through DiveResult.")
 	_assert(returning_diver.level == 2 and returning_diver.unspent_skill_points == 1, "Dive experience should level the resident and award a development point.")
 	_assert(state.current_phase == GamePhaseScript.Phase.END_DAY_REPORT, "A resolved dive should expose its day report before survivor development resumes.")
@@ -277,12 +320,15 @@ func _run() -> void:
 
 	var death_state = GameStateScript.new()
 	death_state.setup_new_campaign(778, DifficultyProfileScript.new())
+	var death_entry_landmark_id: String = str(death_state.underwater_world.blueprint.entry_landmark_id)
+	var death_entry_landmark: Dictionary = death_state.underwater_world.blueprint.get_landmark(death_entry_landmark_id)
+	var death_entry_label := "%s (%s)" % [str(death_entry_landmark.get("display_name", death_entry_landmark_id)), death_entry_landmark_id]
 	var death = DiveResultScript.new()
 	death.diver_id = "igor"
 	death.returned_alive = false
 	death.diver_dead = true
-	death.body_location_if_dead = "dead_city_rooftops_001"
-	death.backpack_location_if_lost = "dead_city_rooftops_001@900,600"
+	death.body_location_if_dead = death_entry_landmark_id
+	death.backpack_location_if_lost = "%s@900,600" % death_entry_landmark_id
 	death.death_world_position = Vector2(900, 600)
 	death.lost_items = {ResourceIdsScript.SCRAP: 3}
 	var death_report = EndOfDayResolverScript.new().resolve(death_state, death, false)
@@ -292,7 +338,7 @@ func _run() -> void:
 		if str(warning).contains("Plecak"):
 			backpack_warning = str(warning)
 			break
-	_assert(backpack_warning.contains("Stacja Nurkowa (R1-00)") and not backpack_warning.contains("sektorze"), "The death report should present the resolved landmark instead of an obsolete sector term.")
+	_assert(backpack_warning.contains(death_entry_label) and not backpack_warning.contains("sektorze"), "The death report should present the manifest-defined landmark instead of an obsolete sector term.")
 	_assert(death_state.underwater_world.dead_divers.has("igor"), "The persistent world should remember the diver's body.")
 	var lost_backpack: Dictionary = death_state.underwater_world.lost_backpacks.get("igor", {})
 	_assert(lost_backpack.get("world_position", Vector2.ZERO) == Vector2(900, 600), "The persistent backpack should retain its exact world position.")

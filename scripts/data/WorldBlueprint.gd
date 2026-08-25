@@ -1,13 +1,21 @@
 class_name WorldBlueprint
 extends Resource
 
+const DEPTH_PROFILE_POINT_COUNT := 5
+const SURFACE_DEPTH_METERS := 8.0
+const MAXIMUM_DEPTH_METERS := 160.0
+
 @export var campaign_seed: int = 1
-## Runtime snapshot compiled from UnderwaterMap.tscn. It belongs to the parent
-## campaign format; the scene and its prefabs are the only map source.
+## Runtime snapshot compiled from the workbench map_manifest.json through the
+## generated UnderwaterMap.tscn. The manifest is semantic authority; the scene
+## is its deterministic derivative.
 @export var map_source_version: int = 0
 @export var map_id: String = ""
 @export var map_gameplay_signature: String = ""
 @export var world_size: Vector2 = Vector2.ZERO
+## Compiled copy of the manifest-owned curve: x is normalized global Y, y is
+## physical depth in metres. Region membership never participates in sampling.
+@export var depth_profile_points: PackedVector2Array = default_depth_profile_points()
 @export var entry_landmark_id: String = ""
 @export var entry_position: Vector2 = Vector2.ZERO
 @export var exit_position: Vector2 = Vector2.ZERO
@@ -34,6 +42,7 @@ func clear() -> void:
 	map_id = ""
 	map_gameplay_signature = ""
 	world_size = Vector2.ZERO
+	depth_profile_points.clear()
 	entry_landmark_id = ""
 	entry_position = Vector2.ZERO
 	exit_position = Vector2.ZERO
@@ -53,6 +62,74 @@ func clear() -> void:
 	landmark_lookup.clear()
 	connection_lookup.clear()
 	chunk_index.clear()
+
+func depth_at(world_position: Vector2) -> float:
+	return depth_at_world_y(depth_profile_points, world_size.y, world_position.y)
+
+static func default_depth_profile_points() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(0.0, SURFACE_DEPTH_METERS),
+		Vector2(0.237, 35.0),
+		Vector2(0.401, 70.0),
+		Vector2(0.607, 115.0),
+		Vector2(1.0, MAXIMUM_DEPTH_METERS),
+	])
+
+static func depth_profile_validation_errors(points: PackedVector2Array) -> PackedStringArray:
+	var errors := PackedStringArray()
+	if points.size() != DEPTH_PROFILE_POINT_COUNT:
+		errors.append(
+			"Profil musi zawierać dokładnie %d punktów (proporcja wysokości, metry)."
+			% DEPTH_PROFILE_POINT_COUNT
+		)
+		return errors
+	for index in range(points.size()):
+		var point := points[index]
+		if not is_finite(point.x) or not is_finite(point.y):
+			errors.append("Punkt %d profilu zawiera wartość niefinitywną." % index)
+			continue
+		if point.x < 0.0 or point.x > 1.0:
+			errors.append("Punkt %d profilu musi mieć proporcję wysokości w zakresie 0..1." % index)
+		if index > 0:
+			var previous := points[index - 1]
+			if point.x <= previous.x:
+				errors.append("Proporcje wysokości profilu muszą być ściśle rosnące.")
+			if point.y <= previous.y:
+				errors.append("Głębokość profilu musi być ściśle rosnąca.")
+	if not is_equal_approx(points[0].x, 0.0):
+		errors.append("Pierwszy punkt profilu musi zaczynać się przy proporcji 0.")
+	if not is_equal_approx(points[0].y, SURFACE_DEPTH_METERS):
+		errors.append("Pierwszy punkt profilu musi mieć głębokość %.1f m." % SURFACE_DEPTH_METERS)
+	var last := points[points.size() - 1]
+	if not is_equal_approx(last.x, 1.0):
+		errors.append("Ostatni punkt profilu musi kończyć się przy proporcji 1.")
+	if not is_equal_approx(last.y, MAXIMUM_DEPTH_METERS):
+		errors.append("Ostatni punkt profilu musi mieć głębokość %.1f m." % MAXIMUM_DEPTH_METERS)
+	return errors
+
+static func depth_at_world_y(
+	points: PackedVector2Array,
+	world_height: float,
+	world_y: float
+) -> float:
+	var profile := points
+	if profile.size() < 2:
+		profile = default_depth_profile_points()
+	var normalized_y := clampf(world_y / maxf(world_height, 1.0), 0.0, 1.0)
+	if normalized_y <= profile[0].x:
+		return profile[0].y
+	for index in range(1, profile.size()):
+		var previous := profile[index - 1]
+		var current := profile[index]
+		if normalized_y > current.x:
+			continue
+		var segment_ratio := clampf(
+			(normalized_y - previous.x) / maxf(current.x - previous.x, 0.000001),
+			0.0,
+			1.0
+		)
+		return lerpf(previous.y, current.y, segment_ratio)
+	return profile[profile.size() - 1].y
 
 func rebuild_indexes() -> void:
 	landmark_lookup.clear()

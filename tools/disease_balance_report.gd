@@ -1,10 +1,11 @@
 extends SceneTree
 
-const FORMAT_VERSION := 1
+const FORMAT_VERSION := 2
 const DEFAULT_DAYS := 14
 const DEFAULT_REPEAT := 2
 const STARTING_MEDICINE := 5
 const STARTING_HOPE := 60
+const DIVE_HAZARD_SOURCE_ID := "contaminated_salvage"
 
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
@@ -147,7 +148,7 @@ func _build_report(configuration: Dictionary) -> Dictionary:
 			"id": str(FloodFever.id),
 			"version": int(FloodFever.definition_version),
 			"signature": str(FloodFever.configuration_signature),
-			"r1_06_pressure": int(FloodFever.authored_source_pressures.get("R1-06", 0)),
+			"authored_dive_pressure": int(FloodFever.authored_source_pressures.get(DIVE_HAZARD_SOURCE_ID, 0)),
 		},
 		"configuration": {
 			"mode": str(configuration.mode),
@@ -583,17 +584,17 @@ func _seed_scenario(state, scenario: Dictionary) -> Dictionary:
 		state.find_survivor("igor").disease_cases.append(disease_case)
 		state.disease_campaign.last_resolved_day = 1
 		return {"ok": true}
-	var source_pressure := int(FloodFever.authored_source_pressures.get("R1-06", 0))
+	var source_pressure := int(FloodFever.authored_source_pressures.get(DIVE_HAZARD_SOURCE_ID, 0))
 	var exposure = DiseaseExposureStateScript.create(
 		str(FloodFever.id),
 		"igor",
 		"dive",
-		"R1-06",
+		DIVE_HAZARD_SOURCE_ID,
 		source_pressure,
 		int(state.day)
 	)
 	if exposure == null or not exposure.is_valid():
-		return _runtime_error("INVALID_EXPOSURE_FIXTURE", "Nie udało się utworzyć narażenia R1-06.")
+		return _runtime_error("INVALID_EXPOSURE_FIXTURE", "Nie udało się utworzyć domenowego narażenia podczas nurkowania.")
 	state.disease_campaign.pending_exposures.append(exposure)
 	return {"ok": true}
 
@@ -931,7 +932,7 @@ func _scenario_definition(scenario_id: String) -> Dictionary:
 				"starts_symptomatic": false,
 				"start_day": 1,
 				"adverse_conditions_pressure": 1,
-				"description": "R1-06, pełne racje, izolacja każdego aktywnego przypadku i Lecznica III z profilaktyką/terapią.",
+				"description": "Skażony odzysk, pełne racje, izolacja każdego aktywnego przypadku i Lecznica III z profilaktyką/terapią.",
 			}
 		"frugal_natural":
 			return {
@@ -941,7 +942,7 @@ func _scenario_definition(scenario_id: String) -> Dictionary:
 				"starts_symptomatic": false,
 				"start_day": 1,
 				"adverse_conditions_pressure": 1,
-				"description": "R1-06, połowa racji w Narażeniu, potem pełna racja, izolacja awaryjna i brak leczenia.",
+				"description": "Skażony odzysk, połowa racji w Narażeniu, potem pełna racja, izolacja awaryjna i brak leczenia.",
 			}
 		"late_outbreak_response":
 			return {
@@ -951,7 +952,7 @@ func _scenario_definition(scenario_id: String) -> Dictionary:
 				"starts_symptomatic": false,
 				"start_day": 1,
 				"adverse_conditions_pressure": 1,
-				"description": "R1-06, początkowo brak racji/izolacji/leczenia; po wybuchu pełne racje, izolacja i Lecznica I.",
+				"description": "Skażony odzysk, początkowo brak racji/izolacji/leczenia; po wybuchu pełne racje, izolacja i Lecznica I.",
 			}
 		"no_response":
 			return {
@@ -961,7 +962,7 @@ func _scenario_definition(scenario_id: String) -> Dictionary:
 				"starts_symptomatic": false,
 				"start_day": 1,
 				"adverse_conditions_pressure": 1,
-				"description": "R1-06, brak racji, izolacji i opieki przez cały horyzont; granica skutków, nie rozsądna strategia gracza.",
+				"description": "Skażony odzysk, brak racji, izolacji i opieki przez cały horyzont; granica skutków, nie rozsądna strategia gracza.",
 			}
 	return {}
 

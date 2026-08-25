@@ -7,8 +7,6 @@ const BuildingEffectSystemScript := preload("res://scripts/base/BuildingEffectSy
 const BuildingSystemScript := preload("res://scripts/base/BuildingSystem.gd")
 const BuildingWorkSystemScript := preload("res://scripts/base/BuildingWorkSystem.gd")
 const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
-const ExpeditionPreparationSystemScript := preload("res://scripts/base/ExpeditionPreparationSystem.gd")
-const MissionSystemScript := preload("res://scripts/base/MissionSystem.gd")
 const MedicalCareSystemScript := preload("res://scripts/base/MedicalCareSystem.gd")
 const ProductionSystemScript := preload("res://scripts/base/ProductionSystem.gd")
 const RationAllocationSystemScript := preload("res://scripts/base/RationAllocationSystem.gd")
@@ -21,6 +19,8 @@ const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const PolicyStateScript := preload("res://scripts/data/PolicyState.gd")
 const WorkPaceSystemScript := preload("res://scripts/base/WorkPaceSystem.gd")
 const WorkshopOrderStateScript := preload("res://scripts/data/WorkshopOrderState.gd")
+
+const TEST_HEAVY_OBJECT_ID := "fixture_heavy_object"
 
 const BUILDING_SLOTS := {
 	"fishing_hut": "top_left",
@@ -135,9 +135,7 @@ func _initialize() -> void:
 	_test_staffing_forecast_matches_day_resolution()
 	_test_ration_allocation_contract()
 	_test_kitchen_forecast_matches_ration_policies()
-	_test_operator_rescue_is_zero_when_starting_from_buoy()
 	_test_station_diver_capability_uses_expedition_requirements()
-	_test_common_line_expedition_guidance_overrides_tracked_missions()
 	_test_infirmary_injury_forecast_matches_resolution()
 	_test_zero_output_workshop_forecast_matches_resolution()
 	_test_workshop_priority_preview_skips_non_working_queue_heads()
@@ -823,12 +821,8 @@ func _test_contextual_work_pace_panel_copy() -> void:
 	var heavy_workshop = _add_staffed_building(heavy_state, "workshop", "bottom_left", 3, "anka")
 	heavy_workshop.work_pace = WorkPaceSystemScript.WORK_PACE_CAREFUL
 	heavy_workshop.work_tension = 2
-	var heavy_spawns: Array = heavy_state.underwater_world.blueprint.heavy_object_spawns
-	_assert(not heavy_spawns.is_empty(), "The heavy pace-copy fixture needs one canonical heavy object.")
-	if heavy_spawns.is_empty():
-		return
-	var heavy_id := str(heavy_spawns[0].get("id", ""))
-	heavy_state.underwater_world.marked_heavy_objects.append(heavy_id)
+	_add_test_heavy_object(heavy_state)
+	heavy_state.underwater_world.marked_heavy_objects.append(TEST_HEAVY_OBJECT_ID)
 	heavy_state.current_day_plan.sync_from_state(heavy_state)
 	var heavy_copy := _work_pace_panel_copy(heavy_state, "workshop", heavy_workshop)
 	_assert(
@@ -906,40 +900,6 @@ func _test_staffing_forecast_matches_day_resolution() -> void:
 	_assert(idle_preview_text.contains("18% teraz → 3% po regeneracji → 3% po prognozowanym połowie"), "An unstaffed Fishing Hut should show the resolver's larger idle recovery and zero catch.")
 	EndOfDayResolverScript.new()._resolve_fishing(idle_state, ReportStateScript.new())
 	_assert(is_equal_approx(float(idle_state.platform.fishing_pressure), float(idle_preview.get("fishing_pressure_after_catch", -1.0))), "The idle pressure forecast should exactly match the resolver's unstaffed recovery.")
-
-func _test_operator_rescue_is_zero_when_starting_from_buoy() -> void:
-	var state = _new_state()
-	var station = _add_staffed_building(state, "diving_station", "bottom_right", 4, "igor")
-	station.assigned_survivor_ids.append("mira")
-	var operator = state.find_survivor("mira")
-	operator.current_assignment = station.id
-	operator.status = SurvivorStateScript.Status.WORKING
-	_assert(state.current_day_plan.set_selected_diver("anka"), "The operator-rescue fixture needs a free selected diver distinct from Station workers.")
-	state.underwater_world.placed_buoys.append("B-01")
-	_assert(state.current_day_plan.select_expedition_entry("R2-02"), "A placed buoy should expose R2-02 as a selectable Station IV entry point.")
-	state.diving_equipment.owned_gear_ids.erase("diving_lantern_mk1")
-	state.diving_equipment.equipped_by_slot.erase("light")
-	var owned_gear_before: Array[String] = state.diving_equipment.owned_gear_ids.duplicate()
-	var equipped_gear_before: Dictionary = state.diving_equipment.equipped_by_slot.duplicate(true)
-
-	var definition = BUILDING_DEFINITIONS.get("diving_station")
-	var analysis: Dictionary = ExpeditionPreparationSystemScript.new().analyze(state, station, definition)
-	_assert(bool(analysis.get("operator_assigned", false)), "The second capable Station worker should remain assigned as the operator.")
-	_assert(not bool(analysis.get("operator_rescue_available", true)), "Operator rescue should be unavailable away from the main line.")
-	_assert(is_zero_approx(float(analysis.get("operator_rescue_effective_chance", -1.0))), "The effective operator rescue chance should be zero for a buoy start.")
-
-	var effect_system = BuildingEffectSystemScript.new()
-	var preview: Dictionary = effect_system.staffing_preview(state, definition, station)
-	var preview_text := "\n".join(preview.get("lines", []))
-	_assert(preview_text.contains("0%") and preview_text.contains("głównej linie"), "The Station staffing forecast should explain why the assigned operator currently gives zero rescue chance.")
-	var worker_line := effect_system.worker_contribution_line(state, definition, station, 1, operator)
-	_assert(worker_line.contains("0%") and worker_line.contains("starcie z boi") and worker_line.contains("głównej linie"), "The operator card should state the zero effective chance and main-line restriction for a buoy start.")
-	_assert(
-		state.diving_equipment.owned_gear_ids == owned_gear_before
-		and state.diving_equipment.equipped_by_slot == equipped_gear_before,
-		"Station analysis, aggregate preview and worker copy must not repair or otherwise mutate persistent diving equipment."
-	)
-
 
 func _test_ration_allocation_contract() -> void:
 	var system = RationAllocationSystemScript.new()
@@ -1155,45 +1115,6 @@ func _test_station_diver_capability_uses_expedition_requirements() -> void:
 	var worker_line := effect_system.worker_contribution_line(state, definition, station, 0, station_service)
 	_assert(worker_line.contains("Obsługa Stacji") and worker_line.contains("+5%"), "The first Station worker card should present support contribution, not a diver blocker.")
 
-func _test_common_line_expedition_guidance_overrides_tracked_missions() -> void:
-	var state = _new_state()
-	var station = _add_staffed_building(state, "diving_station", "bottom_right", 1, "igor")
-	_assert(state.current_day_plan.set_selected_diver("mira"), "Campaign guidance fixtures require a free selected diver rather than Station staffing as the diver source.")
-	state.story_flags.junction_j7_active = true
-	state.story_flags.archive_terminal_active = true
-	state.story_flags.archive_map_transmitted = true
-	state.story_flags.black_front_active = true
-	state.story_flags.black_front_days_total = 12
-	state.story_flags.black_front_days_remaining = 12
-	state.underwater_world.delta.activated_fixed_devices.assign(["junction_j7", "archive_terminal"])
-	MissionSystemScript.new().reconcile(state)
-	var preparation = ExpeditionPreparationSystemScript.new()
-
-	var setup = preparation.build_setup(state, station, BUILDING_DEFINITIONS["diving_station"])
-	_assert(setup != null, "A staffed level-one Station should build a campaign expedition setup.")
-	if setup == null:
-		return
-	_assert(state.mission_progress.tracked_mission_id == "foundation_harbor", "The fixture should retain Foundation Harbor as the tracked journal mission.")
-	_assert(setup.objective_target_landmark_id == "R3-04" and setup.objective_title.contains("DIAGNOSTYKA"), "The active Common Line diagnosis must route the expedition to R3-04 despite the tracked foundation mission.")
-
-	state.story_flags.r3_diagnosed = true
-	setup = preparation.build_setup(state, station, BUILDING_DEFINITIONS["diving_station"])
-	_assert(setup != null and setup.objective_target_landmark_id != "R3-04", "While the Regulator is still a Workshop-only task, expedition guidance must not send the diver back to R-3 prematurely.")
-	state.story_flags.r3_regulator_ready = true
-	setup = preparation.build_setup(state, station, BUILDING_DEFINITIONS["diving_station"])
-	_assert(setup != null and setup.objective_target_landmark_id == "R3-04" and setup.objective_title.contains("URUCHOM GENERATOR"), "A completed regulator must route the expedition back to R3-04 for activation.")
-
-	state.story_flags.r3_generator_active = true
-	setup = preparation.build_setup(state, station, BUILDING_DEFINITIONS["diving_station"])
-	_assert(setup != null and setup.objective_target_landmark_id == "R4-06" and setup.objective_title.contains("C-4"), "An active R-3 must route the expedition to R4-06 and the C-4 switchboard.")
-
-	state.story_flags.c4_switchboard_active = true
-	setup = preparation.build_setup(state, station, BUILDING_DEFINITIONS["diving_station"])
-	_assert(setup != null and setup.objective_target_landmark_id != "R4-06", "While the Splitter is still a Workshop-only task, expedition guidance must not send the diver back to C-4 prematurely.")
-	state.story_flags.common_line_splitter_ready = true
-	setup = preparation.build_setup(state, station, BUILDING_DEFINITIONS["diving_station"])
-	_assert(setup != null and setup.objective_target_landmark_id == "R4-06" and setup.objective_title.contains("ROZDZIELACZ"), "A completed splitter must route the expedition back to R4-06 for installation.")
-
 func _test_infirmary_injury_forecast_matches_resolution() -> void:
 	var state = _new_state()
 	var infirmary = _add_staffed_building(state, "infirmary", "center", 4, "anka")
@@ -1249,12 +1170,8 @@ func _test_workshop_priority_preview_skips_non_working_queue_heads() -> void:
 	_assert(positive_production.queue_recipe(production_state, production_workshop, positive_production.get_recipe("diving_lantern_mk2")), "The positive preview fixture should queue a first canonical order.")
 	_assert(positive_production.queue_recipe(production_state, production_workshop, positive_production.get_recipe("oxygen_tank_mk2")), "The positive preview fixture should queue a second order for partial overflow.")
 	production_state.current_day_plan.sync_from_state(production_state)
-	var production_heavy_spawns: Array = production_state.underwater_world.blueprint.heavy_object_spawns
-	_assert(not production_heavy_spawns.is_empty(), "The positive preview fixture needs one canonical heavy object.")
-	if production_heavy_spawns.is_empty():
-		return
-	var production_heavy_id := str(production_heavy_spawns[0].get("id", ""))
-	production_state.underwater_world.marked_heavy_objects.append(production_heavy_id)
+	_add_test_heavy_object(production_state)
+	production_state.underwater_world.marked_heavy_objects.append(TEST_HEAVY_OBJECT_ID)
 	production_state.resources.set_amount(ResourceIdsScript.PLATFORM_INTEGRITY, 40)
 	var production_preview: Dictionary = BuildingEffectSystemScript.new().staffing_preview(
 		production_state,
@@ -1273,7 +1190,7 @@ func _test_workshop_priority_preview_skips_non_working_queue_heads() -> void:
 		production_workshop.queued_production_orders.size() == 2
 		and production_workshop.queued_production_orders[0].work_progress == 0
 		and production_workshop.queued_production_orders[1].work_progress == 0
-		and production_state.underwater_world.marked_heavy_objects.has(production_heavy_id)
+		and production_state.underwater_world.marked_heavy_objects.has(TEST_HEAVY_OBJECT_ID)
 		and production_state.resources.get_amount(ResourceIdsScript.PLATFORM_INTEGRITY) == 40,
 		"Positive Workshop preview must preserve both FIFO progress and every lower-priority target."
 	)
@@ -1291,12 +1208,8 @@ func _test_workshop_priority_preview_skips_non_working_queue_heads() -> void:
 	)
 	blocked_workshop.queued_production_orders.append(blocked_order)
 	blocked_workshop.next_production_order_sequence = 2
-	var heavy_spawns: Array = blocked_state.underwater_world.blueprint.heavy_object_spawns
-	_assert(not heavy_spawns.is_empty(), "The blocked-head priority fixture needs one canonical heavy object.")
-	if heavy_spawns.is_empty():
-		return
-	var heavy_id := str(heavy_spawns[0].get("id", ""))
-	blocked_state.underwater_world.marked_heavy_objects.append(heavy_id)
+	_add_test_heavy_object(blocked_state)
+	blocked_state.underwater_world.marked_heavy_objects.append(TEST_HEAVY_OBJECT_ID)
 	var blocked_preview: Dictionary = BuildingEffectSystemScript.new().staffing_preview(
 		blocked_state,
 		BUILDING_DEFINITIONS.get("workshop"),
@@ -1602,6 +1515,15 @@ func _new_state():
 	state.resources.set_amount(ResourceIdsScript.HOPE, 55)
 	state.resources.set_amount(ResourceIdsScript.PLATFORM_INTEGRITY, 70)
 	return state
+
+
+func _add_test_heavy_object(state) -> void:
+	state.underwater_world.blueprint.heavy_object_spawns.append({
+		"id": TEST_HEAVY_OBJECT_ID,
+		"display_name": "Ciężki obiekt fixture",
+		"rewards": {ResourceIdsScript.SCRAP: 2},
+	})
+
 
 func _add_staffed_building(state, definition_id: String, slot_id: String, level: int, survivor_id: String):
 	var building = BuildingStateScript.new()

@@ -10,7 +10,7 @@ const SettlementEventChoiceDefinitionScript := preload("res://scripts/definition
 const SettlementEventDefinitionScript := preload("res://scripts/definitions/SettlementEventDefinition.gd")
 const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
-const UnderwaterMapSceneCompilerScript := preload("res://scripts/diving/UnderwaterMapSceneCompiler.gd")
+const UnderwaterMapSceneCompilerScript := preload("res://underwater_map_workbench/runtime/UnderwaterMapSceneCompiler.gd")
 const SETTLEMENT_EVENT_BALANCE_PATH := "res://data/balance/settlement_events.tres"
 const DIVE_LIGHTING_PATH := "res://data/balance/dive_lighting.tres"
 
@@ -245,10 +245,10 @@ func _validate_definitions() -> void:
 	if diseases.has("flood_fever"):
 		var flood_fever = diseases["flood_fever"]
 		if flood_fever != null and flood_fever.get_script() == DiseaseDefinitionScript:
-			if str(flood_fever.display_name) != "Gorączka Zalewowa" or int(flood_fever.definition_version) != 1:
+			if str(flood_fever.display_name) != "Gorączka Zalewowa" or int(flood_fever.definition_version) != 2:
 				validation_errors.append("Produkcyjna Gorączka Zalewowa ma niepoprawną nazwę lub definition_version.")
-			if flood_fever.authored_source_pressures != {"R1-06": 3}:
-				validation_errors.append("Produkcyjna Gorączka Zalewowa musi mieć dokładnie źródło R1-06 o presji 3.")
+			if flood_fever.authored_source_pressures != {"contaminated_salvage": 3}:
+				validation_errors.append("Produkcyjna Gorączka Zalewowa musi mieć dokładnie domenowe źródło contaminated_salvage o presji 3.")
 			if flood_fever.ration_pressure_modifiers != {"full": -1, "half": 0, "none": 1}:
 				validation_errors.append("Produkcyjna Gorączka Zalewowa ma niepoprawne modyfikatory faktycznej racji.")
 

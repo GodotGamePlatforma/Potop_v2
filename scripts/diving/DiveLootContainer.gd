@@ -1,10 +1,10 @@
 class_name DiveLootContainer
 extends Area2D
 
-const SupplyCrateTexture := preload("res://assets/diving/interactables/supply_crate.png")
-const ToolLockerTexture := preload("res://assets/diving/interactables/tool_locker.png")
-const LostBackpackTexture := preload("res://assets/diving/interactables/lost_backpack.png")
-const DroppedBundleTexture := preload("res://assets/diving/interactables/dropped_bundle.png")
+const SupplyCrateTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/supply_crate.png")
+const ToolLockerTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/tool_locker.png")
+const LostBackpackTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/lost_backpack.png")
+const DroppedBundleTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/dropped_bundle.png")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const VisualStyle := preload("res://scripts/diving/DiveInteractableVisualStyle.gd")
 
@@ -28,10 +28,11 @@ var opened: bool = false
 var initial_contents: Dictionary = {}
 var _sprite: Sprite2D
 var _authored_visual_override := false
+var _mounting_overlay: Node2D
 var _semantic_overlay: Node2D
 var _visual_context: Dictionary = {}
-var _explicit_region_hint: String = ""
-var _region_id: String = "R1"
+var _explicit_context_hint: String = ""
+var _context_id: String = ""
 var _graphics_quality: String = "medium"
 var _reduced_motion: bool = false
 var _visual_semantic_override: String = ""
@@ -93,11 +94,12 @@ func set_authored_visual_override(enabled: bool) -> void:
 	_refresh_visual()
 	queue_redraw()
 
-func configure_visual_context(context: Dictionary, explicit_region_hint: String = "") -> void:
+func configure_visual_context(context: Dictionary, explicit_context_hint: String = "") -> void:
 	_visual_context = context.duplicate(true)
-	_explicit_region_hint = explicit_region_hint.strip_edges()
-	_resolve_visual_region()
+	_explicit_context_hint = explicit_context_hint.strip_edges()
+	_resolve_visual_context_id()
 	_refresh_visual_style()
+	_refresh_semantic_overlay()
 	queue_redraw()
 
 func set_graphics_quality(quality_id: String) -> void:
@@ -110,7 +112,20 @@ func set_graphics_quality(quality_id: String) -> void:
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
+	_refresh_visual_style()
 	queue_redraw()
+
+func set_interaction_presentation(focused: bool, progress: float) -> void:
+	VisualStyle.set_effect_interaction(self, focused, progress)
+
+func set_visual_time_for_tests(time_seconds: float) -> void:
+	VisualStyle.set_effect_time_for_tests(self, time_seconds)
+
+func release_visual_time_override() -> void:
+	VisualStyle.release_effect_time_override(self)
+
+func visual_effect_state_for_tests() -> Dictionary:
+	return VisualStyle.effect_state(self)
 
 func set_visual_semantic(semantic_kind: String) -> void:
 	_visual_semantic_override = semantic_kind.strip_edges().to_lower()
@@ -154,6 +169,11 @@ func _build_visual() -> void:
 		_sprite.name = "ContainerSprite"
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
+	if _mounting_overlay == null:
+		_mounting_overlay = Node2D.new()
+		_mounting_overlay.name = "ToolLockerFrontMount"
+		_mounting_overlay.z_index = 1
+		add_child(_mounting_overlay)
 	if _semantic_overlay == null:
 		_semantic_overlay = Node2D.new()
 		_semantic_overlay.name = "SemanticMarking"
@@ -166,7 +186,11 @@ func _refresh_visual() -> void:
 		return
 	_sprite.texture = visual_texture()
 	_sprite.position = Vector2.ZERO
-	_sprite.rotation = 0.0
+	var visual_seed := float(posmod(_visual_stable_id().hash(), 1009)) / 1008.0
+	_sprite.rotation = lerpf(-0.018, 0.018, visual_seed)
+	_sprite.position.x = lerpf(-1.5, 1.5, visual_seed)
+	_sprite.flip_h = visual_kind in [VisualKind.SUPPLY_CRATE, VisualKind.TOOL_LOCKER] \
+		and posmod(_visual_stable_id().hash(), 2) == 1
 	var scale_value := 0.64
 	match visual_kind:
 		VisualKind.TOOL_LOCKER:
@@ -182,25 +206,47 @@ func _refresh_visual() -> void:
 	else:
 		_sprite.modulate = Color.WHITE
 	_sprite.visible = not _authored_visual_override
-	_resolve_visual_region()
+	_resolve_visual_context_id()
 	_refresh_visual_style()
 	_refresh_semantic_overlay()
 
-func _resolve_visual_region() -> void:
-	_region_id = VisualStyle.resolve_region(_explicit_region_hint, _visual_context, _visual_stable_id())
+func _resolve_visual_context_id() -> void:
+	_context_id = VisualStyle.resolve_context_id(_explicit_context_hint, _visual_context)
+
+
+func _resolved_style_context() -> Dictionary:
+	var context := _visual_context.duplicate(true)
+	if not _context_id.is_empty():
+		context["context_id"] = _context_id
+	return context
 
 func _refresh_visual_style() -> void:
 	if _sprite == null:
 		return
 	VisualStyle.apply_sprite(
 		_sprite,
-		_region_id,
+		_resolved_style_context(),
 		_visual_stable_id(),
 		_graphics_quality,
 		0.68 if opened else 1.0
 	)
+	var effect_radius := 49.0 if visual_kind in [VisualKind.LOST_BACKPACK, VisualKind.DROPPED_BUNDLE] else 57.0
+	VisualStyle.configure_effect(
+		self,
+		_sprite,
+		"container",
+		_resolved_style_context(),
+		_visual_stable_id(),
+		_graphics_quality,
+		_reduced_motion,
+		opened,
+		effect_radius,
+		_visual_context,
+		_semantic_kind()
+	)
 	if _semantic_overlay != null:
 		_semantic_overlay.modulate.a = 0.50 if opened else 1.0
+	_refresh_tool_locker_front_mounting()
 
 func _visual_stable_id() -> String:
 	if not container_id.is_empty():
@@ -258,25 +304,37 @@ func _refresh_semantic_overlay() -> void:
 	_semantic_overlay.visible = not _authored_visual_override
 	if _authored_visual_override:
 		return
-	var palette_data := VisualStyle.palette(_region_id)
+	var palette_data := VisualStyle.palette(_resolved_style_context())
 	var accent: Color = palette_data.get("accent", Color("72cfd0"))
 	var shadow: Color = palette_data.get("shadow", Color("07161c"))
 	accent.a = 0.78
 	shadow.a = 0.66
 	var seed_fraction := float(posmod(_visual_stable_id().hash(), 101)) / 100.0
-	_semantic_overlay.rotation = lerpf(-0.035, 0.035, seed_fraction)
+	_semantic_overlay.rotation = lerpf(-0.055, 0.055, seed_fraction)
 	_semantic_overlay.position = Vector2(0.0, -4.0)
+	var plate_half_size := Vector2(13.0, 10.0)
 	match visual_kind:
+		VisualKind.TOOL_LOCKER:
+			# Etykieta omija centralne koło/rygiel i wygląda jak stary nitowany znacznik,
+			# a nie ikona interfejsu przyklejona na środku obiektu.
+			_semantic_overlay.position = Vector2(-23.0, -23.0)
+			plate_half_size = Vector2(11.0, 8.0)
 		VisualKind.LOST_BACKPACK:
 			_semantic_overlay.position = Vector2(0.0, 2.0)
+			plate_half_size = Vector2(11.0, 8.0)
 		VisualKind.DROPPED_BUNDLE:
 			_semantic_overlay.position = Vector2(0.0, 1.0)
-	_add_mark_polygon(PackedVector2Array([
-		Vector2(-13, -10), Vector2(13, -10), Vector2(13, 10), Vector2(-13, 10),
-	]), shadow)
+			plate_half_size = Vector2(11.0, 8.0)
+	var plate := PackedVector2Array([
+		Vector2(-plate_half_size.x, -plate_half_size.y + 1.0),
+		Vector2(plate_half_size.x - 1.0, -plate_half_size.y),
+		Vector2(plate_half_size.x, plate_half_size.y - 2.0),
+		Vector2(-plate_half_size.x + 2.0, plate_half_size.y),
+	])
+	_add_mark_polygon(plate, Color(shadow.r, shadow.g, shadow.b, 0.46))
 	_add_mark_line(PackedVector2Array([
-		Vector2(-13, -10), Vector2(13, -10), Vector2(13, 10), Vector2(-13, 10), Vector2(-13, -10),
-	]), Color(accent.r, accent.g, accent.b, 0.42), 1.2)
+		plate[0], plate[1], plate[2], plate[3], plate[0],
+	]), Color(accent.r, accent.g, accent.b, 0.24), 1.0)
 	_draw_semantic_icon(_semantic_kind(), accent)
 
 func _draw_semantic_icon(kind: String, color: Color) -> void:
@@ -350,17 +408,19 @@ func _draw() -> void:
 	if _authored_visual_override:
 		return
 	var radius := 49.0 if visual_kind in [VisualKind.LOST_BACKPACK, VisualKind.DROPPED_BUNDLE] else 57.0
-	VisualStyle.draw_grounding(self, radius, _region_id, _visual_stable_id(), _graphics_quality, opened)
+	if visual_kind == VisualKind.TOOL_LOCKER:
+		_draw_tool_locker_mounting()
+	VisualStyle.draw_grounding(self, radius, _resolved_style_context(), _visual_stable_id(), _graphics_quality, opened)
 	VisualStyle.draw_signal_arcs(
 		self,
 		radius,
-		_region_id,
+		_resolved_style_context(),
 		_visual_stable_id(),
 		_graphics_quality,
 		opened,
 		1.18 if mandatory_order >= 0 else 1.0
 	)
-	var palette_data := VisualStyle.palette(_region_id)
+	var palette_data := VisualStyle.palette(_resolved_style_context())
 	var outline: Color = palette_data.get("accent", Color("72cfd0"))
 	if mandatory_order >= 0 and not opened:
 		var notch_count := clampi(mandatory_order + 1, 1, 3)
@@ -370,3 +430,110 @@ func _draw() -> void:
 	if opened and visual_kind in [VisualKind.SUPPLY_CRATE, VisualKind.TOOL_LOCKER]:
 		draw_line(Vector2(-41, -31), Vector2(28, -58), Color(outline.r, outline.g, outline.b, 0.48), 7.0, true)
 		draw_circle(Vector2(35, -52), 3.0, Color(outline.r, outline.g, outline.b, 0.62))
+
+func _draw_tool_locker_mounting() -> void:
+	var palette_data := VisualStyle.palette(_resolved_style_context())
+	var body_mid: Color = palette_data.get("body_mid", Color("35535a"))
+	var shadow: Color = palette_data.get("shadow", Color("07161c"))
+	var silt: Color = palette_data.get("silt", Color("6f7971"))
+	var seed := float(posmod((_visual_stable_id() + ":mount").hash(), 1009)) / 1008.0
+	var side := -1.0 if seed < 0.5 else 1.0
+	var state_alpha := 0.68 if opened else 1.0
+	shadow.a = 0.60 * state_alpha
+	body_mid.a = 0.58 * state_alpha
+	silt.a = 0.42 * state_alpha
+
+	# Osprzęt pozostaje częścią roli szafki. Stable ID tylko rozprasza jego drobne
+	# odchylenia i nigdy nie wybiera znaczenia ani pochodzenia obiektu.
+	var skew := lerpf(-5.0, 5.0, seed)
+	draw_polyline(PackedVector2Array([
+		Vector2(-76.0, -33.0 + skew), Vector2(-66.0, -42.0),
+		Vector2(61.0, -42.0 + skew * 0.35), Vector2(74.0, -33.0),
+	]), shadow, 9.0, true)
+	draw_polyline(PackedVector2Array([
+		Vector2(side * 73.0, 23.0), Vector2(side * 64.0, 40.0), Vector2(side * 48.0, 44.0),
+	]), shadow, 7.0, true)
+	draw_polyline(PackedVector2Array([
+		Vector2(-side * 71.0, 17.0), Vector2(-side * 59.0, 31.0),
+	]), Color(body_mid.r, body_mid.g, body_mid.b, 0.50 * state_alpha), 6.0, true)
+
+	var deposit_side := -1.0 if seed < 0.5 else 1.0
+	draw_polyline(PackedVector2Array([
+		Vector2(deposit_side * 46.0, 47.0),
+		Vector2(deposit_side * 24.0, 51.0),
+		Vector2(deposit_side * 5.0, 48.0),
+	]), silt, 2.2, true)
+
+
+func _refresh_tool_locker_front_mounting() -> void:
+	if _mounting_overlay == null:
+		return
+	for child in _mounting_overlay.get_children():
+		child.free()
+	_mounting_overlay.visible = visual_kind == VisualKind.TOOL_LOCKER and not _authored_visual_override
+	if not _mounting_overlay.visible:
+		return
+	_mounting_overlay.position = _sprite.position
+	_mounting_overlay.rotation = _sprite.rotation
+	_mounting_overlay.modulate.a = 0.68 if opened else 1.0
+
+	var palette_data := VisualStyle.palette(_resolved_style_context())
+	var body_mid: Color = palette_data.get("body_mid", Color("35535a"))
+	var shadow: Color = palette_data.get("shadow", Color("07161c"))
+	var patina: Color = palette_data.get("patina", Color("78979a"))
+	var rim: Color = palette_data.get("rim", Color("b9edf0"))
+	var seed := float(posmod((_visual_stable_id() + ":mount").hash(), 1009)) / 1008.0
+	var side := -1.0 if seed < 0.5 else 1.0
+	var quality_level := VisualStyle.quality_level(_graphics_quality)
+	shadow.a = 0.56
+	body_mid.a = 0.58
+	patina.a = 0.58
+	rim.a = 0.18
+
+	var strap_x := side * lerpf(24.0, 31.0, seed)
+	var strap := PackedVector2Array([
+		Vector2(strap_x - side * 3.0, -50.0), Vector2(strap_x + side * 2.0, -18.0),
+		Vector2(strap_x - side, 16.0), Vector2(strap_x + side * 4.0, 49.0),
+	])
+	_add_mount_line(strap, shadow, 8.0)
+	_add_mount_line(strap, patina, 4.5)
+	var clamp_x := -side * lerpf(34.0, 43.0, seed)
+	_add_mount_line(PackedVector2Array([
+		Vector2(clamp_x, 32.0), Vector2(clamp_x + side * 2.0, 50.0),
+	]), shadow, 7.0)
+	_add_mount_line(PackedVector2Array([
+		Vector2(clamp_x, 32.0), Vector2(clamp_x + side * 2.0, 50.0),
+	]), body_mid, 5.0)
+	if quality_level >= 1:
+		_add_mount_disc(Vector2(clamp_x, 42.0), 2.0, rim)
+	if quality_level >= 2:
+		_add_mount_line(PackedVector2Array([
+			Vector2(side * 50.0, -18.0), Vector2(side * 58.0, -8.0), Vector2(side * 55.0, 2.0),
+		]), Color(patina.r, patina.g, patina.b, 0.32), 2.0)
+
+
+func _add_mount_line(points: PackedVector2Array, color: Color, width: float) -> void:
+	var line := Line2D.new()
+	line.points = points
+	line.width = width
+	line.default_color = color
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.antialiased = true
+	_mounting_overlay.add_child(line)
+
+
+func _add_mount_polygon(points: PackedVector2Array, color: Color) -> void:
+	var polygon := Polygon2D.new()
+	polygon.polygon = points
+	polygon.color = color
+	_mounting_overlay.add_child(polygon)
+
+
+func _add_mount_disc(center: Vector2, radius: float, color: Color) -> void:
+	var points := PackedVector2Array()
+	for index in range(10):
+		var angle := TAU * float(index) / 10.0
+		points.append(center + Vector2(cos(angle), sin(angle)) * radius)
+	_add_mount_polygon(points, color)

@@ -1,78 +1,79 @@
 class_name DiveInteractableVisualStyle
 extends RefCounted
 
-const REGION_SKIN_SHADER: Shader = preload("res://assets/diving/interactables/interactable_region_skin.gdshader")
+const INTERACTABLE_SKIN_SHADER: Shader = preload("res://underwater_map_workbench/assets/gameplay/interactables/interactable_region_skin.gdshader")
+const INTERACTABLE_EFFECTS_SCRIPT = preload("res://scripts/diving/DiveInteractableVisualEffects.gd")
 const VALID_QUALITIES := ["low", "medium", "high"]
+const EFFECT_NODE_NAME := "InteractableVisualEffects"
+const COLOR_KEYS := [
+	"tint",
+	"patina",
+	"accent",
+	"rim",
+	"shadow",
+	"silt",
+	"body_dark",
+	"body_mid",
+	"body_light",
+]
+const FLOAT_KEYS := ["patina_mode", "tint_strength", "patina_strength"]
 
 
-static func resolve_region(explicit_hint: String, visual_context: Dictionary, stable_id: String) -> String:
-	var hinted_region := _normalize_region(explicit_hint)
-	if not hinted_region.is_empty():
-		return hinted_region
+static func resolve_context_id(explicit_hint: String, visual_context: Dictionary) -> String:
+	var normalized_hint := explicit_hint.strip_edges()
+	if not normalized_hint.is_empty():
+		return normalized_hint
+	for key in ["context_id", "style_id", "palette_id", "region_id"]:
+		var context_id := str(visual_context.get(key, "")).strip_edges()
+		if not context_id.is_empty():
+			return context_id
+	return ""
 
-	var id_region := _region_from_stable_id(stable_id)
-	if not id_region.is_empty():
-		return id_region
 
-	return _normalize_region(str(visual_context.get("region_id", "")))
+static func resolve_region(explicit_hint: String, visual_context: Dictionary, _stable_id: String) -> String:
+	# Compatibility for existing presenters. The stable ID is deliberately ignored:
+	# presentation context must be supplied explicitly by the caller.
+	return resolve_context_id(explicit_hint, visual_context)
 
 
-static func palette(region_id: String) -> Dictionary:
-	match _normalize_region(region_id):
-		"R1":
-			return _make_palette(
-				"R1",
-				Color("a8cad0"), Color("78979a"), Color("69cad2"), Color("b9edf0"),
-				Color("091d24"), Color("5f797c"), Color("142b31"), Color("35535a"), Color("88a7a8"),
-				1.0, 0.12, 0.21
-			)
-		"R2":
-			return _make_palette(
-				"R2",
-				Color("9dad80"), Color("617943"), Color("a9bf5f"), Color("d3dda0"),
-				Color("101c18"), Color("596343"), Color("18271f"), Color("3c5037"), Color("83936b"),
-				2.0, 0.16, 0.28
-			)
-		"R3":
-			return _make_palette(
-				"R3",
-				Color("c49a72"), Color("9d4f2f"), Color("d99851"), Color("f0c588"),
-				Color("21140f"), Color("76513a"), Color("2d1b16"), Color("68402d"), Color("bd8863"),
-				3.0, 0.18, 0.32
-			)
-		"R4":
-			return _make_palette(
-				"R4",
-				Color("758a98"), Color("27353b"), Color("66a9bb"), Color("a1d7df"),
-				Color("050a0d"), Color("29363a"), Color("0a1115"), Color("20323a"), Color("607b84"),
-				4.0, 0.22, 0.34
-			)
-		_:
-			return _make_palette(
-				"", Color("a5b3b4"), Color("657477"), Color("76adb2"), Color("b4d7d9"),
-				Color("0b171b"), Color("566568"), Color("16262a"), Color("3d5054"), Color("839497"),
-				0.0, 0.10, 0.18
-			)
+static func palette(style_source: Variant = {}) -> Dictionary:
+	var context := _context_from(style_source)
+	var colors := _default_palette()
+	_merge_palette_values(colors, context)
+	var profile: Variant = context.get("profile", {})
+	if profile is Dictionary:
+		_merge_palette_values(colors, profile as Dictionary)
+	var explicit_colors: Variant = context.get("colors", context.get("visual_colors", {}))
+	if explicit_colors is Dictionary:
+		_merge_palette_values(colors, explicit_colors as Dictionary)
+	if context.get("water_color") is Color:
+		colors["tint"] = context["water_color"]
+	if context.get("accent_color") is Color:
+		colors["accent"] = context["accent_color"]
+	if profile is Dictionary and (profile as Dictionary).get("caustics_color") is Color:
+		colors["accent"] = (profile as Dictionary)["caustics_color"]
+	colors["context_id"] = resolve_context_id("", context)
+	return colors
 
 
 static func apply_sprite(
 	sprite: Sprite2D,
-	region_id: String,
+	style_source: Variant,
 	stable_id: String,
 	quality: String,
 	state_strength: float = 1.0
 ) -> void:
 	if sprite == null:
 		return
-	var colors := palette(region_id)
+	var colors := palette(style_source)
 	var skin_material := sprite.material as ShaderMaterial
-	if skin_material != null and skin_material.shader != REGION_SKIN_SHADER:
+	if skin_material != null and skin_material.shader != INTERACTABLE_SKIN_SHADER:
 		# Nie nadpisuj specjalistycznego materiału prefabu; wspólne łuki i osad
-		# nadal zapewnią regionalną spójność bez utraty autorskiego efektu.
+		# nadal zapewnią spójność bez utraty autorskiego efektu.
 		return
 	if skin_material == null:
 		skin_material = ShaderMaterial.new()
-		skin_material.shader = REGION_SKIN_SHADER
+		skin_material.shader = INTERACTABLE_SKIN_SHADER
 		sprite.material = skin_material
 
 	skin_material.set_shader_parameter("region_tint", colors["tint"])
@@ -86,17 +87,80 @@ static func apply_sprite(
 	skin_material.set_shader_parameter("state_strength", clampf(state_strength, 0.0, 1.0))
 
 
+static func configure_effect(
+	host: Node2D,
+	target_sprite: Sprite2D,
+	effect_role: String,
+	style_source: Variant,
+	stable_id: String,
+	quality: String,
+	reduced_motion: bool,
+	resolved: bool,
+	radius: float,
+	visual_context: Dictionary = {},
+	state_tag: String = ""
+) -> INTERACTABLE_EFFECTS_SCRIPT:
+	var effect: INTERACTABLE_EFFECTS_SCRIPT = _ensure_effect(host)
+	if effect == null:
+		return null
+	var context := visual_context.duplicate(true)
+	context.merge(_context_from(style_source), true)
+	var visual_variant := str(context.get("effect_variant", context.get("visual_variant", ""))).strip_edges().to_lower()
+	if visual_variant.is_empty() and effect_role == "device":
+		# `state_tag` jest jawną semantyką prefabu. Może zachować rozpoznawalność
+		# urządzenia, ale nie służy do wyprowadzania regionu ani koloru.
+		visual_variant = state_tag.strip_edges().to_lower()
+	effect.configure(
+		effect_role,
+		resolve_context_id("", context),
+		stable_id,
+		palette(context),
+		quality_level(quality),
+		reduced_motion,
+		resolved,
+		radius,
+		float(context.get("depth_ratio", 0.0)),
+		target_sprite,
+		state_tag,
+		visual_variant
+	)
+	return effect
+
+
+static func set_effect_interaction(host: Node2D, focused: bool, progress: float) -> void:
+	var effect: INTERACTABLE_EFFECTS_SCRIPT = _effect(host)
+	if effect != null:
+		effect.set_interaction_presentation(focused, progress)
+
+
+static func set_effect_time_for_tests(host: Node2D, time_seconds: float) -> void:
+	var effect: INTERACTABLE_EFFECTS_SCRIPT = _effect(host)
+	if effect != null:
+		effect.set_visual_time_for_tests(time_seconds)
+
+
+static func release_effect_time_override(host: Node2D) -> void:
+	var effect: INTERACTABLE_EFFECTS_SCRIPT = _effect(host)
+	if effect != null:
+		effect.release_visual_time_override()
+
+
+static func effect_state(host: Node2D) -> Dictionary:
+	var effect: INTERACTABLE_EFFECTS_SCRIPT = _effect(host)
+	return effect.presentation_state() if effect != null else {}
+
+
 static func draw_grounding(
 	canvas: CanvasItem,
 	radius: float,
-	region_id: String,
+	style_source: Variant,
 	stable_id: String,
 	quality: String,
 	completed: bool = false
 ) -> void:
 	if canvas == null or radius <= 0.0:
 		return
-	var colors := palette(region_id)
+	var colors := palette(style_source)
 	var level := quality_level(quality)
 	var seed := _stable_seed(stable_id)
 	var grounded_color: Color = colors["shadow"]
@@ -133,7 +197,7 @@ static func draw_grounding(
 static func draw_signal_arcs(
 	canvas: CanvasItem,
 	radius: float,
-	region_id: String,
+	style_source: Variant,
 	stable_id: String,
 	quality: String,
 	completed: bool = false,
@@ -141,7 +205,7 @@ static func draw_signal_arcs(
 ) -> void:
 	if canvas == null or radius <= 0.0 or emphasis <= 0.0:
 		return
-	var colors := palette(region_id)
+	var colors := palette(style_source)
 	var level := quality_level(quality)
 	var seed := _stable_seed(stable_id)
 	var accent: Color = colors["accent"]
@@ -149,28 +213,30 @@ static func draw_signal_arcs(
 	var rim: Color = colors["rim"]
 	rim.a = clampf((0.20 if not completed else 0.12) * emphasis, 0.0, 0.42)
 
-	# Jeden nieregularny ślad na low/medium i dwa na high: to osad/caustics,
-	# nie symetryczny celownik UI otaczający każdy obiekt.
-	var arc_count := 2 if level >= 2 else 1
-	var base_angle := -2.46 + seed * 0.34
-	var arc_span := 0.34 + seed * 0.18
-	for arc_index in range(arc_count):
-		var angle := base_angle + float(arc_index) * (2.12 + seed * 0.51)
-		var local_radius := radius * (0.92 + 0.13 * fmod(seed * 5.0 + float(arc_index) * 0.37, 1.0))
-		canvas.draw_arc(Vector2.ZERO, local_radius, angle, angle + arc_span, 12, accent, 2.0, true)
+	# Krótkie, niesymetryczne smugi mineralne są przyklejone do dolnego materiału.
+	# Nie otaczają obiektu, dzięki czemu nie czytają się jak nawiasy lub celownik UI.
+	var stroke_count := 2 if level >= 2 else 1
+	var side := -1.0 if seed < 0.5 else 1.0
+	for stroke_index in range(stroke_count):
+		var mirrored_side := side if stroke_index == 0 else -side
+		var base := Vector2(
+			mirrored_side * radius * (0.43 + seed * 0.09),
+			radius * (0.36 + float(stroke_index) * 0.075)
+		)
+		var travel := Vector2(-mirrored_side * radius * (0.16 + seed * 0.05), radius * 0.035)
+		canvas.draw_polyline(PackedVector2Array([
+			base,
+			base + travel * 0.44 + Vector2(0.0, -2.0),
+			base + travel,
+		]), accent, 1.7 if level == 0 else 2.0, true)
 		if level >= 2:
 			canvas.draw_line(
-				Vector2.from_angle(angle + arc_span + 0.10) * (local_radius - 2.0),
-				Vector2.from_angle(angle + arc_span + 0.21) * (local_radius + 5.0),
+				base + travel * 0.28 + Vector2(1.0, 2.0),
+				base + travel * 0.72 + Vector2(2.0, 3.0),
 				rim,
-				1.2,
+				1.0,
 				true
 			)
-	if completed:
-		var mark_color := accent
-		mark_color.a = clampf(0.72 * emphasis, 0.0, 0.88)
-		canvas.draw_line(Vector2(-7.0, 1.0), Vector2(-2.0, 6.0), mark_color, 2.4, true)
-		canvas.draw_line(Vector2(-2.0, 6.0), Vector2(8.0, -5.0), mark_color, 2.4, true)
 
 
 static func normalize_quality(quality: String) -> String:
@@ -182,61 +248,60 @@ static func quality_level(quality: String) -> int:
 	return VALID_QUALITIES.find(normalize_quality(quality))
 
 
-static func _normalize_region(region_id: String) -> String:
-	var normalized := region_id.strip_edges().to_upper()
-	if normalized in ["R1", "R2", "R3", "R4"]:
-		return normalized
-	return ""
+static func _ensure_effect(host: Node2D) -> INTERACTABLE_EFFECTS_SCRIPT:
+	if host == null:
+		return null
+	var existing := host.get_node_or_null(EFFECT_NODE_NAME)
+	if existing != null:
+		return existing as INTERACTABLE_EFFECTS_SCRIPT
+	var effect := INTERACTABLE_EFFECTS_SCRIPT.new() as INTERACTABLE_EFFECTS_SCRIPT
+	effect.name = EFFECT_NODE_NAME
+	host.add_child(effect)
+	return effect
 
 
-static func _region_from_stable_id(stable_id: String) -> String:
-	var normalized := stable_id.strip_edges().to_lower()
-	if normalized.is_empty():
-		return ""
-	if normalized == "junction_j7" or normalized == "archive_terminal":
-		return "R1"
-	if normalized.begins_with("c4_"):
-		return "R4"
-	if normalized.begins_with("r3_"):
-		return "R3"
-	var padded := "_%s_" % normalized
-	for region_index in range(1, 5):
-		if padded.contains("_r%d_" % region_index):
-			return "R%d" % region_index
-	return ""
+static func _effect(host: Node2D) -> INTERACTABLE_EFFECTS_SCRIPT:
+	if host == null:
+		return null
+	return host.get_node_or_null(EFFECT_NODE_NAME) as INTERACTABLE_EFFECTS_SCRIPT
 
 
 static func _stable_seed(stable_id: String) -> float:
 	return float(posmod(stable_id.hash(), 100003)) / 100003.0
 
 
-static func _make_palette(
-	region_id: String,
-	tint: Color,
-	patina: Color,
-	accent: Color,
-	rim: Color,
-	shadow: Color,
-	silt: Color,
-	body_dark: Color,
-	body_mid: Color,
-	body_light: Color,
-	patina_mode: float,
-	tint_strength: float,
-	patina_strength: float
-) -> Dictionary:
+static func _context_from(style_source: Variant) -> Dictionary:
+	if style_source is Dictionary:
+		return (style_source as Dictionary).duplicate(true)
+	if typeof(style_source) in [TYPE_STRING, TYPE_STRING_NAME]:
+		var context_id := str(style_source).strip_edges()
+		if not context_id.is_empty():
+			return {"context_id": context_id}
+	return {}
+
+
+static func _merge_palette_values(target: Dictionary, values: Dictionary) -> void:
+	for key in COLOR_KEYS:
+		if values.get(key) is Color:
+			target[key] = values[key]
+	for key in FLOAT_KEYS:
+		if typeof(values.get(key)) in [TYPE_INT, TYPE_FLOAT]:
+			target[key] = float(values[key])
+
+
+static func _default_palette() -> Dictionary:
 	return {
-		"region_id": region_id,
-		"tint": tint,
-		"patina": patina,
-		"accent": accent,
-		"rim": rim,
-		"shadow": shadow,
-		"silt": silt,
-		"body_dark": body_dark,
-		"body_mid": body_mid,
-		"body_light": body_light,
-		"patina_mode": patina_mode,
-		"tint_strength": tint_strength,
-		"patina_strength": patina_strength,
+		"context_id": "",
+		"tint": Color("a5b3b4"),
+		"patina": Color("657477"),
+		"accent": Color("76adb2"),
+		"rim": Color("b4d7d9"),
+		"shadow": Color("0b171b"),
+		"silt": Color("566568"),
+		"body_dark": Color("16262a"),
+		"body_mid": Color("3d5054"),
+		"body_light": Color("839497"),
+		"patina_mode": 0.0,
+		"tint_strength": 0.10,
+		"patina_strength": 0.18,
 	}

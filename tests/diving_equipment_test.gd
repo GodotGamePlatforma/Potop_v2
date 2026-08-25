@@ -151,9 +151,18 @@ func _initialize() -> void:
 	var deep_boundary_color: Color = lighting.ambient_color_for_depth(DiveLighting.deep_darkness_min_depth, DiveLighting)
 	var deep_color: Color = lighting.ambient_color_for_depth(160.0, DiveLighting)
 	var shallow_after_jump: Color = lighting.ambient_color_for_depth(8.0, DiveLighting)
+	_assert(DiveLighting.deep_darkness_min_depth >= 150.0, "Ambient exposure must fade across the broad world depth instead of collapsing inside R3.")
+	_assert(_channel_spread(DiveLighting.shallow_ambient_color) <= 0.001 and _channel_spread(DiveLighting.deep_ambient_color) <= 0.001, "CanvasModulate must stay achromatic so spectral absorption has exactly one owner: water.")
 	_assert(shallow_color.is_equal_approx(DiveLighting.shallow_ambient_color) and shallow_boundary_color.is_equal_approx(shallow_color), "The whole first-region depth range must retain the authored shallow ambient.")
 	_assert(_luminance(shallow_color) > _luminance(transition_color) and _luminance(transition_color) > _luminance(deep_color), "Ambient visibility must darken monotonically through the authored depth transition.")
 	_assert(deep_boundary_color.is_equal_approx(DiveLighting.deep_ambient_color) and deep_color.is_equal_approx(deep_boundary_color), "The deepest region must retain the authored deep ambient after the transition endpoint.")
+	_assert(_luminance(deep_color) / _luminance(shallow_color) >= 0.55, "The deepest ambient must preserve readable midtones instead of crushing the world into black.")
+	var previous_ambient_luminance := _luminance(lighting.ambient_color_for_depth(0.0, DiveLighting))
+	for sampled_depth in range(5, 166, 5):
+		var sampled_luminance := _luminance(lighting.ambient_color_for_depth(float(sampled_depth), DiveLighting))
+		_assert(sampled_luminance <= previous_ambient_luminance + 0.0001, "Ambient exposure must remain monotonic at every sampled depth.")
+		_assert(previous_ambient_luminance - sampled_luminance <= 0.035, "Ambient exposure must not create a visible depth band between neighboring samples.")
+		previous_ambient_luminance = sampled_luminance
 	_assert(shallow_after_jump.is_equal_approx(shallow_color), "Jumping deep and back to shallow depth must restore the exact stateless ambient color.")
 	_assert(LanternMk1.light_inner_radius > 125.0 and LanternMk1.light_outer_radius > 300.0, "Lantern I should use the increased starting visibility range.")
 	_assert(LanternMk1.light_outer_radius < LanternMk2.light_outer_radius, "Lantern II must remain the longer-range upgrade.")
@@ -166,9 +175,9 @@ func _initialize() -> void:
 	_assert(point_light.shadow_enabled and point_light.shadow_item_cull_mask == 1, "The diver light should retain terrain-only shadows.")
 	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF13 and is_equal_approx(point_light.shadow_filter_smooth, 1.5), "High quality should use the authored PCF13 shadow profile.")
 	lighting.apply_graphics_quality(point_light, "low")
-	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_NONE and is_zero_approx(point_light.shadow_filter_smooth), "Low quality should disable only shadow filtering.")
+	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF5 and is_equal_approx(point_light.shadow_filter_smooth, 2.0), "Low quality should retain a lightweight soft-shadow profile without hard terrain wedges.")
 	lighting.apply_graphics_quality(point_light, "medium")
-	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF5 and is_equal_approx(point_light.shadow_filter_smooth, 1.5), "Medium quality should use the PCF5 shadow profile.")
+	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF13 and is_equal_approx(point_light.shadow_filter_smooth, 2.0), "Medium quality should use the smooth PCF13 shadow profile.")
 	lighting.apply_graphics_quality(point_light, "high")
 	_assert(point_light.shadow_filter == Light2D.SHADOW_FILTER_PCF13 and is_equal_approx(point_light.shadow_filter_smooth, 1.5), "Returning to high quality should restore PCF13 deterministically.")
 	_assert(is_equal_approx(point_light.texture_scale, mk1_scale) and is_equal_approx(point_light.energy, mk1_energy) and point_light.color.is_equal_approx(mk1_color), "Graphics quality must not change lantern range, energy or color.")
@@ -194,11 +203,12 @@ func _initialize() -> void:
 	point_light.queue_free()
 
 	var death = DiveResultScript.new()
+	var entry_landmark_id: String = str(state.underwater_world.blueprint.entry_landmark_id)
 	death.diver_id = "igor"
 	death.returned_alive = false
 	death.diver_dead = true
-	death.body_location_if_dead = "dead_city_rooftops_001"
-	death.backpack_location_if_lost = "dead_city_rooftops_001@100,100"
+	death.body_location_if_dead = entry_landmark_id
+	death.backpack_location_if_lost = "%s@100,100" % entry_landmark_id
 	death.lost_gear.assign(["diving_lantern_mk2", "oxygen_tank_mk3", "harpoon_pistol", "diving_lantern_mk1", "oxygen_tank_mk1", "knife"])
 	EndOfDayResolverScript.new().resolve(state, death, false)
 	_assert(not state.diving_equipment.owns("diving_lantern_mk2"), "A crafted lantern carried by a dead diver must be removed from base equipment.")
@@ -214,9 +224,10 @@ func _initialize() -> void:
 	var transfer_state = GameStateScript.new()
 	transfer_state.setup_new_campaign(1404, DifficultyProfileScript.new())
 	transfer_state.tutorial.complete()
+	var transfer_entry_landmark_id: String = str(transfer_state.underwater_world.blueprint.entry_landmark_id)
 	transfer_state.underwater_world.lost_backpacks["first_diver"] = {
 		"diver_id": "first_diver",
-		"landmark_id": "R2-02",
+		"landmark_id": transfer_entry_landmark_id,
 		"world_position": Vector2(400, 300),
 		"items": {},
 		"gear_ids": ["oxygen_tank_mk2"],
@@ -227,8 +238,8 @@ func _initialize() -> void:
 	transfer_death.diver_id = "mira"
 	transfer_death.returned_alive = false
 	transfer_death.diver_dead = true
-	transfer_death.body_location_if_dead = "R2-02"
-	transfer_death.backpack_location_if_lost = "R2-02@500,350"
+	transfer_death.body_location_if_dead = transfer_entry_landmark_id
+	transfer_death.backpack_location_if_lost = "%s@500,350" % transfer_entry_landmark_id
 	transfer_death.death_world_position = Vector2(500, 350)
 	transfer_death.recovered_backpacks["first_diver"] = {
 		"items": {},
@@ -246,12 +257,13 @@ func _initialize() -> void:
 	var empty_death_state = GameStateScript.new()
 	empty_death_state.setup_new_campaign(1405, DifficultyProfileScript.new())
 	empty_death_state.tutorial.complete()
+	var empty_entry_landmark_id: String = str(empty_death_state.underwater_world.blueprint.entry_landmark_id)
 	var empty_death = DiveResultScript.new()
 	empty_death.diver_id = "anka"
 	empty_death.returned_alive = false
 	empty_death.diver_dead = true
-	empty_death.body_location_if_dead = "R1-00"
-	empty_death.backpack_location_if_lost = "R1-00@120,120"
+	empty_death.body_location_if_dead = empty_entry_landmark_id
+	empty_death.backpack_location_if_lost = "%s@120,120" % empty_entry_landmark_id
 	empty_death.death_world_position = Vector2(120, 120)
 	empty_death.lost_gear.assign(["diving_lantern_mk1", "oxygen_tank_mk1", "knife"])
 	EndOfDayResolverScript.new().resolve(empty_death_state, empty_death, false)
@@ -306,6 +318,9 @@ func _contains_fragment(lines: Array[String], fragment: String) -> bool:
 
 func _luminance(color: Color) -> float:
 	return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722
+
+func _channel_spread(color: Color) -> float:
+	return maxf(color.r, maxf(color.g, color.b)) - minf(color.r, minf(color.g, color.b))
 
 func _resume_planning_after_direct_resolution(state) -> void:
 	state.pending_settlement_event = null

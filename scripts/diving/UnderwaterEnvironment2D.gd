@@ -1,19 +1,31 @@
 class_name UnderwaterEnvironment2D
 extends Node2D
 
-const POST_PROCESS_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_post_process.gdshader")
-const CAUSTICS_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_caustics.gdshader")
-const LIGHT_SHAFTS_SHADER: Shader = preload("res://assets/diving/world/shaders/underwater_light_shafts.gdshader")
+const POST_PROCESS_SHADER: Shader = preload("res://underwater_map_workbench/assets/shaders/underwater_post_process.gdshader")
+const CAUSTICS_SHADER: Shader = preload("res://underwater_map_workbench/assets/shaders/underwater_caustics.gdshader")
+const LIGHT_SHAFTS_SHADER: Shader = preload("res://underwater_map_workbench/assets/shaders/underwater_light_shafts.gdshader")
 
 const POST_PROCESS_CANVAS_LAYER := 1
 const VALID_GRAPHICS_QUALITIES := ["low", "medium", "high"]
-const DEFAULT_WORLD_SIZE := Vector2(11520.0, 6480.0)
+const DEFAULT_WORLD_SIZE := Vector2.ONE
 const DEFAULT_REGION_COLOR := Color(0.035, 0.20, 0.26, 1.0)
 const DEFAULT_ACCENT_COLOR := Color(0.18, 0.75, 0.80, 1.0)
 const REFERENCE_CURRENT_SPEED := 90.0
 const PARTICLE_TEXTURE_SIZE := 16
+const BUBBLE_TEXTURE_SIZE := 24
 const EFFECT_HALF_EXTENT := Vector2(920.0, 540.0)
 const REDUCED_MOTION_RATE := 0.08
+const LOW_FOCUS_RECOVERY := 0.42
+const REFRACTION_PIXELS_BY_QUALITY := {
+	"low": 0.0,
+	"medium": 0.42,
+	"high": 0.72,
+}
+const CHROMATIC_ABERRATION_PIXELS_BY_QUALITY := {
+	"low": 0.0,
+	"medium": 0.0,
+	"high": 0.18,
+}
 
 var _world_size := DEFAULT_WORLD_SIZE
 var _visual_profiles: Array[Resource] = []
@@ -29,6 +41,7 @@ var _profile_caustics_strength := 0.35
 var _current_vector := Vector2.ZERO
 var _smoothed_flow := Vector2.ZERO
 var _diver_position := Vector2.ZERO
+var _visual_anchor_position := Vector2.ZERO
 var _quality_caustics_intensity := 0.055
 var _quality_light_shafts_intensity := 0.035
 
@@ -41,9 +54,12 @@ var _light_shafts: Polygon2D
 var _light_shafts_material: ShaderMaterial
 var _far_particles: GPUParticles2D
 var _near_particles: GPUParticles2D
+var _bubble_particles: GPUParticles2D
 var _far_particle_material: ParticleProcessMaterial
 var _near_particle_material: ParticleProcessMaterial
+var _bubble_particle_material: ParticleProcessMaterial
 var _near_particle_budget := 0
+var _bubble_particle_budget := 0
 
 
 func _ready() -> void:
@@ -82,7 +98,8 @@ func update_environment(
 	delta: float = 0.0,
 	water_clarity: float = 0.7,
 	suspended_particle_density: float = 0.35,
-	caustics_strength: float = 0.35
+	caustics_strength: float = 0.35,
+	visual_anchor_position: Vector2 = Vector2(INF, INF)
 ) -> void:
 	_ensure_effect_nodes()
 	_depth_ratio = clampf(depth_ratio, 0.0, 1.0)
@@ -93,6 +110,11 @@ func update_environment(
 	_profile_caustics_strength = clampf(caustics_strength, 0.0, 1.0)
 	_current_vector = current_vector
 	_diver_position = diver_position
+	_visual_anchor_position = (
+		visual_anchor_position
+		if is_finite(visual_anchor_position.x) and is_finite(visual_anchor_position.y)
+		else diver_position
+	)
 
 	var safe_delta := maxf(delta, 0.0)
 	var motion_rate := REDUCED_MOTION_RATE if _reduced_motion else 1.0
@@ -105,10 +127,11 @@ func update_environment(
 		var response := 1.0 - exp(-safe_delta * 3.5)
 		_smoothed_flow = _smoothed_flow.lerp(normalized_flow, response)
 
-	_caustics.global_position = diver_position
-	_light_shafts.global_position = diver_position
-	_far_particles.global_position = diver_position
-	_near_particles.global_position = diver_position
+	_caustics.global_position = _visual_anchor_position
+	_light_shafts.global_position = _visual_anchor_position
+	_far_particles.global_position = _visual_anchor_position
+	_near_particles.global_position = _visual_anchor_position
+	_bubble_particles.global_position = _visual_anchor_position
 	_apply_environment_parameters()
 
 
@@ -134,12 +157,14 @@ func environment_state() -> Dictionary:
 		"current_vector": _current_vector,
 		"smoothed_flow": _smoothed_flow,
 		"diver_position": _diver_position,
+		"visual_anchor_position": _visual_anchor_position,
 		"post_process_layer": POST_PROCESS_CANVAS_LAYER,
 		"refraction_enabled": _graphics_quality != "low" and not _reduced_motion,
 		"caustics_intensity": _quality_caustics_intensity * clampf(_profile_caustics_strength * 1.25, 0.22, 1.0),
-		"light_shafts_intensity": _quality_light_shafts_intensity * lerpf(0.72, 1.0, _water_clarity),
+		"light_shafts_intensity": _resolved_light_shafts_intensity(),
 		"far_particle_count": _far_particles.amount if _far_particles != null else 0,
 		"near_particle_count": _near_particle_budget,
+		"bubble_particle_count": _bubble_particle_budget,
 	}
 
 
@@ -199,12 +224,16 @@ func _build_particles() -> void:
 	var particle_texture := _create_mote_texture()
 	_far_particle_material = _create_particle_material(false)
 	_near_particle_material = _create_particle_material(true)
+	_bubble_particle_material = _create_bubble_particle_material()
 	_far_particles = _create_particle_emitter("FarSuspendedMatter", particle_texture, _far_particle_material, 6.8)
 	_near_particles = _create_particle_emitter("NearSuspendedMatter", particle_texture, _near_particle_material, 4.2)
+	_bubble_particles = _create_particle_emitter("SparseBubbles", _create_bubble_texture(), _bubble_particle_material, 4.8)
 	_far_particles.z_index = -24
 	_near_particles.z_index = 6
+	_bubble_particles.z_index = -21
 	add_child(_far_particles)
 	add_child(_near_particles)
+	add_child(_bubble_particles)
 
 
 func _create_particle_emitter(
@@ -246,6 +275,21 @@ func _create_particle_material(near_field: bool) -> ParticleProcessMaterial:
 	return material
 
 
+func _create_bubble_particle_material() -> ParticleProcessMaterial:
+	var material := ParticleProcessMaterial.new()
+	material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	material.emission_box_extents = Vector3(EFFECT_HALF_EXTENT.x, EFFECT_HALF_EXTENT.y, 1.0)
+	material.direction = Vector3(0.12, -1.0, 0.0)
+	material.spread = 24.0
+	material.gravity = Vector3(0.0, -0.55, 0.0)
+	material.initial_velocity_min = 8.0
+	material.initial_velocity_max = 16.0
+	material.scale_min = 0.26
+	material.scale_max = 0.72
+	material.color_ramp = _create_bubble_fade()
+	return material
+
+
 func _create_particle_fade(near_field: bool) -> GradientTexture1D:
 	var peak_alpha := 0.34 if near_field else 0.22
 	var gradient := Gradient.new()
@@ -255,6 +299,20 @@ func _create_particle_fade(near_field: bool) -> GradientTexture1D:
 		Color(0.72, 0.93, 0.94, peak_alpha),
 		Color(0.54, 0.82, 0.82, peak_alpha * 0.72),
 		Color(0.45, 0.72, 0.74, 0.0),
+	])
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = gradient
+	return ramp
+
+
+func _create_bubble_fade() -> GradientTexture1D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.12, 0.78, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(0.72, 0.94, 0.96, 0.0),
+		Color(0.72, 0.94, 0.96, 0.20),
+		Color(0.54, 0.84, 0.88, 0.16),
+		Color(0.54, 0.84, 0.88, 0.0),
 	])
 	var ramp := GradientTexture1D.new()
 	ramp.gradient = gradient
@@ -271,6 +329,21 @@ func _create_mote_texture() -> ImageTexture:
 			var alpha := 1.0 - smoothstep(0.05, 0.94, distance)
 			alpha *= alpha
 			image.set_pixel(x, y, Color(0.78, 0.96, 0.96, alpha))
+	return ImageTexture.create_from_image(image)
+
+
+func _create_bubble_texture() -> ImageTexture:
+	var image := Image.create(BUBBLE_TEXTURE_SIZE, BUBBLE_TEXTURE_SIZE, false, Image.FORMAT_RGBA8)
+	var center := Vector2(BUBBLE_TEXTURE_SIZE - 1, BUBBLE_TEXTURE_SIZE - 1) * 0.5
+	var radius := float(BUBBLE_TEXTURE_SIZE) * 0.5
+	for y in range(BUBBLE_TEXTURE_SIZE):
+		for x in range(BUBBLE_TEXTURE_SIZE):
+			var offset := Vector2(x, y) - center
+			var distance := offset.length() / radius
+			var ring := smoothstep(0.58, 0.74, distance) * (1.0 - smoothstep(0.84, 0.98, distance))
+			var highlight := 1.0 - smoothstep(0.0, 0.18, offset.distance_to(Vector2(-4.5, -4.0)) / radius)
+			var alpha := clampf(ring * 0.78 + highlight * 0.34, 0.0, 1.0)
+			image.set_pixel(x, y, Color(0.76, 0.96, 0.98, alpha))
 	return ImageTexture.create_from_image(image)
 
 
@@ -306,42 +379,44 @@ func _apply_graphics_quality() -> void:
 		return
 	var far_budget := 32
 	var near_budget := 0
-	var refraction := 0.0
+	var bubble_budget := 0
+	var refraction_pixels := float(REFRACTION_PIXELS_BY_QUALITY.get(_graphics_quality, 0.0))
 	var grain := 0.002
 	var bloom := 0.0
-	var chromatic_aberration := 0.0
+	var chromatic_aberration_pixels := float(CHROMATIC_ABERRATION_PIXELS_BY_QUALITY.get(_graphics_quality, 0.0))
 	_quality_caustics_intensity = 0.055
-	_quality_light_shafts_intensity = 0.035
+	_quality_light_shafts_intensity = 0.030
 	match _graphics_quality:
 		"medium":
-			far_budget = 56
-			near_budget = 8
-			refraction = 0.00075
+			far_budget = 64
+			near_budget = 10
+			bubble_budget = 4
 			grain = 0.003
 			bloom = 0.032
-			chromatic_aberration = 0.00022
-			_quality_caustics_intensity = 0.095
-			_quality_light_shafts_intensity = 0.068
+			_quality_caustics_intensity = 0.105
+			_quality_light_shafts_intensity = 0.072
 		"high":
-			far_budget = 96
-			near_budget = 16
-			refraction = 0.00115
+			far_budget = 104
+			near_budget = 20
+			bubble_budget = 8
 			grain = 0.004
 			bloom = 0.058
-			chromatic_aberration = 0.00042
-			_quality_caustics_intensity = 0.14
-			_quality_light_shafts_intensity = 0.105
+			_quality_caustics_intensity = 0.155
+			_quality_light_shafts_intensity = 0.130
 
 	_far_particles.amount = far_budget
 	_near_particles.amount = maxi(near_budget, 1)
+	_bubble_particles.amount = maxi(bubble_budget, 1)
 	_near_particle_budget = near_budget
+	_bubble_particle_budget = bubble_budget
 	_far_particles.emitting = true
 	_near_particles.emitting = near_budget > 0
-	_post_process_material.set_shader_parameter("refraction_strength", refraction)
+	_bubble_particles.emitting = bubble_budget > 0
+	_post_process_material.set_shader_parameter("refraction_pixels", refraction_pixels)
 	_post_process_material.set_shader_parameter("grain_strength", grain)
 	_post_process_material.set_shader_parameter("quality_level", VALID_GRAPHICS_QUALITIES.find(_graphics_quality))
 	_post_process_material.set_shader_parameter("bloom_strength", bloom)
-	_post_process_material.set_shader_parameter("chromatic_aberration", chromatic_aberration)
+	_post_process_material.set_shader_parameter("chromatic_aberration_pixels", chromatic_aberration_pixels)
 	_light_shafts_material.set_shader_parameter("quality_level", VALID_GRAPHICS_QUALITIES.find(_graphics_quality))
 	_apply_environment_parameters()
 	_apply_reduced_motion()
@@ -353,15 +428,22 @@ func _apply_reduced_motion() -> void:
 	var particle_speed := 0.12 if _reduced_motion else 1.0
 	_far_particles.speed_scale = particle_speed
 	_near_particles.speed_scale = particle_speed
-	var base_refraction := 0.0
-	if _graphics_quality == "medium":
-		base_refraction = 0.00075
-	elif _graphics_quality == "high":
-		base_refraction = 0.00115
+	_bubble_particles.speed_scale = particle_speed
+	var base_refraction_pixels := float(REFRACTION_PIXELS_BY_QUALITY.get(_graphics_quality, 0.0))
+	var base_chromatic_aberration_pixels := float(CHROMATIC_ABERRATION_PIXELS_BY_QUALITY.get(_graphics_quality, 0.0))
 	_post_process_material.set_shader_parameter(
-		"refraction_strength",
-		0.0 if _reduced_motion else base_refraction
+		"refraction_pixels",
+		0.0 if _reduced_motion else base_refraction_pixels
 	)
+	_post_process_material.set_shader_parameter(
+		"chromatic_aberration_pixels",
+		base_chromatic_aberration_pixels
+	)
+	_post_process_material.set_shader_parameter(
+		"low_focus_recovery",
+		LOW_FOCUS_RECOVERY if _graphics_quality == "low" and not _reduced_motion else 0.0
+	)
+	_post_process_material.set_shader_parameter("reduced_motion", _reduced_motion)
 	_light_shafts_material.set_shader_parameter("reduced_motion", _reduced_motion)
 
 
@@ -374,7 +456,7 @@ func _apply_environment_parameters() -> void:
 	_post_process_material.set_shader_parameter("flow_vector", _smoothed_flow)
 	_post_process_material.set_shader_parameter("region_color", _region_color)
 	_post_process_material.set_shader_parameter("accent_color", _accent_color)
-	_post_process_material.set_shader_parameter("world_anchor", _diver_position)
+	_post_process_material.set_shader_parameter("world_anchor", _visual_anchor_position)
 	_post_process_material.set_shader_parameter("water_clarity", _water_clarity)
 	_post_process_material.set_shader_parameter("suspended_particle_density", _suspended_particle_density)
 	_post_process_material.set_shader_parameter("caustics_strength", _profile_caustics_strength)
@@ -382,7 +464,7 @@ func _apply_environment_parameters() -> void:
 	_caustics_material.set_shader_parameter("anim_time", _visual_time)
 	_caustics_material.set_shader_parameter("depth_ratio", _depth_ratio)
 	_caustics_material.set_shader_parameter("flow_vector", _smoothed_flow)
-	_caustics_material.set_shader_parameter("world_anchor", _diver_position)
+	_caustics_material.set_shader_parameter("world_anchor", _visual_anchor_position)
 	_caustics_material.set_shader_parameter("accent_color", _accent_color)
 	_caustics_material.set_shader_parameter(
 		"intensity",
@@ -392,14 +474,24 @@ func _apply_environment_parameters() -> void:
 	_light_shafts_material.set_shader_parameter("anim_time", _visual_time)
 	_light_shafts_material.set_shader_parameter("reduced_motion", _reduced_motion)
 	_light_shafts_material.set_shader_parameter("flow_vector", _smoothed_flow)
-	_light_shafts_material.set_shader_parameter("world_anchor", _diver_position)
+	_light_shafts_material.set_shader_parameter("world_anchor", _visual_anchor_position)
 	_light_shafts_material.set_shader_parameter("region_color", _region_color)
 	_light_shafts_material.set_shader_parameter("accent_color", _accent_color)
+	_light_shafts_material.set_shader_parameter("depth_ratio", _depth_ratio)
+	_light_shafts_material.set_shader_parameter("water_clarity", _water_clarity)
+	_light_shafts_material.set_shader_parameter("suspended_particle_density", _suspended_particle_density)
 	_light_shafts_material.set_shader_parameter(
 		"intensity",
-		_quality_light_shafts_intensity * lerpf(0.72, 1.0, _water_clarity)
+		_quality_light_shafts_intensity
 	)
 	_apply_particle_flow_and_color()
+
+
+func _resolved_light_shafts_intensity() -> float:
+	var depth_visibility := lerpf(1.0, 0.28, smoothstep(0.10, 0.92, _depth_ratio))
+	var clarity_visibility := lerpf(0.66, 1.0, _water_clarity)
+	var density_visibility := lerpf(1.0, 0.78, _suspended_particle_density)
+	return _quality_light_shafts_intensity * depth_visibility * clarity_visibility * density_visibility
 
 
 func _apply_particle_flow_and_color() -> void:
@@ -412,10 +504,14 @@ func _apply_particle_flow_and_color() -> void:
 		flow_direction = (flow_direction + Vector2(0.0, -0.18)).normalized()
 	_far_particle_material.direction = Vector3(flow_direction.x, flow_direction.y, 0.0)
 	_near_particle_material.direction = Vector3(flow_direction.x, flow_direction.y, 0.0)
+	var bubble_flow := Vector2(flow_direction.x * 0.36, -1.0).normalized()
+	_bubble_particle_material.direction = Vector3(bubble_flow.x, bubble_flow.y, 0.0)
 	var current_boost := clampf(_smoothed_flow.length(), 0.0, 1.0)
 	_far_particle_material.initial_velocity_max = lerpf(3.5, 8.0, current_boost)
 	_near_particle_material.initial_velocity_max = lerpf(8.0, 16.0, current_boost)
+	_bubble_particle_material.initial_velocity_max = lerpf(14.0, 22.0, current_boost)
 	var particle_color := _region_color.lerp(_accent_color, 0.56).lerp(Color.WHITE, 0.24)
 	var density_alpha := lerpf(0.34, 1.0, _suspended_particle_density)
 	_far_particle_material.color = Color(particle_color.r, particle_color.g, particle_color.b, 0.78 * density_alpha)
 	_near_particle_material.color = Color(particle_color.r, particle_color.g, particle_color.b, 0.92 * density_alpha)
+	_bubble_particle_material.color = Color(particle_color.r, particle_color.g, particle_color.b, 0.72 * density_alpha)

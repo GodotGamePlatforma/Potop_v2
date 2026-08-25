@@ -1,7 +1,7 @@
 [gd_resource type="Resource" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/DiveThreatDefinition.gd" id="1_threat"]
-[ext_resource type="Texture2D" path="res://assets/diving/threats/noise_eel.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://underwater_map_workbench/assets/gameplay/threats/noise_eel.png" id="2_texture"]
 
 [resource]
 script = ExtResource("1_threat")

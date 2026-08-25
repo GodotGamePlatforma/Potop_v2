@@ -18,11 +18,26 @@ const R3_DIAGNOSTIC_DEVICE_ID := "r3_diagnostic_panel"
 const R3_GENERATOR_DEVICE_ID := "r3_generator"
 const C4_SWITCHBOARD_DEVICE_ID := "c4_switchboard"
 const COMMON_LINE_SPLITTER_DEVICE_ID := "c4_splitter_mount"
+const REQUIRED_MAP_DEVICE_IDS: Array[String] = [
+	JUNCTION_J7_DEVICE_ID,
+	ARCHIVE_TERMINAL_DEVICE_ID,
+	R3_DIAGNOSTIC_DEVICE_ID,
+	R3_GENERATOR_DEVICE_ID,
+	C4_SWITCHBOARD_DEVICE_ID,
+	COMMON_LINE_SPLITTER_DEVICE_ID,
+]
 const BLACK_FRONT_DAYS_EASY := 15
 const BLACK_FRONT_DAYS_STANDARD := 12
 const BLACK_FRONT_DAYS_HARD := 10
 const CRISIS_DAYS := 3
 const CRISIS_RECOVERY_HOPE := 15
+
+
+static func required_map_device_ids() -> Array[String]:
+	var result: Array[String] = []
+	result.assign(REQUIRED_MAP_DEVICE_IDS)
+	return result
+
 
 func apply_dive_result(state, dive_result, report) -> Dictionary:
 	var recovered: Dictionary = {}
@@ -99,19 +114,19 @@ func objective_text(state) -> String:
 		return "Czarny Front dotarł. Integralność 100% — ostatnia decyzja energetyczna jest gotowa."
 	if story.black_front_active:
 		if not story.archive_map_transmitted:
-			return "%s  Uruchom terminal w Zalanym Archiwum R1-09 i prześlij mapę Wspólnej Linii." % front_text
+			return "%s  Uruchom terminal w Zalanym Archiwum i prześlij mapę Wspólnej Linii." % front_text
 		if not story.r3_diagnosed:
-			return "%s  Dotrzyj do Elektrowni R3-04 i wykonaj diagnostykę Generatora R-3." % front_text
+			return "%s  Dotrzyj do Generatora R-3 i wykonaj diagnostykę." % front_text
 		if not story.r3_regulator_ready:
 			return "%s  Wykonaj Regulator R-3 w Warsztacie II: 6 złomu, 3 tkaniny/gumy, 2 części techniczne i 200 punktów pracy." % front_text
 		if not story.r3_generator_active:
-			return "%s  Wróć do Elektrowni R3-04, zamontuj Regulator R-3 i uruchom generator." % front_text
+			return "%s  Wróć do Generatora R-3, zamontuj Regulator R-3 i uruchom urządzenie." % front_text
 		if not story.c4_switchboard_active:
-			return "%s  Dotrzyj do Serca R4-06 i uruchom awaryjny panel Rozdzielni C-4." % front_text
+			return "%s  Dotrzyj do Rozdzielni C-4 i uruchom jej panel awaryjny." % front_text
 		if not story.common_line_splitter_ready:
 			return "%s  Wykonaj Rozdzielacz Wspólnej Linii w Warsztacie III: 10 złomu, 5 tkaniny/gumy, 4 części techniczne i 400 punktów pracy." % front_text
 		if not story.common_line_splitter_installed:
-			return "%s  Wróć do Serca R4-06 i zamontuj Rozdzielacz przy Rozdzielni C-4." % front_text
+			return "%s  Wróć do Rozdzielni C-4 i zamontuj Rozdzielacz Wspólnej Linii." % front_text
 		return "%s  Rozdzielacz działa — utrzymaj 100%% Integralności i rozbudowuj Wspólną Linię." % front_text
 	return "Uruchom węzeł J-7 i odbuduj Wspólną Linię."
 

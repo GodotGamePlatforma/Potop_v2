@@ -210,6 +210,7 @@ func seed_user_settings_before_ready(quality_id: String, reduced_motion: bool) -
 func _ready() -> void:
 	diver.input_enabled = false
 	diver.distance_travelled.connect(_on_distance_travelled)
+	diver.surface_contacts_reported.connect(_on_diver_surface_contacts_reported)
 	_build_current_visual()
 	_build_underwater_environment()
 	_build_ui()
@@ -230,6 +231,7 @@ func _process(delta: float) -> void:
 	if setup == null or session == null:
 		return
 	if _ending:
+		_clear_interaction_target_presentation()
 		_sync_diver_visual_context(true)
 		return
 	dive_map.update_streaming(diver.global_position, false, _streaming_visible_half_extent())
@@ -245,6 +247,7 @@ func _process(delta: float) -> void:
 		diver.current_velocity = Vector2.ZERO
 		diver.velocity = Vector2.ZERO
 		_cancel_talent_actions()
+		_clear_interaction_target_presentation()
 		_sync_diver_visual_context(true)
 		_update_ui()
 		return
@@ -323,8 +326,7 @@ func _start_attempt(is_retry: bool) -> void:
 	_ending = false
 	_travelled_distance = 0.0
 	_tutorial_step_time = 0.0
-	_interaction_target = null
-	_interaction_progress = 0.0
+	_set_interaction_target(null)
 	_quiet_repair_progress = 0.0
 	_quiet_repair_blocked_until_release = false
 	_scout_runtime.reset()
@@ -372,6 +374,12 @@ func _start_attempt(is_retry: bool) -> void:
 func _on_distance_travelled(distance: float) -> void:
 	if not _attempt_failed and not _ending:
 		_travelled_distance += distance
+
+
+func _on_diver_surface_contacts_reported(contacts: Array) -> void:
+	if dive_map == null or not dive_map.has_method("present_canonical_terrain_contacts"):
+		return
+	dive_map.present_canonical_terrain_contacts(contacts)
 
 func _handle_combat_input() -> void:
 	if Input.is_action_just_pressed("dive_weapon_knife"):
@@ -473,15 +481,14 @@ func _update_interaction(delta: float) -> void:
 	if _rescue_system.is_towing(session):
 		nearest = dive_map.exit_line if diver.global_position.distance_to(dive_map.exit_line.global_position) <= INTERACTION_DISTANCE else null
 	if nearest != _interaction_target:
-		_interaction_target = nearest
-		_interaction_progress = 0.0
+		_set_interaction_target(nearest)
 	if _interaction_target == null:
 		return
+	_sync_interaction_target_presentation()
 	if _interaction_target is DiveWorldPickup:
 		if Input.is_action_just_pressed("dive_interact"):
 			var completed_target = _interaction_target
-			_interaction_target = null
-			_interaction_progress = 0.0
+			_set_interaction_target(null)
 			_complete_interaction(completed_target)
 		return
 
@@ -489,17 +496,41 @@ func _update_interaction(delta: float) -> void:
 		var required_tool := _required_tool_for(_interaction_target)
 		if not required_tool.is_empty() and not session.has_tool(required_tool):
 			_interaction_progress = 0.0
+			_sync_interaction_target_presentation()
 			_show_status("Brak narzędzia: %s." % _required_tool_display_name(_interaction_target, required_tool), 1.0)
 			return
 		_interaction_progress += delta * _risk_runtime.interaction_speed_multiplier(session, setup)
 		var required := float(_interaction_target.interaction_seconds)
 		if _interaction_progress >= required:
 			var completed_target = _interaction_target
-			_interaction_target = null
-			_interaction_progress = 0.0
+			_set_interaction_target(null)
 			_complete_interaction(completed_target)
 	else:
 		_interaction_progress = 0.0
+	_sync_interaction_target_presentation()
+
+func _set_interaction_target(target) -> void:
+	if target == _interaction_target:
+		return
+	_clear_interaction_target_presentation()
+	_interaction_target = target
+	_interaction_progress = 0.0
+	_sync_interaction_target_presentation()
+
+func _sync_interaction_target_presentation() -> void:
+	if _interaction_target == null or not is_instance_valid(_interaction_target):
+		return
+	if not _interaction_target.has_method("set_interaction_presentation"):
+		return
+	var required := maxf(float(_interaction_target.get("interaction_seconds")), 0.01)
+	var progress_ratio := clampf(_interaction_progress / required, 0.0, 1.0)
+	_interaction_target.call("set_interaction_presentation", true, progress_ratio)
+
+func _clear_interaction_target_presentation() -> void:
+	if _interaction_target == null or not is_instance_valid(_interaction_target):
+		return
+	if _interaction_target.has_method("set_interaction_presentation"):
+		_interaction_target.call("set_interaction_presentation", false, 0.0)
 
 func _complete_interaction(target) -> void:
 	if target is DiveWorldPickup:
@@ -996,7 +1027,10 @@ func _finish_death(reason: String) -> void:
 func _try_operator_extraction(reason: String) -> bool:
 	if not bool(setup.operator_assigned):
 		return false
-	if str(setup.start_entry_point) not in ["R1-00", "dead_city_rooftops_001"]:
+	if game_state == null or game_state.underwater_world == null or game_state.underwater_world.blueprint == null:
+		return false
+	var canonical_entry_id := str(game_state.underwater_world.blueprint.entry_landmark_id).strip_edges()
+	if canonical_entry_id.is_empty() or str(setup.start_entry_point) != canonical_entry_id:
 		return false
 	var rescue_max_distance := maxf(float(setup.difficulty_modifiers.get(
 		"operator_rescue_max_distance",
@@ -1337,7 +1371,7 @@ func _build_disease_hazard_overlay(canvas: CanvasLayer) -> void:
 	column.add_theme_constant_override("separation", 18)
 	content.add_child(column)
 	var eyebrow := Label.new()
-	eyebrow.text = "R1-06  //  JAWNA DECYZJA PRZED ŁUPEM"
+	eyebrow.text = "ZAGROŻENIE CHOROBOWE  //  JAWNA DECYZJA PRZED ŁUPEM"
 	eyebrow.add_theme_font_size_override("font_size", 12)
 	eyebrow.add_theme_color_override("font_color", Color("c79f6b"))
 	column.add_child(eyebrow)
@@ -1989,7 +2023,8 @@ func _update_environment_lighting(delta: float = 0.0) -> void:
 			maxf(delta, 0.0),
 			float(visual_profile.get("water_clarity")) if visual_profile != null else 0.7,
 			float(visual_profile.get("suspended_particle_density")) if visual_profile != null else 0.35,
-			float(visual_profile.get("caustics_strength")) if visual_profile != null else 0.35
+			float(visual_profile.get("caustics_strength")) if visual_profile != null else 0.35,
+			_visual_camera_anchor()
 		)
 
 
@@ -2006,7 +2041,7 @@ func _configure_underwater_environment() -> void:
 	if _underwater_environment == null or not is_instance_valid(_underwater_environment):
 		return
 	_underwater_environment.configure(
-		dive_map.world_size() if dive_map != null else Vector2(11_520.0, 6_480.0),
+		dive_map.world_size() if dive_map != null else Vector2.ONE,
 		dive_map.terrain_visual_profiles() if dive_map != null and dive_map.has_method("terrain_visual_profiles") else []
 	)
 
@@ -2028,11 +2063,16 @@ func _update_current_presentation(delta: float, snap_transition: bool = false) -
 		_active_current_vector = dive_map.current_at(diver.global_position) * _difficulty_modifier("current_strength_multiplier")
 	if _current_visual == null or not is_instance_valid(_current_visual):
 		_build_current_visual()
-	var world_anchor := diver.global_position
+	_current_visual.update_sample(_active_current_vector, _visual_camera_anchor(), delta, snap_transition)
+
+
+func _visual_camera_anchor() -> Vector2:
+	if diver == null:
+		return Vector2.ZERO
 	var camera := diver.get_node_or_null("Camera2D") as Camera2D
 	if camera != null and camera.is_inside_tree():
-		world_anchor = camera.get_screen_center_position()
-	_current_visual.update_sample(_active_current_vector, world_anchor, delta, snap_transition)
+		return camera.get_screen_center_position()
+	return diver.global_position
 
 
 func _streaming_visible_half_extent() -> Vector2:

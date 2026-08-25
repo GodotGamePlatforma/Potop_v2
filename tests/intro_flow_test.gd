@@ -7,6 +7,12 @@ const PLATFORM_PRERENDER_PATH := "res://assets/intro/platform_prerender.png"
 const PLATFORM_PRERENDER_SIZE := Vector2(1672.0, 941.0)
 const PLATFORM_PRERENDER_SHA256 := "B27242D563A474D9318FFA767504A8225CB1940B6635A85447458057DF74B19C"
 const MIRA_PORTRAIT_PATH := "res://assets/ui/portraits/mira_boruta_portrait_v1.png"
+const INTRO_PREMIX_PATH := "res://assets/audio/intro/intro_ambient.ogg"
+const INTRO_PREMIX_LENGTH_SECONDS := 45.0
+const INTRO_PREMIX_SAMPLE_RATE := 48000
+const INTRO_PREMIX_BPM := 64.0
+const INTRO_PREMIX_BEAT_COUNT := 48
+const INTRO_PREMIX_BAR_BEATS := 4
 
 const TEST_SAVE := "user://test_intro_flow.tres"
 const TEST_PENDING := "user://test_intro_flow.pending.tres"
@@ -52,6 +58,25 @@ func _ready() -> void:
 	_assert(intro == null or intro.find_children("*", "Node3D", true, false).is_empty(), "Intro must remain a purely 2D presentation tree.")
 	_assert(intro == null or not intro.has_method("set_graphics_quality"), "Graphics quality must not reconfigure a static intro prerender.")
 	_assert(intro == null or intro.find_child("VoicePlayer", true, false) == null, "Intro must not instantiate a voice player.")
+	var intro_audio_players: Array[Node] = intro.find_children("*", "AudioStreamPlayer", true, false) if intro != null else []
+	_assert(intro_audio_players.size() == 1, "Intro must use exactly one local premix player without parallel rain or music stems.")
+	var ambient_player := intro.find_child("AmbientPlayer", true, false) as AudioStreamPlayer if intro != null else null
+	_assert(ambient_player != null, "Intro must expose its single rain-and-music premix as AmbientPlayer.")
+	if ambient_player != null:
+		_assert(ambient_player.playing, "The premix should start alongside the authoritative intro animation.")
+		_assert(not ambient_player.autoplay, "The controller should start the premix explicitly with the intro timeline.")
+		_assert(ambient_player.bus == &"Master", "The premix should use the project's one real Master bus.")
+		_assert(is_equal_approx(ambient_player.volume_db, 0.0), "The premix should preserve its authored local level without voice-over ducking.")
+		var premix_stream := ambient_player.stream as AudioStreamOggVorbis
+		_assert(premix_stream != null, "AmbientPlayer should load the authored Ogg Vorbis premix.")
+		if premix_stream != null:
+			_assert(premix_stream.resource_path == INTRO_PREMIX_PATH, "Intro should resolve the approved rain-and-music premix asset.")
+			_assert(not premix_stream.has_loop(), "The 45-second intro premix must not loop.")
+			_assert(absf(premix_stream.get_length() - INTRO_PREMIX_LENGTH_SECONDS) <= 0.02, "The premix should preserve the exact 12-bar intro duration.")
+			_assert(is_equal_approx(premix_stream.bpm, INTRO_PREMIX_BPM), "The imported premix should preserve the authored 64 BPM grid.")
+			_assert(premix_stream.beat_count == INTRO_PREMIX_BEAT_COUNT, "The imported premix should preserve exactly 48 beats.")
+			_assert(premix_stream.bar_beats == INTRO_PREMIX_BAR_BEATS, "The imported premix should preserve the 4/4 bar grid.")
+			_assert(premix_stream.packet_sequence != null and premix_stream.packet_sequence.sampling_rate == INTRO_PREMIX_SAMPLE_RATE, "The runtime premix should use the authored 48 kHz sample rate.")
 	var speaker_label := intro.find_child("SpeakerLabel", true, false) as Label if intro != null else null
 	_assert(speaker_label != null and speaker_label.text == "MIRA", "The intro should identify the author of its text without implying voice-over.")
 	var mira_portrait := intro.find_child("MiraPortrait", true, false) as Control if intro != null else null
@@ -85,14 +110,13 @@ func _ready() -> void:
 			_assert(mira_portrait != null and mira_portrait.is_visible_in_tree(), "Mira's portrait must remain visible for caption %d." % (index + 1))
 		intro.call("set_timeline_time_for_tests", 4.0)
 		_assert(_label_text(intro, "NarrationLabel").contains("Pięć lat"), "Opening caption should be Mira's first-person chronicle.")
-		var ambient_player := intro.find_child("AmbientPlayer", true, false) as AudioStreamPlayer
-		_assert(ambient_player != null and is_equal_approx(ambient_player.volume_db, 0.0), "Ambient should keep a fixed local level because intro has no voice-over ducking.")
+		_assert(ambient_player != null and is_equal_approx(ambient_player.volume_db, 0.0), "Premix should keep a fixed local level because intro has no voice-over ducking.")
 		intro.call("set_timeline_time_for_tests", 18.5)
 		_assert(_alpha(intro, "DiscoveryPlate") > 0.9 and _label_text(intro, "NarrationLabel").contains("było nas troje"), "Discovery beat should show exactly the human premise named by Mira.")
 		intro.call("set_timeline_time_for_tests", 25.0)
 		_assert(_alpha(intro, "PlatformReveal") > 0.9 and _label_text(intro, "NarrationLabel").contains("odbudować świat"), "The prerendered platform beat should bridge the illustration to live gameplay.")
 		intro.call("set_timeline_time_for_tests", 28.5)
-		_assert(ambient_player != null and is_equal_approx(ambient_player.volume_db, 0.0), "Ambient level should remain stable between captions.")
+		_assert(ambient_player != null and is_equal_approx(ambient_player.volume_db, 0.0), "Premix level should remain stable between captions.")
 		intro.call("set_timeline_time_for_tests", 34.0)
 		_assert(_alpha(intro, "BridgePlate") > 0.9 and _label_text(intro, "NarrationLabel").contains("Pod nami"), "Underwater beat should connect survival resources and missing people to the depths.")
 		intro.call("set_timeline_time_for_tests", 43.0)
@@ -135,9 +159,15 @@ func _ready() -> void:
 		var natural_player := natural_intro.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		_assert(natural_player != null, "Intro should use AnimationPlayer as its authoritative clock.")
 		if natural_player != null:
+			var intro_animation := natural_player.get_animation(&"intro")
+			_assert(intro_animation != null and is_equal_approx(intro_animation.length, INTRO_PREMIX_LENGTH_SECONDS), "The authoritative visual timeline should preserve the same 45-second authored duration.")
+			var natural_premix_player := natural_intro.find_child("AmbientPlayer", true, false) as AudioStreamPlayer
+			if natural_premix_player != null:
+				natural_premix_player.stop()
+				natural_premix_player.stream = null
 			natural_player.speed_scale = 1000.0
 	await _frames(12)
-	_assert(programmatic_game.current_scene != null and programmatic_game.current_scene.name == "BaseScene", "The natural animation end should use the same safe handoff as skip.")
+	_assert(programmatic_game.current_scene != null and programmatic_game.current_scene.name == "BaseScene", "The natural animation end should use the same safe handoff as skip even when the premix is unavailable.")
 
 	natural_intro = null
 	programmatic_game.queue_free()
@@ -153,7 +183,7 @@ func _ready() -> void:
 	if _failed:
 		get_tree().quit(1)
 		return
-	print("Intro flow test passed: text-only prerendered intro, fixed ambient, deterministic beats, skip and continue are safe.")
+	print("Intro flow test passed: text-only prerendered intro, fixed rain-and-music premix, deterministic beats, skip and continue are safe.")
 	get_tree().quit(0)
 
 

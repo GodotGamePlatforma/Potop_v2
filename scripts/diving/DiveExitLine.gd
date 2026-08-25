@@ -1,8 +1,8 @@
 class_name DiveExitLine
 extends Area2D
 
-const ReturnLineTexture := preload("res://assets/diving/interactables/return_line.png")
-const ReturnBellTexture := preload("res://assets/diving/interactables/return_bell.png")
+const ReturnLineTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/return_line.png")
+const ReturnBellTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/return_bell.png")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const VisualStyle := preload("res://scripts/diving/DiveInteractableVisualStyle.gd")
 
@@ -52,7 +52,20 @@ func set_graphics_quality(quality_id: String) -> void:
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
+	_refresh_visual()
 	queue_redraw()
+
+func set_interaction_presentation(focused: bool, progress: float) -> void:
+	VisualStyle.set_effect_interaction(self, focused, progress)
+
+func set_visual_time_for_tests(time_seconds: float) -> void:
+	VisualStyle.set_effect_time_for_tests(self, time_seconds)
+
+func release_visual_time_override() -> void:
+	VisualStyle.release_effect_time_override(self)
+
+func visual_effect_state_for_tests() -> Dictionary:
+	return VisualStyle.effect_state(self)
 
 func visual_texture() -> Texture2D:
 	return ReturnBellTexture if support_level >= 4 else ReturnLineTexture
@@ -86,20 +99,22 @@ func _refresh_visual() -> void:
 			_graphics_quality,
 			1.0
 		)
+	var exit_id := "return_bell" if support_level >= 4 else "return_line"
+	VisualStyle.configure_effect(
+		self,
+		_sprite,
+		"exit",
+		_visual_region_id,
+		exit_id,
+		_graphics_quality,
+		_reduced_motion,
+		support_level >= 4,
+		88.0,
+		_visual_context,
+		exit_id
+	)
 
 func _draw() -> void:
 	var exit_id := "return_bell" if support_level >= 4 else "return_line"
 	VisualStyle.draw_grounding(self, 88.0, _visual_region_id, exit_id, _graphics_quality, false)
 	VisualStyle.draw_signal_arcs(self, 78.0, _visual_region_id, exit_id, _graphics_quality, false, 1.26)
-	if _authored_visual_override:
-		return
-	var palette := VisualStyle.palette(_visual_region_id)
-	var outline: Color = palette.get("rim", Color("77e1d8")) if support_level >= 4 else palette.get("accent", Color("f2cf73"))
-	# Pęcherzyki pozostają fizycznym drogowskazem ku powierzchni, lecz ich liczba skaluje się profilem.
-	var bubble_count := 2 if _graphics_quality == "low" else 4 if _graphics_quality == "medium" else 5
-	if _reduced_motion:
-		bubble_count = mini(bubble_count, 3)
-	for bubble in range(bubble_count):
-		var position := Vector2(32.0 + bubble * 6.0, -112.0 - bubble * 29.0)
-		draw_circle(position, 3.0 + bubble * 0.5, Color(outline.r, outline.g, outline.b, 0.28))
-		draw_arc(position, 4.0 + bubble * 0.5, -2.7, 1.5, 10, Color(0.86, 1.0, 1.0, 0.62), 1.0, true)

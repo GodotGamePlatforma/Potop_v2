@@ -1,7 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="PackedScene" path="res://tests/fixtures/unsafe_visual_side_effects.tscn" id="1_unsafe"]
-
-[node name="NestedVisualFixture" type="Node2D"]
-
-[node name="UnsafeNestedInstance" parent="." instance=ExtResource("1_unsafe")]

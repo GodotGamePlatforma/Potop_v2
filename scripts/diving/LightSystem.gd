@@ -4,9 +4,9 @@ extends RefCounted
 const TerrainOcclusionScript := preload("res://scripts/diving/DiveTerrainOcclusion.gd")
 const LIGHT_TEXTURE_SIZE := 256
 const FALLBACK_SHALLOW_VISIBILITY_MAX_DEPTH := 35.0
-const FALLBACK_DEEP_DARKNESS_MIN_DEPTH := 105.0
-const FALLBACK_SHALLOW_AMBIENT := Color(0.96, 0.98, 1.0, 1.0)
-const FALLBACK_DEEP_AMBIENT := Color(0.32, 0.38, 0.48, 1.0)
+const FALLBACK_DEEP_DARKNESS_MIN_DEPTH := 160.0
+const FALLBACK_SHALLOW_AMBIENT := Color.WHITE
+const FALLBACK_DEEP_AMBIENT := Color(0.58, 0.58, 0.58, 1.0)
 const FALLBACK_TRANSITION_POWER := 1.0
 const NORMAL_MAPPED_LIGHT_HEIGHT := 96.0
 
@@ -46,11 +46,11 @@ func apply_graphics_quality(point_light: PointLight2D, quality_id: String) -> vo
 		return
 	match quality_id:
 		"low":
-			point_light.shadow_filter = Light2D.SHADOW_FILTER_NONE
-			point_light.shadow_filter_smooth = 0.0
-		"medium":
 			point_light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
-			point_light.shadow_filter_smooth = 1.5
+			point_light.shadow_filter_smooth = 2.0
+		"medium":
+			point_light.shadow_filter = Light2D.SHADOW_FILTER_PCF13
+			point_light.shadow_filter_smooth = 2.0
 		_:
 			point_light.shadow_filter = Light2D.SHADOW_FILTER_PCF13
 			point_light.shadow_filter_smooth = 1.5

@@ -1,9 +1,9 @@
 class_name DiveRescueSurvivor
 extends Area2D
 
-const LeonTrappedTexture := preload("res://assets/diving/rescue/leon_trapped.png")
-const LeonFreedTexture := preload("res://assets/diving/rescue/leon_freed.png")
-const LeonTowingTexture := preload("res://assets/diving/rescue/leon_towing.png")
+const LeonTrappedTexture := preload("res://underwater_map_workbench/assets/gameplay/rescue/leon_trapped.png")
+const LeonFreedTexture := preload("res://underwater_map_workbench/assets/gameplay/rescue/leon_freed.png")
+const LeonTowingTexture := preload("res://underwater_map_workbench/assets/gameplay/rescue/leon_towing.png")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const VisualStyle := preload("res://scripts/diving/DiveInteractableVisualStyle.gd")
 
@@ -23,6 +23,7 @@ enum Stage {
 var campaign_stage: Stage = Stage.TRAPPED
 var _tow_target: Node2D
 var _sprite: Sprite2D
+var _trapped_debris_beam: Line2D
 var _authored_visual_override := false
 var _visual_context: Dictionary = {}
 var _visual_region_id := "r1"
@@ -108,6 +109,24 @@ func configure_visual_context(context: Dictionary, explicit_region_hint: String 
 	_refresh_visual()
 	queue_redraw()
 
+
+func sync_visual_context(context: Dictionary, explicit_region_hint: String = "", minimum_depth_delta: float = 0.01) -> bool:
+	var next_context := context.duplicate(true)
+	var next_region := VisualStyle.resolve_region(explicit_region_hint, next_context, encounter_id)
+	var next_depth := clampf(float(next_context.get("depth_ratio", 0.0)), 0.0, 1.0)
+	var current_depth := float(_visual_context.get("depth_ratio", -1.0))
+	if (
+		next_region == _visual_region_id
+		and current_depth >= 0.0
+		and absf(next_depth - current_depth) < maxf(minimum_depth_delta, 0.0)
+	):
+		return false
+	_visual_context = next_context
+	_visual_region_id = next_region
+	_refresh_visual()
+	queue_redraw()
+	return true
+
 func set_graphics_quality(quality_id: String) -> void:
 	_graphics_quality = VisualStyle.normalize_quality(quality_id)
 	_refresh_visual()
@@ -115,7 +134,20 @@ func set_graphics_quality(quality_id: String) -> void:
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
+	_refresh_visual()
 	queue_redraw()
+
+func set_interaction_presentation(focused: bool, progress: float) -> void:
+	VisualStyle.set_effect_interaction(self, focused, progress)
+
+func set_visual_time_for_tests(time_seconds: float) -> void:
+	VisualStyle.set_effect_time_for_tests(self, time_seconds)
+
+func release_visual_time_override() -> void:
+	VisualStyle.release_effect_time_override(self)
+
+func visual_effect_state_for_tests() -> Dictionary:
+	return VisualStyle.effect_state(self)
 
 func visual_texture() -> Texture2D:
 	match stage:
@@ -146,6 +178,23 @@ func _build_visual() -> void:
 		_sprite.name = "RescueSprite"
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(_sprite)
+	_trapped_debris_beam = get_node_or_null("TrappedDebrisBeam") as Line2D
+	if _trapped_debris_beam == null:
+		_trapped_debris_beam = Line2D.new()
+		_trapped_debris_beam.name = "TrappedDebrisBeam"
+		_trapped_debris_beam.z_index = 1
+		_trapped_debris_beam.width = 8.0
+		_trapped_debris_beam.antialiased = true
+		_trapped_debris_beam.joint_mode = Line2D.LINE_JOINT_BEVEL
+		_trapped_debris_beam.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		_trapped_debris_beam.end_cap_mode = Line2D.LINE_CAP_ROUND
+		_trapped_debris_beam.points = PackedVector2Array([
+			Vector2(-72.0, 44.0),
+			Vector2(-62.0, -6.0),
+			Vector2(-30.0, -42.0),
+			Vector2(8.0, -35.0),
+		])
+		add_child(_trapped_debris_beam)
 	_refresh_visual()
 
 func _refresh_visual() -> void:
@@ -153,7 +202,14 @@ func _refresh_visual() -> void:
 		return
 	_sprite.texture = visual_texture()
 	_sprite.scale = Vector2.ONE * (0.66 if stage == Stage.TOWING else 0.74)
+	_sprite.position = Vector2(12.0, 6.0) if stage == Stage.TRAPPED else Vector2.ZERO
 	_sprite.visible = not _authored_visual_override
+	if _trapped_debris_beam != null:
+		var palette := VisualStyle.palette(_visual_region_id)
+		var beam_color: Color = palette.get("body_dark", Color("142b31"))
+		_trapped_debris_beam.default_color = Color(beam_color.r, beam_color.g, beam_color.b, 0.92)
+		_trapped_debris_beam.width = 7.0 if _graphics_quality == "low" else 8.0
+		_trapped_debris_beam.visible = stage == Stage.TRAPPED and not _authored_visual_override
 	if _sprite.visible:
 		VisualStyle.apply_sprite(
 			_sprite,
@@ -162,12 +218,35 @@ func _refresh_visual() -> void:
 			_graphics_quality,
 			0.9 if stage == Stage.TOWING else 1.0
 		)
+	var survivor_id := encounter_id if not encounter_id.is_empty() else "rescue_survivor"
+	VisualStyle.configure_effect(
+		self,
+		_sprite,
+		"rescue",
+		_visual_region_id,
+		survivor_id,
+		_graphics_quality,
+		_reduced_motion,
+		stage != Stage.TRAPPED,
+		80.0,
+		_visual_context,
+		_stage_tag()
+	)
+
+func _stage_tag() -> String:
+	match stage:
+		Stage.TRAPPED:
+			return "trapped"
+		Stage.FREED:
+			return "freed"
+		Stage.TOWING:
+			return "towing"
+	return "trapped"
 
 func _draw() -> void:
 	var survivor_id := encounter_id if not encounter_id.is_empty() else "rescue_survivor"
 	var resolved := stage != Stage.TRAPPED
 	VisualStyle.draw_grounding(self, 80.0, _visual_region_id, survivor_id, _graphics_quality, resolved)
-	VisualStyle.draw_signal_arcs(self, 67.0, _visual_region_id, survivor_id, _graphics_quality, resolved, 1.2)
 	if _authored_visual_override:
 		return
 	var palette := VisualStyle.palette(_visual_region_id)
@@ -176,7 +255,3 @@ func _draw() -> void:
 		# Lina jest sygnałem stanu i kierunku, niezależnym od regionalnej barwy.
 		draw_line(Vector2(55, 0), Vector2(58, -28), Color(outline.r, outline.g, outline.b, 0.84), 2.5, true)
 		draw_circle(Vector2(58, -28), 3.5, Color(0.82, 0.77, 0.49, 0.9))
-	elif stage == Stage.TRAPPED:
-		# Dwa nieregularne pręty kotwiczą sylwetkę w wraku, bez pełnej świetlnej obręczy.
-		draw_line(Vector2(-57, -37), Vector2(-42, 38), Color(outline.r, outline.g, outline.b, 0.48), 3.0, true)
-		draw_line(Vector2(54, -32), Vector2(44, 41), Color(outline.r, outline.g, outline.b, 0.42), 3.0, true)

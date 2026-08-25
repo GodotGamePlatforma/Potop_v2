@@ -2,6 +2,7 @@ extends SceneTree
 
 const TEST_ROUNDTRIP_PATH := "user://test_workshop_order_roundtrip.tres"
 const KNOWN_TEST_OUTPUT_GEAR_IDS: Array[String] = ["diving_lantern_mk2"]
+const TEST_HEAVY_OBJECT_ID := "fixture_heavy_object"
 
 const BuildingStateScript := preload("res://scripts/data/BuildingState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
@@ -280,13 +281,14 @@ func _test_zero_point_queue_outcomes_fall_through_priorities() -> void:
 	)
 	heavy_workshop.queued_production_orders.append(blocked_order)
 	heavy_workshop.next_production_order_sequence = 2
-	heavy_state.underwater_world.marked_heavy_objects.append("ship_engine_r1")
+	_add_test_heavy_object(heavy_state)
+	heavy_state.underwater_world.marked_heavy_objects.append(TEST_HEAVY_OBJECT_ID)
 	var heavy_report = ReportStateScript.new()
 	var heavy_resolver = EndOfDayResolverScript.new()
 	heavy_resolver._capture_capable_worker_snapshot(heavy_state)
 	heavy_resolver._resolve_workshop_and_repairs(heavy_state, heavy_report)
 	_assert(heavy_workshop.queued_production_orders.size() == 1 and heavy_workshop.queued_production_orders[0] == blocked_order, "A controlled blocked order should stay reserved after the lower-priority task runs.")
-	_assert(not heavy_state.underwater_world.marked_heavy_objects.has("ship_engine_r1") and heavy_state.underwater_world.recovered_heavy_objects.has("ship_engine_r1"), "Zero production points from a blocked head should allow one marked heavy object to be recovered.")
+	_assert(not heavy_state.underwater_world.marked_heavy_objects.has(TEST_HEAVY_OBJECT_ID) and heavy_state.underwater_world.recovered_heavy_objects.has(TEST_HEAVY_OBJECT_ID), "Zero production points from a blocked head should allow one marked heavy object to be recovered.")
 	_assert(_contains_fragment(heavy_report.warnings, "missing_gear_target") and _contains_fragment(heavy_report.entries, "wydobył ciężki obiekt"), "The report should expose both the preserved order error and the real heavy-recovery task.")
 
 	var repair_state = _new_state(1, 20)
@@ -314,6 +316,7 @@ func _test_positive_production_blocks_lower_priorities_and_commits_work() -> voi
 	_assert(production.queue_recipe(state, workshop, production.get_recipe("diving_lantern_mk2")), "The positive-priority fixture should queue a first canonical order.")
 	_assert(production.queue_recipe(state, workshop, production.get_recipe("oxygen_tank_mk2")), "The positive-priority fixture should queue a second order for partial overflow.")
 	state.current_day_plan.sync_from_state(state)
+	_add_test_heavy_object(state)
 	var heavy_spawns: Array = state.underwater_world.blueprint.heavy_object_spawns
 	_assert(not heavy_spawns.is_empty(), "The positive-priority fixture needs one canonical heavy object.")
 	if heavy_spawns.is_empty():
@@ -530,6 +533,14 @@ func _new_state(workshop_level: int, target_day: int):
 	var worker = state.find_survivor("anka")
 	worker.current_assignment = workshop.id
 	return state
+
+
+func _add_test_heavy_object(state) -> void:
+	state.underwater_world.blueprint.heavy_object_spawns.append({
+		"id": TEST_HEAVY_OBJECT_ID,
+		"display_name": "Ciężki obiekt fixture",
+		"rewards": {ResourceIdsScript.SCRAP: 2},
+	})
 
 
 func _resource_snapshot(state) -> Dictionary:

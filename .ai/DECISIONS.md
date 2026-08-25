@@ -493,9 +493,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0043 - Aktywna granica produktu
 
 - Domena: zakres gry
-- Status / aktywny zakres: Czesciowo zastapione; D1-D4, D6
+- Status / aktywny zakres: Czesciowo zastapione; D1, D3-D4, D6
 - Zatwierdzenie: 2026-08-08
-- Relacje: Zastepuje: brak | Zastapiona przez: ARD-0055/D5
+- Relacje: Zastepuje: brak | Zastapiona przez: ARD-0055/D5; ARD-0102/D4
 - D1. Aktywna kampania i Kronika korzystaja z jednej stalej, szescioslotowej platformy; dzielnice, przenoszenie, sasiedztwo, segmenty konstrukcji i uszkodzenia pojedynczych budynkow wymagaja osobnej decyzji oraz oceny zapisu.
 - D2. Stala mapa ma jeden kanoniczny wymiar, a dostep do czterech regionow wynika z miekkich bram domenowych; zmienna przeszkoda nie moze naruszyc jedynej trasy krytycznej i wymaga trwalego WorldDelta.
 - D3. Normalny powrot wymaga aktywnej liny, a Operator jest jedyna aktywna awaryjna ekstrakcja; nazwa Dzwonu glebinowego nie ustanawia drugiego wyjscia.
@@ -864,9 +864,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0072 - Certyfikat pelnej drogi odzyskania zasobu
 
 - Domena: nurkowanie, progresja i narzedzia projektowe
-- Status / aktywny zakres: Obowiazuje; D1-D9
+- Status / aktywny zakres: Zastapione w calosci
 - Zatwierdzenie: 2026-08-09
-- Relacje: Zastepuje: brak | Zastapiona przez: brak
+- Relacje: Zastepuje: brak | Zastapiona przez: ARD-0102/D8-D9
 - D1. Osiagalnosc autorskiego zasobu oznacza swiadectwo konkretnej sekwencji wejscie -> interakcje -> wymagany ladunek -> normalna aktywna lina, a nie sam dystans, wspolny komponent mapy ani ratunek Operatora.
 - D2. Swiadectwo rozdziela FEASIBLE od SAFE; pierwszy wynik wymaga zywego nurka i tlenu wiekszego od zera po pelnej interakcji liny, drugi dodatkowo obowiazkowej rezerwy z walidowanej polityki.
 - D3. Twardy wynik uzywa kanonicznej kolizji runtime, rzeczywistego gabarytu nurka, kierunkowych pradow, czasu, tlenu, ciezaru, slotow, narzedzi, temperatury, kombinezonu, przeszkod oraz aktywnych zagrozen. Planner moze wskazac kandydata, lecz certyfikat nadaje dopiero deterministyczny replay wspolnych regul.
@@ -920,9 +920,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0075 - Scena Godot jako jedyne zrodlo swiata podwodnego
 
 - Domena: swiat nurkowania, authoring, runtime i kompatybilnosc zapisu
-- Status / aktywny zakres: Czesciowo zastapione; D1-D4, D6-D8, D11-D12
+- Status / aktywny zakres: Czesciowo zastapione; D3, D7-D8
 - Zatwierdzenie: 2026-08-10
-- Relacje: Zastepuje: ARD-0074/calosc | Zastapiona przez: ARD-0076/D9-D10; ARD-0085/D5
+- Relacje: Zastepuje: ARD-0074/calosc | Zastapiona przez: ARD-0076/D9-D10; ARD-0085/D5; ARD-0102/D1-D2,D4,D6,D11-D12
 - D1. `res://scenes/diving/UnderwaterMap.tscn` jest jedynym produkcyjnym zrodlem statycznego swiata podwodnego. Generator kodowy, katalog `.tres`, draft i wykonywany overview nie moga utrzymywac rownoleglej topologii ani rozmieszczenia.
 - D2. Regiony, landmarki, wejscie, wyjscie, polaczenia, prady, kontenery, pickupy, zagrozenia, cele ratunkowe, ciezkie obiekty, boje, bramy skrotow, przeszkody i dekoracje sa instancjami scen authoringowych w zwyklym drzewie Godot. Projektant moze je dodawac, usuwac, przesuwac, obracac i skalowac zgodnie z walidowanym kontraktem danego typu.
 - D3. Kazdy obiekt mapy ma stabilne, unikalne `Object ID`, a kazde polaczenie stabilne, unikalne `Connection ID`; przestrzenie ID obiektow i polaczen sa rozdzielone. Trwaly `WorldDelta` odnosi postep wylacznie do stabilnych ID, nie do sciezki noda, kolejnosci dziecka ani nazwy scenowej.
@@ -956,9 +956,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0077 - Wspolna Linia jako jeden kregoslup kampanii
 
 - Domena: kampania, tutorial, swiat nurkowania i zapis
-- Status / aktywny zakres: Obowiazuje; D1-D8
+- Status / aktywny zakres: Czesciowo zastapione; D1-D2, D4-D8
 - Zatwierdzenie: 2026-08-12
-- Relacje: Zastepuje: ARD-0029/calosc; ARD-0055/calosc | Zastapiona przez: brak
+- Relacje: Zastepuje: ARD-0029/calosc; ARD-0055/calosc | Zastapiona przez: ARD-0102/D3
 - D1. Nowa kampania korzysta z jednego przebiegu Wspolnej Linii: trzy prowadzone dni, J-7, jawne odliczanie Czarnego Frontu, Archiwum, R-3, C-4, wybor energii i Kronika.
 - D2. `CampaignProgressionSystem` pozostaje jedynym wlascicielem przejsc aktow, odliczania, finalnej dostepnosci i wyniku; misje, dialogi oraz UI sa konsumentami jego typowanego stanu.
 - D3. J-7, Archiwum, R-3 i C-4 sa stalymi, typowanymi urzadzeniami sceny mapy. Ich lokalna interakcja przechodzi przez `DiveResult`, a trwaly skutek przez `WorldDelta`; nie sa przedmiotami plecaka ani luznymi flagami UI.
@@ -1077,9 +1077,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0085 - Jedna semantyczna maska terenu i pochodna prezentacja
 
 - Domena: swiat nurkowania, authoring terenu, prezentacja, fizyka i kompatybilnosc zapisu
-- Status / aktywny zakres: Czesciowo zastapione; D4, D6-D7
+- Status / aktywny zakres: Czesciowo zastapione; D4, D7
 - Zatwierdzenie: 2026-08-13
-- Relacje: Zastepuje: ARD-0075/D5 | Zastapiona przez: ARD-0092/D5; ARD-0098/D1-D4
+- Relacje: Zastepuje: ARD-0075/D5 | Zastapiona przez: ARD-0092/D5; ARD-0098/D1-D4; ARD-0102/D2,D9
 - D1. Bazowa maska nawigacji wskazana przez `UnderwaterMap.tscn` jest jedynym semantycznym zrodlem makrogeometrii terenu. Kontur renderowanych skal, segmenty kolizji i reprezentacja aktywnych chunkow sa deterministycznymi pochodnymi tej samej maski, a kazda pozniejsza okluzja swiatla terenu rowniez musi byc jej pochodna.
 - D2. Kanoniczna kolizja runtime ARD-0052 pozostaje wlascicielem przechodniosci. Pochodny material nie moze zmieniac fizyki; scenowe `MapObstacle` nadal sa jawnymi lokalnymi nakladkami wspolnego rastra, a widoczny prefab sam nie ustanawia kolizji.
 - D3. Pochodne sa odswiezane oraz walidowane z produkcyjnej sceny bez osobnego draftu, katalogu publikacyjnego ani recznego etapu wypiekania. Nody i zasoby utworzone dla aktywnego chunka sa cache'em prezentacji/runtime i nie sa zapisywane z powrotem do sceny jako drugie zrodlo.
@@ -1265,12 +1265,12 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0098 - Scenowe wielokaty Godot sa zrodlem makroterenu
 
 - Domena: swiat nurkowania, authoring mapy, topologia, fizyka i prezentacja
-- Status / aktywny zakres: Obowiazuje; D1-D8
+- Status / aktywny zakres: Zastapione w calosci
 - Zatwierdzenie: 2026-08-15
-- Relacje: Zastepuje: ARD-0085/D1-D3 | Zastapiona przez: brak
+- Relacje: Zastepuje: ARD-0085/D1-D3 | Zastapiona przez: ARD-0102/calosc
 - D1. Jedynym semantycznym zrodlem bazowej makrogeometrii terenu jest uporzadkowany podzbior edytowalnych `Polygon2D` zapisanych w `UnderwaterMap.tscn`. Projektant zmienia ich punkty i transformacje zwyklymi uchwytami widoku 2D Godota; nie istnieje osobny edytor mapy ani drugi format authoringu.
 - D2. Wielokaty deklaruja operacje otwartej wody albo pelnego terenu i sa skladane deterministycznie w kolejnosci sceny. Bazowa maska PNG, prezentacyjny SDF, segmenty kolizji, okludery i dane chunkow sa wylacznie pochodnymi tej kompozycji. Reczna edycja pochodnego PNG nie zmienia semantyki mapy, a niezgodna albo nieaktualna pochodna ma zatrzymac walidacje zamiast cicho zmienic fizyke.
-- D3. Kompilator i runtime korzystaja z tego samego rasteryzatora scenowych wielokatow oraz `MapObstacle`. Pochodny raster zachowuje dotychczasowy prog przechodniosci, rozmiar swiata, stabilny podpis gameplayowy i wspolna reprezentacje granic dla fizyki, renderu oraz swiatla.
+- D3. Kompilator i runtime korzystaja z tego samego rasteryzatora scenowych wielokatow oraz `MapObstacle`. Pochodny raster zachowuje dotychczasowy prog przechodniosci, rozmiar swiata, deterministyczne wyprowadzanie podpisu gameplayowego i wspolna reprezentacje granic dla fizyki, renderu oraz swiatla. Identyczna geometria daje identyczny podpis, natomiast zatwierdzona zmiana topologii tworzy nowy podpis zgodnie z ARD-0100/D6.
 - D4. Pierwsze przelaczenie authority wymaga deterministycznego odtworzenia dotychczasowej maski komorka w komorke. Dopoki test parytetu nie potwierdzi identycznej topologii, produkcyjny runtime pozostaje przy dotychczasowej pochodnej; migracja nie moze przesunac landmarkow, tras, stable ID ani znaczenia zapisanych postepow.
 - D5. `MapObstacle` moze uzywac edytowalnego, nieregularnego wielokata zapisanego w scenie; brak wielokata zachowuje prostokatny fallback dla istniejacych instancji. Przeszkoda nadal trafia do wspolnego rastra, a `Visual Scene` pozostaje bezkolizyjna i nie ustanawia fizyki.
 - D6. Bezkolizyjne wizualizacje Wspolnej Linii korzystaja z zapisanych w scenie `Path2D` i `Curve2D`. Punkty koncowe sa walidowane wobec wlascicieli gameplayowych, lecz sama krzywa wizualna nie przejmuje stanu, interakcji ani kolizji.
@@ -1282,9 +1282,9 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 ## ARD-0099 - Wydzielony warsztat mapy podwodnej i grafiki
 
 - Domena: authoring mapy podwodnej, grafika swiata, dokumentacja i proces pracy
-- Status / aktywny zakres: Obowiazuje; D1-D8
+- Status / aktywny zakres: Zastapione w calosci
 - Zatwierdzenie: 2026-08-16
-- Relacje: Zastepuje: ARD-0086/D1,D5; ARD-0097/calosc | Zastapiona przez: brak
+- Relacje: Zastepuje: ARD-0086/D1,D5; ARD-0097/calosc | Zastapiona przez: ARD-0102/calosc
 - D1. Repozytorium utrzymuje jeden wyspecjalizowany hub `underwater_map_workbench/` z lokalnymi `AGENTS.md`, `README.md`, `.ai/PROJECT_CONTEXT.md` i `.ai/DECISIONS.md`. Piec dokumentow korzeniowych pozostaje kanoniczne dla calego produktu, runtime, architektury, zapisu i onboardingu, a dokumenty warsztatu sa jedynym wlascicielem szczegolowego procesu produkcji grafiki mapy, lokalnego jezyka wizualnego, stanu assetow oraz akceptacji artystycznej.
 - D2. Warsztat nie jest osobnym projektem Godot ani drugim formatem mapy. Nie przechowuje kopii `UnderwaterMap.tscn`, makroterenu, blueprintu, maski kolizji, `WorldDelta` ani produkcyjnych assetow; kanoniczne pliki pozostaja na istniejacych sciezkach `res://`, a warsztat kieruje praca nad nimi.
 - D3. Zadania projektowania mapy, biomow, landmarkow, tla, grafiki i assetow swiata sa semantycznie routowane do `underwater_map_workbench/AGENTS.md`. Codex uruchomiony z katalogu warsztatu czyta ten blizszy plik jako punkt wejscia, a on dobiera lokalny i globalny kontekst proporcjonalnie do ryzyka; routing obowiazuje takze wtedy, gdy edytowany plik lezy poza samym katalogiem warsztatu.
@@ -1295,3 +1295,59 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 - D8. Wydzielenie procesu nie zmienia `GameState`, `WorldDelta`, `DiveResult`, source-v4, semantycznej authority `UnderwaterMap.tscn`, formatu kampanii ani podpisu gameplayowego. Jawnie zlecona zmiana topologii lub rozmieszczenia przechodzi globalna bramke rozbieznosci, walidacje osiagalnosci i testy mapy tak samo jak praca w glownym katalogu.
 - Powod i skutek: osobny Codex otrzymuje wyspecjalizowany kontekst i rygor produkcji wizualnej bez odcinania go od pelnego projektu i bez tworzenia drugiej mapy. Master-first oraz warstwowy authoring rozwiazuja problem technicznie bezszwowych, lecz kompozycyjnie niespojnych obrazow.
 - Odwolania: AGENTS.md; underwater_map_workbench/AGENTS.md; underwater_map_workbench/.ai/DECISIONS.md; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2, 9.1.2 i 13.
+
+## ARD-0100 - Glebokosc swiata jest niezalezna od dwuwymiarowej geografii biomow
+
+- Domena: swiat nurkowania, geografia biomow, ryzyko, prezentacja i kompatybilnosc zapisu
+- Status / aktywny zakres: Czesciowo zastapione; D1, D4
+- Zatwierdzenie: 2026-08-17
+- Relacje: Zastepuje: brak | Zastapiona przez: ARD-0102/D2-D3,D5-D10
+- D1. Fizyczna glebokosc nurka jest ciagla i monotoniczna funkcja jego bezwzglednej pozycji `Y` w kanonicznym swiecie. Nie zalezy od nazwy, prostokata ani kolejnosci regionu i nie moze skokowo zmienic sie po przekroczeniu pionowej granicy biomu na tej samej wysokosci.
+- D2. Tozsamosc biomu jest dwuwymiarowa strefa authorowana w `UnderwaterMap.tscn`. Cztery stabilne ID pozostaja bez zmian, lecz tworza uklad skarpowego miasta portowego: R1 na gornym lewym tarasie, R2 na dolnym lewym tarasie, R3 jako pionowa prawa dzielnica portowo-przemyslowa, a R4 jako pelnoszeroki dolny pas.
+- D3. R1 rozdziela prezentacyjna korone dachow od nizszych fasad, ulic i wnetrz bez tworzenia nowego regionu gameplayowego. R3 rozdziela gorne nabrzeze i stocznie od nizszego ciezkiego przemyslu, a R4 zachowuje podziemna i glebinowa role niezaleznie od motywow zatopionego miasta.
+- D4. Efekty zalezne od cisnienia, zimna, swiatla i ryzyka probkuja wspolna fizyczna glebokosc. Paleta, material, zawiesina i tozsamosc obiektu moga dodatkowo probkowac region, lecz nie moga nadpisac ani zdublowac wlasciciela glebokosci.
+- D5. `UnderwaterMap.tscn` pozostaje jedynym authority granic regionow, pozycji, tras i statycznego swiata. Wizualna maska przejsc biomow oraz mastery L00-L05 sa prezentacyjnymi pochodnymi tej sceny i nie ustanawiaja drugiej geografii.
+- D6. Zatwierdzone przestawienie regionow, landmarkow, tras i obiektow zaleznch tworzy nowy `map_gameplay_signature`. Kampania ze starszym podpisem jest odrzucana bez mutacji, importu i przesuwania `WorldDelta`; nie powstaje migracja pozycyjna. Zatwierdzony clean break simple-parallax zachowuje 27 stabilnych ID landmarkow oraz rekordy 36 zwyklych polaczen i siedmiu skrotow, lecz zastepuje makroteren i przebiegi tras, dlatego stanowi nowy statyczny swiat.
+- D7. Stabilne ID R1-R4, landmarkow i obiektow zachowuja znaczenie domenowe. Przeniesienie calej grupy obejmuje jej cele interaktywne, ladunek, prad, zagrozenie, trase oraz certyfikat odzyskiwalnosci, aby graf i zapis nie wskazywaly dawnej pozycji.
+- D8. Mastery szerokiej grafiki zaakceptowane dla poprzedniej geografii traca status produkcyjnego authority rozmieszczenia. Po zmianie statycznego swiata wymagaja ponownego map-aware mastera, technicznej walidacji, surveyu i jawnej akceptacji przed promocja. Dotychczasowe rodziny V5-V7 oraz ich landmarkowe overlaye pozostaja wylacznie historia i provenance, nie fallbackiem produkcyjnego runtime.
+- D9. Produkcyjna mapa nurkowania jest jednym ortograficznym przekrojem 2D. Plany `L00-L05` moga roznic tempo kamery i ostrosc, lecz nie tworza perspektywicznej podlogi, izometrii, sceny 2,5D ani wizualnego przejscia sprzecznego z kanoniczna maska wody.
+- D10. Zabudowany landmark otrzymuje fizycznie przechodnie wnetrze wyciete w scenowym makroterenie i polaczone z grafem co najmniej jednym czytelnym wejsciem; otwarty landmark otrzymuje analogicznie osiagalna strefe centralna. Bezkolizyjny prefab pozostaje prezentacja przekroju i nie moze sam ustanawiac komory, wejscia, teleportu ani kolizji. Wnetrza naleza do tego samego swiata, podpisu mapy i certyfikacji odzyskiwalnosci.
+- Powod i skutek: uklad bocznych dzielnic i dolnego rdzenia pozwala umiescic apteke, szpital, stocznie i fabryke w logicznej geografii bez falszywego skoku glebokosci na granicy koloru. Cena jest jawny clean break statycznej mapy oraz ponowna certyfikacja tras i grafiki.
+- Odwolania: ARD-0052; ARD-0072; ARD-0075; ARD-0085; ARD-0092; ARD-0098; ARD-0099; docs/OgolnyZarys.txt - sekcje 6 i 7; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 5.6, 9, 11 i 13.
+
+## ARD-0101 - Docelowy swiat nurkowania ma logiczna siatke 12 x 12 Full HD
+
+- Domena: przestrzen swiata nurkowania, authoring mapy, balans podrozy i kompatybilnosc zapisu
+- Status / aktywny zakres: Czesciowo zastapione; D1-D2
+- Zatwierdzenie: 2026-08-23
+- Relacje: Zastepuje: brak | Zastapiona przez: ARD-0102/D3-D9
+- D1. Docelowy kanoniczny prostokat swiata ma dokladnie `23 040 x 12 960` jednostek. Jest opisywany jako logiczna siatka `12 x 12` pol kompozycyjnych Full HD po `1 920 x 1 080` jednostek; pola te nie sa klatkami kamery ani osobnymi sektorami gameplayowymi.
+- D2. Rozszerzenie swiata nie zmienia kontraktu kamery: bazowy viewport pozostaje `1 280 x 720`, a staly zoom `1,20`, co pokazuje okolo `1 066,67 x 600` jednostek i daje okolo `21,6 x 21,6` rzeczywistych kadrow kamery na caly docelowy prostokat. Skala nurka, obiektow i mechanik ruchu nie jest mnozona razem z wymiarem swiata.
+- D3. `UnderwaterMap.tscn` pozostaje jedynym authority calej przestrzeni. Raster makroterenu zachowuje `GRID_STEP = 8`, a indeks streamingu `chunk_size = 512`; rastry, SDF, segmenty, okludery i chunki sa ponownie wyprowadzane z nowej sceny, a nie rozciagane z poprzednich pochodnych.
+- D4. Fizyczna glebokosc pozostaje jedna ciagla i monotoniczna funkcja globalnego `Y` od `8 m` przy gornej granicy do `160 m` przy dolnej granicy nowego swiata. Regiony R1-R4 zachowuja stabilne tozsamosci dwuwymiarowe i nie przejmuja authority glebokosci.
+- D5. Zmiana wymiarow jest pelnym re-authoringiem statycznego swiata, a nie slepym skalowaniem `2x`. Projektant uklada na nowo makroteren, granice regionow, landmarki, portale, krzywe tras, obiekty zalezne, wejscie i wyjscie z zachowaniem dotychczasowej skali lokalnej oraz czytelnosci gameplayu.
+- D6. Rdzen 27 landmarkow zachowuje stabilne ID i znaczenie domenowe. Kazdy przenoszony landmark jest authorowany i certyfikowany razem z nalezacymi do niego portalami, trasami, celami, ladunkiem, pradem, zagrozeniem oraz innymi zaleznymi rekordami; samo zachowanie ID nie jest dowodem osiagalnosci ani zgodnosci balansu.
+- D7. Aktywacja nowej przestrzeni celowo tworzy nowy `map_gameplay_signature`, ale nie podnosi sama z siebie `MAP_SOURCE_VERSION = 4`, rewizji kampanii 2 ani nie zmienia modelu `WorldDelta`. Kampania z poprzednim podpisem jest odrzucana atomowo bez importu, migracji pozycyjnej, reinterpretacji lub mutacji `WorldDelta`; gracz rozpoczyna nowa kampanie dla nowego statycznego swiata.
+- D8. Tlen, czas, dystans, zimno, prady, zagrozenia, ladunek, dostepne wejscia i rezerwa powrotna sa ponownie oceniane na rzeczywistych trasach. Promocja wymaga pelnej certyfikacji odzyskiwalnosci dla publicznych profili, walidacji osiagalnosci i granic, zgodnych pochodnych oraz testow persistence clean breaku.
+- D9. Szeroka grafika nowego swiata powstaje master-first na docelowej geografii. Wczesniejsze mastery, cutouty i liczby elementow moga pozostac provenance lub aktywnym baseline'em starego swiata, ale nie sa automatycznie inwentarzem produkcyjnym przestrzeni `12 x 12`; szczegol akceptacji i podzialu wizualnego nalezy do warsztatu mapy.
+- Powod i skutek: wiekszy swiat daje dluzsza, bardziej zroznicowana eksploracje bez pomniejszenia lokalnego gameplayu i bez pozornego zachowania kompatybilnosci zapisow. Cena jest ponowne authorowanie geografii, grafiki i tras oraz pelna recertyfikacja przed przelaczeniem runtime.
+- Odwolania: ARD-0013; ARD-0052; ARD-0072; ARD-0075; ARD-0092; ARD-0098; ARD-0099; ARD-0100; docs/OgolnyZarys.txt - sekcje 6 i 7; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 9, 11 i 13; underwater_map_workbench/.ai/DECISIONS.md.
+
+## ARD-0102 - Manifest warsztatu jest jedynym zrodlem mapy source-v5
+
+- Domena: mapa podwodna, authoring, runtime, tutorial, zapis, testy i granice modulow
+- Status / aktywny zakres: Obowiazuje; D1-D10
+- Zatwierdzenie: 2026-08-25
+- Relacje: Zastepuje: ARD-0043/D2; ARD-0072/calosc; ARD-0075/D1-D2,D4,D6,D11-D12; ARD-0077/D3; ARD-0085/D6; ARD-0098/calosc; ARD-0099/calosc; ARD-0100/D2-D3,D5-D10; ARD-0101/D3-D9 | Zastapiona przez: brak
+- D1. `underwater_map_workbench/` jest wlascicielem calego aktywnego pakietu mapy i potrzebnych grafik podwodnego gameplayu: `map_manifest.json`, deterministycznie generowanej `UnderwaterMap.tscn`, lokalnego kompilatora i cienkiego hosta w `runtime/`, `tools/build_underwater_map.py`, `tests/underwater_map_smoke_test.gd`, shaderow srodowiska oraz `assets/gameplay/`. Korzen projektu zachowuje ogolne mechaniki nurkowania, dane domenowe, integracje Godot i ogolny runner testow, ale nie utrzymuje drugiego katalogu podwodnych grafik ani kopii plikow mapy.
+- D2. `map_manifest.json` jest jedynym semantycznym zrodlem topologii, granic, pozycji, identyfikatorow i zawartosci konkretnej mapy. `UnderwaterMap.tscn` jest jego deterministyczna pochodna i nie podlega recznej edycji; builder ma umiec zbudowac scene oraz wykryc jej dryf wzgledem manifestu.
+- D3. Promowalna mapa ma dokladnie logiczna siatke `12 x 12` pol po `1 920 x 1 080` jednostek, czyli prostokat `23 040 x 12 960`. Manifest jest jedynym wlascicielem liczby instancji, ich identyfikatorow, wspolrzednych i szczegolowej topologii; ARD nie zamraza migawki zawartosci konkretnej rewizji.
+- D4. Dawne cztery regiony, 27 landmarkow, polaczenia, skroty, makroteren, maski, warianty graficzne i pipeline'y V1-V7 nie sa fallbackiem ani drugim zrodlem nowej mapy. Liczba i ksztalt stref, warstw i pozostalych rekordow sa walidowanymi danymi biezacego manifestu.
+- D5. Promocja mapy wymaga przypisanej w manifeście i osiagalnej sekwencji semantycznych urzadzen `junction_j7` -> `archive_terminal` -> `r3_diagnostic_panel` -> `r3_generator` -> `c4_switchboard` -> `c4_splitter_mount`. Szczegolowe instancje, landmarki i trasy realizujace ten kontrakt nie sa okreslane w ARD.
+- D6. Reset mapy nie usuwa, nie wylacza ani nie bramkuje ogolnych systemow tlenu, lootu, interakcji, ekwipunku, powrotu, tutorialu lub kampanii. J-7, Archiwum, diagnostyka i generator R-3, rozdzielnica C-4 oraz gniazdo montazu rozgaleznika pozostaja aktywnymi elementami Wspolnej Linii z dialogiem, quick-flow i logika progresji; sam montaz rozgaleznika jest wyborem opcjonalnym, ale jego osiagalne gniazdo nalezy do kontraktu promowalnej mapy. Mapa niespelniajaca sekwencji z D5 nie moze zostac promowana jako kompletna mapa kampanii.
+- D7. Nowa mapa publikuje `map_source_version = 5` i stanowi celowy clean break. Zapis z poprzednim podpisem lub wersja mapy jest odrzucany atomowo bez skalowania pozycji, migracji rekordow, reinterpretacji `WorldDelta` ani uruchamiania starej mapy jako fallbacku.
+- D8. Jedynym testem specyficznym dla formatu i technicznej spojnosci pakietu mapy jest lokalny `underwater_map_smoke_test.gd`; sprawdza walidacje manifestu, deterministycznosc i ladowanie sceny oraz integracje kompilatora z runtime. Jeden korzeniowy test graniczny kampania-manifest sprawdza obecnosc i unikalnosc semantycznych urzadzen z D5 oraz przypisanie kazdego z nich do istniejacego landmarku, bez nawigacji, wspolrzednych, liczby pozostalych obiektow, regionow ani grafiki. Faktyczna osiagalnosc i jakosc tras sa bramka recznego playtestu, nie automatycznym BFS-em ani warunkiem wygenerowania sceny. Pozostale testy ogolnych mechanik nurkowania, tutorialu i kampanii pozostaja w korzeniu i nie powielaja topologii manifestu.
+- D9. Kazda przyszla zmiana granicy albo konkretnej instancji mapowej, w tym jej identyfikatora, roli i pozycji, przechodzi przez manifest i lokalny builder. Nowe identyfikatory landmarkow i ich pozycje pochodza wylacznie z manifestu; dawne `R1-09`, `R3-04` i `R4-06` nie sa wartosciami domyslnymi ani fallbackiem. Nowe grafiki konkretnej mapy trafiaja wyłącznie do lokalnego `assets/`, a wielokrotnego uzytku grafiki ogolnego gameplayu podwodnego do `assets/gameplay/`; ogolne mechaniki moga korzystac z tej biblioteki bez rekordu pozycyjnego, a manifest wskazuje asset tylko wtedy, gdy ustanawia jego uzycie przez konkretna instancje lub warstwe mapy. Nie utrzymuje sie wersji alternatywnych, kandydatow produkcyjnych, recznie poprawianych kopii sceny ani mapowo-zaleznych testow starego swiata.
+- D10. Dokumenty korzeniowe opisuja przekrojowa konsekwencje dla produktu, architektury, zapisu i integracji, a krotkie dokumenty warsztatu sa operacyjnym wejsciem dla calego pakietu konkretnej mapy. Lokalny `MAP-ARD-0013` jest wlascicielem schema-v2, osi rewizji oraz prezentacyjnego pipeline'u `L00-L10`; uszczegolawia ten kontrakt bez przejmowania globalnych regul gameplayu, persistence i testow domenowych.
+- Powod i skutek: jedna mapa i jeden manifest usuwaja sprzeczne wersje oraz rozproszone authority, zachowujac kompletna os aktywnej kampanii jako kontrakt promocji zamiast zamrazac przejsciowa migawke odbudowy. Cena jest swiadomy brak kompatybilnosci pozycyjnej ze starym swiatem oraz ponowne authorowanie rozmieszczenia od zera.
+- Odwolania: ARD-0013; ARD-0077; ARD-0092; ARD-0100/D1,D4; ARD-0101/D1-D2; underwater_map_workbench/.ai/DECISIONS.md; docs/OgolnyZarys.txt - sekcje 6-7; docs/Ostatni_Pomost_architektura_Godot.txt - sekcje 2, 9, 11 i 13.

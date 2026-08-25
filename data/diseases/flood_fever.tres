@@ -47,8 +47,9 @@ display_name = "Odporność"
 script = ExtResource("1_disease")
 id = "flood_fever"
 display_name = "Gorączka Zalewowa"
-configuration_signature = "0f332829078acde18d0a45f0ad2489a3687c900325f5a6cd598dad0bef6e5586"
+definition_version = 2
+configuration_signature = "800e2fdd69a88394ebc501ae79701e453fd2661c6233fcb1b3d4eb60bb925f86"
 authored_source_pressures = {
-"R1-06": 3
+"contaminated_salvage": 3
 }
 stages = Array[Resource]([SubResource("Exposed"), SubResource("Symptomatic"), SubResource("Severe"), SubResource("Recovering"), SubResource("Immune")])

@@ -41,7 +41,7 @@ Postęp fabularny wynika z budowy sześciu obiektów, naprawy platformy, urucham
 
 [AKTYWNE] — INTRO NOWEJ KAMPANII
 
-Pomijalne, około 45-sekundowe intro prowadzi Mira w pierwszej osobie. Cztery beztekstowe, prerenderowane ujęcia pokazują zatopione miasto, dokładnie troje ludzi zbliżających się do pustej platformy, ustalony kadr początkowej Przystani oraz linę prowadzącą ku ruinom. Intro jest oddzielnym bytem prezentacyjnym i nie uruchamia świata 3D ani pogody kampanii; żywa baza 2,5D/3D zaczyna się dopiero po przejściu do tutoriala. Ostatnia kwestia — „Jeśli chcemy zobaczyć jutro, musimy zbudować drogę w dół” — bezpośrednio uzasadnia budowę Stacji Nurkowej podczas pierwszego dnia tutoriala. Wszystkie siedem kwestii Miry jest przekazywanych jako podpisane napisy obok jej portretu; intro ani późniejsza kampania nie używają nagranego lub syntetycznego voice-overu. Oryginalny ambient deszczu, morza i pracującego metalu zachowuje własny rytm bez ściszania pod nieistniejący głos. Intro można pominąć przyciskiem albo `ESC`.
+Pomijalne, około 45-sekundowe intro prowadzi Mira w pierwszej osobie. Cztery beztekstowe, prerenderowane ujęcia pokazują zatopione miasto, dokładnie troje ludzi zbliżających się do pustej platformy, ustalony kadr początkowej Przystani oraz linę prowadzącą ku ruinom. Intro jest oddzielnym bytem prezentacyjnym i nie uruchamia świata 3D ani pogody kampanii; żywa baza 2,5D/3D zaczyna się dopiero po przejściu do tutoriala. Ostatnia kwestia — „Jeśli chcemy zobaczyć jutro, musimy zbudować drogę w dół” — bezpośrednio uzasadnia budowę Stacji Nurkowej podczas pierwszego dnia tutoriala. Wszystkie siedem kwestii Miry jest przekazywanych jako podpisane napisy obok jej portretu; intro ani późniejsza kampania nie używają nagranego lub syntetycznego voice-overu. Oryginalny, bezwokalny premiks łączy warstwowy deszcz, morze i pracujący metal z kameralną, postindustrialną muzyką: opad prowadzi obraz zatopionego miasta, oszczędny trzydźwiękowy motyw pojawia się wraz z ocalałymi, a zanurzenie tłumi powierzchnię i pogłębia brzmienie bez triumfalnej kulminacji. Całość zachowuje własny rytm bez ściszania pod nieistniejący głos. Intro można pominąć przyciskiem albo `ESC`.
 
 [AKTYWNE] — PORTRET MIRY W INTRO
 
@@ -343,9 +343,9 @@ Cechy i więzi są obecnie danymi narracyjnymi. Nie realizują jeszcze pełnego 
 
 Decyzja gracza / warunek:
 
-Choroba zawsze ma jawne źródło. Pierwszym pełnym przypadkiem jest Gorączka Zalewowa, na którą nurek może narazić się przez opcjonalną, uprzednio opisaną interakcję z zalanym zapleczem medycznym w R1-06. Nagrodą jest dokładnie 5 jednostek chemikaliów i leków; ta jawna wymiana ryzyko/nagroda nie podlega mnożnikowi ilości łupu profilu trudności. Zła pogoda, brak racji albo słabe schronienie nie tworzą choroby samodzielnie; mogą tylko pogorszyć istniejące narażenie. Zagrożenie nie występuje podczas tutoriala.
+Choroba zawsze ma jawne źródło. Pierwszym pełnym przypadkiem jest Gorączka Zalewowa, na którą nurek może narazić się przez opcjonalną interakcję ze skażonym znaleziskiem rozmieszczonym przez manifest mapy. Po aktywacji źródła nagrodą pozostaje dokładnie 5 jednostek chemikaliów i leków, a ta jawna wymiana ryzyko/nagroda nie podlega mnożnikowi ilości łupu profilu trudności. Zła pogoda, brak racji albo słabe schronienie nie tworzą choroby samodzielnie; mogą tylko pogorszyć istniejące narażenie. Zagrożenie nie występuje podczas tutoriala.
 
-Standardowy próg zachorowania wynosi 4 punkty. Pierwsze narażenie w R1-06 daje 3, kontakt z osobą mającą objawy 2, a z osobą w stanie ciężkim 3. Faktycznie otrzymana pełna racja odejmuje 1, połowa nie zmienia wyniku, a brak racji dodaje 1. Niekorzystne połączenie pogody ze słabym schronieniem albo integralnością może dodać najwyżej 1. Oś trudności Społeczeństwo koryguje dzienną presję o -1/0/+1 na profilu Łagodnym/Standardowym/Surowym. Każdy składnik jest widoczny przed zablokowaniem planu albo w raporcie.
+Standardowy próg zachorowania wynosi 4 punkty. Aktywowane mapowe źródło narażenia daje 3, kontakt z osobą mającą objawy 2, a z osobą w stanie ciężkim 3. Faktycznie otrzymana pełna racja odejmuje 1, połowa nie zmienia wyniku, a brak racji dodaje 1. Niekorzystne połączenie pogody ze słabym schronieniem albo integralnością może dodać najwyżej 1. Oś trudności Społeczeństwo koryguje dzienną presję o -1/0/+1 na profilu Łagodnym/Standardowym/Surowym. Każdy składnik jest widoczny przed zablokowaniem planu albo w raporcie.
 
 Narażenie pozyskane w dniu N nie rozwija objawów tej samej nocy. Dzień N+1 jest pełnym oknem reakcji: gracz może przeznaczyć lek na profilaktykę, zapewnić pełną rację, odizolować osobę albo przyjąć ryzyko. Dopiero koniec tego dnia porównuje jawną presję z progiem. Wynik poniżej progu usuwa narażenie; wynik równy albo wyższy powoduje objawy od kolejnego planowania.
 
@@ -604,7 +604,7 @@ Sąsiedztwo, segmenty, pływaki, uszkodzenia pojedynczych budynków, aktywne pra
 
 [AKTYWNE]
 
-Gracz steruje jednym nurkiem w ciągłym świecie 2D. Płytkie Dachy Umarłego Miasta są czytelne dzięki światłu docierającemu z powierzchni, natomiast wraz z głębokością światło otoczenia płynnie zanika. Podstawowe ograniczenia to tlen, zdrowie, stan kombinezonu, zimno, światło, sloty, udźwig, prądy, hałas, zagrożenie i droga powrotna.
+Gracz steruje jednym nurkiem w ciągłym świecie 2D. Płytka część świata wokół Stacji Nurkowej jest czytelna dzięki światłu docierającemu z powierzchni, natomiast wraz ze wzrostem bezwzględnej głębokości światło otoczenia płynnie zanika. Podstawowe ograniczenia to tlen, zdrowie, stan kombinezonu, zimno, światło, sloty, udźwig, prądy, hałas, zagrożenie i droga powrotna.
 
 Kamera pozostaje stabilnie wycentrowana na nurku i używa stałego zbliżenia `1,20`. Przy bazowym obrazie `1280 × 720` pokazuje około `1067 × 600` jednostek świata, dzięki czemu wyprawa skupia się na najbliższym oświetlonym otoczeniu. Sprint nie oddala obrazu, a interfejs zachowuje własny rozmiar niezależnie od kamery.
 
@@ -659,7 +659,7 @@ Latarnia i butla są wybieralnym sprzętem kampanii. Awaryjne warianty I są dos
 
 Decyzja gracza / warunek:
 
-W pierwszym, płytkim regionie gracz może bezpiecznie poznawać podstawy nurkowania bez używania latarni. Niżej światło otoczenia zanika płynnie, dlatego gracz decyduje, kiedy włączyć wyposażoną latarnię i zaakceptować widoczność dla zagrożeń reagujących na bliskie światło.
+W płytkiej części świata gracz może bezpiecznie poznawać podstawy nurkowania bez używania latarni. Niżej światło otoczenia zanika płynnie, dlatego gracz decyduje, kiedy włączyć wyposażoną latarnię i zaakceptować widoczność dla zagrożeń reagujących na bliskie światło.
 
 Widoczny skutek i feedback:
 
@@ -667,7 +667,7 @@ Otoczenie stopniowo ciemnieje wraz z aktualną głębokością, niezależnie od 
 
 Ograniczenia i wyjątki istotne dla gracza:
 
-Ciemność pozostaje miękką barierą, nie niewidzialnym zakazem wejścia do regionu. Wyłączenie latarni usuwa jej lokalne światło i przestaje wzbudzać zagrożenia samym świeceniem, ale nie rozjaśnia głębokiego otoczenia. Próba użycia bez wyposażonej latarni daje czytelny komunikat i nie zmienia sesji.
+Ciemność pozostaje miękką barierą, nie niewidzialnym zakazem zejścia głębiej. Wyłączenie latarni usuwa jej lokalne światło i przestaje wzbudzać zagrożenia samym świeceniem, ale nie rozjaśnia głębokiego otoczenia. Próba użycia bez wyposażonej latarni daje czytelny komunikat i nie zmienia sesji.
 
 Odwołania: ARD-0003, ARD-0007, ARD-0015, ARD-0040; architektura, sekcje 5.2, 5.5, 9.3, 12.1 i 12.3.
 
@@ -683,9 +683,9 @@ Każde wyzerowanie tlenu podczas obowiązkowej wyprawy tutorialowej resetuje lok
 
 [AKTYWNE] — STAŁE URZĄDZENIA FABULARNE
 
-Złącze J-7, terminal Archiwum, Generator R-3 i Rozdzielnia C-4 są stałymi urządzeniami świata, nie przedmiotami plecaka. Ich uruchomienie trafia do kampanii dopiero przez zakończony wynik wyprawy. Po tutorialu aktywacja może pozostać trwała również wtedy, gdy nurek zginie podczas późniejszej drogi powrotnej; śmierć nadal zachowuje wszystkie własne konsekwencje. W tutorialu nieudana próba nie utrwala żadnej zmiany.
+Stałe urządzenie świata nie jest przedmiotem plecaka, a jego uruchomienie trafia do kampanii dopiero przez zakończony wynik wyprawy. Promowalna mapa zapewnia osiągalne, przypisane przez manifest urządzenia dla J-7, Terminala Archiwum, panelu diagnostycznego i Generatora R-3, Centralnej Rozdzielni C-4 oraz gniazda montażu Rozdzielacza. Archiwum, R-3 i C-4 są wymaganymi etapami kampanii, a sam montaż Rozdzielacza aktywną ścieżką opcjonalną. Po tutorialu aktywacja urządzenia może pozostać trwała również wtedy, gdy nurek zginie podczas późniejszej drogi powrotnej; śmierć nadal zachowuje wszystkie własne konsekwencje. W tutorialu nieudana próba nie utrwala żadnej zmiany.
 
-Aktywny pion obejmuje Złącze J-7, terminal Zalanego Archiwum w R1-09, Generator R-3 w Elektrowni R3-04, Rozdzielnię C-4 oraz opcjonalny montaż Rozdzielacza w R4-06. J-7 pojawia się od dnia 3 i rozpoczyna jeden jawny licznik Czarnego Frontu: 15 dni na Łagodnym, 12 na Standardowym i 10 na Surowym; profil własny wyprowadza termin z osi pogody. Dzień aktywacji pokazuje pełną wartość, a każdy następny ukończony dzień odejmuje dokładnie jeden niezależnie od wyprawy i kryzysu. Od dnia 4 gracz może otworzyć łomem terminal Archiwum i po zatwierdzonym wyniku wyprawy przesłać mapę Wspólnej Linii do Przystani. Mapa nie jest przedmiotem plecaka. Po transmisji gracz diagnozuje R-3, wykonuje Regulator w zwykłej kolejce Warsztatu, a podczas kolejnej wyprawy montuje go i uruchamia generator. Następnie uruchamia C-4, opcjonalnie produkuje Rozdzielacz i montuje go przy rozdzielni.
+J-7 pojawia się od dnia 3 i rozpoczyna jeden jawny licznik Czarnego Frontu: 15 dni na Łagodnym, 12 na Standardowym i 10 na Surowym; profil własny wyprowadza termin z osi pogody. Dzień aktywacji pokazuje pełną wartość, a każdy następny ukończony dzień odejmuje dokładnie jeden niezależnie od wyprawy i kryzysu. Dalsza kolejność pozostaje aktywnym kontraktem: transmisja mapy Wspólnej Linii, Archiwum, diagnoza R-3, wykonanie i montaż Regulatora, uruchomienie generatora, konfiguracja C-4 oraz opcjonalny montaż Rozdzielacza. Dialog po J-7, quick-flow i dalsza progresja prowadzą przez te etapy, a mapa nie może zostać promowana, jeżeli pomija wymagany cel albo czyni go nieosiągalnym.
 
 [DOCELOWE] — POZA ZAKRESEM NURKOWANIA
 
@@ -695,7 +695,7 @@ Balon, ręczne awaryjne wynurzenie, flary, przecinak, przynęta, medykament dla 
 
 [AKTYWNE]
 
-Leon Wrona czeka w Zatopionym Hotelu R1-03. Uwolnienie wymaga łomu, który jest stałym narzędziem każdej wyprawy. Nie istnieje wybór leku z magazynu bazy: aby podnieść jego zdrowie do 48, nurek musi wcześniej znaleźć pod wodą 1 jednostkę chemikaliów i leków oraz zachować ją w plecaku; bez niej holuje Leona krytycznie z 24 zdrowia.
+Ratunek i holowanie Leona pozostają aktywną misją opcjonalną, a jego konkretne rozmieszczenie należy wyłącznie do manifestu mapy. Uwolnienie wymaga łomu, który jest stałym narzędziem każdej wyprawy. Nie istnieje wybór leku z magazynu bazy: aby podnieść jego zdrowie do 48, nurek musi wcześniej znaleźć pod wodą 1 jednostkę chemikaliów i leków oraz zachować ją w plecaku; bez niej holuje Leona krytycznie z 24 zdrowia.
 
 - po stabilizacji: ruch nurka 64%, koszt tlenu +25%;
 - bez stabilizacji: ruch 48%, koszt tlenu +55%;
@@ -705,134 +705,57 @@ Bezpieczny powrót dodaje Leona przed racjami, schronieniem i leczeniem tego sam
 
 [DOCELOWE] — ROLA LEONA W NOWEJ FABULE
 
-Leon nie jest pierwszym głosem odbieranym przez radio i nie uruchamia Aktu I. Pozostaje opcjonalnym ratunkiem w Zatopionym Hotelu. Po ocaleniu ujawnia, że pracował przy Generatorze R-3, podpowiada bezpieczniejszą procedurę naprawy i komentuje decyzję o podziale energii. Jeżeli nie żyje albo nie został uratowany, wymagane informacje nadal znajdują się w Zalanym Archiwum.
+Leon nie jest pierwszym głosem odbieranym przez radio i nie uruchamia Aktu I. Pozostaje opcjonalnym ratunkiem, którego instancję i położenie może ustanowić wyłącznie manifest. Po ocaleniu ujawnia, że pracował przy Generatorze R-3, podpowiada bezpieczniejszą procedurę naprawy i komentuje decyzję o podziale energii. Jeżeli nie żyje albo nie został uratowany, wymagane informacje nadal zapewnia obowiązkowy etap Archiwum.
 
-6.3. Gwarancja odzyskiwalności i profile wypraw
+6.3. Osiągalność aktywnych celów
 
 [AKTYWNE]
 
-Każdy autorsko rozmieszczony zasób ma najwcześniejszy, jawny profil wyprawy, dla którego projekt gwarantuje nie tylko dopłynięcie, ale zebranie wymaganej ilości i normalny, fizyczny powrót do aktywnej liny. Profil określa niezależnie etap Stacji, Warsztatu, butlę, latarnię, nurka, dostępne wcześniej boje i skróty oraz jeden z publicznych presetów trudności. Późny zasób nie musi być dostępny z Butlą I, ale materiał potrzebny do wykonania kolejnego ulepszenia nie może wymagać tego samego ulepszenia do odzyskania.
+Promowalna mapa gwarantuje wykonywalny tutorial — zdobycie obowiązkowego minimum, przecięcie blokady, aktywację J-7 i fizyczny powrót do liny — oraz dalszą osiągalną oś Archiwum, diagnostyka R-3, Generator R-3, C-4 i gniazdo montażu Rozdzielacza. Każdy obowiązkowy etap pozwala wykonać wymaganą interakcję i wrócić fizycznie do aktywnej liny.
 
-Gwarantowana ilość oznacza:
-
-- dla zwykłego kontenera — co najmniej jedną wybraną sztukę; raport dodatkowo podaje bezpieczne maksimum na wyprawę i liczbę wymaganych wypraw;
-- dla wolnostojącego pickupu — cały pickup;
-- dla tutoriala, ratunku, uruchomienia stałego urządzenia i innego celu obowiązkowego — pełny wymagany cel;
-- dla ilościowego zapytania projektanta — dokładnie wskazany zestaw, na przykład 10 desek, 2 tkaniny i gumy oraz 5 chemikaliów i leków, z jawnym rozróżnieniem jednej wspólnej wyprawy od kilku niezależnych wypraw.
-
-`FEASIBLE` oznacza wykonaną trasę zakończoną żywym nurkiem przy linie i z tlenem większym od zera. `SAFE` wymaga ponadto obowiązkowej, strojalnej rezerwy tlenu. Certyfikat korzysta z rzeczywistej kolizji, wymiaru nurka, prądów, obciążenia, slotów, narzędzi, czasu interakcji, zimna, kombinezonu, zamkniętych przeszkód i aktywnych zagrożeń. Operator nie jest normalnym powrotem i nie spełnia gwarancji dostarczenia zasobu.
-
-Gwarancja jest twarda dla Łagodnego, Standardu i Surowego w przypisanym profilu progresji. Konfiguracja Niestandardowa otrzymuje pełną diagnozę, lecz nie obietnicę dodatniego wyniku. Zamknięty skrót pozostaje zamknięty, dopóki profil jawnie nie zakłada jego wcześniejszego utrwalenia. Boja ustawiona podczas bieżącej wyprawy nie staje się linią tej samej wyprawy; jako wejście może wystąpić wyłącznie w późniejszym profilu i dopiero po osobnym, bezpiecznym certyfikacie jej ustawienia.
-
-Wynik projektowy wskazuje co najmniej pozycję, profil, wejście, trasę, wymagany i pozostały tlen, rezerwę, ciężar, sloty, bezpieczną ilość, ekspozycję na przeciwników oraz konkretną przyczynę odrzucenia. Dzięki temu nowe rozmieszczenie przedmiotu jest przyjmowane tylko wtedy, gdy narzędzie potrafi dostarczyć powtarzalne świadectwo pełnej wyprawy.
+Dodanie albo przesunięcie instancji w manifeście nie zmienia produktu przez samo położenie. Ręczny playtest promowalnej mapy potwierdza na faktycznym układzie osiągalność, jakość tras, wykonanie interakcji i fizyczne powroty dla całej osi kampanii. Automatyczna analiza nawigacji nie zastępuje tego odbioru ani nie blokuje samego wygenerowania sceny. Ogólne reguły tlenu, ruchu, łupu, narzędzi, ryzyka i powrotu pozostają niezależne od konkretnego układu mapy.
 
 7. STAŁY I TRWAŁY ŚWIAT
 
+[AKTYWNE] — PROMOWALNA MAPA 12 × 12
+
+Świat nurkowania jest jednym ciągłym prostokątem o wymiarach `23 040 × 12 960` jednostek. Logiczna siatka authoringu ma dokładnie `12 × 12` pól po `1 920 × 1 080`; pola nie są osobnymi sektorami gameplayowymi. Bazowy viewport `1280 × 720`, stały zoom `1,20`, skala nurka oraz ogólne zasady ruchu nie zmieniają się. Szczegółowy podział stref i topologia pochodzą wyłącznie z bieżącego manifestu.
+
+Stacja Nurkowa jest punktem startu, a aktywna lina wyjścia znajduje się w przypisanym jej punkcie manifestu. Liczba i identyfikatory landmarków, rozmieszczenie urządzeń, strefy, trasy, prądy, zagrożenia oraz ciężkie obiekty są wyłącznie zawartością manifestu. Dawne cztery nazwane regiony i katalog 27 landmarków nie stanowią domyślnego układu ani fallbacku.
+
+Pełny gameplay nurkowania pozostaje aktywny: tlen, ruch, światło, ekwipunek, udźwig, loot, interakcje, śmierć, odzyskiwanie sprzętu, powrót, wynik wyprawy, tutorial i kampania nadal korzystają ze swoich ogólnych reguł. Reset usuwa starą zawartość i rozmieszczenie mapy, a nie te mechaniki.
+
+7.1. Minimalna trasa tutorialowa
+
 [AKTYWNE]
 
-Mapa ma 11 520 × 6 480 jednostek, cztery regiony, 27 landmarków, 36 zwykłych połączeń i siedem trwałych skrótów — 43 połączenia łącznie — 12 stałych, jednostkowych znalezisk, stałe kontenery, prądy, jedno zagrożenie, jedno spotkanie ratunkowe i trzy ciężkie obiekty. Zielone Osiedla nie zawierają Banku Nasion ani dawnego skrótu prowadzącego z niego do Zalanego Archiwum; sam graf zwykłych połączeń nadal łączy wszystkie landmarki, więc osiągalność nie zależy od otwarcia skrótu.
+Promowalna mapa deklaruje w manifeście obiekty potrzebne do tutoriala:
 
-Geometria, pozycje ważnych obiektów i bramy skrótów są autorsko stałe. Seed kampanii nie zmienia funkcjonalnej topologii ani tras; wpływa tylko na jawnie losowane lub skalowane elementy, takie jak zaokrąglenie łupu kontenerowego.
+- dwie skrzynie tutorialowe: A i B;
+- blokadę przecinaną Nożem;
+- złącze J-7 aktywowane po usunięciu blokady.
 
-[AKTYWNE] — AUTORSKA MAPA W GODOT
+Skrzynie, blokada i J-7 są obiektami gameplayowymi, nie landmarkami. Prowadzona trasa ma zawsze kolejność: Stacja Nurkowa → skrzynia A → skrzynia B → blokada → J-7 → Stacja Nurkowa. Retry odtwarza lokalny stan próby, a dopiero zatwierdzony bezpieczny powrót przenosi wynik tutoriala do kampanii.
 
-Decyzja twórcy / warunek:
+7.2. Trwałość i clean break
 
-Twórca otwiera produkcyjną scenę świata podwodnego w edytorze Godot, a szeroką grafikę edytuje w jej kanonicznej scenie kompozycji. Widzi instancję kompozycji całej mapy oraz instancje regionów, landmarków, tras, prądów, przeszkód, źródeł łupu, zagrożeń, celów interaktywnych i dekoracji. Szeroka grafika świata ma dokładnie sześć nazwanych planów prezentacyjnych `L00-L05`; każdy autorski element planu pozostaje osobnym, wybieralnym składnikiem, który można niezależnie przesunąć, obrócić, skalować, rozciągnąć, ukryć albo wymienić. Scena kompozycji jest częścią produkcyjnej mapy, a nie szkicem ani drugim modelem świata. Spłaszczony obraz może pozostać jednym elementem tylko wtedy, gdy cała jego zawartość ma być poprawiana i przemieszczana wspólnie. Twórca może także dodawać dostarczone prefaby, zmieniać ich dane oraz przypisywać własne sceny wizualne z assetami. Gracz nie wykonuje tych operacji podczas kampanii.
+[AKTYWNE]
 
-Widoczny skutek i feedback:
+Trwałe skutki ogólnych interakcji zapisują się przez semantyczne ID instancji wyprowadzone z manifestu oraz istniejący wynik wyprawy. Dotyczy to tutorialowych skrzyń i blokady, J-7 oraz dalszych urządzeń osi kampanii; żaden z tych obiektów nie staje się przez to landmarkiem ani przedmiotem fabularnym plecaka.
 
-Zapisana i poprawnie zwalidowana scena jest dokładnie tym statycznym światem, który składa wyprawa — bez osobnego szkicu, katalogu publikacyjnego ani drugiej listy pozycji w kodzie. Markery, obrysy, etykiety, trasy, sześć planów grafiki i przypisane prefaby są widoczne bez uruchamiania gry. Walidacja wskazuje brakujące albo powielone role planów, niedozwolony element wizualny, brakujące lub powielone ID, obiekt w niewłaściwej gałęzi drzewa, błędne referencje, cele poza mapą, niedozwolone prefaby i utratę podstawowej przechodniości.
+Nowa mapa jest celowym source-v5 clean breakiem. Kampania utworzona dla starszej mapy nie jest skalowana, przesuwana ani częściowo migrowana do nowych współrzędnych i nie może użyć starego świata jako fallbacku. Gracz rozpoczyna nową kampanię zgodną z nowym podpisem mapy.
 
-Ograniczenia i wyjątki istotne dla gracza:
+7.3. Wymagana oś mapowa kampanii
 
-Tożsamość trwałych obiektów wynika ze stabilnego ID. Zmiana wyłącznie prezentacyjna może odświeżyć wygląd bez kasowania postępu, ale zmiana topologii, położenia, zawartości, interakcji, przeszkody albo bazowej nawigacji tworzy inny statyczny świat i blokuje kontynuację niezgodnej kampanii zamiast po cichu przesuwać jej stan. Bazowy kontur wielkoskalowych skał ma jedno semantyczne źródło: edycja tej maski wyprowadza zarówno widoczny teren, jak i fizyczną granicę. Pojedyncze nowe lub poprawiane przeszkody nadal należy authorować jako prefaby mapy; niewidoczna korekta kolizji służy wyłącznie elementowi, którego wygląd już istnieje. Każda zmiana celu objętego gwarancją odzyskiwalności nadal musi zachować normalną drogę powrotu na profilach Łagodnym, Standardowym i Surowym.
+[AKTYWNE] — URZĄDZENIA WSPÓLNEJ LINII
 
-Odwołania: ARD-0072, ARD-0075, ARD-0085; architektura, sekcje 9.1, 9.1.1, 11 i 13.
+Promowalna mapa prowadzi od J-7 przez Terminal Archiwum, panel diagnostyczny i Generator R-3 do Centralnej Rozdzielni C-4 oraz dostępnego gniazda montażu Rozdzielacza. Archiwum, oba kroki R-3 i C-4 są obowiązkowe; wykonanie i montaż Rozdzielacza oraz ratunek Leona zachowują role opcjonalne. Instancje, ich pozycje i szczegółowe trasy pochodzą wyłącznie z manifestu, bez dawnych współrzędnych i identyfikatorów pozycyjnych jako fallbacku.
 
-Widoczny kontur skał i kolizje terenu przedstawiają tę samą przestrzeń, aby pokazana droga była również drogą dostępną w grze. Techniczne wyprowadzanie obu reprezentacji ze wspólnego źródła i jego pokrycie należą do architektury, sekcje 9 i 13.
+[DOCELOWE] Chorobowe źródło, dodatkowy loot, biomy, dodatkowe strefy, pozostałe landmarki, skróty, zagrożenia, dodatkowe ratunki i szeroka grafika mogą zostać ponownie zaprojektowane oraz rozmieszczone dla nowej mapy bez przywracania starego inwentarza.
 
-Na mapie nie istnieje drugi Dzwon, dodatkowy punkt wejścia ani osobna interakcja; aktywny „Dzwon głębinowy” pozostaje wyłącznie nazwą Stacji IV.
+Stara topologia 27 landmarków, jej wersje i pipeline'y V1-V7, maski oraz warianty graficzne są wycofane. Nie stanowią biblioteki kandydatów ani zapasowej wersji świata. Każda przyszła zmiana zaczyna się od jednej zatwierdzonej zmiany manifestu, a rozmieszczenie obowiązkowego celu otrzymuje proporcjonalny odbiór gameplayowy bez tworzenia drugiego katalogu pozycji.
 
-Trwałość obejmuje:
-
-- otwarte kontenery i dokładną resztę ich zawartości;
-- zabrane pickupy;
-- boje i skróty;
-- oznaczone i odzyskane ciężkie obiekty;
-- porzucone pakunki;
-- ID landmarku zgonu jako telemetrię oraz osobny, odzyskiwalny plecak z utraconym sprzętem; runtime nie renderuje ciała;
-- wynik ratunku;
-- odkryte podczas wyprawy miejsca, które dają PD; obecna gra nie odtwarza między wyprawami pełnej mapy odkryć ani fog-of-war.
-
-[AKTYWNE] — TRWAŁOŚĆ URZĄDZEŃ KAMPANII
-
-Trwały świat zachowuje załączenie J-7, przesłanie mapy z Archiwum, diagnozę i uruchomienie R-3, aktywację C-4 oraz montaż Rozdzielacza. Żadna z tych czynności nie tworzy zwykłego przedmiotu plecaka; gotowy Rozdzielacz jest jednorazowym narzędziem kampanii udostępnianym wyłącznie do montażu.
-
-Wszystkie cztery regiony istnieją i są fizycznie osiągalne od początku. Dystans, tlen, światło, głębokość, zimno, jakość kombinezonu, prądy, kolizje terenu i dostępne wejścia tworzą miękką barierę. Poziom Stacji nie ustawia niewidzialnego zakazu wejścia do biomu.
-
-7.1. Cztery biomy
-
-[AKTYWNE] — GEOGRAFIA
-
-- Dachy Umarłego Miasta — najpłytsze ruiny, Zalane Archiwum R1-09, Zatopiony Hotel i kontrolowane miejsce nauki.
-- Zielone Osiedla — roślinny region z tkaninami, lekami, przeszkodami i drogami do dalszych skrótów.
-- Rdzawy Pas — strefa przemysłowa z Elektrownią R3-04, ciężkimi mechanizmami i zasobami technicznymi.
-- Czarne Serce — najgłębszy region z centralnymi urządzeniami dawnej sieci.
-
-Aktywne wspólne mechaniki różnicujące podróż to odległość, głębokość i zimno, ciemność, prądy, rodzaj łupu, pojedyncze wymagania narzędzi oraz pierwsze zagrożenie reagujące na hałas i bliskie światło.
-
-[AKTYWNE] — GEOGRAFIA KAMPANII „WSPÓLNA LINIA”
-
-- Dachy prowadzą od kabla pod Przystanią do złącza J-7 oraz później do terminala mapy wspólnej sieci w Zalanym Archiwum.
-- Zielone Osiedla dostarczają materiały i skróty potrzebne do rozbudowy Stacji, Warsztatu oraz pełnej Radiostacji; nie zawierają obowiązkowego przenoszonego klucza fabularnego.
-- Rdzawy Pas zawiera Generator Pływowy R-3, który trzeba zdiagnozować, naprawić wykonanym w Warsztacie regulatorem i uruchomić na miejscu.
-- Czarne Serce zawiera Centralną Rozdzielnię C-4, gdzie nurek przygotowuje końcowy podział energii pomiędzy Przystań i Platformę Północną.
-
-[AKTYWNE] — BIEŻĄCA TOŻSAMOŚĆ REGIONÓW
-
-Regiony nie mają jeszcze pełnej, odrębnej warstwy mechanik definiującej każdy biom. Ich bieżąca tożsamość wynika z autorskiej geografii, głębokości, zimna, prądów, łupu i obiektów; nie należy przedstawiać tego jako ukończonego systemu biomów sterowanego danymi. Szczegół techniczny: architektura, sekcja 9.3.
-
-[AKTYWNE] — CZYTELNA TOŻSAMOŚĆ WIZUALNA REGIONÓW
-
-Decyzja gracza / warunek:
-
-Podczas zejścia gracz rozpoznaje region nie tylko po nazwie i głębokości, lecz również po spójnej palecie, przejrzystości wody, zawiesinie, świetle i charakterze powierzchni. Dachy pozostają chłodne i stosunkowo czytelne, Zielone Osiedla bardziej organiczne i oliwkowe, Rdzawy Pas cięższy oraz bursztynowo-rdzawy, a Czarne Serce głębsze i chłodniejsze, lecz nadal czytelne w półtonach oraz oszczędne w punktach światła.
-
-Widoczny skutek i feedback:
-
-Oprawa przyjmuje kierunek premium, kinowego realizmu 2D/2,5D z kontrolowanym malarskim wykończeniem. Wiarygodność wynika z autorskiej scenografii, zróżnicowanych materiałów, absorpcji barw, spadku kontrastu z dystansem, wielu planów głębi, miękkiego światła objętościowego oraz naturalnego zaniku poświat. Każdy reprezentatywny kadr ma czytelną hierarchię: ciemniejsza rama środowiska prowadzi wzrok do jaśniejszego korytarza ruchu, a jeden duży motyw biomu buduje skalę i tożsamość bez zagłuszania celu. Otwarte pole wokół nurka pozostaje spokojniejsze od obrzeży, dzięki czemu wysoki poziom detalu nie odbiera czytelności drogi, interakcji ani zagrożeń.
-
-Obraz pozostaje przyjazny, stonowany i oparty na czytelnych półtonach — głębia nie zmienia eksploracji w horror, nie tworzy agresywnej winiety ani dużych połaci pozbawionej szczegółu czerni. Mokra skała, osad, glony, korozja, metal, szkło i przewody różnią się fakturą oraz reakcją na światło; ciepłe lampy użytkowe kontrastują z chłodną wodą, ale nie zamieniają całego kadru w neon. Stylizacja pozostaje tylko tam, gdzie chroni czytelność sylwetki nurka, zagrożeń, interakcji i drogi; nie opiera obrazu na grubym komiksowym konturze, płaskim cieniowaniu ani jednolitym gradiencie.
-
-Skały otrzymują nieregularną, ograniczoną drobną strukturę, osad i kierunkowe modelowanie krawędzi zgodnej z kolizją zamiast równomiernej obwódki. Woda ma subtelne caustics, głębię barwy, zawiesinę, pył, miękkie pola światła i lokalny ruch prądu; plany dalsze są miększe i mniej nasycone. Rzadkie rośliny, rumowiska i ślady osadu wzmacniają charakter regionu przy krawędziach oraz landmarkach, bez budowania gęstej rafy lub zasłaniania trasy. Pełnoekranowa atmosfera zachowuje czytelność sylwetki nurka, punktów interakcji i HUD-u, a unikalne urządzenia, landmarki i dekoracje pozostają autorskimi elementami osadzonymi na wspólnej powierzchni.
-
-Ograniczenia i wyjątki istotne dla gracza:
-
-Profil jakości zmienia koszt i gęstość efektów, nie przechodniość ani zasady widoczności. Tryb ograniczenia ruchu usuwa refrakcję i uspokaja animowaną zawiesinę, zachowując statyczną paletę, kontrast i wszystkie sygnały gameplayowe. Ta warstwa nie ustanawia jeszcze pełnych mechanik biomów opisanych niżej.
-
-Odwołania: ARD-0040, ARD-0049, ARD-0052, ARD-0066, ARD-0085; architektura, sekcje 9.1, 9.3, 12.1 i 12.3.
-
-[AKTYWNE] — WARSTWOWE TŁO BIOMÓW
-
-Każdy region korzysta z tego samego stosu sześciu nieinteraktywnych planów: `L00` bazowego pola barwy, `L01` najdalszych sylwetek, `L02` dalekich konstrukcji, `L03` średniego planu i dryfujących dekoracji, `L04` skóry związanej z kanonicznym terenem oraz `L05` oszczędnych zasłonięć pierwszego planu. Dachy pokazują zatopione bryły miasta i odległe okna, Zielone Osiedla — kołyszące się pasma roślin oraz drobną faunę, Rdzawy Pas — konstrukcje, rurociągi, stacje i zawieszony osad przemysłowy, a Czarne Serce — monumentalne pozostałości sieci oraz powoli dryfujące sylwetki dalekiego życia. Dalsze plany poruszają się względem kamery wolniej od bliższych, `L04` nie odkleja się od fizycznego terenu, a `L05` nie zasłania nurka, celu ani sygnałów interakcji. Formy reagują na wodę, światło oraz prąd bez udawania zagrożenia, kolizji albo celu.
-
-Plan jest widoczny również bez latarni, lecz ma niższy kontrast od nurka, Wspólnej Linii i obiektów interaktywnych. Profil niski upraszcza detal, a ograniczenie ruchu zatrzymuje dryf i falowanie bez usuwania kompozycji ani tożsamości regionu.
-
-Odwołania: ARD-0041, ARD-0049 i ARD-0085; architektura, sekcje 9.1.2 i 13.
-
-[DOCELOWE] — PEŁNA TOŻSAMOŚĆ
-
-- Dachy: szkło, zawalenia, drzwi i kontrolowane miejsce nauki.
-- Zielone Osiedla: toksyczne zakwity, oplątanie i lokalnie zmienna roślinność.
-- Rdzawy Pas: elektryka, toksyny, ciężkie mechanizmy i hałas przemysłowy.
-- Czarne Serce: ciśnienie, śluzy, muł, ekstremalne zimno i dodatkowe stworzenia.
-
-Ruchoma roślinność nie może zmieniać stałej topologii ani blokować jedynej drogi obowiązkowej. Jeżeli powstanie, ma działać lokalnie w opcjonalnych przejściach, a jej zmiana musi przetrwać zapis i ponowne wczytanie.
-
-Odradzanie alg, małży i innych zasobów biologicznych także pozostaje docelowe; obecna zawartość kontenerów i 12 stałych pickupów są zasobami skończonymi.
-
-Na profilu Standard skończona, autorska pula mapy obejmuje 58 jednostek jedzenia: 17 w Dachach Umarłego Miasta, 22 w Zielonych Osiedlach, 10 w Rdzawym Pasie i 9 w Czarnym Sercu. Obowiązkowa skrzynia tutorialowa nadal zawiera dokładnie 6 jednostek, a dodatkowe zapasy są rozłożone pomiędzy zwykłe kontenery dalszych tras i podlegają ich normalnemu skalowaniu trudnością. Wczesna wyprawa nastawiona na żywność powinna pozwolić wrócić z około 8–12 jednostkami, a późniejsza z 12–18, zależnie od udźwigu, wybranej trasy i pozostawionej wcześniej zawartości.
+Odwołania: ARD-0013, ARD-0077 i ARD-0102; architektura, sekcje 9, 11 i 13.
 
 8. TRUDNOŚĆ I PRESJA
 
@@ -862,15 +785,9 @@ Próg przetrwania pozostaje taki sam na wszystkich profilach: w chwili rozpoczę
 
 Licznik nie zatrzymuje się podczas kryzysu przywództwa, dnia bez wyprawy ani nieukończonej misji. Czarny Front nie może przyjść wcześniej przez losowanie i nie można przesunąć go dialogiem.
 
-[AKTYWNE] — WYSTARCZALNOŚĆ KAMPANII
+[AKTYWNE] — WYSTARCZALNOŚĆ PROMOWALNEJ MAPY
 
-Na trzech publicznych presetach autorska pula zasobów i certyfikowane trasy mają umożliwiać przy poprawnej grze:
-
-- odbudowę sześciu budynków co najmniej do poziomów wymaganych przez główną ścieżkę;
-- doprowadzenie integralności do 100%;
-- wykonanie sprzętu koniecznego do bezpiecznego dotarcia do R-3 i C-4;
-- wykonanie Regulatora R-3 oraz, przy ambitnej ścieżce, Rozdzielacza Wspólnej Linii;
-- uzyskanie każdego z trzech zakończeń.
+Na trzech publicznych presetach promowalna mapa umożliwia ukończenie tutoriala, wykonanie Noża ratowniczego, przejście od J-7 przez Archiwum, diagnostykę i uruchomienie R-3 do konfiguracji C-4, opcjonalny montaż Rozdzielacza oraz fizyczne powroty do liny. Ogólna gospodarka, budynki, receptury, licznik Frontu, trzy wyniki energii i Kronika pozostają częścią tego samego pełnego przebiegu.
 
 Nie jest to obietnica przejścia bez strat ani gwarancja dla każdej kombinacji Niestandardowej. Gracz nadal może utracić materiały, ludzi, sprzęt albo czas.
 
@@ -896,7 +813,7 @@ Platforma Północna nie jest antagonistą. Jej mieszkańcy potrzebują energii 
 
 Po tutorialu żadna główna scena nie wymaga przeżycia Miry, Anki ani Igora. Osobiste dialogi są używane, gdy dana osoba żyje, ale wymagane informacje przekazuje aktualny Głos Przystani, Głos techniczny albo neutralny raport systemu.
 
-Dziennik misji prowadzi gracza, lecz poza trzema dniami tutoriala nie stawia niewidzialnych ścian. Wszystkie cztery regiony pozostają fizycznie dostępne; dystans, tlen, sprzęt, zimno, prądy, skróty i ryzyko tworzą miękkie bariery.
+Dziennik misji prowadzi gracza, lecz poza trzema dniami tutoriala nie stawia niewidzialnych ścian. Bariery, obszary i cele przestrzenne mogą wynikać wyłącznie z rekordów manifestu oraz ogólnych mechanik wyprawy; dokument produktu nie ustanawia drugiej topologii mapy.
 
 Północna nie ma osobnego, ukrytego zegara śmierci. Jej pogarszający się stan jest wiązany z tym samym jawnym licznikiem Czarnego Frontu. Każda ważna zmiana jest przekazywana przez radio i zapisywana w dzienniku.
 
@@ -910,7 +827,7 @@ Obowiązkowe raporty mają pierwszeństwo przed fabułą. Po zakończeniu dnia g
 
 Tutorial wykorzystuje rozmowy tylko w ważnych przejściach fabularnych: Mira i Anka ustalają potrzebę pierwszego dachu oraz drogi w dół, Anka i Igor omawiają czarny kabel, Warsztat i pierwsze zejście, a po pierwszym powrocie Igor i Anka rozpoznają blokadę oraz potrzebę Noża ratowniczego. Po bezpiecznym powrocie z J-7 odzyskanie zasilania, pierwsza odpowiedź od żywych ludzi od pięciu lat, koszt podłączenia Północnej oraz ostrzeżenie o Czarnym Froncie tworzą jedną ciągłą scenę zamiast technicznego debriefu i osobnego powitania. Pozostałe kroki zachowują czytelną kapsułę celu, podświetlenie albo nawigację bez przerywania ich kolejnymi oknami fabularnymi. Zamknięcie rozmowy nie zalicza kroku i nie omija wymaganej akcji.
 
-Po tutorialu pełne rozmowy pojawiają się przy kamieniach, które zmieniają wiedzę, relację z Północną albo moralne znaczenie decyzji: Archiwum, uruchomienie R-3, C-4, montaż Rozdzielacza i ostatni dzień. Klara wraca w środkowej części kampanii, dzięki czemu Północna pozostaje grupą konkretnych ludzi, a nie tylko treścią raportu i finałowego wyboru. Czysto techniczne potwierdzenia diagnozy, wykonania Regulatora i wykonania Rozdzielacza są krótkimi, dwu- lub trzyprzejściowymi interludiami. Dziennik misji nadal przechowuje wymagany cel.
+Po tutorialu katalog domenowy zachowuje pełne rozmowy dla kamieni, które zmieniają wiedzę, relację z Północną albo moralne znaczenie decyzji: Archiwum, uruchomienie R-3, C-4, montaż Rozdzielacza i ostatni dzień. Dialog po J-7 oraz dalsze rozmowy i quick-flow pozostają aktywne i prowadzą przez urządzenia przypisane przez manifest. Klara wraca w środkowej części kampanii, dzięki czemu Północna pozostaje grupą konkretnych ludzi, a nie tylko treścią raportu i finałowego wyboru. Czysto techniczne potwierdzenia diagnozy, wykonania Regulatora i wykonania Rozdzielacza są krótkimi, dwu- lub trzyprzejściowymi interludiami. Dziennik misji nadal przechowuje wymagany stan domenowy.
 
 Głos Przystani i Głos techniczny wybierają żyjącą, obecną i zdolną osobę z właściwego kontekstu; jeżeli nie da się zbudować wiarygodnej wymiany dwóch osób, scena może przejść w monolog albo neutralny raport bez udawania, że zmarła lub nieobecna postać nadal mówi. Samo obejrzenie albo zamknięcie rozmowy nie zmienia kampanii, nie zapisuje osobnej flagi i nie tworzy nowej bramki postępu.
 
@@ -932,7 +849,7 @@ Jedno przejście uruchamia najwyżej jeden krótki efekt, który nie jest zapęt
 
 Odwołania: ARD-0087; architektura, sekcje 12.1 i 13.
 
-Dokładny następny cel Wspólnej Linii i licznik Czarnego Frontu pozostają czytelne obok śledzonej misji. Podczas przygotowania wyprawy prowadzenie kampanii wskazuje właściwe urządzenie przed celem zwykłej misji, lecz nie wysyła nurka pod wodę w etapach wymagających wyłącznie pracy Warsztatu.
+Dokładny następny etap Wspólnej Linii i licznik Czarnego Frontu pozostają czytelne obok śledzonej misji. Podczas przygotowania wyprawy prowadzenie kampanii wskazuje urządzenie tylko wtedy, gdy jego aktywna instancja istnieje w manifeście; nie wysyła nurka pod wodę dla etapu bez rozmieszczenia ani w etapach wymagających wyłącznie pracy Warsztatu.
 
 9.2. AKT I — MARTWA LINIA
 
@@ -976,7 +893,7 @@ Cele:
 4. Zdobądź wskazane minimum: 1 jednostkę jedzenia, 1 deskę oraz 3 złomu i 2 tkaniny i gumy potrzebne na Nóż ratowniczy. Nadwyżkę można pozostawić w skrzyniach.
 5. Wróć do głównej liny.
 
-Pod Przystanią Igor odnajduje podstawowy łup oraz kabel biegnący po dnie. Przewód prowadzi między resztkami konstrukcji, lecz dalsze przejście blokują sieci, liny i roślinność.
+Pod Przystanią Igor odnajduje podstawowy łup oraz kabel biegnący po otwartym dnie. Dalsze przejście blokują sieci, liny i roślinność.
 
 Podczas prowadzonych kroków wyprawy bursztynowa strzałka porusza się po stałym okręgu wokół nurka i obraca w pełnym kierunku bieżącego celu. Prowadzi kolejno do obowiązkowych źródeł łupu, zablokowanego przejścia i głównej liny; znika po zbliżeniu się do celu oraz po zakończeniu tutoriala.
 
@@ -1001,7 +918,7 @@ Poranny raport kieruje gracza do aktywnego Warsztatu. Tutorial prowadzi gracza p
 
 Po przydzieleniu pracownika panel Warsztatu przechodzi z OBSADY do DZIAŁANIA i wskazuje wykonanie Noża, aby kolejny krok nie pozostawał ukryty w poprzedniej zakładce. Instrukcja podaje nazwę wymaganej akcji i jej pełny koszt.
 
-Igor wraca do wcześniejszej przeszkody, przecina blokadę i podąża za kablem przez Dachy Umarłego Miasta. Przewód prowadzi do podwodnej rozdzielni:
+Igor wraca do wcześniejszej przeszkody, przecina blokadę i podąża za kablem przez otwartą wodę. Przewód prowadzi do aktywnego złącza:
 
 J-7 — POMOST 7
 
@@ -1086,7 +1003,11 @@ Pogarszanie stanu Północnej jest częścią tego samego odliczania. Gra nie uk
 
 MISJA — MAPA WSPÓLNEJ SIECI
 
-Klara przekazuje współrzędne starego terminala w Zalanym Archiwum R1-09.
+[AKTYWNE] — OŚ URZĄDZEŃ WSPÓLNEJ LINII
+
+Poniższe etapy Archiwum, Leona, R-3, C-4 i Rozdzielacza zachowują aktywną kolejność kampanii, zasady interakcji, ekonomię oraz skutki fabularne. Archiwum, panel diagnostyczny i Generator R-3 oraz C-4 są wymagane, Leon i wykonanie Rozdzielacza opcjonalni, natomiast promowalna mapa zapewnia również osiągalne gniazdo jego montażu. Konkretne instancje i położenia pochodzą wyłącznie z manifestu; dawne nazwy rejonów, identyfikatory pozycyjne i współrzędne nie mają authority.
+
+Klara przekazuje aktywny cel Archiwum, a manifest wyznacza jego konkretną instancję oraz osiągalną drogę.
 
 Nurek:
 
@@ -1103,8 +1024,8 @@ Mapa pokazuje:
 
 - Pomost 7 — Przystań;
 - Platformę Północną;
-- Generator Pływowy R-3 w Rdzawym Pasie;
-- Centralną Rozdzielnię C-4 w Czarnym Sercu.
+- Generator Pływowy R-3;
+- Centralną Rozdzielnię C-4.
 
 Obie platformy korzystają ze starego banku akumulatorów. Generator R-3, który powinien uzupełniać energię, nie działa od kilku lat. Ponowne podłączenie Pomostu 7 nie odebrało Północnej sprawnego źródła — przyspieszyło wyczerpywanie ostatniego wspólnego zapasu. Bank może podtrzymać jedną priorytetową linię podczas Czarnego Frontu, ale nie obie naraz.
 
@@ -1126,9 +1047,9 @@ KLARA:
 
 Nie ma sabotażysty ani jednego złoczyńcy. Dawna decyzja ocaliła jedną grupę kosztem porzucenia pustej platformy. Finał postawi gracza przed podobnym wyborem, ale da mu szansę przygotowania trzeciego rozwiązania.
 
-MISJA OPCJONALNA — CZŁOWIEK Z HOTELU
+MISJA OPCJONALNA — RATUNEK LEONA
 
-Leon Wrona pozostaje w Zatopionym Hotelu i korzysta z aktywnej mechaniki ratunku. Nie rozpoczyna głównej fabuły.
+Leon Wrona korzysta z aktywnej mechaniki ratunku i nie rozpoczyna głównej fabuły. Jego opcjonalną instancję i położenie może ustanowić wyłącznie manifest mapy.
 
 Po uratowaniu ujawnia, że pracował przy Generatorze R-3. Dzięki temu:
 
@@ -1151,7 +1072,7 @@ Aby kampania nie utknęła przez niewykonany cel, Akt III rozpoczyna się najpó
 
 Podczas rozmowy Klara informuje, że bank Północnej nie wytrzyma maksymalnego obciążenia sztormu. Generator R-3 może ustabilizować obie platformy w zwykłych warunkach, ale stara Rozdzielnia C-4 podczas głównej fali potrafi bezpiecznie zasilać tylko jedną linię.
 
-Głos techniczny przedstawia możliwość wykonania prowizorycznego rozdzielacza. Wymaga on materiałów, pracy Warsztatu i zejścia do Czarnego Serca — dokładnie tych zasobów i dni, które można przeznaczyć na utrzymanie 100% Przystani.
+Głos techniczny przedstawia możliwość wykonania prowizorycznego rozdzielacza. Wymaga on materiałów, pracy Warsztatu i wyprawy do C-4 — dokładnie tych zasobów i dni, które można przeznaczyć na utrzymanie 100% Przystani.
 
 9.4. AKT III — NOC BEZ BRZEGU
 
@@ -1163,9 +1084,9 @@ W CHWILI UDERZENIA CZARNEGO FRONTU PRZYSTAŃ MUSI MIEĆ 100% INTEGRALNOŚCI.
 
 Dodatkowym, świadomym wyborem jest próba uratowania Platformy Północnej.
 
-MISJA — SERCE RDZY
+MISJA — GENERATOR R-3
 
-Generator Pływowy R-3 znajduje się w przemysłowej części Rdzawego Pasa.
+Generator Pływowy R-3 jest wymaganym stałym urządzeniem świata. Manifest przypisuje osobno osiągalny panel diagnostyczny i generator, bez pozycji domyślnej poza mapą.
 
 Pierwsza wyprawa:
 
@@ -1211,9 +1132,9 @@ Warsztat może wykonać prowizoryczny Rozdzielacz Wspólnej Linii. Zlecenie wyma
 
 Rozdzielacz nie tworzy energii. Pozwala jedynie podzielić obciążenie generatora pomiędzy obie linie podczas największej fali. Bez sprawnego R-3, Radiostacji i 100% integralności nie daje bezpiecznego wyniku.
 
-MISJA — CZARNE SERCE
+MISJA — CENTRALNA ROZDZIELNIA
 
-Centralna Rozdzielnia C-4 znajduje się w najgłębszym regionie mapy. Dystans, zimno, prądy, ciemność, sprzęt i droga powrotna są naturalnymi wymaganiami wyprawy.
+Centralna Rozdzielnia C-4 jest wymaganym stałym urządzeniem świata, a dostępne przy niej gniazdo przyjmuje Rozdzielacz, jeżeli został wykonany. Faktyczny dystans, głębokość, ryzyko i droga powrotna wynikają wyłącznie z rozmieszczenia mapowego w manifeście.
 
 Nurek:
 
@@ -1464,7 +1385,7 @@ Zatwierdzone, lecz nadal niewdrożone piony produktu:
 - późniejsze zdarzenia radiowe zależne od losu Platformy Północnej;
 - pełne osobiste warianty dialogów ról odpornych na śmierć konkretnych bohaterów;
 - relacje, konflikty i konsekwencje cech wykraczające poza warianty dialogów i Kronikę;
-- pełna mechaniczna tożsamość czterech biomów;
+- mechaniczna tożsamość przyszłych biomów lub regionów dopiero po osobnej decyzji produktowej i rozmieszczeniu w manifeście;
 - dodatkowe zagrożenia, ratunki i narzędzia;
 - odradzanie wybranych zasobów biologicznych;
 - ewentualna nowa fizyczna platforma lub dzielnice wyłącznie po osobnej decyzji produktowej.

@@ -10,9 +10,7 @@ kind = "heavy_recovered_count"
 text = "Oznacz i wydobądź co najmniej jeden ciężki obiekt."
 description = "Dzwon głębinowy i Wyciągarka pozwalają sprowadzać do Przystani znaleziska niemożliwe do uniesienia przez nurka."
 required_count = 1
-target_landmark_id = "R1-07"
-landmark_label = "Statek w Ulicy"
-guidance = "Wypatrz silnik statku przy Statku w Ulicy (R1-07), oznacz go pod wodą, a następnie użyj ciężkiego odzysku w bazie."
+guidance = "Odnajdź ciężki obiekt, oznacz go pod wodą, a następnie użyj ciężkiego odzysku w bazie."
 
 [resource]
 script = ExtResource("1_mission")

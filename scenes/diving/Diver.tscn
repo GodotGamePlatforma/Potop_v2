@@ -1,11 +1,11 @@
 [gd_scene load_steps=8 format=3 uid="uid://bpl1dvxy5p701"]
 
 [ext_resource type="Script" uid="uid://h1dogxd7e64l" path="res://scripts/diving/DiverController.gd" id="1_diver_controller"]
-[ext_resource type="SpriteFrames" path="res://assets/diving/diver/diver_sprite_frames.tres" id="2_diver_frames"]
+[ext_resource type="SpriteFrames" path="res://underwater_map_workbench/assets/gameplay/diver/diver_sprite_frames.tres" id="2_diver_frames"]
 [ext_resource type="Script" uid="uid://bro2yixdaglhk" path="res://scripts/diving/DiverVisualEffects.gd" id="3_visual_effects"]
-[ext_resource type="Shader" path="res://assets/diving/diver/diver_readability.gdshader" id="4_readability_shader"]
-[ext_resource type="Resource" path="res://assets/diving/diver/diver_socket_profile.tres" id="5_socket_profile"]
-[ext_resource type="Shader" path="res://assets/diving/diver/diver_lantern_cone.gdshader" id="6_lantern_cone_shader"]
+[ext_resource type="Shader" path="res://underwater_map_workbench/assets/gameplay/diver/diver_readability.gdshader" id="4_readability_shader"]
+[ext_resource type="Resource" path="res://underwater_map_workbench/assets/gameplay/diver/diver_socket_profile.tres" id="5_socket_profile"]
+[ext_resource type="Shader" path="res://underwater_map_workbench/assets/gameplay/diver/diver_lantern_cone.gdshader" id="6_lantern_cone_shader"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_diver_readability"]
 shader = ExtResource("4_readability_shader")
@@ -66,8 +66,6 @@ shape = SubResource("CircleShape2D_interaction")
 zoom = Vector2(1.2, 1.2)
 limit_left = 0
 limit_top = 0
-limit_right = 11520
-limit_bottom = 6480
 position_smoothing_enabled = true
 position_smoothing_speed = 7.0
 

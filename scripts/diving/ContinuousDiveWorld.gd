@@ -2,7 +2,7 @@ class_name ContinuousDiveWorld
 extends Node2D
 
 const WorldStateScript := preload("res://scripts/data/UnderwaterWorldState.gd")
-const MapSceneCompilerScript := preload("res://scripts/diving/UnderwaterMapSceneCompiler.gd")
+const MapSceneCompilerScript := preload("res://underwater_map_workbench/runtime/UnderwaterMapSceneCompiler.gd")
 const ContainerScript := preload("res://scripts/diving/DiveLootContainer.gd")
 const DiseaseHazardContainerScript := preload("res://scripts/diving/DiveDiseaseHazardContainer.gd")
 const WorldPickupScript := preload("res://scripts/diving/DiveWorldPickup.gd")
@@ -15,14 +15,12 @@ const RescueSurvivorScript := preload("res://scripts/diving/DiveRescueSurvivor.g
 const DifficultyMathScript := preload("res://scripts/core/DifficultyMath.gd")
 const NavigationSnapshotScript := preload("res://scripts/diving/DiveNavigationSnapshot.gd")
 const MapNavigationRasterScript := preload("res://scripts/diving/MapNavigationRaster.gd")
-const TerrainRendererScript := preload("res://scripts/diving/UnderwaterTerrainRenderer.gd")
-const VisualChunkStreamerScript := preload("res://scripts/diving/DiveVisualChunkStreamer.gd")
 const TerrainOcclusionScript := preload("res://scripts/diving/DiveTerrainOcclusion.gd")
 
-const MAP_WORLD_SIZE := Vector2(11_520, 6_480)
 const STREAM_RADIUS_CHUNKS := 3
 const DROPPED_LOOT_MERGE_DISTANCE := 96.0
 const AUTHORED_VISUAL_META := &"authored_map_visual"
+const AUTHORED_VISUAL_SCENE_PATH_META := &"authored_map_visual_scene_path"
 
 var exit_line: DiveExitLine
 var containers: Array[DiveLootContainer] = []
@@ -34,7 +32,7 @@ var dropped_loot_piles: Array[DiveDroppedLoot] = []
 var rescue_survivors: Array[DiveRescueSurvivor] = []
 var persistent_opened: Array[String] = []
 var persistent_remaining_contents: Dictionary = {}
-var active_sector_id: String = "R1-00"
+var active_sector_id: String = ""
 var streamed_sector_ids: Array[String] = []
 var active_chunk_keys: Array[String] = []
 
@@ -50,10 +48,6 @@ var _last_stream_chunk := Vector2i(-9999, -9999)
 var _start_position := Vector2.ZERO
 var _dropped_loot_fallback_sequence: int = 0
 var _runtime_dynamic: Node2D
-var _terrain_renderer: UnderwaterTerrainRenderer
-var _visual_chunk_streamer
-var _visual_layer_stack
-var _terrain_profiles: Array[Resource] = []
 var _collision_segments_by_chunk: Dictionary = {}
 var _loaded_collision_chunks: Dictionary = {}
 var _collision_chunks_root: Node2D
@@ -61,6 +55,7 @@ var _graphics_quality := "high"
 var _reduced_motion := false
 var _last_stream_radius := Vector2i(-1, -1)
 var _snapshot_analysis_mode := false
+var _static_authored_visual_bindings: Array[Dictionary] = []
 
 func _ready() -> void:
 	if _blueprint == null:
@@ -124,6 +119,7 @@ func _runtime_add_child(node: Node) -> void:
 	_runtime_root().add_child(node)
 
 func _clear_runtime_dynamic() -> void:
+	_static_authored_visual_bindings.clear()
 	var root := _runtime_root()
 	for child in root.get_children():
 		root.remove_child(child)
@@ -155,33 +151,29 @@ func start_position() -> Vector2:
 	return _start_position
 
 func world_size() -> Vector2:
-	return _blueprint.world_size if _blueprint != null else MAP_WORLD_SIZE
+	return _blueprint.world_size if _blueprint != null else Vector2.ONE
 
 
 func terrain_visual_profiles() -> Array[Resource]:
-	return _terrain_profiles.duplicate()
+	return []
 
 
 func set_graphics_quality(quality_id: String) -> void:
-	_graphics_quality = quality_id if quality_id in ["low", "medium", "high"] else "high"
-	if _visual_layer_stack != null and is_instance_valid(_visual_layer_stack):
-		_visual_layer_stack.set_graphics_quality(_graphics_quality)
-	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
-		_visual_chunk_streamer.set_graphics_quality(_graphics_quality)
-	if _terrain_renderer != null:
-		_terrain_renderer.set_graphics_quality(_graphics_quality)
+	var normalized := quality_id if quality_id in ["low", "medium", "high"] else "high"
+	var quality_changed := normalized != _graphics_quality
+	_graphics_quality = normalized
 	_apply_interactable_visual_setting(&"set_graphics_quality", _graphics_quality)
+	if quality_changed:
+		_refresh_static_authored_visuals()
 
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
-	if _visual_layer_stack != null and is_instance_valid(_visual_layer_stack):
-		_visual_layer_stack.set_reduced_motion(enabled)
-	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
-		_visual_chunk_streamer.set_reduced_motion(enabled)
-	if _terrain_renderer != null:
-		_terrain_renderer.set_reduced_motion(enabled)
 	_apply_interactable_visual_setting(&"set_reduced_motion", enabled)
+
+
+func set_interactable_visual_time_for_tests(time_seconds: float) -> void:
+	_apply_interactable_visual_setting(&"set_visual_time_for_tests", maxf(time_seconds, 0.0))
 
 
 func visual_context_at(world_position: Vector2) -> Dictionary:
@@ -194,6 +186,7 @@ func visual_context_at(world_position: Vector2) -> Dictionary:
 	var profile_state := _blended_visual_profile_at(world_position)
 	return {
 		"region_id": region_id,
+		"depth_ratio": clampf(world_position.y / maxf(world_size().y, 1.0), 0.0, 1.0),
 		"water_color": profile_state.get("water_color", region.get("water_color", Color(0.035, 0.20, 0.26, 1.0))),
 		"accent_color": profile_state.get("caustics_color", region.get("accent_color", Color(0.18, 0.75, 0.80, 1.0))),
 		"profile": profile_state,
@@ -201,33 +194,25 @@ func visual_context_at(world_position: Vector2) -> Dictionary:
 
 
 func _blended_visual_profile_at(world_position: Vector2) -> Dictionary:
-	var profiles: Array[Resource] = []
-	profiles.assign(_terrain_profiles)
-	profiles.sort_custom(func(a: Resource, b: Resource) -> bool:
-		return a != null and (b == null or float(a.get("start_depth_ratio")) < float(b.get("start_depth_ratio")))
-	)
-	if profiles.is_empty() or profiles[0] == null:
+	if _blueprint == null:
+		return {}
+	var region: Dictionary = _blueprint.get_region_at(world_position)
+	if region.is_empty():
 		return {}
 	var depth_ratio := clampf(world_position.y / maxf(world_size().y, 1.0), 0.0, 1.0)
-	var profile_index := profiles.size() - 1
-	for index in range(profiles.size()):
-		var candidate := profiles[index]
-		if candidate != null and depth_ratio <= float(candidate.get("end_depth_ratio")):
-			profile_index = index
-			break
-	var current := profiles[profile_index]
-	var start_depth := float(current.get("start_depth_ratio"))
-	var end_depth := float(current.get("end_depth_ratio"))
-	var local_depth := clampf((depth_ratio - start_depth) / maxf(end_depth - start_depth, 0.0001), 0.0, 1.0)
-	var next := profiles[mini(profile_index + 1, profiles.size() - 1)]
-	var transition := smoothstep(0.82, 1.0, local_depth) if next != current else 0.0
-	var current_water := (current.get("water_near_color") as Color).lerp(current.get("water_far_color") as Color, local_depth)
+	var region_weights := {}
+	var region_id := str(region.get("id", "")).strip_edges().to_lower()
+	if not region_id.is_empty():
+		region_weights[region_id] = 1.0
 	return {
-		"water_color": current_water.lerp(next.get("water_near_color") as Color, transition),
-		"caustics_color": (current.get("caustics_color") as Color).lerp(next.get("caustics_color") as Color, transition),
-		"water_clarity": lerpf(float(current.get("water_clarity")), float(next.get("water_clarity")), transition),
-		"suspended_particle_density": lerpf(float(current.get("suspended_particle_density")), float(next.get("suspended_particle_density")), transition),
-		"caustics_strength": lerpf(float(current.get("caustics_strength")), float(next.get("caustics_strength")), transition),
+		"water_color": region.get("water_color", Color(0.035, 0.20, 0.26, 1.0)),
+		"caustics_color": region.get("accent_color", Color(0.18, 0.75, 0.80, 1.0)),
+		"water_clarity": lerpf(0.82, 0.48, depth_ratio),
+		"suspended_particle_density": lerpf(0.08, 0.24, depth_ratio),
+		"caustics_strength": lerpf(0.32, 0.10, depth_ratio),
+		"current_distortion_strength": 0.0,
+		"depth_ratio": depth_ratio,
+		"region_weights": region_weights,
 	}
 
 
@@ -263,34 +248,21 @@ func _configure_interactable_presentation(target: Node2D, record: Dictionary, st
 		target.call("set_reduced_motion", _reduced_motion)
 
 
-func _presentation_region_hint(record: Dictionary, stable_id: String, world_position: Vector2) -> String:
-	var normalized_id := stable_id.to_lower()
-	for region_number in range(1, 5):
-		var region_token := "r%d" % region_number
-		if (
-			normalized_id.begins_with(region_token)
-			or normalized_id.contains("_%s_" % region_token)
-			or normalized_id.ends_with("_%s" % region_token)
-		):
-			return region_token.to_upper()
-	if normalized_id.begins_with("c4_"):
-		return "R4"
-	if normalized_id in ["junction_j7", "archive_terminal", "exit_line"]:
-		return "R1"
+func _presentation_region_hint(record: Dictionary, _stable_id: String, world_position: Vector2) -> String:
 	for landmark_key in ["landmark_id", "entry_landmark_id"]:
 		var landmark_id := str(record.get(landmark_key, ""))
 		if landmark_id.is_empty() or _blueprint == null:
 			continue
 		var linked_landmark: Dictionary = _blueprint.get_landmark(landmark_id)
 		var linked_region := str(linked_landmark.get("region_id", "")).to_upper()
-		if linked_region in ["R1", "R2", "R3", "R4"]:
+		if not linked_region.is_empty():
 			return linked_region
 	if _blueprint != null:
 		var nearest_landmark: Dictionary = _blueprint.get_nearest_landmark(world_position)
 		var nearest_region := str(nearest_landmark.get("region_id", "")).to_upper()
-		if nearest_region in ["R1", "R2", "R3", "R4"]:
+		if not nearest_region.is_empty():
 			return nearest_region
-	return str(visual_context_at(world_position).get("region_id", "R1")).to_upper()
+	return str(visual_context_at(world_position).get("region_id", "")).to_upper()
 
 func collision_segment_count() -> int:
 	return _collision_segment_count
@@ -315,7 +287,9 @@ func navigation_snapshot(
 	if exit_line != null and is_instance_valid(exit_line):
 		resolved_exit_position = exit_line.global_position
 	var current_zones: Array = _blueprint.current_zones if _blueprint != null else []
-	var depth_regions: Array = _blueprint.regions if _blueprint != null else []
+	var depth_profile_points := PackedVector2Array()
+	if _blueprint != null:
+		depth_profile_points = _blueprint.depth_profile_points.duplicate()
 	snapshot.configure(
 		world_size(),
 		Vector2i(_grid_width, _grid_height),
@@ -325,7 +299,7 @@ func navigation_snapshot(
 		_start_position,
 		resolved_exit_position,
 		current_zones,
-		depth_regions,
+		depth_profile_points,
 		_navigation_closed_gate_descriptors(),
 		_navigation_target_descriptors(),
 		_navigation_threat_descriptors()
@@ -377,13 +351,7 @@ func create_or_merge_dropped_loot_pile(
 func depth_at(world_position: Vector2) -> float:
 	if _blueprint == null:
 		return 0.0
-	var region: Dictionary = _blueprint.get_region_at(world_position)
-	if region.is_empty():
-		return lerpf(8.0, 160.0, clampf(world_position.y / maxf(world_size().y, 1.0), 0.0, 1.0))
-	var bounds: Rect2 = region.get("bounds", Rect2(Vector2.ZERO, world_size()))
-	var depth_range: Vector2 = region.get("depth_range", Vector2(8, 160))
-	var local_ratio := clampf((world_position.y - bounds.position.y) / maxf(bounds.size.y, 1.0), 0.0, 1.0)
-	return lerpf(depth_range.x, depth_range.y, local_ratio)
+	return _blueprint.depth_at(world_position)
 
 func module_name_at(world_position: Vector2) -> String:
 	if _blueprint == null:
@@ -452,8 +420,7 @@ func landmark_id_at(world_position: Vector2) -> String:
 func update_streaming(world_position: Vector2, force: bool = false, visible_half_extent: Vector2 = Vector2.ZERO) -> void:
 	if _blueprint == null:
 		return
-	if _visual_chunk_streamer != null and is_instance_valid(_visual_chunk_streamer):
-		_visual_chunk_streamer.update_streaming(world_position, visible_half_extent, force)
+	_refresh_towed_survivor_visual_context()
 	var center_chunk: Vector2i = _blueprint.chunk_coord_at(world_position)
 	var safe_chunk_size := maxi(_blueprint.chunk_size, 1)
 	var stream_radius := Vector2i(
@@ -471,9 +438,25 @@ func update_streaming(world_position: Vector2, force: bool = false, visible_half
 		var landmark_chunk: Vector2i = _blueprint.chunk_coord_at(landmark.get("position", Vector2.ZERO))
 		if absi(landmark_chunk.x - center_chunk.x) <= stream_radius.x and absi(landmark_chunk.y - center_chunk.y) <= stream_radius.y:
 			streamed_sector_ids.append(str(landmark.get("id", "")))
-	if _terrain_renderer != null:
-		_terrain_renderer.set_active_chunks(active_chunk_keys)
 	_sync_collision_chunks(active_chunk_keys)
+
+
+func _refresh_towed_survivor_visual_context() -> void:
+	for survivor in rescue_survivors:
+		if survivor == null or not is_instance_valid(survivor):
+			continue
+		if survivor.stage != DiveRescueSurvivor.Stage.TOWING:
+			continue
+		var context := visual_context_at(survivor.global_position)
+		var region_id := str(context.get("region_id", "")).to_upper()
+		survivor.sync_visual_context(context, region_id, 0.01)
+
+
+func present_canonical_terrain_contacts(contacts: Array) -> bool:
+	# The clean baseline has no authored terrain impact renderer. Physical world
+	# boundaries remain canonical, while this optional presentation hook is off.
+	return false
+
 
 func _reset_dropped_loot_piles() -> void:
 	_dropped_loot_fallback_sequence = 0
@@ -486,8 +469,9 @@ func _reset_dropped_loot_piles() -> void:
 			continue
 		dropped_loot_piles.erase(pile)
 		containers.erase(pile)
-		if pile.get_parent() == self:
-			remove_child(pile)
+		var parent: Node = pile.get_parent()
+		if parent != null:
+			parent.remove_child(pile)
 		pile.queue_free()
 
 func _find_dropped_loot_merge_target(persistence_id: String, world_position: Vector2) -> DiveDroppedLoot:
@@ -798,10 +782,6 @@ func _rebuild_world() -> void:
 	_collision_segments_by_chunk.clear()
 	_loaded_collision_chunks.clear()
 	_collision_chunks_root = null
-	_terrain_renderer = null
-	_visual_chunk_streamer = null
-	_visual_layer_stack = null
-	_terrain_profiles.clear()
 	if not _snapshot_analysis_mode:
 		_build_source_visual_layers()
 	_build_navigation_from_source()
@@ -819,39 +799,6 @@ func _build_source_visual_layers() -> void:
 		return
 	visual_layers.name = "VisualLayers"
 	_runtime_add_child(visual_layers)
-	_visual_layer_stack = visual_layers.get_node_or_null("SixLayerVisuals")
-	if _visual_layer_stack == null:
-		push_error("Scena mapy nie zawiera stosu VisualLayers/SixLayerVisuals.")
-	_visual_chunk_streamer = visual_layers.get_node_or_null("VisualChunkStreamer")
-	if _visual_chunk_streamer == null:
-		_visual_chunk_streamer = VisualChunkStreamerScript.new()
-		_visual_chunk_streamer.name = "VisualChunkStreamer"
-		visual_layers.add_child(_visual_chunk_streamer)
-	_visual_chunk_streamer.configure(visual_layers, world_size())
-	_terrain_profiles = MapSceneCompilerScript.new().terrain_visual_profiles()
-	_terrain_renderer = TerrainRendererScript.new()
-	_terrain_renderer.name = "TerrainRenderer"
-	_terrain_renderer.contour_mask = MapSceneCompilerScript.new().navigation_grid_texture()
-	_terrain_renderer.contour_sdf = MapSceneCompilerScript.new().terrain_render_sdf_texture()
-	_terrain_renderer.rock_detail_texture = MapSceneCompilerScript.new().terrain_detail_texture()
-	_terrain_renderer.world_size = world_size()
-	_terrain_renderer.chunk_size = _blueprint.chunk_size if _blueprint != null else 512
-	_terrain_renderer.region_profiles.assign(_terrain_profiles)
-	visual_layers.add_child(_terrain_renderer)
-	if _visual_layer_stack != null and _visual_layer_stack.has_method("content_root"):
-		_terrain_renderer.configure_layer_roots(
-			_visual_layer_stack.content_root("L00_base_color", "world", "generated"),
-			_visual_layer_stack.content_root("L01_ultra_far_silhouettes", "parallax", "generated"),
-			_visual_layer_stack.content_root("L04_near_terrain_skin", "world", "generated")
-		)
-	_terrain_renderer.rebuild_visuals()
-	if _visual_layer_stack != null:
-		_visual_layer_stack.set_graphics_quality(_graphics_quality)
-		_visual_layer_stack.set_reduced_motion(_reduced_motion)
-	_visual_chunk_streamer.set_graphics_quality(_graphics_quality)
-	_visual_chunk_streamer.set_reduced_motion(_reduced_motion)
-	_terrain_renderer.set_graphics_quality(_graphics_quality)
-	_terrain_renderer.set_reduced_motion(_reduced_motion)
 
 func _build_authored_visual_prefabs() -> void:
 	if _blueprint == null:
@@ -881,6 +828,8 @@ func _instance_static_authored_visual(record: Dictionary, layer_z_index: int) ->
 	if not _attach_authored_visual(anchor, record):
 		anchor.get_parent().remove_child(anchor)
 		anchor.free()
+		return
+	_static_authored_visual_bindings.append({"anchor": anchor, "record": record})
 
 
 func _attach_authored_visual(
@@ -890,7 +839,7 @@ func _attach_authored_visual(
 ) -> bool:
 	if target == null or _snapshot_analysis_mode:
 		return false
-	var scene_path := str(record.get("visual_scene_path", record.get("scene_path", "")))
+	var scene_path := _resolved_visual_scene_path(record)
 	if scene_path.is_empty():
 		return false
 	var packed := ResourceLoader.load(scene_path) as PackedScene
@@ -911,6 +860,7 @@ func _attach_authored_visual(
 	var object_wrapper := Node2D.new()
 	object_wrapper.name = "AuthoredMapVisual"
 	object_wrapper.set_meta(AUTHORED_VISUAL_META, true)
+	object_wrapper.set_meta(AUTHORED_VISUAL_SCENE_PATH_META, scene_path)
 	object_wrapper.rotation = (
 		0.0
 		if object_rotation_already_applied
@@ -935,6 +885,56 @@ func _attach_authored_visual(
 
 func _record_has_authored_visual(record: Dictionary) -> bool:
 	return not str(record.get("visual_scene_path", record.get("scene_path", ""))).is_empty()
+
+
+func _resolved_visual_scene_path(record: Dictionary) -> String:
+	if _graphics_quality == "high":
+		var high_path := str(record.get("visual_scene_high_path", "")).strip_edges()
+		if not high_path.is_empty():
+			return high_path
+	if _graphics_quality in ["medium", "high"]:
+		var medium_path := str(record.get("visual_scene_medium_path", "")).strip_edges()
+		if not medium_path.is_empty():
+			return medium_path
+	return str(record.get("visual_scene_path", record.get("scene_path", ""))).strip_edges()
+
+
+func _refresh_static_authored_visuals() -> void:
+	for binding in _static_authored_visual_bindings:
+		var anchor := binding.get("anchor") as Node2D
+		if anchor == null or not is_instance_valid(anchor):
+			continue
+		var record: Dictionary = binding.get("record", {})
+		var desired_path := _resolved_visual_scene_path(record)
+		var current_wrapper: Node2D
+		for child in anchor.get_children():
+			if child is Node2D and child.has_meta(AUTHORED_VISUAL_META):
+				current_wrapper = child as Node2D
+				break
+		var current_path := (
+			str(current_wrapper.get_meta(AUTHORED_VISUAL_SCENE_PATH_META, ""))
+			if current_wrapper != null
+			else ""
+		)
+		if current_path == desired_path:
+			continue
+		if desired_path.is_empty() or not _attach_authored_visual(anchor, record):
+			continue
+		var replacement_wrapper: Node2D
+		for child in anchor.get_children():
+			if (
+				child is Node2D
+				and child != current_wrapper
+				and child.has_meta(AUTHORED_VISUAL_META)
+				and str(child.get_meta(AUTHORED_VISUAL_SCENE_PATH_META, "")) == desired_path
+			):
+				replacement_wrapper = child as Node2D
+				break
+		if current_wrapper != null and is_instance_valid(current_wrapper):
+			anchor.remove_child(current_wrapper)
+			current_wrapper.free()
+		if replacement_wrapper != null:
+			replacement_wrapper.name = "AuthoredMapVisual"
 
 
 func _disable_visual_collisions(root_node: Node) -> void:

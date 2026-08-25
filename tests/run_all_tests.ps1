@@ -44,10 +44,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $testTimeoutWasExplicit = $PSBoundParameters.ContainsKey("TestTimeoutSeconds")
-$testSpecificDefaultTimeoutSeconds = @{
-    "dive_layout_story_regression_test.gd" = 600
-    "dive_recovery_certification_test.gd" = 3600
-}
+$testSpecificDefaultTimeoutSeconds = @{}
 
 # PowerShell 7 can otherwise promote native stderr to PowerShell errors. Godot's
 # stdout and stderr are inspected together below, using the engine's own error
@@ -151,12 +148,11 @@ function Assert-ProjectGodotCacheAvailable {
 }
 
 $quickHeadlessScriptTests = @(
+    "campaign_map_contract_test.gd"
     "campaign_story_system_test.gd"
     "competency_system_test.gd"
     "expedition_preparation_selection_test.gd"
-    "fixed_device_visual_scene_test.gd"
     "interactable_visual_style_test.gd"
-    "macro_terrain_raster_test.gd"
     "narrative_content_test.gd"
     "profession_talent_system_test.gd"
     "production_system_test.gd"
@@ -164,38 +160,28 @@ $quickHeadlessScriptTests = @(
     "campaign_format_test.gd"
     "smoke_test.gd"
     "tutorial_flow_test.gd"
-    "underwater_environment_test.gd"
-    "underwater_map_scene_test.gd"
 )
 
 $fullHeadlessScriptTests = @(
     "base_environment_test.gd"
     "building_system_test.gd"
+    "campaign_map_contract_test.gd"
     "campaign_story_system_test.gd"
     "career_progression_system_test.gd"
     "competency_system_test.gd"
     "profession_talent_system_test.gd"
-    "continuous_map_collision_test.gd"
     "difficulty_director_test.gd"
     "difficulty_profile_test.gd"
     "difficulty_simulation_test.gd"
     "disease_definition_test.gd"
     "disease_end_of_day_test.gd"
     "disease_system_test.gd"
-    "dive_layout_story_regression_test.gd"
-    "dive_navigation_snapshot_test.gd"
-    "dive_recovery_certification_test.gd"
     "dive_risk_system_test.gd"
     "dive_system_test.gd"
-    "dive_visual_chunk_streaming_test.gd"
     "diving_equipment_test.gd"
     "expedition_preparation_selection_test.gd"
-    "fixed_device_visual_scene_test.gd"
     "interactable_visual_style_test.gd"
-    "macro_terrain_raster_test.gd"
-    "mission_system_test.gd"
     "narrative_content_test.gd"
-    "persistent_exploration_test.gd"
     "portrait_catalog_test.gd"
     "production_system_test.gd"
     "rescue_system_test.gd"
@@ -207,8 +193,6 @@ $fullHeadlessScriptTests = @(
     "smoke_test.gd"
     "survival_dependencies_test.gd"
     "tutorial_flow_test.gd"
-    "underwater_environment_test.gd"
-    "underwater_map_scene_test.gd"
     "weather_system_test.gd"
     "worker_assignment_persistence_test.gd"
 )
@@ -224,16 +208,11 @@ $fullHeadlessFlowScenes = @(
     "BaseOptionalPanelsFlowTest.tscn"
     "BasePortraitBindingTest.tscn"
     "BuildingSlotMotionTest.tscn"
-    "DiseaseEpidemicFlowTest.tscn"
     "DiverPresentationTest.tscn"
-    "DiveRiskFlowTest.tscn"
     "IntroFlowTest.tscn"
-    "MissionJournalFlowTest.tscn"
     "MorningEventFlowTest.tscn"
     "NarrativeDialogueFlowTest.tscn"
     "PauseMenuFlowTest.tscn"
-    "PersistentExplorationFlowTest.tscn"
-    "RescueFlowTest.tscn"
     "SettingsUIFlowTest.tscn"
     "SurvivorDevelopmentFlowTest.tscn"
     "TutorialPartialLootFlowTest.tscn"
@@ -251,9 +230,7 @@ $nativeSnapshotScenes = @(
     "BuildingOccupancyBadgesSnapshot.tscn"
     "CampaignOutcomesSnapshot.tscn"
     "DiveHudLayoutSnapshot.tscn"
-    "DiveUISnapshot.tscn"
     "IntroVisualSnapshot.tscn"
-    "PngWorldSnapshot.tscn"
     "SettingsUISnapshot.tscn"
 )
 
@@ -446,6 +423,34 @@ function New-IsolatedTestWorkspace {
     }
 }
 
+function ConvertTo-TestProjectRelativePath {
+    param([string]$TargetName)
+
+    if ([string]::IsNullOrWhiteSpace($TargetName)) {
+        throw "Test target name cannot be empty."
+    }
+
+    $normalized = $TargetName.Trim().Replace('\', '/')
+    if ($normalized.StartsWith("tests/", [StringComparison]::OrdinalIgnoreCase)) {
+        return $normalized
+    }
+    if ($normalized -match '(?i)^underwater_map_workbench/tests/[^/]+\.gd$') {
+        return $normalized
+    }
+    if ($normalized.Contains('/')) {
+        throw "Manifest test target must be a tests/ entry or a direct underwater_map_workbench/tests/*.gd script: '$TargetName'."
+    }
+    return "tests/$normalized"
+}
+
+
+function ConvertTo-TestResourcePath {
+    param([string]$TargetName)
+
+    return "res://$(ConvertTo-TestProjectRelativePath -TargetName $TargetName)"
+}
+
+
 function Resolve-TestTarget {
     param(
         [string]$RequestedTarget,
@@ -454,10 +459,11 @@ function Resolve-TestTarget {
     )
 
     if ([string]::IsNullOrWhiteSpace($RequestedTarget)) {
-        throw "$ParameterName requires a .gd script or .tscn scene from the tests directory."
+        throw "$ParameterName requires a .gd script or .tscn scene from tests/, or a direct .gd script from underwater_map_workbench/tests/."
     }
 
     $testsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "tests")).TrimEnd([char[]]"\/")
+    $workbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "underwater_map_workbench/tests")).TrimEnd([char[]]"\/")
     $targetText = $RequestedTarget.Trim()
     $candidatePath = $null
     if ($targetText.StartsWith("res://", [StringComparison]::OrdinalIgnoreCase)) {
@@ -469,7 +475,8 @@ function Resolve-TestTarget {
     }
     else {
         $normalizedRelative = $targetText.Replace('\', '/')
-        if ($normalizedRelative.StartsWith("tests/", [StringComparison]::OrdinalIgnoreCase)) {
+        if ($normalizedRelative.StartsWith("tests/", [StringComparison]::OrdinalIgnoreCase) -or
+            $normalizedRelative.StartsWith("underwater_map_workbench/tests/", [StringComparison]::OrdinalIgnoreCase)) {
             $candidatePath = Join-Path $SourceProjectRoot ($normalizedRelative.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
         }
         else {
@@ -479,19 +486,30 @@ function Resolve-TestTarget {
 
     $absoluteTarget = [System.IO.Path]::GetFullPath($candidatePath)
     $testsPrefix = $testsRoot + [System.IO.Path]::DirectorySeparatorChar
-    if (-not $absoluteTarget.StartsWith($testsPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Test target must stay inside '$testsRoot': '$RequestedTarget'."
+    $extension = [System.IO.Path]::GetExtension($absoluteTarget).ToLowerInvariant()
+    $isTestsTarget = $absoluteTarget.StartsWith($testsPrefix, [StringComparison]::OrdinalIgnoreCase)
+    $isDirectWorkbenchScript = (
+        $extension -eq ".gd" -and
+        [string]::Equals(
+            [System.IO.Path]::GetDirectoryName($absoluteTarget).TrimEnd([char[]]"\/"),
+            $workbenchTestsRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    )
+    if (-not $isTestsTarget -and -not $isDirectWorkbenchScript) {
+        throw "Test target must stay inside '$testsRoot', or be a direct .gd script inside '$workbenchTestsRoot': '$RequestedTarget'."
     }
     if (-not (Test-Path -LiteralPath $absoluteTarget -PathType Leaf)) {
         throw "Test target does not exist: '$RequestedTarget'."
     }
-
-    $extension = [System.IO.Path]::GetExtension($absoluteTarget).ToLowerInvariant()
-    if ($extension -notin @(".gd", ".tscn")) {
+    if ($extension -notin @(".gd", ".tscn") -or ($isDirectWorkbenchScript -and $extension -ne ".gd")) {
         throw "Test target must be a .gd script or .tscn scene: '$RequestedTarget'."
     }
 
-    return $absoluteTarget.Substring($testsPrefix.Length).Replace('\', '/')
+    if ($isDirectWorkbenchScript) {
+        return "underwater_map_workbench/tests/$([System.IO.Path]::GetFileName($absoluteTarget))"
+    }
+    return "tests/$($absoluteTarget.Substring($testsPrefix.Length).Replace('\', '/'))"
 }
 
 function New-TestCase {
@@ -824,14 +842,6 @@ function Invoke-GodotTest {
     }
 }
 
-if ($quickHeadlessScriptTests.Count -ne 15 -or
-    $quickHeadlessFlowScenes.Count -ne 3 -or
-    $fullHeadlessScriptTests.Count -ne 42 -or
-    $fullHeadlessFlowScenes.Count -ne 18 -or
-    $nativeSnapshotScenes.Count -ne 11) {
-    throw "The explicit test manifest has an invalid group size. Expected quick 15+3, full 42+18 and 11 snapshots."
-}
-
 $manifestGroups = [ordered]@{
     "quick headless scripts" = $quickHeadlessScriptTests
     "full headless scripts" = $fullHeadlessScriptTests
@@ -961,8 +971,9 @@ else {
         $(if ($IncludeSnapshots) { @($nativeSnapshotScenes) } else { @() })
 }
 $missingTargets = @($manifestTargets | Where-Object {
-    $relativeTarget = ([string]$_).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
-    -not (Test-Path -LiteralPath (Join-Path (Join-Path $sourceProjectRoot "tests") $relativeTarget) -PathType Leaf)
+    $projectRelativeTarget = ConvertTo-TestProjectRelativePath -TargetName ([string]$_)
+    $relativeTarget = $projectRelativeTarget.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+    -not (Test-Path -LiteralPath (Join-Path $sourceProjectRoot $relativeTarget) -PathType Leaf)
 })
 if ($missingTargets.Count -gt 0) {
     throw "The test manifest references missing files: $($missingTargets -join ', ')"
@@ -997,7 +1008,7 @@ try {
     if ($null -ne $resolvedTarget) {
         $targetExtension = [System.IO.Path]::GetExtension($resolvedTarget).ToLowerInvariant()
         $isNativeTarget = $targetUsesNativeWindow
-        $targetResourcePath = "res://tests/$resolvedTarget"
+        $targetResourcePath = "res://$resolvedTarget"
         if ($targetExtension -eq ".gd") {
             $targetArguments = if ($isNativeTarget) {
                 @("--path", $projectRoot, "--rendering-method", "gl_compatibility", "--script", $targetResourcePath)
@@ -1033,10 +1044,11 @@ try {
     }
     else {
         foreach ($scriptName in $headlessScriptTests) {
+            $scriptResourcePath = ConvertTo-TestResourcePath -TargetName $scriptName
             $testCases.Add((New-TestCase `
                 -Name $scriptName `
                 -Group "headless script" `
-                -Arguments @("--headless", "--path", $projectRoot, "--script", "res://tests/$scriptName")))
+                -Arguments @("--headless", "--path", $projectRoot, "--script", $scriptResourcePath)))
         }
 
         if ($Full) {
@@ -1048,19 +1060,21 @@ try {
         }
 
         foreach ($sceneName in $headlessFlowScenes) {
+            $sceneResourcePath = ConvertTo-TestResourcePath -TargetName $sceneName
             $testCases.Add((New-TestCase `
                 -Name $sceneName `
                 -Group "headless flow" `
-                -Arguments @("--headless", "--path", $projectRoot, "res://tests/$sceneName")))
+                -Arguments @("--headless", "--path", $projectRoot, $sceneResourcePath)))
         }
 
         if ($IncludeSnapshots) {
             foreach ($sceneName in $nativeSnapshotScenes) {
+                $sceneResourcePath = ConvertTo-TestResourcePath -TargetName $sceneName
                 $testCases.Add((New-TestCase `
                     -Name $sceneName `
                     -Group "native snapshot" `
                     -NativeWindow $true `
-                    -Arguments @("--path", $projectRoot, "res://tests/$sceneName")))
+                    -Arguments @("--path", $projectRoot, $sceneResourcePath)))
             }
         }
     }

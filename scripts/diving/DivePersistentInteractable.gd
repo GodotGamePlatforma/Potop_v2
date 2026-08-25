@@ -1,19 +1,11 @@
 class_name DivePersistentInteractable
 extends Area2D
 
-const ReturnBuoyTexture := preload("res://assets/diving/interactables/return_buoy.png")
-const ShortcutGateTexture := preload("res://assets/diving/interactables/shortcut_gate.png")
-const ShipEngineTexture := preload("res://assets/diving/interactables/ship_engine.png")
-const ShipyardWinchTexture := preload("res://assets/diving/interactables/shipyard_winch.png")
-const IndustrialGeneratorTexture := preload("res://assets/diving/interactables/industrial_generator.png")
+const ReturnBuoyTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/return_buoy.png")
+const ShortcutGateTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/shortcut_gate.png")
+const IndustrialGeneratorTexture := preload("res://underwater_map_workbench/assets/gameplay/interactables/industrial_generator.png")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const VisualStyle := preload("res://scripts/diving/DiveInteractableVisualStyle.gd")
-
-const HeavyObjectTextures := {
-	"ship_engine_r1": ShipEngineTexture,
-	"shipyard_winch_r3": ShipyardWinchTexture,
-	"scrapyard_generator_r3": IndustrialGeneratorTexture,
-}
 
 enum Kind {
 	BUOY,
@@ -139,7 +131,20 @@ func set_graphics_quality(quality_id: String) -> void:
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
+	_refresh_visual()
 	queue_redraw()
+
+func set_interaction_presentation(focused: bool, progress: float) -> void:
+	VisualStyle.set_effect_interaction(self, focused, progress)
+
+func set_visual_time_for_tests(time_seconds: float) -> void:
+	VisualStyle.set_effect_time_for_tests(self, time_seconds)
+
+func release_visual_time_override() -> void:
+	VisualStyle.release_effect_time_override(self)
+
+func visual_effect_state_for_tests() -> Dictionary:
+	return VisualStyle.effect_state(self)
 
 func visual_texture() -> Texture2D:
 	match kind:
@@ -148,7 +153,7 @@ func visual_texture() -> Texture2D:
 		Kind.SHORTCUT:
 			return ShortcutGateTexture
 		Kind.HEAVY_OBJECT:
-			return HeavyObjectTextures.get(persistent_id, ShipEngineTexture)
+			return IndustrialGeneratorTexture
 		Kind.FIXED_DEVICE:
 			return IndustrialGeneratorTexture
 	return null
@@ -193,7 +198,44 @@ func _refresh_visual() -> void:
 			_graphics_quality,
 			0.82 if completed else 1.0
 		)
+	VisualStyle.configure_effect(
+		self,
+		_sprite,
+		_effect_role(),
+		_visual_region_id,
+		persistent_id if not persistent_id.is_empty() else display_name,
+		_graphics_quality,
+		_reduced_motion,
+		completed,
+		_effect_radius(),
+		_visual_context,
+		persistent_id
+	)
 	_refresh_authored_visual_visibility()
+
+func _effect_role() -> String:
+	match kind:
+		Kind.BUOY:
+			return "buoy"
+		Kind.SHORTCUT:
+			return "shortcut"
+		Kind.HEAVY_OBJECT:
+			return "heavy"
+		Kind.FIXED_DEVICE:
+			return "device"
+	return "device"
+
+func _effect_radius() -> float:
+	match kind:
+		Kind.BUOY:
+			return 66.0
+		Kind.SHORTCUT:
+			return clampf(gate_width * 0.42, 58.0, 92.0)
+		Kind.HEAVY_OBJECT:
+			return 78.0
+		Kind.FIXED_DEVICE:
+			return 72.0
+	return 72.0
 
 func _refresh_authored_visual_visibility() -> void:
 	for child in get_children():

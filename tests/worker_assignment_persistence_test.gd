@@ -131,7 +131,7 @@ func _test_dive_death_is_terminal_before_settlement() -> void:
 	result.diver_id = "igor"
 	result.returned_alive = false
 	result.diver_dead = true
-	result.body_location_if_dead = "R1-01"
+	result.body_location_if_dead = state.underwater_world.blueprint.entry_landmark_id
 	var report = ReportStateScript.new()
 	var resolver = EndOfDayResolverScript.new()
 	resolver._capture_capable_worker_snapshot(state)

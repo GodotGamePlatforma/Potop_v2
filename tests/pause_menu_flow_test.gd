@@ -358,7 +358,7 @@ func _make_setup(day: int):
 		ResourceIdsScript.PLANKS: 1.2,
 		ResourceIdsScript.SCRAP: 1.5,
 	}
-	setup.target_sector = "dead_city_rooftops_001"
+	setup.target_sector = "fixture_entry"
 	setup.selected_objective = "basic_scavenge"
 	setup.tutorial_mode = false
 	return setup

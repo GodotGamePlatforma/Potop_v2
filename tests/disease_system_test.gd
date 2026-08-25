@@ -10,6 +10,8 @@ const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
 const InfirmaryDefinition := preload("res://data/buildings/infirmary.tres")
 
+const DIVE_HAZARD_SOURCE_ID := "contaminated_salvage"
+
 var _failures := 0
 var _system = DiseaseSystemScript.new()
 var _definitions := {"flood_fever": FloodFever}
@@ -40,10 +42,10 @@ func _initialize() -> void:
 func _test_exposure_response_day_and_threshold() -> void:
 	var state = _state(1)
 	state.disease_campaign.pending_exposures.append(
-		DiseaseExposureStateScript.create("flood_fever", "igor", "dive", "R1-06", 3, 1)
+		DiseaseExposureStateScript.create("flood_fever", "igor", "dive", DIVE_HAZARD_SOURCE_ID, 3, 1)
 	)
 	var projection := _project(state, {"igor": "full", "anka": "full", "mira": "full"})
-	_assert(bool(projection.get("valid", false)), "A canonical R1-06 exposure must project successfully.")
+	_assert(bool(projection.get("valid", false)), "A canonical domain dive exposure must project successfully.")
 	_assert(state.find_survivor("igor").disease_cases.is_empty() and state.disease_campaign.pending_exposures.size() == 1, "project_day must not mutate cases or consume pending exposure.")
 	var igor_result := _survivor_result(projection, "igor")
 	_assert(igor_result.get("disease_cases_after", []).size() == 1, "The incoming exposure must become one detached case in the projection.")

@@ -3,7 +3,7 @@ extends Node
 const DiverScene := preload("res://scenes/diving/Diver.tscn")
 const DiveScene := preload("res://scenes/diving/DiveScene.tscn")
 const DiverSocketProfileScript := preload("res://scripts/definitions/DiverSocketProfile.gd")
-const SocketProfile := preload("res://assets/diving/diver/diver_socket_profile.tres")
+const SocketProfile := preload("res://underwater_map_workbench/assets/gameplay/diver/diver_socket_profile.tres")
 const DiveSessionStateScript := preload("res://scripts/data/DiveSessionState.gd")
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 

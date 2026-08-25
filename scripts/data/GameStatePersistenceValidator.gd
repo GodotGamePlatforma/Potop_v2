@@ -42,7 +42,7 @@ const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const DifficultyMathScript := preload("res://scripts/core/DifficultyMath.gd")
 const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")
 const GameDatabaseScript := preload("res://scripts/core/GameDatabase.gd")
-const MapSceneCompilerScript := preload("res://scripts/diving/UnderwaterMapSceneCompiler.gd")
+const MapSceneCompilerScript := preload("res://underwater_map_workbench/runtime/UnderwaterMapSceneCompiler.gd")
 
 const OFFER_SNAPSHOT_SCRIPT_PATH := "res://scripts/data/SettlementEventOfferSnapshot.gd"
 const CHOICE_SNAPSHOT_SCRIPT_PATH := "res://scripts/data/SettlementEventChoiceSnapshot.gd"

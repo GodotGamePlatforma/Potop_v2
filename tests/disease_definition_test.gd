@@ -7,7 +7,8 @@ const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const GameDatabaseScript := preload("res://scripts/core/GameDatabase.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
 
-const EXPECTED_SIGNATURE := "0f332829078acde18d0a45f0ad2489a3687c900325f5a6cd598dad0bef6e5586"
+const DIVE_HAZARD_SOURCE_ID := "contaminated_salvage"
+const EXPECTED_SIGNATURE := "800e2fdd69a88394ebc501ae79701e453fd2661c6233fcb1b3d4eb60bb925f86"
 
 var _failures := 0
 
@@ -32,9 +33,9 @@ func _test_production_definition() -> void:
 	_assert(FloodFever.get_script() == DiseaseDefinitionScript, "Flood fever must use the exact DiseaseDefinition script.")
 	_assert(FloodFever.validation_errors().is_empty(), "Production definition must pass full validation: %s" % "; ".join(FloodFever.validation_errors()))
 	_assert(FloodFever.id == "flood_fever" and FloodFever.display_name == "Gorączka Zalewowa", "Production identity must remain stable.")
-	_assert(FloodFever.definition_version == 1, "Production definition version must be one.")
+	_assert(FloodFever.definition_version == 2, "Production definition version must be two after replacing the authored exposure source.")
 	_assert(FloodFever.infection_threshold == 4, "Standard infection threshold must be four.")
-	_assert(FloodFever.authored_source_pressures == {"R1-06": 3}, "R1-06 must be the only authored source and contribute pressure three.")
+	_assert(FloodFever.authored_source_pressures == {DIVE_HAZARD_SOURCE_ID: 3}, "The neutral dive hazard must be the only authored source and contribute pressure three.")
 	_assert(FloodFever.ration_pressure_modifiers == {"full": -1, "half": 0, "none": 1}, "Actual ration modifiers must be exactly -1/0/+1.")
 	_assert(FloodFever.adverse_conditions_pressure_cap == 1, "Adverse weather and shelter may add at most one pressure.")
 	_assert(FloodFever.emergency_isolation_contact_pressure == 1, "Emergency isolation community contact pressure must be one.")
@@ -101,14 +102,14 @@ func _test_case_phase_boundaries() -> void:
 		_assert(disease_case.validation_errors().is_empty(), "A configured %s case must validate: %s" % [expected.id, "; ".join(disease_case.validation_errors())])
 
 	var tampered = DiseaseCaseStateScript.new()
-	_assert(tampered.setup_from_definition(FloodFever, DiseaseCaseStateScript.Phase.EXPOSED, 2, 3, "dive", "R1-06"), "Tamper fixture must start valid.")
+	_assert(tampered.setup_from_definition(FloodFever, DiseaseCaseStateScript.Phase.EXPOSED, 2, 3, "dive", DIVE_HAZARD_SOURCE_ID), "Tamper fixture must start valid.")
 	tampered.definition_snapshot.find_stage("exposed").dive_allowed = false
 	_assert(_errors_contain(tampered.validation_errors(), "configuration_signature"), "A case with mutated frozen tuning must be rejected, not rebuilt from live data.")
 
 
 func _test_exposure_boundary() -> void:
-	var exposure = DiseaseExposureStateScript.create("flood_fever", "mira", "dive", "R1-06", 3, 2)
-	_assert(exposure.validation_errors().is_empty(), "A complete R1-06 exposure must validate.")
+	var exposure = DiseaseExposureStateScript.create("flood_fever", "mira", "dive", DIVE_HAZARD_SOURCE_ID, 3, 2)
+	_assert(exposure.validation_errors().is_empty(), "A complete domain dive exposure must validate.")
 	var detached = exposure.detached_copy()
 	_assert(detached != null and detached != exposure and detached.validation_errors().is_empty(), "Exposure clone must be detached and valid.")
 	if detached != null:

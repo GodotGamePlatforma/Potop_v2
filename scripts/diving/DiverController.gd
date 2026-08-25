@@ -2,6 +2,7 @@ class_name DiverController
 extends CharacterBody2D
 
 signal distance_travelled(distance: float)
+signal surface_contacts_reported(contacts: Array)
 
 const DiveMovementSystemScript := preload("res://scripts/diving/DiveMovementSystem.gd")
 const DiverSocketProfileScript := preload("res://scripts/definitions/DiverSocketProfile.gd")
@@ -109,8 +110,25 @@ func simulate_motion_tick(
 		drag
 	)
 
+	var attempted_velocity := velocity
 	var previous_position := global_position
 	move_and_slide()
+	var surface_contacts: Array[Dictionary] = []
+	for collision_index in range(get_slide_collision_count()):
+		var collision := get_slide_collision(collision_index)
+		if collision == null:
+			continue
+		var contact_normal := collision.get_normal()
+		if not contact_normal.is_finite() or contact_normal.is_zero_approx():
+			continue
+		surface_contacts.append({
+			"collider": collision.get_collider(),
+			"position": collision.get_position(),
+			"normal": contact_normal.normalized(),
+			"opposition_speed": maxf(-attempted_velocity.dot(contact_normal.normalized()), 0.0),
+		})
+	if not surface_contacts.is_empty():
+		surface_contacts_reported.emit(surface_contacts)
 	var travelled := global_position.distance_to(previous_position)
 	if travelled > 0.01:
 		distance_travelled.emit(travelled)

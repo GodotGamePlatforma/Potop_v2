@@ -3,10 +3,10 @@ extends RefCounted
 
 static var _cached_rasters: Dictionary = {}
 
-## Shared composition of the scene-authored Polygon2D macroterrain plus local
+## Shared composition of the manifest-derived semantic terrain cells plus local
 ## MapObstacle records into the runtime navigation grid. The image entry point
-## remains an adapter for fixtures and derivative checks; production compiler
-## and gameplay consume build_from_cells() from the scene authority.
+## remains an adapter for fixtures and derivative checks; production gameplay
+## consumes build_from_cells() from the workbench compiler output.
 ##
 ## Passing a positive chunk_size additionally exposes
 ## boundary_segments_by_chunk. Its x:y keys identify the chunk containing the
@@ -44,10 +44,10 @@ static func build(
 	)
 
 
-## Applies scene-authored obstacles and derives collision boundaries from an
+## Applies manifest-authored obstacles and derives collision boundaries from an
 ## already compiled semantic terrain raster. The input array is never mutated;
-## this lets the scene Polygon2D authority be cached and shared by compiler and
-## runtime without obstacle records leaking between calls.
+## this lets the manifest-derived base raster be cached and shared by compiler
+## and runtime without obstacle records leaking between calls.
 static func build_from_cells(
 	base_cells: PackedByteArray,
 	width: int,
@@ -233,34 +233,6 @@ static func cell_is_open(
 		and cell.y < height
 		and cells[cell.y * width + cell.x] == 1
 	)
-
-
-static func reachable_cells(
-	cells: PackedByteArray,
-	width: int,
-	height: int,
-	entry: Vector2i
-) -> PackedByteArray:
-	var reachable := PackedByteArray()
-	reachable.resize(maxi(width * height, 0))
-	if not cell_is_open(cells, width, height, entry):
-		return reachable
-	var queue: Array[Vector2i] = [entry]
-	reachable[entry.y * width + entry.x] = 1
-	var read_index := 0
-	while read_index < queue.size():
-		var cell := queue[read_index]
-		read_index += 1
-		for offset in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-			var next: Vector2i = cell + offset
-			if not cell_is_open(cells, width, height, next):
-				continue
-			var index: int = next.y * width + next.x
-			if reachable[index] == 1:
-				continue
-			reachable[index] = 1
-			queue.append(next)
-	return reachable
 
 
 static func _rasterize_blocking_polygon(

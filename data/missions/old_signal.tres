@@ -10,9 +10,8 @@ kind = "fixed_device_activated"
 text = "Uruchom terminal i prześlij mapę Wspólnej Linii."
 description = "Otwórz wejście, przywróć lokalne zasilanie i wyślij dane naprawionym kablem. Nie zabierasz przedmiotu fabularnego."
 target_id = "archive_terminal"
-target_landmark_id = "R1-09"
 landmark_label = "Zalane Archiwum"
-guidance = "Wyrusz do Zalanego Archiwum R1-09, uruchom terminal, prześlij mapę i wróć do aktywnej liny."
+guidance = "Wyrusz do Zalanego Archiwum, uruchom terminal, prześlij mapę i wróć do aktywnej liny."
 
 [resource]
 script = ExtResource("1_mission")

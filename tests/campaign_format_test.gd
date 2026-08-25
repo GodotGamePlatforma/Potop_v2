@@ -27,18 +27,10 @@ func _initialize() -> void:
 	state.setup_new_campaign(25_001, DifficultyProfileScript.new())
 	_assert(state.format_revision == GameFormatScript.CAMPAIGN_FORMAT_REVISION, "Nowa kampania musi używać jedynej bieżącej rewizji formatu.")
 	state.story_flags.junction_j7_active = true; state.story_flags.junction_j7_activated_day = 1
-	state.story_flags.archive_terminal_active = true; state.story_flags.archive_map_transmitted = true; state.story_flags.archive_terminal_activated_day = 1
-	state.story_flags.r3_diagnosed = true; state.story_flags.r3_diagnosed_day = 1
-	state.story_flags.r3_regulator_ready = true; state.story_flags.r3_regulator_completed_day = 1
-	state.story_flags.r3_generator_active = true; state.story_flags.r3_generator_activated_day = 1
-	state.story_flags.c4_switchboard_active = true; state.story_flags.c4_switchboard_activated_day = 1
-	state.story_flags.common_line_splitter_ready = true; state.story_flags.common_line_splitter_completed_day = 1
-	state.story_flags.common_line_splitter_installed = true; state.story_flags.common_line_splitter_installed_day = 1
 	state.story_flags.black_front_arrived = true
-	state.story_flags.energy_configuration = "common_line"
-	state.story_flags.final_outcome_id = "last_bridge"
+	state.story_flags.energy_configuration = "harbor"
+	state.story_flags.final_outcome_id = "quiet_after_storm"
 	state.story_flags.final_resolved_day = 1
-	state.story_flags.north_platform_survived = true
 	state.story_flags.first_full_integrity_day = 1
 	state.story_flags.full_integrity_days = 1
 	state.story_flags.successful_dives = 4
@@ -55,22 +47,22 @@ func _initialize() -> void:
 	operator.current_assignment = community.id; operator.status = SurvivorStateScript.Status.WORKING
 	operator.competency_levels = {"swimming": 2, "oxygen_economy": 3, "resilience": 1}
 	state.story_flags.chronicle_summary = {
-		"outcome_id": "last_bridge", "ending_title": "WSPÓLNA LINIA", "black_front_day": 1,
+		"outcome_id": "quiet_after_storm", "ending_title": "CISZA PO BURZY", "black_front_day": 1,
 		"first_full_integrity_day": 1, "integrity_before_storm": 100, "integrity_after_storm": 100,
 		"full_integrity_days": 1, "dives": 4, "safe_returns": 4, "diver_deaths": 0,
 		"recovered_backpacks": 0, "living_survivors": ["Mira", "Anka", "Igor"], "dead_survivors": [],
 		"accepted_survivors": [], "rejected_survivors": [], "rescued_survivors": 0, "leon_fate": "nierozstrzygnięty",
 		"buildings": [{"definition_id": "community_house", "level": 3}], "resources": {},
-		"r3_active": true, "c4_active": true, "splitter_installed": true, "radio_active": true,
-		"energy_configuration": "common_line", "north_platform_survived": true, "hope": 50, "important_decisions": []
+		"r3_active": false, "c4_active": false, "splitter_installed": false, "radio_active": true,
+		"energy_configuration": "harbor", "north_platform_survived": false, "hope": 50, "important_decisions": []
 	}
 	state.prepare_weather_for_day(); state.prepare_pressure_for_day(); state.begin_new_day_plan()
 	state.preferred_diver_id = "igor"
-	state.underwater_world.delta.activated_fixed_devices.assign(["junction_j7", "archive_terminal", "r3_diagnostic_panel", "r3_generator", "c4_switchboard", "c4_splitter_mount"])
+	state.underwater_world.delta.activated_fixed_devices.assign(["junction_j7"])
 	_assert(manager.save_game(state) == OK, "Bieżący format kampanii musi przejść zapis.")
 	_assert(_legacy_fixture_is_untouched(), "Zapis bieżącej kampanii nie może modyfikować starego pliku.")
 	var loaded = manager.load_game()
-	_assert(loaded != null and loaded.format_revision == GameFormatScript.CAMPAIGN_FORMAT_REVISION and loaded.story_flags.chronicle_summary.outcome_id == "last_bridge" and loaded.preferred_diver_id == "igor", "Bieżący format musi zachować Kronikę i zapamiętanego nurka.")
+	_assert(loaded != null and loaded.format_revision == GameFormatScript.CAMPAIGN_FORMAT_REVISION and loaded.story_flags.chronicle_summary.outcome_id == "quiet_after_storm" and loaded.preferred_diver_id == "igor", "Bieżący format musi zachować Kronikę i zapamiętanego nurka.")
 	var loaded_operator = loaded.find_survivor(operator.id) if loaded != null else null
 	_assert(loaded_operator != null and loaded_operator.competency_levels == {"swimming": 2, "oxygen_economy": 3, "resilience": 1}, "Bieżący format musi zachować kompetencje.")
 	operator.competency_levels["active_dash"] = 1
@@ -78,6 +70,30 @@ func _initialize() -> void:
 	var preserved = manager.load_game()
 	var preserved_operator = preserved.find_survivor(operator.id) if preserved != null else null
 	_assert(preserved_operator != null and preserved_operator.competency_levels == {"swimming": 2, "oxygen_economy": 3, "resilience": 1}, "Odrzucony zapis nie może nadpisać primary.")
+	_cleanup(false)
+	var stale_map_state = preserved.duplicate(true) if preserved != null else null
+	_assert(stale_map_state != null, "Fixture kampanii ze starą sygnaturą mapy wymaga poprawnego bieżącego zapisu.")
+	if stale_map_state != null:
+		var current_signature := str(stale_map_state.underwater_world.blueprint.map_gameplay_signature)
+		var stale_signature := "0".repeat(64) if current_signature != "0".repeat(64) else "f".repeat(64)
+		stale_map_state.underwater_world.blueprint.map_gameplay_signature = stale_signature
+		for candidate_path in [PRIMARY, PENDING, BACKUP]:
+			_assert(
+				ResourceSaver.save(stale_map_state.duplicate(true), candidate_path) == OK,
+				"Fixture starej sygnatury mapy musi powstać dla %s." % candidate_path
+			)
+		var stale_hashes_before := _storage_hashes()
+		_assert(not manager.has_save(), "Żaden kandydat ze starą sygnaturą mapy nie może włączyć Kontynuuj.")
+		_assert(manager.load_game() == null, "Primary, pending ani backup ze starą sygnaturą mapy nie mogą zostać wczytane jako fallback.")
+		_assert(
+			_storage_hashes() == stale_hashes_before,
+			"Odrzucenie starej sygnatury mapy nie może mutować primary, pending ani backupu."
+		)
+		for candidate_path in [PRIMARY, PENDING, BACKUP]:
+			_assert(
+				_diagnostic_mentions(manager, candidate_path, "nie odpowiada bieżącemu manifestowi mapy"),
+				"Diagnostyka %s musi jawnie wskazać clean break sygnatury mapy." % candidate_path
+			)
 	_cleanup(false)
 	state.format_revision = GameFormatScript.CAMPAIGN_FORMAT_REVISION - 1
 	_assert(ResourceSaver.save(state, PRIMARY) == OK, "Niezgodny format musi powstać poza granicą zapisu.")
@@ -112,6 +128,19 @@ func _legacy_fixture_is_untouched() -> bool:
 	var contents := file.get_as_text()
 	file.close()
 	return contents == LEGACY_SENTINEL
+
+func _storage_hashes() -> Dictionary:
+	var hashes := {}
+	for path in [PRIMARY, PENDING, BACKUP]:
+		hashes[path] = FileAccess.get_sha256(path)
+	return hashes
+
+func _diagnostic_mentions(manager, path: String, fragment: String) -> bool:
+	var errors: PackedStringArray = manager.load_diagnostics.get(path, PackedStringArray())
+	for error in errors:
+		if str(error).contains(fragment):
+			return true
+	return false
 
 func _assert(condition: bool, message: String) -> void:
 	if not condition: _failed = true; push_error("Campaign format test failed: " + message)
