@@ -1,0 +1,92 @@
+{
+  "level": "Wiezowiec 02 - Trzy Wloty",
+  "difficulty": "Level 0",
+  "route": [
+    "START",
+    "A",
+    "B",
+    "G1",
+    "C",
+    "G2",
+    "D",
+    "CENTRAL_SHAFT",
+    "GROUND_FLOOR",
+    "EXIT_TO_OCEAN"
+  ],
+  "states": {
+    "0": [
+      "A",
+      "B",
+      "START",
+      "UPPER_EXPLORATION"
+    ],
+    "1": [
+      "A",
+      "B",
+      "C",
+      "MID_EXPLORATION",
+      "START",
+      "UPPER_EXPLORATION"
+    ],
+    "2": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "LOWER_EXPLORATION",
+      "MID_EXPLORATION",
+      "START",
+      "UPPER_EXPLORATION"
+    ],
+    "3": [
+      "A",
+      "B",
+      "C",
+      "CENTRAL_SHAFT",
+      "D",
+      "EXIT",
+      "GROUND_FLOOR",
+      "LOWER_EXPLORATION",
+      "MID_EXPLORATION",
+      "START",
+      "UPPER_EXPLORATION"
+    ]
+  },
+  "state_tests": [
+    {
+      "state": 0,
+      "target": "B",
+      "target_reachable": true,
+      "exit_correctly_locked": true
+    },
+    {
+      "state": 1,
+      "target": "C",
+      "target_reachable": true,
+      "exit_correctly_locked": true
+    },
+    {
+      "state": 2,
+      "target": "D",
+      "target_reachable": true,
+      "exit_correctly_locked": true
+    },
+    {
+      "state": 3,
+      "target": "EXIT",
+      "target_reachable": true,
+      "exit_correctly_locked": true
+    }
+  ],
+  "safeguards": {
+    "B_current_has_safe_cover_pockets": true,
+    "C_route_requires_no_consumable_item": true,
+    "C_opens_return_shortcut": true,
+    "D_has_manual_reset": true,
+    "D_currents_push_to_safe_stops": true,
+    "ground_floor_unlocks_only_after_D": true,
+    "final_exit_is_on_ground_floor": true,
+    "no_basement_route_exists": true
+  },
+  "conceptual_result": "PASS"
+}

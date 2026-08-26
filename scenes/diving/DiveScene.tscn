@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/diving/DiveController.gd" id="1_dive_controller"]
 [ext_resource type="Script" path="res://underwater_map_workbench/runtime/UnderwaterMapRuntime.gd" id="2_dive_map"]
-[ext_resource type="PackedScene" path="res://scenes/diving/Diver.tscn" id="3_diver"]
+[ext_resource type="PackedScene" path="res://diver_workbench/runtime/Diver.tscn" id="3_diver"]
 
 [node name="DiveScene" type="Node2D"]
 script = ExtResource("1_dive_controller")

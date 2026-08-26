@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="UnderwaterMapVisualResidencyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://underwater_map_workbench/runtime/UnderwaterMapVisualResidencyProfile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+prefetch_margin_viewports = 0.75
+retention_margin_viewports = 1.5
+resident_pixel_budget = 48000000
+max_in_flight_requests = 2
+max_commits_per_tick = 1

@@ -11,28 +11,45 @@ import math
 import os
 import re
 import struct
+import subprocess
 import sys
 import tempfile
 import unicodedata
 import zlib
+from collections import deque
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable
 
 
 WORKBENCH_DIR = Path(__file__).resolve().parents[1]
+ROOT_TOOLS_DIR = WORKBENCH_DIR.parent / "tools"
+if str(ROOT_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_TOOLS_DIR))
+
+from workbench_lock import (  # noqa: E402
+    InterprocessWorkspaceLock,
+    WorkspaceLockError,
+)
+
 MANIFEST_PATH = WORKBENCH_DIR / "map_manifest.json"
 SCENE_PATH = WORKBENCH_DIR / "UnderwaterMap.tscn"
+MAP_SCHEMA_VERSION = 6
 L05_GENERATED_DIR = WORKBENCH_DIR / "assets" / "generated" / "l05"
 L05_GENERATED_PATHS = {
     "solid_mask": L05_GENERATED_DIR / "solid_mask.png",
     "open_water_mask": L05_GENERATED_DIR / "open_water_mask.png",
     "boundary_mask": L05_GENERATED_DIR / "boundary_mask.png",
     "full_map_guide": L05_GENERATED_DIR / "full_map_guide.png",
+    "surface_detail_mask": L05_GENERATED_DIR / "surface_detail_mask.png",
     "truth_package": L05_GENERATED_DIR / "truth_package.json",
 }
 L05_SHADER_PATH = "assets/shaders/l05_ground_masked.gdshader"
 L05_SOLID_MASK_RESOURCE_PATH = (
     "res://underwater_map_workbench/assets/generated/l05/solid_mask.png"
+)
+L05_SURFACE_DETAIL_MASK_RESOURCE_PATH = (
+    "res://underwater_map_workbench/assets/generated/l05/surface_detail_mask.png"
 )
 L05_SHADER_RESOURCE_PATH = (
     "res://underwater_map_workbench/assets/shaders/l05_ground_masked.gdshader"
@@ -41,6 +58,8 @@ L05_SHADER_RESOURCE_PATH = (
 EXPECTED_LAYER_IDS = tuple(f"L{index:02d}" for index in range(11))
 PARALLAX_LAYER_IDS = frozenset(("L01", "L02", "L08", "L09"))
 NONBLOCKING_TEXTURE_LAYER_IDS = frozenset(("L01", "L02"))
+STREAMED_BACKDROP_LAYER_IDS = frozenset(("L01", "L02"))
+STREAMED_BACKDROP_CONTRACT = "camera_windowed_texture_v1"
 GROUND_ANCHORED_BACKDROP_LAYER_IDS = frozenset(("L01", "L02"))
 NONBLOCKING_BACKDROP_AFFORDANCE = "nonblocking_backdrop"
 COMPOSITION_PROXY_KIND = "composition_proxy"
@@ -81,6 +100,35 @@ VISUAL_ASSET_KEYS = frozenset(
         "topology_digest",
     )
 )
+STRUCTURE_VISUAL_ASSET_KEYS = frozenset(
+    (
+        "id",
+        "layer_id",
+        "group_id",
+        "kind",
+        "path",
+        "sha256",
+        "pixel_size",
+        "local_rect",
+        "enabled",
+        "affordance",
+        "topology_digest",
+        "partition_digest",
+        "structure_id",
+    )
+)
+STRUCTURE_INTERIOR_TEXTURE_KIND = "structure_interior_texture"
+STRUCTURE_OWNER_MASKED_TEXTURE_KIND = "structure_owner_masked_texture"
+STRUCTURE_INTERIOR_AFFORDANCE = "open_water_clipped_interior"
+STRUCTURE_OWNER_AFFORDANCE = "exact_owner_solid_surface"
+STRUCTURE_CLIP_SHADER_PATH = "assets/shaders/structure_clip_masked.gdshader"
+STRUCTURE_CLIP_SHADER_RESOURCE_PATH = (
+    "res://underwater_map_workbench/assets/shaders/structure_clip_masked.gdshader"
+)
+STRUCTURE_NATIVE_WORLD_UNITS_PER_PIXEL = (1.0, 1.0)
+STRUCTURE_NATIVE_MAX_TEXTURE_DIMENSION = 4096
+STRUCTURE_NATIVE_MAX_TEXTURE_PIXELS = 4096 * 4096
+SURFACE_DETAIL_EDGE_VALUES = (255, 184, 112, 48)
 L05_MODE = "l05_mask_v1"
 L05_SOURCE_FORMAT = "l05_owned_rect_ops_v2"
 L05_PIXEL_SIZE = (576, 324)
@@ -93,6 +141,59 @@ L05_MAPPING = {
     "rounding": "floor",
 }
 STRUCTURE_ROOT_KEYS = frozenset(("templates", "instances"))
+STRUCTURE_REGISTRY_KEYS = frozenset(("instances",))
+STRUCTURE_REGISTRY_INSTANCE_REQUIRED_KEYS = frozenset(
+    ("id", "origin", "enabled", "package")
+)
+STRUCTURE_REGISTRY_INSTANCE_OPTIONAL_KEYS = frozenset(("landmark_id",))
+STRUCTURE_PACKAGE_REFERENCE_KEYS = frozenset(("format", "path", "sha256"))
+STRUCTURE_PACKAGE_REFERENCE_FORMAT = "structure_package_v1"
+STRUCTURE_PACKAGE_FORMAT = "enterable_structure_package_v1"
+STRUCTURE_PACKAGE_KEYS = frozenset(
+    (
+        "schema_version",
+        "format",
+        "template",
+        "size",
+        "local_topology_digest",
+        "collision",
+        "sockets",
+        "runtime",
+        "visual_assets",
+        "scripts",
+        "attempt_state",
+        "references",
+    )
+)
+STRUCTURE_PACKAGE_COLLISION_KEYS = frozenset(
+    ("format", "base", "pixel_size", "world_units_per_pixel", "operations")
+)
+STRUCTURE_PACKAGE_COLLISION_FORMAT = "l05_structure_rect_ops_v1"
+STRUCTURE_PACKAGE_OPERATION_KEYS = frozenset(("id", "op", "rect_px"))
+STRUCTURE_PACKAGE_VISUAL_ASSET_KEYS = frozenset(
+    (
+        "id",
+        "layer_id",
+        "group_id",
+        "kind",
+        "path",
+        "sha256",
+        "pixel_size",
+        "local_rect",
+        "enabled",
+        "affordance",
+    )
+)
+STRUCTURE_PACKAGE_SCRIPT_KEYS = frozenset(("role", "path", "sha256"))
+STRUCTURE_PACKAGE_REQUIRED_SCRIPT_ROLE = "controller"
+STRUCTURE_PACKAGE_ATTEMPT_STATE = {
+    "persistence": "none",
+    "checkpoint": "none",
+    "reset": "whole_structure_attempt",
+}
+STRUCTURE_PACKAGE_REFERENCE_KEYS_EXACT = frozenset(
+    ("path", "sha256", "role", "authority", "excluded_topics")
+)
 STRUCTURE_TEMPLATE_KEYS = frozenset(
     (
         "id",
@@ -114,17 +215,20 @@ STRUCTURE_INSTANCE_REQUIRED_KEYS = frozenset(
         "sockets",
     )
 )
-STRUCTURE_INSTANCE_OPTIONAL_KEYS = frozenset(("landmark_id",))
-STRUCTURE_SOCKET_KEYS = frozenset(("id", "kind", "local_rect"))
-ENTERABLE_TOWER_SOCKET_KINDS = (
-    "entry_opening",
-    "moving_elevator",
-    "dynamic_door",
-    "fixed_interactable",
+STRUCTURE_INSTANCE_OPTIONAL_KEYS = frozenset(
+    (
+        "landmark_id",
+        "runtime",
+        "controller_script",
+        "package_path",
+        "package_sha256",
+        "local_topology_digest",
+        "collision_operations",
+        "structure_scene_path",
+    )
 )
-STRUCTURE_INTERIOR_COLOR = "06131cff"
+STRUCTURE_SOCKET_KEYS = frozenset(("id", "kind", "local_rect"))
 STRUCTURE_SOLID_COLOR = "274956ff"
-STRUCTURE_LABEL_COLOR = "d9edf2ff"
 REQUIRED_GAMEPLAY_COLLECTIONS = (
     "loot_spawns",
     "shortcut_spawns",
@@ -201,6 +305,48 @@ FORBIDDEN_LANDMARK_IDS = frozenset(("R1-09", "R3-04", "R4-06"))
 
 class ManifestError(ValueError):
     pass
+
+
+def _git_common_directory(project_root: Path | None = None) -> Path:
+    """Return one lock identity shared by every linked worktree."""
+    root = (project_root or WORKBENCH_DIR.parent).resolve()
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--git-common-dir"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise WorkspaceLockError(
+            f"cannot resolve the shared Git directory for {root}: {error}"
+        ) from error
+    common_value = result.stdout.strip()
+    if result.returncode != 0 or not common_value:
+        detail = result.stderr.strip() or f"git exited with {result.returncode}"
+        raise WorkspaceLockError(
+            f"cannot resolve the shared Git directory for {root}: {detail}"
+        )
+    common_directory = Path(common_value)
+    if not common_directory.is_absolute():
+        common_directory = root / common_directory
+    return common_directory.resolve()
+
+
+@contextmanager
+def _map_promotion_lock() -> Iterable[None]:
+    """Lock Map publication across linked worktrees and legacy local runners."""
+    project_root = WORKBENCH_DIR.parent.resolve()
+    common_directory = _git_common_directory(project_root)
+    # Take the compatibility lock first so a long local FROZEN snapshot does
+    # not occupy the repository-wide lock while this publisher waits for it.
+    with InterprocessWorkspaceLock(project_root, "map-promotion"):
+        if common_directory == project_root:
+            yield
+            return
+        with InterprocessWorkspaceLock(common_directory, "map-promotion"):
+            yield
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:
@@ -294,8 +440,12 @@ def _require_keys(record: dict[str, Any], keys: Iterable[str], label: str) -> No
 
 def _package_asset_path(value: Any, label: str) -> tuple[str, Path]:
     path = _non_empty_string(value, label)
-    if "\\" in path or not path.startswith("assets/"):
-        raise ManifestError(f"{label} must be a package-relative assets/... path")
+    if "\\" in path or not (
+        path.startswith("assets/") or path.startswith("structures/")
+    ):
+        raise ManifestError(
+            f"{label} must be a workbench-relative assets/... or structures/... path"
+        )
     parts = Path(path).parts
     if Path(path).is_absolute() or ".." in parts or "." in parts:
         raise ManifestError(f"{label} must not escape the workbench package")
@@ -305,6 +455,31 @@ def _package_asset_path(value: Any, label: str) -> tuple[str, Path]:
     except ValueError as error:
         raise ManifestError(f"{label} must remain inside the workbench") from error
     return path, resolved
+
+
+def _structure_package_member_path(
+    package_directory: Path,
+    value: Any,
+    label: str,
+) -> tuple[str, Path, str]:
+    relative_path = _non_empty_string(value, label)
+    if "\\" in relative_path:
+        raise ManifestError(f"{label} must use forward slashes")
+    relative = Path(relative_path)
+    if relative.is_absolute() or ".." in relative.parts or "." in relative.parts:
+        raise ManifestError(f"{label} must not escape its structure package")
+    resolved = (package_directory / relative).resolve()
+    try:
+        resolved.relative_to(package_directory.resolve())
+        workbench_relative = resolved.relative_to(WORKBENCH_DIR.resolve())
+    except ValueError as error:
+        raise ManifestError(f"{label} must remain inside its structure package") from error
+    package_path = workbench_relative.as_posix()
+    return (
+        package_path,
+        resolved,
+        f"res://underwater_map_workbench/{package_path}",
+    )
 
 
 def _png_dimensions(raw: bytes, label: str) -> tuple[int, int]:
@@ -478,6 +653,38 @@ def _validate_ground_anchored_backdrop_png(
         raise ManifestError(f"{label} antialias edge still contains the white production matte")
 
 
+def _validate_structure_visual_png(
+    filesystem_path: Path,
+    pixel_size: tuple[int, int],
+    label: str,
+) -> None:
+    width, height = pixel_size
+    if max(width, height) > STRUCTURE_NATIVE_MAX_TEXTURE_DIMENSION:
+        raise ManifestError(
+            f"{label} exceeds the structure texture limit of "
+            f"{STRUCTURE_NATIVE_MAX_TEXTURE_DIMENSION} pixels per axis"
+        )
+    if width * height > STRUCTURE_NATIVE_MAX_TEXTURE_PIXELS:
+        raise ManifestError(
+            f"{label} exceeds the decoded structure texture pixel budget"
+        )
+    raw = filesystem_path.read_bytes()
+    pixels = _decode_png_rgba8(raw, label, width, height)
+    has_visible_pixel = False
+    transparent_rgb_is_black = True
+    for offset in range(0, len(pixels), 4):
+        red, green, blue, alpha = pixels[offset : offset + 4]
+        if alpha == 0:
+            if red != 0 or green != 0 or blue != 0:
+                transparent_rgb_is_black = False
+        else:
+            has_visible_pixel = True
+    if not has_visible_pixel:
+        raise ManifestError(f"{label} must contain at least one visible pixel")
+    if not transparent_rgb_is_black:
+        raise ManifestError(f"{label} transparent pixels must use black RGB")
+
+
 def _read_hashed_png(
     path_value: Any,
     sha_value: Any,
@@ -558,6 +765,508 @@ def _normalize_canonical_numbers(value: Any) -> Any:
     return value
 
 
+def _structure_local_topology(
+    package: dict[str, Any],
+    label: str,
+    *,
+    verify_declaration: bool = True,
+) -> tuple[str, list[dict[str, Any]]]:
+    size = _pair(package["size"], f"{label}.size")
+    collision = _object(package["collision"], f"{label}.collision")
+    if set(collision) != STRUCTURE_PACKAGE_COLLISION_KEYS:
+        raise ManifestError(
+            f"{label}.collision must contain exactly: "
+            + ", ".join(sorted(STRUCTURE_PACKAGE_COLLISION_KEYS))
+        )
+    if collision["format"] != STRUCTURE_PACKAGE_COLLISION_FORMAT:
+        raise ManifestError(
+            f"{label}.collision.format must be {STRUCTURE_PACKAGE_COLLISION_FORMAT}"
+        )
+    if collision["base"] != "open_water":
+        raise ManifestError(f"{label}.collision.base must be open_water")
+    pixel_size_value = _pair(
+        collision["pixel_size"],
+        f"{label}.collision.pixel_size",
+    )
+    if any(
+        not component.is_integer() or component <= 0.0
+        for component in pixel_size_value
+    ):
+        raise ManifestError(
+            f"{label}.collision.pixel_size must contain positive integers"
+        )
+    pixel_size = (int(pixel_size_value[0]), int(pixel_size_value[1]))
+    world_units_per_pixel = _pair(
+        collision["world_units_per_pixel"],
+        f"{label}.collision.world_units_per_pixel",
+    )
+    if world_units_per_pixel != L05_WORLD_UNITS_PER_PIXEL:
+        raise ManifestError(
+            f"{label}.collision.world_units_per_pixel must be "
+            f"{list(L05_WORLD_UNITS_PER_PIXEL)}"
+        )
+    if (
+        pixel_size[0] * world_units_per_pixel[0],
+        pixel_size[1] * world_units_per_pixel[1],
+    ) != size:
+        raise ManifestError(
+            f"{label}.collision pixel mapping must cover the complete structure"
+        )
+
+    cells = bytearray([255]) * (pixel_size[0] * pixel_size[1])
+    operation_ids: set[str] = set()
+    resolved_operations: list[dict[str, Any]] = []
+    for index, operation_value in enumerate(
+        _array(collision["operations"], f"{label}.collision.operations")
+    ):
+        operation_label = f"{label}.collision.operations[{index}]"
+        operation = _object(operation_value, operation_label)
+        if set(operation) != STRUCTURE_PACKAGE_OPERATION_KEYS:
+            raise ManifestError(
+                f"{operation_label} must contain exactly id, op and rect_px"
+            )
+        operation_id = _non_empty_string(
+            operation["id"],
+            f"{operation_label}.id",
+        )
+        if operation_id in operation_ids:
+            raise ManifestError(f"{operation_label}.id must be unique")
+        operation_ids.add(operation_id)
+        operation_kind = operation["op"]
+        if operation_kind not in ("solid_rect", "open_rect"):
+            raise ManifestError(
+                f"{operation_label}.op must be solid_rect or open_rect"
+            )
+        rect_value = operation["rect_px"]
+        if (
+            not isinstance(rect_value, list)
+            or len(rect_value) != 4
+            or any(
+                isinstance(component, bool) or not isinstance(component, int)
+                for component in rect_value
+            )
+        ):
+            raise ManifestError(
+                f"{operation_label}.rect_px must contain four integers"
+            )
+        x, y, width, height = rect_value
+        if (
+            x < 0
+            or y < 0
+            or width <= 0
+            or height <= 0
+            or x + width > pixel_size[0]
+            or y + height > pixel_size[1]
+        ):
+            raise ManifestError(
+                f"{operation_label}.rect_px lies outside the structure raster"
+            )
+        value = 0 if operation_kind == "solid_rect" else 255
+        row_bytes = bytes([value]) * width
+        for row in range(y, y + height):
+            start = row * pixel_size[0] + x
+            cells[start : start + width] = row_bytes
+        resolved_operations.append(
+            {
+                "id": operation_id,
+                "op": operation_kind,
+                "space": "structure_local_px",
+                "rect_px": copy.deepcopy(rect_value),
+            }
+        )
+
+    digest_payload = {
+        "pixel_size": list(pixel_size),
+        "world_units_per_pixel": list(world_units_per_pixel),
+        "encoding": {"solid": 0, "open_water": 255},
+        "cells_hex": bytes(cells).hex(),
+    }
+    local_digest = (
+        f"structure-topology-v1:{_canonical_sha256(digest_payload)}"
+    )
+    declared_digest = package["local_topology_digest"]
+    if verify_declaration and (
+        not isinstance(declared_digest, str)
+        or re.fullmatch(
+            r"structure-topology-v1:[0-9a-f]{64}",
+            declared_digest,
+        )
+        is None
+        or declared_digest != local_digest
+    ):
+        raise ManifestError(
+            f"{label}.local_topology_digest is stale; expected {local_digest}"
+        )
+    return local_digest, resolved_operations
+
+
+def _resolve_structure_packages(
+    manifest: dict[str, Any],
+    *,
+    verify_package_hashes: bool = True,
+    structure_id_filter: str | None = None,
+) -> dict[str, Any]:
+    registry = _object(manifest["structures"], "structures")
+    if set(registry) == STRUCTURE_ROOT_KEYS:
+        # Synthetic expanded fixtures remain usable by low-level validator tests.
+        return manifest
+    if set(registry) != STRUCTURE_REGISTRY_KEYS:
+        raise ManifestError("schema v6 structures must contain exactly instances")
+
+    topology = _object(manifest["topology"], "topology")
+    collision_declaration = _object(
+        topology["collision_source"],
+        "topology.collision_source",
+    )
+    canonical_digest = str(collision_declaration.get("canonical_digest", ""))
+    partition_digest = str(collision_declaration.get("partition_digest", ""))
+    if re.fullmatch(r"topology-v1:[0-9a-f]{64}", canonical_digest) is None:
+        raise ManifestError(
+            "topology.collision_source.canonical_digest must be declared "
+            "before resolving structures"
+        )
+    if re.fullmatch(r"partition-v1:[0-9a-f]{64}", partition_digest) is None:
+        raise ManifestError(
+            "topology.collision_source.partition_digest must be declared "
+            "before resolving structures"
+        )
+
+    templates: list[dict[str, Any]] = []
+    templates_by_id: dict[str, dict[str, Any]] = {}
+    resolved_instances: list[dict[str, Any]] = []
+    package_visual_assets: list[dict[str, Any]] = []
+    registry_ids: set[str] = set()
+    package_paths: set[str] = set()
+    selected_structure_found = False
+
+    for index, registry_value in enumerate(
+        _array(registry["instances"], "structures.instances")
+    ):
+        registry_label = f"structures.instances[{index}]"
+        record = _object(registry_value, registry_label)
+        record_keys = set(record)
+        if (
+            not STRUCTURE_REGISTRY_INSTANCE_REQUIRED_KEYS.issubset(record_keys)
+            or not record_keys.issubset(
+                STRUCTURE_REGISTRY_INSTANCE_REQUIRED_KEYS
+                | STRUCTURE_REGISTRY_INSTANCE_OPTIONAL_KEYS
+            )
+        ):
+            raise ManifestError(
+                f"{registry_label} must contain id, origin, enabled and package; "
+                "landmark_id is optional"
+            )
+        structure_id = _non_empty_string(record["id"], f"{registry_label}.id")
+        if re.fullmatch(r"[a-z][a-z0-9_]*", structure_id) is None:
+            raise ManifestError(
+                f"{registry_label}.id must be lowercase snake_case"
+            )
+        if structure_id in registry_ids:
+            raise ManifestError(f"{registry_label}.id must be unique")
+        registry_ids.add(structure_id)
+        _pair(record["origin"], f"{registry_label}.origin")
+        _boolean(record["enabled"], f"{registry_label}.enabled")
+        if "landmark_id" in record:
+            _non_empty_string(record["landmark_id"], f"{registry_label}.landmark_id")
+
+        package_reference = _object(
+            record["package"],
+            f"{registry_label}.package",
+        )
+        if set(package_reference) != STRUCTURE_PACKAGE_REFERENCE_KEYS:
+            raise ManifestError(
+                f"{registry_label}.package must contain exactly format, path and sha256"
+            )
+        if package_reference["format"] != STRUCTURE_PACKAGE_REFERENCE_FORMAT:
+            raise ManifestError(
+                f"{registry_label}.package.format must be "
+                f"{STRUCTURE_PACKAGE_REFERENCE_FORMAT}"
+            )
+        expected_package_path = (
+            f"structures/{structure_id}/structure_manifest.json"
+        )
+        package_path = _non_empty_string(
+            package_reference["path"],
+            f"{registry_label}.package.path",
+        )
+        if package_path != expected_package_path:
+            raise ManifestError(
+                f"{registry_label}.package.path must be {expected_package_path}"
+            )
+        if package_path in package_paths:
+            raise ManifestError(
+                f"{registry_label}.package.path must be referenced exactly once"
+            )
+        package_paths.add(package_path)
+        if structure_id_filter is not None and structure_id != structure_id_filter:
+            # A package-local build validates the public registry record, but it
+            # must not open another producer's private manifest or members.
+            continue
+        selected_structure_found = True
+        package_filesystem_path = (WORKBENCH_DIR / package_path).resolve()
+        try:
+            package_filesystem_path.relative_to(WORKBENCH_DIR.resolve())
+        except ValueError as error:
+            raise ManifestError(
+                f"{registry_label}.package.path escapes the workbench"
+            ) from error
+        if not package_filesystem_path.is_file():
+            raise ManifestError(
+                f"structure package does not exist: {package_path}"
+            )
+        package_raw = package_filesystem_path.read_bytes()
+        actual_package_sha = hashlib.sha256(package_raw).hexdigest()
+        declared_package_sha = _sha256(
+            package_reference["sha256"],
+            f"{registry_label}.package.sha256",
+        )
+        if verify_package_hashes and actual_package_sha != declared_package_sha:
+            raise ManifestError(
+                f"{registry_label}.package.sha256 is stale; "
+                f"expected {actual_package_sha}"
+            )
+        try:
+            package = json.loads(package_raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ManifestError(
+                f"invalid structure package JSON {package_path}: {error}"
+            ) from error
+        package = _object(package, f"structure package {structure_id}")
+        package_label = f"structure package {structure_id}"
+        if set(package) != STRUCTURE_PACKAGE_KEYS:
+            raise ManifestError(
+                f"{package_label} must contain exactly: "
+                + ", ".join(sorted(STRUCTURE_PACKAGE_KEYS))
+            )
+        if package["schema_version"] != 1:
+            raise ManifestError(f"{package_label}.schema_version must be 1")
+        if package["format"] != STRUCTURE_PACKAGE_FORMAT:
+            raise ManifestError(
+                f"{package_label}.format must be {STRUCTURE_PACKAGE_FORMAT}"
+            )
+
+        template = _object(package["template"], f"{package_label}.template")
+        if set(template) != STRUCTURE_TEMPLATE_KEYS:
+            raise ManifestError(
+                f"{package_label}.template has an invalid exact key set"
+            )
+        template_id = _non_empty_string(
+            template["id"],
+            f"{package_label}.template.id",
+        )
+        previous_template = templates_by_id.get(template_id)
+        if previous_template is None:
+            templates_by_id[template_id] = copy.deepcopy(template)
+            templates.append(copy.deepcopy(template))
+        elif _normalize_canonical_numbers(previous_template) != _normalize_canonical_numbers(template):
+            raise ManifestError(
+                f"{package_label}.template conflicts with template {template_id}"
+            )
+
+        local_topology_digest, collision_operations = _structure_local_topology(
+            package,
+            package_label,
+        )
+        for operation in collision_operations:
+            operation["structure_id"] = structure_id
+
+        package_directory = package_filesystem_path.parent
+        scripts = _array(package["scripts"], f"{package_label}.scripts")
+        if not scripts:
+            raise ManifestError(f"{package_label}.scripts must contain a controller")
+        scripts_by_role: dict[str, str] = {}
+        for script_index, script_value in enumerate(scripts):
+            script_label = f"{package_label}.scripts[{script_index}]"
+            script = _object(script_value, script_label)
+            if set(script) != STRUCTURE_PACKAGE_SCRIPT_KEYS:
+                raise ManifestError(
+                    f"{script_label} must contain exactly role, path and sha256"
+                )
+            role = _non_empty_string(script["role"], f"{script_label}.role")
+            if re.fullmatch(r"[a-z][a-z0-9_]*", role) is None or role in scripts_by_role:
+                raise ManifestError(
+                    f"{script_label}.role must be unique lowercase snake_case"
+                )
+            _member_path, script_filesystem_path, script_resource_path = (
+                _structure_package_member_path(
+                    package_directory,
+                    script["path"],
+                    f"{script_label}.path",
+                )
+            )
+            if not script_filesystem_path.is_file():
+                raise ManifestError(f"{script_label}.path does not exist")
+            expected_script_sha = _sha256(
+                script["sha256"],
+                f"{script_label}.sha256",
+            )
+            actual_script_sha = hashlib.sha256(
+                script_filesystem_path.read_bytes()
+            ).hexdigest()
+            if actual_script_sha != expected_script_sha:
+                raise ManifestError(
+                    f"{script_label}.sha256 is stale; expected {actual_script_sha}"
+                )
+            scripts_by_role[role] = script_resource_path
+        if STRUCTURE_PACKAGE_REQUIRED_SCRIPT_ROLE not in scripts_by_role:
+            raise ManifestError(
+                f"{package_label}.scripts must contain exactly one controller role"
+            )
+
+        runtime = _object(package["runtime"], f"{package_label}.runtime")
+
+        attempt_state = _object(
+            package["attempt_state"],
+            f"{package_label}.attempt_state",
+        )
+        if attempt_state != STRUCTURE_PACKAGE_ATTEMPT_STATE:
+            raise ManifestError(
+                f"{package_label}.attempt_state must disable persistence and checkpoints"
+            )
+
+        references = _array(package["references"], f"{package_label}.references")
+        for reference_index, reference_value in enumerate(references):
+            reference_label = f"{package_label}.references[{reference_index}]"
+            reference = _object(reference_value, reference_label)
+            if set(reference) != STRUCTURE_PACKAGE_REFERENCE_KEYS_EXACT:
+                raise ManifestError(f"{reference_label} has an invalid exact key set")
+            if reference["authority"] is not False:
+                raise ManifestError(f"{reference_label}.authority must be false")
+            if reference["role"] != "design_reference_only":
+                raise ManifestError(
+                    f"{reference_label}.role must be design_reference_only"
+                )
+            _reference_path, reference_filesystem_path, _resource_path = (
+                _structure_package_member_path(
+                    package_directory,
+                    reference["path"],
+                    f"{reference_label}.path",
+                )
+            )
+            if not reference_filesystem_path.is_file():
+                raise ManifestError(f"{reference_label}.path does not exist")
+            expected_reference_sha = _sha256(
+                reference["sha256"],
+                f"{reference_label}.sha256",
+            )
+            actual_reference_sha = hashlib.sha256(
+                reference_filesystem_path.read_bytes()
+            ).hexdigest()
+            if actual_reference_sha != expected_reference_sha:
+                raise ManifestError(
+                    f"{reference_label}.sha256 is stale; "
+                    f"expected {actual_reference_sha}"
+                )
+            excluded_topics = _array(
+                reference["excluded_topics"],
+                f"{reference_label}.excluded_topics",
+            )
+            if set(excluded_topics) != {
+                "checkpoint",
+                "save_load",
+                "point_of_no_return",
+                "collapse_failure",
+            }:
+                raise ManifestError(
+                    f"{reference_label}.excluded_topics must explicitly exclude "
+                    "the rejected document contracts"
+                )
+
+        resolved_assets: list[dict[str, Any]] = []
+        for asset_index, asset_value in enumerate(
+            _array(package["visual_assets"], f"{package_label}.visual_assets")
+        ):
+            asset_label = f"{package_label}.visual_assets[{asset_index}]"
+            asset = _object(asset_value, asset_label)
+            if set(asset) != STRUCTURE_PACKAGE_VISUAL_ASSET_KEYS:
+                raise ManifestError(f"{asset_label} has an invalid exact key set")
+            asset_path, asset_filesystem_path, _asset_resource_path = (
+                _structure_package_member_path(
+                    package_directory,
+                    asset["path"],
+                    f"{asset_label}.path",
+                )
+            )
+            if not asset_filesystem_path.is_file():
+                raise ManifestError(f"{asset_label}.path does not exist")
+            resolved_asset = copy.deepcopy(asset)
+            resolved_asset["path"] = asset_path
+            resolved_asset["topology_digest"] = canonical_digest
+            resolved_asset["partition_digest"] = partition_digest
+            resolved_asset["structure_id"] = structure_id
+            resolved_assets.append(resolved_asset)
+        package_visual_assets.extend(resolved_assets)
+
+        resolved_instance: dict[str, Any] = {
+            "id": structure_id,
+            "template_id": template_id,
+            "origin": copy.deepcopy(record["origin"]),
+            "size": copy.deepcopy(package["size"]),
+            "enabled": bool(record["enabled"]),
+            "topology_digest": canonical_digest,
+            "partition_digest": partition_digest,
+            "sockets": copy.deepcopy(package["sockets"]),
+            "runtime": copy.deepcopy(runtime),
+            "controller_script": scripts_by_role[STRUCTURE_PACKAGE_REQUIRED_SCRIPT_ROLE],
+            "package_path": package_path,
+            "package_sha256": actual_package_sha,
+            "local_topology_digest": local_topology_digest,
+            "collision_operations": collision_operations,
+            "structure_scene_path": (
+                "res://underwater_map_workbench/"
+                f"structures/{structure_id}/generated/structure.tscn"
+            ),
+        }
+        if "landmark_id" in record:
+            resolved_instance["landmark_id"] = record["landmark_id"]
+        resolved_instances.append(resolved_instance)
+
+    if structure_id_filter is not None and not selected_structure_found:
+        raise ManifestError(f"unknown structure package: {structure_id_filter}")
+
+    resolved_manifest = copy.deepcopy(manifest)
+    resolved_manifest["structures"] = {
+        "templates": templates,
+        "instances": resolved_instances,
+    }
+    resolved_visual = _object(resolved_manifest["visual"], "visual")
+    resolved_visual["assets"] = [
+        *copy.deepcopy(_array(resolved_visual["assets"], "visual.assets")),
+        *package_visual_assets,
+    ]
+    return resolved_manifest
+
+
+def _structure_semantic_projection(
+    structures: dict[str, Any],
+) -> dict[str, Any]:
+    projected_instances: list[dict[str, Any]] = []
+    for value in _array(structures["instances"], "structures.instances"):
+        instance = _object(value, "structure instance")
+        projected = {
+            key: copy.deepcopy(instance[key])
+            for key in (
+                "id",
+                "template_id",
+                "origin",
+                "size",
+                "enabled",
+                "topology_digest",
+                "partition_digest",
+                "sockets",
+            )
+        }
+        if "landmark_id" in instance:
+            projected["landmark_id"] = copy.deepcopy(instance["landmark_id"])
+        if "runtime" in instance:
+            projected["runtime"] = copy.deepcopy(instance["runtime"])
+        projected_instances.append(projected)
+    return {
+        "templates": copy.deepcopy(structures["templates"]),
+        "instances": projected_instances,
+    }
+
+
 def _topology_identity_projection(manifest: dict[str, Any]) -> dict[str, Any]:
     topology = _object(manifest.get("topology"), "topology")
     if topology.get("mode") != L05_MODE:
@@ -606,7 +1315,7 @@ def _gameplay_signature(manifest: dict[str, Any]) -> str:
             }
             for landmark in manifest["landmarks"]
         ],
-        "structures": copy.deepcopy(manifest["structures"]),
+        "structures": _structure_semantic_projection(manifest["structures"]),
         "gameplay": _gameplay_semantic_projection(manifest["gameplay"]),
         "campaign": copy.deepcopy(manifest["campaign"]),
     }
@@ -623,7 +1332,7 @@ def _presentation_fingerprint(manifest: dict[str, Any]) -> str:
         },
         "regions": copy.deepcopy(manifest["regions"]),
         "landmarks": copy.deepcopy(manifest["landmarks"]),
-        "structures": copy.deepcopy(manifest["structures"]),
+        "structures": _structure_semantic_projection(manifest["structures"]),
         "topology": _topology_identity_projection(manifest),
         "gameplay": copy.deepcopy(manifest["gameplay"]),
         "campaign": copy.deepcopy(manifest["campaign"]),
@@ -792,6 +1501,8 @@ def _validate_visual(
         "station_color",
     ):
         _color(visual[key], f"visual.{key}")
+    if len(_color(visual["water_color"], "visual.water_color")) != 6:
+        raise ManifestError("visual.water_color must be an opaque RGB hex color")
     _positive_number(visual["grid_width"], "visual.grid_width")
     _positive_number(visual["border_width"], "visual.border_width")
     if "diagnostic_grid_enabled" in visual:
@@ -862,7 +1573,22 @@ def _validate_visual(
             if parallax_scale != (1.0, 1.0):
                 raise ManifestError(f"{label}.parallax_scale must be [1, 1]")
 
-        if expected_id == "L05":
+        if expected_id == "L00":
+            if (
+                layer["role"] != "water_base"
+                or layer["geometry_role"] != "none"
+                or layer["affordance_policy"] != NO_BLOCKING_POLICY
+            ):
+                raise ManifestError(
+                    "L00 must be the nonblocking water_base background"
+                )
+            if not layer["enabled"] or layer["reserved"]:
+                raise ManifestError("L00 must be enabled and not reserved")
+            if rgb_modulate != "ffffff":
+                raise ManifestError(
+                    "L00.rgb_modulate must remain ffffff; water_color is its sole color"
+                )
+        elif expected_id == "L05":
             if (
                 layer["role"] != "collider_authority"
                 or layer["geometry_role"] != "collider_authority"
@@ -895,14 +1621,25 @@ def _validate_visual(
 
     assets = _array(visual["assets"], "visual.assets")
     asset_ids: set[str] = set()
-    element_node_keys: set[tuple[str, str, str]] = set()
+    element_node_keys: set[tuple[str, str, str, str]] = set()
+    structure_build: dict[str, Any] = topology_build["structure_build"]
     for index, asset_value in enumerate(assets):
         label = f"visual.assets[{index}]"
         asset = _object(asset_value, label)
-        if set(asset) != VISUAL_ASSET_KEYS:
+        kind_value = asset.get("kind")
+        is_structure_asset = kind_value in {
+            STRUCTURE_INTERIOR_TEXTURE_KIND,
+            STRUCTURE_OWNER_MASKED_TEXTURE_KIND,
+        }
+        expected_keys = (
+            STRUCTURE_VISUAL_ASSET_KEYS
+            if is_structure_asset
+            else VISUAL_ASSET_KEYS
+        )
+        if set(asset) != expected_keys:
             raise ManifestError(
                 f"{label} must contain exactly: "
-                + ", ".join(sorted(VISUAL_ASSET_KEYS))
+                + ", ".join(sorted(expected_keys))
             )
         asset_id = _non_empty_string(asset["id"], f"{label}.id")
         if asset_id in asset_ids:
@@ -922,20 +1659,107 @@ def _validate_visual(
             ("L02", "texture_rect"),
             ("L02", COMPOSITION_PROXY_KIND),
             ("L05", "collision_masked_material"),
+            ("L04", STRUCTURE_INTERIOR_TEXTURE_KIND),
+            ("L05", STRUCTURE_OWNER_MASKED_TEXTURE_KIND),
         }:
             raise ManifestError(
                 f"{label} must be L01-L02/texture_rect|{COMPOSITION_PROXY_KIND} "
-                "or L05/collision_masked_material"
+                "or a typed L04/L05 structure-local texture"
             )
-        element_node_key = (layer_id, group_id, _safe_node_name(asset_id))
+        structure_id = ""
+        if is_structure_asset:
+            structure_id = _non_empty_string(
+                asset["structure_id"],
+                f"{label}.structure_id",
+            )
+        element_node_key = (
+            structure_id,
+            layer_id,
+            group_id,
+            _safe_node_name(asset_id),
+        )
         if element_node_key in element_node_keys:
             raise ManifestError(
-                f"{label}.id collides with another generated node name in "
-                f"VisualLayers/{layer_id}/{group_id}"
+                f"{label}.id collides with another generated visual node name"
             )
         element_node_keys.add(element_node_key)
-        _boolean(asset["enabled"], f"{label}.enabled")
+        enabled = _boolean(asset["enabled"], f"{label}.enabled")
         _non_empty_string(asset["affordance"], f"{label}.affordance")
+
+        if is_structure_asset:
+            instance = structure_build["instances_by_id"].get(structure_id)
+            if instance is None:
+                raise ManifestError(
+                    f"{label}.structure_id references an unknown structure"
+                )
+            if enabled and not instance["enabled"]:
+                raise ManifestError(
+                    f"{label} cannot be enabled for a disabled structure"
+                )
+            local_rect = _rect(asset["local_rect"], f"{label}.local_rect")
+            if not _rect_contains_rect(
+                (0.0, 0.0, instance["size"][0], instance["size"][1]),
+                local_rect,
+            ) or local_rect[2] <= 0.0 or local_rect[3] <= 0.0:
+                raise ManifestError(
+                    f"{label}.local_rect must lie inside its structure"
+                )
+            for component, step in zip(
+                local_rect,
+                L05_WORLD_UNITS_PER_PIXEL + L05_WORLD_UNITS_PER_PIXEL,
+            ):
+                quotient = component / step
+                if not math.isclose(
+                    quotient,
+                    round(quotient),
+                    rel_tol=0.0,
+                    abs_tol=1.0e-9,
+                ):
+                    raise ManifestError(
+                        f"{label}.local_rect must align to the L05 40 x 40 grid"
+                    )
+            _, filesystem_path, pixel_size = _read_hashed_png(
+                asset["path"],
+                asset["sha256"],
+                asset["pixel_size"],
+                label,
+            )
+            if local_rect[2:] != (float(pixel_size[0]), float(pixel_size[1])):
+                raise ManifestError(
+                    f"{label}.local_rect size must equal pixel_size exactly "
+                    "(one source pixel per world unit; no resizing)"
+                )
+            _validate_structure_visual_png(filesystem_path, pixel_size, label)
+            topology_digest = asset["topology_digest"]
+            partition_digest = asset["partition_digest"]
+            if topology_digest != topology_build.get("canonical_digest"):
+                raise ManifestError(f"{label}.topology_digest is stale")
+            if partition_digest != topology_build.get("partition_digest"):
+                raise ManifestError(f"{label}.partition_digest is stale")
+            if topology_digest != instance["source"]["topology_digest"]:
+                raise ManifestError(
+                    f"{label}.topology_digest must match its structure"
+                )
+            if partition_digest != instance["source"]["partition_digest"]:
+                raise ManifestError(
+                    f"{label}.partition_digest must match its structure"
+                )
+            if kind == STRUCTURE_INTERIOR_TEXTURE_KIND:
+                if asset["affordance"] != STRUCTURE_INTERIOR_AFFORDANCE:
+                    raise ManifestError(
+                        f"{label}.affordance must be {STRUCTURE_INTERIOR_AFFORDANCE}"
+                    )
+            elif asset["affordance"] != STRUCTURE_OWNER_AFFORDANCE:
+                raise ManifestError(
+                    f"{label}.affordance must be {STRUCTURE_OWNER_AFFORDANCE}"
+                )
+            shader_path = WORKBENCH_DIR / STRUCTURE_CLIP_SHADER_PATH
+            if not shader_path.is_file():
+                raise ManifestError(
+                    f"missing structure clip shader: {STRUCTURE_CLIP_SHADER_PATH}"
+                )
+            continue
+
         world_rect = _rect(asset["world_rect"], f"{label}.world_rect")
         if (
             world_rect[0] < 0.0
@@ -1023,6 +1847,22 @@ def _validate_visual(
                 raise ManifestError(f"missing L05 shader: {L05_SHADER_PATH}")
 
 
+def _rect_contains_rect(
+    outer: tuple[float, float, float, float],
+    inner: tuple[float, float, float, float],
+) -> bool:
+    return (
+        inner[0] >= outer[0]
+        and inner[1] >= outer[1]
+        and inner[0] + inner[2] <= outer[0] + outer[2]
+        and inner[1] + inner[3] <= outer[1] + outer[3]
+    )
+
+
+
+
+
+
 def _validate_structures(
     manifest: dict[str, Any],
     world_size: tuple[float, float],
@@ -1045,8 +1885,9 @@ def _validate_structures(
         template_id = _non_empty_string(template["id"], f"{label}.id")
         if template_id in templates_by_id:
             raise ManifestError(f"{label}.id must be unique")
-        if template["kind"] != "enterable_tower":
-            raise ManifestError(f"{label}.kind must be enterable_tower")
+        template_kind = _non_empty_string(template["kind"], f"{label}.kind")
+        if re.fullmatch(r"[a-z][a-z0-9_]*", template_kind) is None:
+            raise ManifestError(f"{label}.kind must be lowercase snake_case")
         if template["interior_layer_id"] != "L04":
             raise ManifestError(f"{label}.interior_layer_id must be L04")
         if template["collider_layer_id"] != "L05":
@@ -1055,11 +1896,23 @@ def _validate_structures(
             template["allowed_socket_kinds"],
             f"{label}.allowed_socket_kinds",
         )
-        if socket_kinds != list(ENTERABLE_TOWER_SOCKET_KINDS):
-            raise ManifestError(
-                f"{label}.allowed_socket_kinds must exactly match the "
-                "enterable tower socket contract"
+        if not socket_kinds:
+            raise ManifestError(f"{label}.allowed_socket_kinds must not be empty")
+        normalized_socket_kinds: list[str] = []
+        for socket_kind_index, socket_kind_value in enumerate(socket_kinds):
+            socket_kind = _non_empty_string(
+                socket_kind_value,
+                f"{label}.allowed_socket_kinds[{socket_kind_index}]",
             )
+            if (
+                re.fullmatch(r"[a-z][a-z0-9_]*", socket_kind) is None
+                or socket_kind in normalized_socket_kinds
+            ):
+                raise ManifestError(
+                    f"{label}.allowed_socket_kinds must contain unique "
+                    "lowercase snake_case values"
+                )
+            normalized_socket_kinds.append(socket_kind)
         templates_by_id[template_id] = template
 
     instances_by_id: dict[str, dict[str, Any]] = {}
@@ -1079,7 +1932,7 @@ def _validate_structures(
             raise ManifestError(
                 f"{label} must contain required fields: "
                 + ", ".join(sorted(STRUCTURE_INSTANCE_REQUIRED_KEYS))
-                + "; optional field: landmark_id"
+                + "; optional fields: landmark_id, runtime"
             )
         instance_id = _non_empty_string(instance["id"], f"{label}.id")
         if instance_id in instances_by_id or instance_id in templates_by_id:
@@ -1122,6 +1975,8 @@ def _validate_structures(
 
         sockets = _array(instance["sockets"], f"{label}.sockets")
         socket_ids: set[str] = set()
+        socket_file_names: set[str] = set()
+        sockets_by_id: dict[str, dict[str, Any]] = {}
         for socket_index, socket_value in enumerate(sockets):
             socket_label = f"{label}.sockets[{socket_index}]"
             socket = _object(socket_value, socket_label)
@@ -1133,6 +1988,12 @@ def _validate_structures(
             if socket_id in socket_ids:
                 raise ManifestError(f"{socket_label}.id must be unique within its structure")
             socket_ids.add(socket_id)
+            socket_file_name = _safe_node_name(socket_id)
+            if socket_file_name in socket_file_names:
+                raise ManifestError(
+                    f"{socket_label}.id collides with another generated socket-card name"
+                )
+            socket_file_names.add(socket_file_name)
             socket_kind = _non_empty_string(socket["kind"], f"{socket_label}.kind")
             if socket_kind not in template["allowed_socket_kinds"]:
                 raise ManifestError(f"{socket_label}.kind is not allowed by its template")
@@ -1160,6 +2021,10 @@ def _validate_structures(
                     raise ManifestError(
                         f"{socket_label}.local_rect must align to the L05 40 x 40 grid"
                     )
+            sockets_by_id[socket_id] = socket
+
+        if "runtime" in instance:
+            _object(instance["runtime"], f"{label}.runtime")
 
         resolved = {
             "source": instance,
@@ -1168,6 +2033,7 @@ def _validate_structures(
             "origin": origin,
             "size": size,
             "enabled": enabled,
+            "sockets_by_id": sockets_by_id,
         }
         instances_by_id[instance_id] = resolved
         resolved_instances.append(resolved)
@@ -1189,6 +2055,8 @@ def _validate_structure_bindings(
 ) -> None:
     expected_topology_digest = str(topology_build.get("canonical_digest", ""))
     expected_partition_digest = str(topology_build.get("partition_digest", ""))
+    owner_ids = set(topology_build.get("owner_ids", []))
+
     for instance in structure_build["instances"]:
         source: dict[str, Any] = instance["source"]
         instance_id = str(instance["id"])
@@ -1208,6 +2076,15 @@ def _validate_structure_bindings(
         if source["partition_digest"] != expected_partition_digest:
             raise ManifestError(
                 f"structure instance {instance_id}.partition_digest is stale"
+            )
+        if (
+            source.get("runtime") is not None
+            and instance["enabled"]
+            and instance_id not in owner_ids
+        ):
+            raise ManifestError(
+                f"structure instance {instance_id}.runtime requires "
+                "an enabled owner partition"
             )
 
 
@@ -1420,7 +2297,29 @@ def _validate_topology(
             instance["origin_px"] = origin_px
             instance["size_px"] = size_px
 
-        operations = _array(payload["operations"], "L05 payload.operations")
+        global_operations = _array(
+            payload["operations"],
+            "L05 payload.operations",
+        )
+        for index, operation_value in enumerate(global_operations):
+            operation = _object(
+                operation_value,
+                f"L05 payload.operations[{index}]",
+            )
+            if operation.get("space") != "world_px":
+                raise ManifestError(
+                    "the global L05 payload may contain only world_px operations; "
+                    "structure-local geometry belongs to its package"
+                )
+        operations = copy.deepcopy(global_operations)
+        for instance in structure_build["instances"]:
+            if not instance["enabled"]:
+                continue
+            operations.extend(
+                copy.deepcopy(
+                    instance["source"].get("collision_operations", [])
+                )
+            )
         cells = bytearray([open_water]) * (L05_PIXEL_SIZE[0] * L05_PIXEL_SIZE[1])
         solid_owner_cells = [0] * (L05_PIXEL_SIZE[0] * L05_PIXEL_SIZE[1])
         operation_ids: set[str] = set()
@@ -2028,10 +2927,9 @@ def _validate_entry_exit(
     _validate_position(exit_record["position"], "exit.position", world_size)
 
 
-def load_and_validate_manifest() -> tuple[
+def _load_and_validate_manifest_raw(raw: bytes) -> tuple[
     dict[str, Any], str, str, str, dict[str, Any]
 ]:
-    raw = MANIFEST_PATH.read_bytes()
     try:
         manifest = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -2057,11 +2955,17 @@ def load_and_validate_manifest() -> tuple[
         ),
         "manifest",
     )
-    if manifest["schema_version"] != 5:
-        raise ManifestError("schema_version must be 5")
+    if manifest["schema_version"] != MAP_SCHEMA_VERSION:
+        raise ManifestError(
+            f"schema_version must be {MAP_SCHEMA_VERSION}"
+        )
     if "region" in manifest:
-        raise ManifestError("schema_version 5 uses regions; legacy region is not allowed")
+        raise ManifestError(
+            f"schema_version {MAP_SCHEMA_VERSION} uses regions; "
+            "legacy region is not allowed"
+        )
 
+    manifest = _resolve_structure_packages(manifest)
     _validate_revision(manifest)
     world_size = _validate_map(manifest)
     region_bounds = _validate_regions(manifest, world_size)
@@ -2099,6 +3003,12 @@ def load_and_validate_manifest() -> tuple[
         _presentation_fingerprint(manifest),
         topology_build,
     )
+
+
+def load_and_validate_manifest() -> tuple[
+    dict[str, Any], str, str, str, dict[str, Any]
+]:
+    return _load_and_validate_manifest_raw(MANIFEST_PATH.read_bytes())
 
 
 def _gd_number(value: Any) -> str:
@@ -2229,9 +3139,373 @@ def _l05_boundary_mask(cells: bytes, width: int, height: int) -> bytes:
     return bytes(boundary)
 
 
+def _structure_generated_path(structure_id: str, *parts: str) -> Path:
+    return (
+        WORKBENCH_DIR
+        / "structures"
+        / structure_id
+        / "generated"
+        / Path(*parts)
+    )
+
+
+def _artifact_record(path: Path, content: bytes) -> dict[str, str]:
+    return {
+        "path": path.relative_to(WORKBENCH_DIR).as_posix(),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
+def _binary_boundary_mask(pixels: bytes, width: int, height: int) -> bytes:
+    if len(pixels) != width * height:
+        raise ManifestError("binary boundary source has an invalid size")
+    boundary = bytearray(width * height)
+    for y in range(height):
+        row_start = y * width
+        if pixels[row_start] != 0:
+            boundary[row_start] = 255
+        if pixels[row_start + width - 1] != 0:
+            boundary[row_start + width - 1] = 255
+        for x in range(1, width):
+            left = row_start + x - 1
+            right = left + 1
+            if pixels[left] != pixels[right]:
+                boundary[left] = 255
+                boundary[right] = 255
+    for x in range(width):
+        if pixels[x] != 0:
+            boundary[x] = 255
+        bottom = (height - 1) * width + x
+        if pixels[bottom] != 0:
+            boundary[bottom] = 255
+    for y in range(1, height):
+        previous_start = (y - 1) * width
+        current_start = y * width
+        for x in range(width):
+            previous = previous_start + x
+            current = current_start + x
+            if pixels[previous] != pixels[current]:
+                boundary[previous] = 255
+                boundary[current] = 255
+    return bytes(boundary)
+
+
+def _structure_native_masks(
+    topology_build: dict[str, Any],
+    instance: dict[str, Any],
+) -> tuple[int, int, bytes, bytes, bytes, bytes]:
+    instance_id = str(instance["id"])
+    width_float, height_float = instance["size"]
+    if not width_float.is_integer() or not height_float.is_integer():
+        raise ManifestError(
+            f"structure {instance_id} needs integer world dimensions for native art"
+        )
+    width = int(width_float)
+    height = int(height_float)
+    if max(width, height) > STRUCTURE_NATIVE_MAX_TEXTURE_DIMENSION:
+        raise ManifestError(
+            f"structure {instance_id} exceeds the native mask limit of "
+            f"{STRUCTURE_NATIVE_MAX_TEXTURE_DIMENSION} pixels per axis"
+        )
+    if width * height > STRUCTURE_NATIVE_MAX_TEXTURE_PIXELS:
+        raise ManifestError(
+            f"structure {instance_id} exceeds the native mask pixel budget"
+        )
+    step_x_float, step_y_float = topology_build["world_units_per_pixel"]
+    if not step_x_float.is_integer() or not step_y_float.is_integer():
+        raise ManifestError("structure native masks require integral L05 cell dimensions")
+    step_x = int(step_x_float)
+    step_y = int(step_y_float)
+    local_cells, cell_width, cell_height = _structure_local_cells(instance)
+    if width != cell_width * step_x or height != cell_height * step_y:
+        raise ManifestError(
+            f"structure {instance_id} native size does not match its L05 cell bounds"
+        )
+    solid_native = bytearray(width * height)
+    open_native = bytearray(width * height)
+    for local_cell_y in range(cell_height):
+        solid_row = bytearray()
+        open_row = bytearray()
+        source_row = local_cell_y * cell_width
+        for local_cell_x in range(cell_width):
+            source_index = source_row + local_cell_x
+            solid_row.extend(
+                bytes([255 if local_cells[source_index] == 0 else 0])
+                * step_x
+            )
+            open_row.extend(
+                bytes([255 if local_cells[source_index] == 255 else 0])
+                * step_x
+            )
+        for native_row_offset in range(step_y):
+            destination = (
+                (local_cell_y * step_y + native_row_offset) * width
+            )
+            solid_native[destination : destination + width] = solid_row
+            open_native[destination : destination + width] = open_row
+    boundary_native = _binary_boundary_mask(bytes(solid_native), width, height)
+    guide = bytearray(width * height * 4)
+    for pixel_index in range(width * height):
+        if boundary_native[pixel_index] != 0:
+            color = (255, 0, 255, 255)
+        elif solid_native[pixel_index] != 0:
+            color = (0, 0, 0, 255)
+        elif open_native[pixel_index] != 0:
+            color = (0, 255, 255, 255)
+        else:
+            color = (64, 64, 64, 255)
+        target = pixel_index * 4
+        guide[target : target + 4] = bytes(color)
+    return (
+        width,
+        height,
+        bytes(solid_native),
+        bytes(open_native),
+        boundary_native,
+        bytes(guide),
+    )
+
+
+def _rects_intersect(
+    first: tuple[int, int, int, int],
+    second: tuple[int, int, int, int],
+) -> bool:
+    return (
+        first[0] < second[0] + second[2]
+        and second[0] < first[0] + first[2]
+        and first[1] < second[1] + second[3]
+        and second[1] < first[1] + first[3]
+    )
+
+
+def _panel_neighbors(
+    panel: tuple[int, int, int, int],
+    other: tuple[int, int, int, int],
+) -> bool:
+    horizontal_touch = (
+        panel[0] + panel[2] == other[0]
+        or other[0] + other[2] == panel[0]
+    ) and max(panel[1], other[1]) < min(
+        panel[1] + panel[3],
+        other[1] + other[3],
+    )
+    vertical_touch = (
+        panel[1] + panel[3] == other[1]
+        or other[1] + other[3] == panel[1]
+    ) and max(panel[0], other[0]) < min(
+        panel[0] + panel[2],
+        other[0] + other[2],
+    )
+    return horizontal_touch or vertical_touch
+
+
+def _json_bytes(value: Any) -> bytes:
+    return (
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
+def _surface_detail_mask(topology_build: dict[str, Any]) -> bytes:
+    """Return the deterministic RGBA presentation mask derived from L05 truth.
+
+    R is the exposed solid edge distance, G marks seams between different solid
+    owners, B marks a generic frame around boundary sockets that have open water
+    continuity on both sides, and A is always opaque.  No channel can create
+    geometry: RGB is populated only for canonical solid cells.
+    """
+    width, height = topology_build["pixel_size"]
+    cells: bytes = topology_build["cells"]
+    solid_value = int(topology_build["encoding"]["solid"])
+    owners: list[int] = topology_build["solid_owner_cells"]
+    detail = bytearray(width * height * 4)
+    for cell_index in range(width * height):
+        detail[cell_index * 4 + 3] = 255
+
+    def in_bounds(x: int, y: int) -> bool:
+        return 0 <= x < width and 0 <= y < height
+
+    def cell_index(x: int, y: int) -> int:
+        return y * width + x
+
+    def is_solid(x: int, y: int) -> bool:
+        return in_bounds(x, y) and cells[cell_index(x, y)] == solid_value
+
+    distances = [-1] * (width * height)
+    queue: deque[tuple[int, int]] = deque()
+    for y in range(height):
+        for x in range(width):
+            index = cell_index(x, y)
+            if cells[index] != solid_value:
+                continue
+            if any(
+                not is_solid(neighbor_x, neighbor_y)
+                for neighbor_x, neighbor_y in (
+                    (x - 1, y),
+                    (x + 1, y),
+                    (x, y - 1),
+                    (x, y + 1),
+                )
+            ):
+                distances[index] = 0
+                queue.append((x, y))
+    while queue:
+        x, y = queue.popleft()
+        index = cell_index(x, y)
+        distance = distances[index]
+        if distance >= len(SURFACE_DETAIL_EDGE_VALUES) - 1:
+            continue
+        for neighbor_x, neighbor_y in (
+            (x - 1, y),
+            (x + 1, y),
+            (x, y - 1),
+            (x, y + 1),
+        ):
+            if not is_solid(neighbor_x, neighbor_y):
+                continue
+            neighbor_index = cell_index(neighbor_x, neighbor_y)
+            if distances[neighbor_index] >= 0:
+                continue
+            distances[neighbor_index] = distance + 1
+            queue.append((neighbor_x, neighbor_y))
+    for index, distance in enumerate(distances):
+        if 0 <= distance < len(SURFACE_DETAIL_EDGE_VALUES):
+            detail[index * 4] = SURFACE_DETAIL_EDGE_VALUES[distance]
+
+    for y in range(height):
+        for x in range(width):
+            index = cell_index(x, y)
+            owner = owners[index]
+            if cells[index] != solid_value or owner <= 0:
+                continue
+            for neighbor_x, neighbor_y in ((x + 1, y), (x, y + 1)):
+                if not is_solid(neighbor_x, neighbor_y):
+                    continue
+                neighbor_index = cell_index(neighbor_x, neighbor_y)
+                neighbor_owner = owners[neighbor_index]
+                if neighbor_owner > 0 and neighbor_owner != owner:
+                    detail[index * 4 + 1] = 255
+                    detail[neighbor_index * 4 + 1] = 255
+
+    cell_width, cell_height = topology_build["world_units_per_pixel"]
+    for instance in topology_build["structure_build"]["instances"]:
+        if not instance["enabled"]:
+            continue
+        origin_x, origin_y = instance["origin_px"]
+        size_x, size_y = instance["size_px"]
+        structure_width, structure_height = instance["size"]
+        for socket_index, socket_value in enumerate(instance["source"].get("sockets", [])):
+            socket = _object(socket_value, f"structure socket[{socket_index}]")
+            local_x, local_y, local_width, local_height = _rect(
+                socket["local_rect"],
+                f"structure socket[{socket_index}].local_rect",
+            )
+            local_left = max(0, math.floor(local_x / cell_width))
+            local_top = max(0, math.floor(local_y / cell_height))
+            local_right = min(size_x, math.ceil((local_x + local_width) / cell_width))
+            local_bottom = min(size_y, math.ceil((local_y + local_height) / cell_height))
+            if local_left >= local_right or local_top >= local_bottom:
+                continue
+            global_left = origin_x + local_left
+            global_top = origin_y + local_top
+            global_right = origin_x + local_right
+            global_bottom = origin_y + local_bottom
+            core_open = any(
+                not is_solid(x, y)
+                for y in range(global_top, global_bottom)
+                for x in range(global_left, global_right)
+            )
+            if not core_open:
+                continue
+            boundary_sides: list[str] = []
+            if local_x <= 0:
+                boundary_sides.append("left")
+            if local_y <= 0:
+                boundary_sides.append("top")
+            if local_x + local_width >= structure_width:
+                boundary_sides.append("right")
+            if local_y + local_height >= structure_height:
+                boundary_sides.append("bottom")
+            has_open_continuity = False
+            for side in boundary_sides:
+                if side == "left":
+                    has_open_continuity = any(
+                        not is_solid(origin_x - 1, y) and not is_solid(origin_x, y)
+                        for y in range(global_top, global_bottom)
+                    )
+                elif side == "right":
+                    has_open_continuity = any(
+                        not is_solid(origin_x + size_x, y)
+                        and not is_solid(origin_x + size_x - 1, y)
+                        for y in range(global_top, global_bottom)
+                    )
+                elif side == "top":
+                    has_open_continuity = any(
+                        not is_solid(x, origin_y - 1) and not is_solid(x, origin_y)
+                        for x in range(global_left, global_right)
+                    )
+                else:
+                    has_open_continuity = any(
+                        not is_solid(x, origin_y + size_y)
+                        and not is_solid(x, origin_y + size_y - 1)
+                        for x in range(global_left, global_right)
+                    )
+                if has_open_continuity:
+                    break
+            if not has_open_continuity:
+                continue
+            for y in range(global_top - 1, global_bottom + 1):
+                for x in range(global_left - 1, global_right + 1):
+                    if is_solid(x, y):
+                        detail[cell_index(x, y) * 4 + 2] = 255
+    return bytes(detail)
+
+
+def _structure_surface_detail_crop(
+    topology_build: dict[str, Any],
+    instance: dict[str, Any],
+    surface_detail_mask: bytes,
+) -> tuple[int, int, bytes]:
+    """Return the package-local L05-cell crop used by one structure shader."""
+    world_width, world_height = topology_build["pixel_size"]
+    origin_x, origin_y = instance["origin_px"]
+    width, height = instance["size_px"]
+    if (
+        origin_x < 0
+        or origin_y < 0
+        or width <= 0
+        or height <= 0
+        or origin_x + width > world_width
+        or origin_y + height > world_height
+    ):
+        raise ManifestError(
+            f"structure {instance['id']} surface-detail crop exceeds L05 bounds"
+        )
+    if len(surface_detail_mask) != world_width * world_height * 4:
+        raise ManifestError("surface-detail source has an invalid RGBA size")
+    crop = bytearray(width * height * 4)
+    row_bytes = width * 4
+    for local_y in range(height):
+        source_start = ((origin_y + local_y) * world_width + origin_x) * 4
+        target_start = local_y * row_bytes
+        crop[target_start : target_start + row_bytes] = surface_detail_mask[
+            source_start : source_start + row_bytes
+        ]
+    return width, height, bytes(crop)
+
+
 def _render_l05_artifacts(
     topology_build: dict[str, Any],
     manifest_sha: str,
+    manifest: dict[str, Any],
+    *,
+    structure_id_filter: str | None = None,
+    include_map_artifacts: bool = True,
 ) -> dict[Path, bytes]:
     if topology_build.get("mode") != L05_MODE:
         return {}
@@ -2239,47 +3513,56 @@ def _render_l05_artifacts(
     cells: bytes = topology_build["cells"]
     solid_value = int(topology_build["encoding"]["solid"])
     open_water_value = int(topology_build["encoding"]["open_water"])
-    solid_mask = bytes(255 if value == solid_value else 0 for value in cells)
-    open_water_mask = bytes(
-        255 if value == open_water_value else 0 for value in cells
-    )
-    boundary_mask = _l05_boundary_mask(cells, width, height)
-    guide = bytearray(width * height * 4)
-    for index, value in enumerate(cells):
-        if boundary_mask[index] == 255:
-            color = (255, 0, 255, 255)
-        elif value == solid_value:
-            color = (0, 0, 0, 255)
-        else:
-            color = (0, 255, 255, 255)
-        start = index * 4
-        guide[start : start + 4] = bytes(color)
-    artifacts = {
-        L05_GENERATED_PATHS["solid_mask"]: _encode_png_gray8(
-            width, height, solid_mask
-        ),
-        L05_GENERATED_PATHS["open_water_mask"]: _encode_png_gray8(
-            width, height, open_water_mask
-        ),
-        L05_GENERATED_PATHS["boundary_mask"]: _encode_png_gray8(
-            width, height, boundary_mask
-        ),
-        L05_GENERATED_PATHS["full_map_guide"]: _encode_png_rgba8(
-            width, height, bytes(guide)
-        ),
-    }
-    artifact_records = {}
-    for name in (
-        "solid_mask",
-        "open_water_mask",
-        "boundary_mask",
-        "full_map_guide",
-    ):
-        path = L05_GENERATED_PATHS[name]
-        artifact_records[name] = {
-            "path": path.relative_to(WORKBENCH_DIR).as_posix(),
-            "sha256": hashlib.sha256(artifacts[path]).hexdigest(),
-        }
+    surface_detail_mask = _surface_detail_mask(topology_build)
+    artifacts: dict[Path, bytes] = {}
+    artifact_records: dict[str, dict[str, str]] = {}
+    if include_map_artifacts:
+        solid_mask = bytes(255 if value == solid_value else 0 for value in cells)
+        open_water_mask = bytes(
+            255 if value == open_water_value else 0 for value in cells
+        )
+        boundary_mask = _l05_boundary_mask(cells, width, height)
+        guide = bytearray(width * height * 4)
+        for index, value in enumerate(cells):
+            if boundary_mask[index] == 255:
+                color = (255, 0, 255, 255)
+            elif value == solid_value:
+                color = (0, 0, 0, 255)
+            else:
+                color = (0, 255, 255, 255)
+            start = index * 4
+            guide[start : start + 4] = bytes(color)
+        artifacts.update(
+            {
+                L05_GENERATED_PATHS["solid_mask"]: _encode_png_gray8(
+                    width, height, solid_mask
+                ),
+                L05_GENERATED_PATHS["open_water_mask"]: _encode_png_gray8(
+                    width, height, open_water_mask
+                ),
+                L05_GENERATED_PATHS["boundary_mask"]: _encode_png_gray8(
+                    width, height, boundary_mask
+                ),
+                L05_GENERATED_PATHS["full_map_guide"]: _encode_png_rgba8(
+                    width, height, bytes(guide)
+                ),
+                L05_GENERATED_PATHS["surface_detail_mask"]: _encode_png_rgba8(
+                    width, height, surface_detail_mask
+                ),
+            }
+        )
+        for name in (
+            "solid_mask",
+            "open_water_mask",
+            "boundary_mask",
+            "full_map_guide",
+            "surface_detail_mask",
+        ):
+            path = L05_GENERATED_PATHS[name]
+            artifact_records[name] = {
+                "path": path.relative_to(WORKBENCH_DIR).as_posix(),
+                "sha256": hashlib.sha256(artifacts[path]).hexdigest(),
+            }
     owner_ids: list[str] = topology_build["owner_ids"]
     solid_owner_cells: list[int] = topology_build["solid_owner_cells"]
     owner_cell_counts = [
@@ -2289,13 +3572,26 @@ def _render_l05_artifacts(
         }
         for owner_index, owner_id in enumerate(owner_ids)
     ]
+    structure_assets_by_id: dict[str, list[dict[str, Any]]] = {}
+    for asset_value in manifest["visual"]["assets"]:
+        asset = _object(asset_value, "visual asset")
+        if asset.get("kind") not in {
+            STRUCTURE_INTERIOR_TEXTURE_KIND,
+            STRUCTURE_OWNER_MASKED_TEXTURE_KIND,
+        }:
+            continue
+        structure_assets_by_id.setdefault(str(asset["structure_id"]), []).append(asset)
+
     structure_cards = []
     for instance in topology_build["structure_build"]["instances"]:
         source: dict[str, Any] = instance["source"]
+        instance_id = str(instance["id"])
+        if structure_id_filter is not None and instance_id != structure_id_filter:
+            continue
         origin_px = instance["origin_px"]
         size_px = instance["size_px"]
         structure_card = {
-            "id": instance["id"],
+            "id": instance_id,
             "template_id": source["template_id"],
             "enabled": instance["enabled"],
             "origin": list(instance["origin"]),
@@ -2310,37 +3606,282 @@ def _render_l05_artifacts(
             "partition_digest": source["partition_digest"],
             "sockets": copy.deepcopy(source["sockets"]),
         }
+        if "runtime" in source:
+            structure_card["runtime"] = copy.deepcopy(source["runtime"])
         if "landmark_id" in source:
             structure_card["landmark_id"] = source["landmark_id"]
+        if instance["enabled"]:
+            (
+                native_width,
+                native_height,
+                native_solid,
+                native_open,
+                native_boundary,
+                native_guide,
+            ) = _structure_native_masks(topology_build, instance)
+            (
+                detail_width,
+                detail_height,
+                local_surface_detail,
+            ) = _structure_surface_detail_crop(
+                topology_build,
+                instance,
+                surface_detail_mask,
+            )
+            native_outputs = {
+                "solid_mask_native": (
+                    _structure_generated_path(
+                        instance_id,
+                        "solid_mask_native.png",
+                    ),
+                    _encode_png_gray8(native_width, native_height, native_solid),
+                ),
+                "open_water_mask_native": (
+                    _structure_generated_path(
+                        instance_id,
+                        "open_water_mask_native.png",
+                    ),
+                    _encode_png_gray8(native_width, native_height, native_open),
+                ),
+                "boundary_mask_native": (
+                    _structure_generated_path(
+                        instance_id,
+                        "boundary_mask_native.png",
+                    ),
+                    _encode_png_gray8(native_width, native_height, native_boundary),
+                ),
+                "guide_native": (
+                    _structure_generated_path(
+                        instance_id,
+                        "guide_native.png",
+                    ),
+                    _encode_png_rgba8(native_width, native_height, native_guide),
+                ),
+                "surface_detail_mask_local": (
+                    _structure_generated_path(
+                        instance_id,
+                        "surface_detail_mask_local.png",
+                    ),
+                    _encode_png_rgba8(
+                        detail_width,
+                        detail_height,
+                        local_surface_detail,
+                    ),
+                ),
+            }
+            native_artifact_records: dict[str, dict[str, str]] = {}
+            for artifact_id, (artifact_path, artifact_content) in native_outputs.items():
+                artifacts[artifact_path] = artifact_content
+                native_artifact_records[artifact_id] = _artifact_record(
+                    artifact_path,
+                    artifact_content,
+                )
+
+            native_mapping = {
+                "local_origin": [0, 0],
+                "world_units_per_pixel": [1, 1],
+                "source_world_units_per_pixel": [
+                    int(topology_build["world_units_per_pixel"][0]),
+                    int(topology_build["world_units_per_pixel"][1]),
+                ],
+                "x_axis": "right",
+                "y_axis": "down",
+                "pixel_reference": "pixel_edge",
+                "rounding": "floor",
+            }
+            structure_assets = structure_assets_by_id.get(instance_id, [])
+            panel_rects: set[tuple[int, int, int, int]] = set()
+            for asset in structure_assets:
+                local_rect = _rect(
+                    asset["local_rect"],
+                    f"structure asset {asset['id']}.local_rect",
+                )
+                panel_rects.add(tuple(int(value) for value in local_rect))
+            if not panel_rects:
+                panel_rects.add((0, 0, native_width, native_height))
+            ordered_panel_rects = sorted(
+                panel_rects,
+                key=lambda rect: (rect[1], rect[0], rect[3], rect[2]),
+            )
+            panel_ids = {
+                rect: "panel_%d_%d_%d_%d" % rect
+                for rect in ordered_panel_rects
+            }
+            socket_rects = {
+                str(socket["id"]): tuple(
+                    int(value)
+                    for value in _rect(
+                        socket["local_rect"],
+                        f"structure socket {socket['id']}.local_rect",
+                    )
+                )
+                for socket in source["sockets"]
+            }
+            panel_records = []
+            for panel_rect in ordered_panel_rects:
+                panel_id = panel_ids[panel_rect]
+                panel_assets = sorted(
+                    str(asset["id"])
+                    for asset in structure_assets
+                    if tuple(
+                        int(value)
+                        for value in _rect(
+                            asset["local_rect"],
+                            f"structure asset {asset['id']}.local_rect",
+                        )
+                    )
+                    == panel_rect
+                )
+                panel_socket_ids = sorted(
+                    socket_id
+                    for socket_id, socket_rect in socket_rects.items()
+                    if _rects_intersect(panel_rect, socket_rect)
+                )
+                neighbor_ids = sorted(
+                    panel_ids[other_rect]
+                    for other_rect in ordered_panel_rects
+                    if other_rect != panel_rect
+                    and _panel_neighbors(panel_rect, other_rect)
+                )
+                panel_card = {
+                    "schema_version": 1,
+                    "generated": True,
+                    "authority": False,
+                    "structure_id": instance_id,
+                    "panel_id": panel_id,
+                    "package_manifest_path": source["package_path"],
+                    "package_manifest_sha256": source["package_sha256"],
+                    "local_topology_digest": source["local_topology_digest"],
+                    "local_rect": list(panel_rect),
+                    "native_pixel_rect": list(panel_rect),
+                    "source_cell_rect": [
+                        panel_rect[0] // int(L05_WORLD_UNITS_PER_PIXEL[0]),
+                        panel_rect[1] // int(L05_WORLD_UNITS_PER_PIXEL[1]),
+                        panel_rect[2] // int(L05_WORLD_UNITS_PER_PIXEL[0]),
+                        panel_rect[3] // int(L05_WORLD_UNITS_PER_PIXEL[1]),
+                    ],
+                    "mapping": copy.deepcopy(native_mapping),
+                    "native_artifacts": copy.deepcopy(native_artifact_records),
+                    "asset_ids": panel_assets,
+                    "socket_ids": panel_socket_ids,
+                    "neighbor_panel_ids": neighbor_ids,
+                }
+                panel_path = _structure_generated_path(
+                    instance_id,
+                    "panels",
+                    f"{panel_id}.json",
+                )
+                panel_content = _json_bytes(panel_card)
+                artifacts[panel_path] = panel_content
+                panel_records.append(
+                    {
+                        "id": panel_id,
+                        "local_rect": list(panel_rect),
+                        **_artifact_record(panel_path, panel_content),
+                    }
+                )
+
+            socket_card_records = []
+            for socket in source["sockets"]:
+                socket_id = str(socket["id"])
+                socket_rect = socket_rects[socket_id]
+                socket_card = {
+                    "schema_version": 1,
+                    "generated": True,
+                    "authority": False,
+                    "structure_id": instance_id,
+                    "socket_id": socket_id,
+                    "kind": socket["kind"],
+                    "package_manifest_path": source["package_path"],
+                    "package_manifest_sha256": source["package_sha256"],
+                    "local_topology_digest": source["local_topology_digest"],
+                    "local_rect": list(socket_rect),
+                    "native_pixel_rect": list(socket_rect),
+                    "source_cell_rect": [
+                        socket_rect[0] // int(L05_WORLD_UNITS_PER_PIXEL[0]),
+                        socket_rect[1] // int(L05_WORLD_UNITS_PER_PIXEL[1]),
+                        socket_rect[2] // int(L05_WORLD_UNITS_PER_PIXEL[0]),
+                        socket_rect[3] // int(L05_WORLD_UNITS_PER_PIXEL[1]),
+                    ],
+                    "mapping": copy.deepcopy(native_mapping),
+                    "native_artifacts": copy.deepcopy(native_artifact_records),
+                    "panel_ids": [
+                        panel_ids[panel_rect]
+                        for panel_rect in ordered_panel_rects
+                        if _rects_intersect(panel_rect, socket_rect)
+                    ],
+                }
+                socket_path = _structure_generated_path(
+                    instance_id,
+                    "socket_cards",
+                    f"{_safe_node_name(socket_id)}.json",
+                )
+                socket_content = _json_bytes(socket_card)
+                artifacts[socket_path] = socket_content
+                socket_card_records.append(
+                    {
+                        "id": socket_id,
+                        "kind": socket["kind"],
+                        **_artifact_record(socket_path, socket_content),
+                    }
+                )
+
+            structure_truth = {
+                "schema_version": 1,
+                "generated": True,
+                "authority": False,
+                "structure_id": instance_id,
+                "package_manifest_path": source["package_path"],
+                "package_manifest_sha256": source["package_sha256"],
+                "local_topology_digest": source["local_topology_digest"],
+                "template_id": source["template_id"],
+                "size": [native_width, native_height],
+                "mapping": native_mapping,
+                "native_artifacts": native_artifact_records,
+                "panels": panel_records,
+                "socket_cards": socket_card_records,
+                "sockets": copy.deepcopy(source["sockets"]),
+                "runtime": copy.deepcopy(source.get("runtime", {})),
+                "controller_script": source["controller_script"],
+                "visual_asset_ids": sorted(
+                    str(asset["id"]) for asset in structure_assets
+                ),
+            }
+            structure_truth_path = _structure_generated_path(
+                instance_id,
+                "structure_truth.json",
+            )
+            structure_truth_content = _json_bytes(structure_truth)
+            artifacts[structure_truth_path] = structure_truth_content
+            structure_card["native_artifacts"] = native_artifact_records
+            structure_card["panels"] = panel_records
+            structure_card["socket_cards"] = socket_card_records
+            structure_card["structure_truth"] = _artifact_record(
+                structure_truth_path,
+                structure_truth_content,
+            )
         structure_cards.append(structure_card)
-    truth_package = {
-        "generated": True,
-        "authority": False,
-        "manifest_sha256": manifest_sha,
-        "payload_path": topology_build["payload_path"],
-        "payload_sha256": topology_build["payload_sha256"],
-        "canonical_digest": topology_build["canonical_digest"],
-        "partition_digest": topology_build["partition_digest"],
-        "pixel_size": list(topology_build["pixel_size"]),
-        "world_units_per_pixel": list(topology_build["world_units_per_pixel"]),
-        "mapping": copy.deepcopy(topology_build["mapping"]),
-        "encoding": copy.deepcopy(topology_build["encoding"]),
-        "solid_cell_count": sum(value == solid_value for value in cells),
-        "open_water_cell_count": sum(value == open_water_value for value in cells),
-        "owner_ids": owner_ids,
-        "owner_cell_counts": owner_cell_counts,
-        "structures": structure_cards,
-        "artifacts": artifact_records,
-    }
-    artifacts[L05_GENERATED_PATHS["truth_package"]] = (
-        json.dumps(
-            truth_package,
-            ensure_ascii=False,
-            sort_keys=True,
-            indent=2,
-        )
-        + "\n"
-    ).encode("utf-8")
+    if include_map_artifacts:
+        truth_package = {
+            "generated": True,
+            "authority": False,
+            "manifest_sha256": manifest_sha,
+            "payload_path": topology_build["payload_path"],
+            "payload_sha256": topology_build["payload_sha256"],
+            "canonical_digest": topology_build["canonical_digest"],
+            "partition_digest": topology_build["partition_digest"],
+            "pixel_size": list(topology_build["pixel_size"]),
+            "world_units_per_pixel": list(topology_build["world_units_per_pixel"]),
+            "mapping": copy.deepcopy(topology_build["mapping"]),
+            "encoding": copy.deepcopy(topology_build["encoding"]),
+            "solid_cell_count": sum(value == solid_value for value in cells),
+            "open_water_cell_count": sum(value == open_water_value for value in cells),
+            "owner_ids": owner_ids,
+            "owner_cell_counts": owner_cell_counts,
+            "structures": structure_cards,
+            "artifacts": artifact_records,
+        }
+        artifacts[L05_GENERATED_PATHS["truth_package"]] = _json_bytes(truth_package)
     return artifacts
 
 
@@ -2447,8 +3988,88 @@ def _structure_owner_boundary_segments(
     return segments
 
 
+def _structure_local_cells(
+    instance: dict[str, Any],
+) -> tuple[bytes, int, int]:
+    width, height = instance["size_px"]
+    cells = bytearray([255]) * (width * height)
+    for operation in instance["source"].get("collision_operations", []):
+        x, y, rect_width, rect_height = operation["rect_px"]
+        value = 0 if operation["op"] == "solid_rect" else 255
+        row_bytes = bytes([value]) * rect_width
+        for row in range(y, y + rect_height):
+            start = row * width + x
+            cells[start : start + rect_width] = row_bytes
+    return bytes(cells), width, height
+
+
+def _merged_structure_local_rectangles(
+    instance: dict[str, Any],
+) -> list[tuple[int, int, int, int]]:
+    cells, width, height = _structure_local_cells(instance)
+    active: dict[tuple[int, int], list[int]] = {}
+    merged: list[tuple[int, int, int, int]] = []
+    for y in range(height):
+        runs: list[tuple[int, int]] = []
+        x = 0
+        while x < width:
+            if cells[y * width + x] != 0:
+                x += 1
+                continue
+            run_start = x
+            x += 1
+            while x < width and cells[y * width + x] == 0:
+                x += 1
+            runs.append((run_start, x - run_start))
+        run_keys = set(runs)
+        for key in list(active):
+            if key not in run_keys:
+                left, top, run_width, run_height = active.pop(key)
+                merged.append((left, top, run_width, run_height))
+        for run_start, run_width in runs:
+            key = (run_start, run_width)
+            if key in active:
+                active[key][3] += 1
+            else:
+                active[key] = [run_start, y, run_width, 1]
+    for left, top, run_width, run_height in active.values():
+        merged.append((left, top, run_width, run_height))
+    merged.sort(key=lambda rect: (rect[1], rect[0], rect[3], rect[2]))
+    return merged
+
+
+def _structure_local_boundary_segments(
+    instance: dict[str, Any],
+) -> list[tuple[float, float]]:
+    cells, width, height = _structure_local_cells(instance)
+    pixel_width, pixel_height = L05_WORLD_UNITS_PER_PIXEL
+    segments: list[tuple[float, float]] = []
+
+    def is_solid(x: int, y: int) -> bool:
+        return 0 <= x < width and 0 <= y < height and cells[y * width + x] == 0
+
+    for y in range(height):
+        for x in range(width):
+            if not is_solid(x, y):
+                continue
+            left = x * pixel_width
+            top = y * pixel_height
+            right = (x + 1) * pixel_width
+            bottom = (y + 1) * pixel_height
+            if not is_solid(x, y - 1):
+                segments.extend(((left, top), (right, top)))
+            if not is_solid(x + 1, y):
+                segments.extend(((right, top), (right, bottom)))
+            if not is_solid(x, y + 1):
+                segments.extend(((right, bottom), (left, bottom)))
+            if not is_solid(x - 1, y):
+                segments.extend(((left, bottom), (left, top)))
+    return segments
+
+
 def _scene_structure_resources(
     topology_build: dict[str, Any],
+    structure_ids: set[str] | None = None,
 ) -> tuple[list[str], list[dict[str, Any]]]:
     if topology_build.get("mode") != L05_MODE:
         return [], []
@@ -2458,6 +4079,10 @@ def _scene_structure_resources(
         instance
         for instance in topology_build["structure_build"]["instances"]
         if instance["enabled"]
+        and (
+            structure_ids is None
+            or str(instance["id"]) in structure_ids
+        )
     ]
     for index, instance in enumerate(enabled_instances):
         binding = {
@@ -2514,16 +4139,47 @@ def _append_layer_root(lines: list[str], layer: dict[str, Any]) -> None:
     )
 
 
+def _is_streamed_backdrop(asset: dict[str, Any]) -> bool:
+    return (
+        asset["kind"] == "texture_rect"
+        and asset["layer_id"] in STREAMED_BACKDROP_LAYER_IDS
+    )
+
+
 def _scene_visual_asset_resources(
     manifest: dict[str, Any],
+    *,
+    include_structure_assets: bool = True,
+    structure_id_filter: str = "",
 ) -> tuple[list[str], list[str], list[dict[str, Any]]]:
-    assets: list[dict[str, Any]] = manifest["visual"]["assets"]
+    source_assets: list[dict[str, Any]] = manifest["visual"]["assets"]
+    assets: list[dict[str, Any]] = []
+    for asset in source_assets:
+        is_structure_asset = asset["kind"] in {
+            STRUCTURE_INTERIOR_TEXTURE_KIND,
+            STRUCTURE_OWNER_MASKED_TEXTURE_KIND,
+        }
+        if is_structure_asset and not include_structure_assets:
+            continue
+        if (
+            structure_id_filter
+            and (
+                not is_structure_asset
+                or str(asset.get("structure_id", "")) != structure_id_filter
+            )
+        ):
+            continue
+        if structure_id_filter and not is_structure_asset:
+            continue
+        assets.append(asset)
     if not assets:
         return [], [], []
     ext_resources: list[str] = []
     sub_resources: list[str] = []
     bindings: list[dict[str, Any]] = []
-    has_l05 = any(asset["layer_id"] == "L05" for asset in assets)
+    has_l05 = any(
+        asset["kind"] == "collision_masked_material" for asset in assets
+    )
     if has_l05:
         ext_resources.extend(
             (
@@ -2531,6 +4187,45 @@ def _scene_visual_asset_resources(
                 f'[ext_resource type="Texture2D" path="{L05_SOLID_MASK_RESOURCE_PATH}" id="Texture_l05_solid"]',
             )
         )
+    has_structure_assets = any(
+        asset["kind"]
+        in {
+            STRUCTURE_INTERIOR_TEXTURE_KIND,
+            STRUCTURE_OWNER_MASKED_TEXTURE_KIND,
+        }
+        for asset in assets
+    )
+    if has_l05:
+        ext_resources.append(
+            f'[ext_resource type="Texture2D" path="{L05_SURFACE_DETAIL_MASK_RESOURCE_PATH}" '
+            'id="Texture_l05_surface_detail"]'
+        )
+    if has_structure_assets:
+        if not structure_id_filter:
+            raise ManifestError(
+                "structure visual resources require one package-local structure filter"
+            )
+        structure_detail_path = _structure_generated_path(
+            structure_id_filter,
+            "surface_detail_mask_local.png",
+        )
+        structure_detail_resource_path = (
+            "res://underwater_map_workbench/"
+            + structure_detail_path.relative_to(WORKBENCH_DIR).as_posix()
+        )
+        ext_resources.append(
+            f'[ext_resource type="Texture2D" path="{structure_detail_resource_path}" '
+            'id="Texture_l05_surface_detail"]'
+        )
+        ext_resources.append(
+            f'[ext_resource type="Shader" path="{STRUCTURE_CLIP_SHADER_RESOURCE_PATH}" '
+            'id="Shader_structure_clip"]'
+        )
+    structures_by_id = {
+        str(instance["id"]): instance
+        for instance in manifest["structures"]["instances"]
+    }
+    structure_mask_resource_ids: dict[tuple[str, str], str] = {}
     for index, asset in enumerate(assets):
         binding: dict[str, Any] = {
             "asset": asset,
@@ -2539,15 +4234,105 @@ def _scene_visual_asset_resources(
         if asset["kind"] == COMPOSITION_PROXY_KIND:
             bindings.append(binding)
             continue
-        texture_id = f"Texture_asset_{index:04d}"
         resource_path = (
             "res://underwater_map_workbench/" + str(asset["path"])
         )
+        if _is_streamed_backdrop(asset):
+            binding["resource_path"] = resource_path
+            binding["residency_contract"] = STREAMED_BACKDROP_CONTRACT
+            bindings.append(binding)
+            continue
+        texture_id = f"Texture_asset_{index:04d}"
         ext_resources.append(
             f'[ext_resource type="Texture2D" path="{resource_path}" id="{texture_id}"]'
         )
         binding["texture_id"] = texture_id
-        if asset["kind"] == "collision_masked_material":
+        if asset["kind"] in {
+            STRUCTURE_INTERIOR_TEXTURE_KIND,
+            STRUCTURE_OWNER_MASKED_TEXTURE_KIND,
+        }:
+            structure_id = str(asset["structure_id"])
+            binding["structure_id"] = structure_id
+            mask_name = (
+                "open_water_mask_native"
+                if asset["kind"] == STRUCTURE_INTERIOR_TEXTURE_KIND
+                else "solid_mask_native"
+            )
+            mask_key = (structure_id, mask_name)
+            mask_resource_id = structure_mask_resource_ids.get(mask_key)
+            if mask_resource_id is None:
+                mask_resource_id = (
+                    f"Texture_structure_mask_{len(structure_mask_resource_ids):04d}"
+                )
+                structure_mask_resource_ids[mask_key] = mask_resource_id
+                mask_path = _structure_generated_path(
+                    structure_id,
+                    f"{mask_name}.png",
+                )
+                mask_resource_path = (
+                    "res://underwater_map_workbench/"
+                    + mask_path.relative_to(WORKBENCH_DIR).as_posix()
+                )
+                ext_resources.append(
+                    f'[ext_resource type="Texture2D" path="{mask_resource_path}" '
+                    f'id="{mask_resource_id}"]'
+                )
+            material_id = f"ShaderMaterial_asset_{index:04d}"
+            binding["material_id"] = material_id
+            local_x, local_y, local_width, local_height = _rect(
+                asset["local_rect"],
+                f"visual.assets[{index}].local_rect",
+            )
+            structure_size = _pair(
+                structures_by_id[structure_id]["size"],
+                f"structure {structure_id}.size",
+            )
+            structure_origin = _pair(
+                structures_by_id[structure_id]["origin"],
+                f"structure {structure_id}.origin",
+            )
+            world_size = _pair(manifest["map"]["world_size"], "map.world_size")
+            sub_resources.extend(
+                (
+                    "",
+                    f'[sub_resource type="ShaderMaterial" id="{material_id}"]',
+                    'shader = ExtResource("Shader_structure_clip")',
+                    f'shader_parameter/clip_mask = ExtResource("{mask_resource_id}")',
+                    'shader_parameter/surface_detail_mask = ExtResource("Texture_l05_surface_detail")',
+                    "shader_parameter/detail_enabled = "
+                    + (
+                        "true"
+                        if asset["kind"] == STRUCTURE_OWNER_MASKED_TEXTURE_KIND
+                        else "false"
+                    ),
+                    "shader_parameter/local_rect_origin = "
+                    + _gd_vector(
+                        [local_x, local_y],
+                        f"visual.assets[{index}].local_rect_origin",
+                    ),
+                    "shader_parameter/local_rect_size = "
+                    + _gd_vector(
+                        [local_width, local_height],
+                        f"visual.assets[{index}].local_rect_size",
+                    ),
+                    "shader_parameter/structure_size = "
+                    + _gd_vector(
+                        list(structure_size),
+                        f"structure {structure_id}.size",
+                    ),
+                    "shader_parameter/world_rect_origin = "
+                    + _gd_vector(
+                        [structure_origin[0] + local_x, structure_origin[1] + local_y],
+                        f"visual.assets[{index}].world_rect_origin",
+                    ),
+                    "shader_parameter/world_size = "
+                    + _gd_vector(
+                        list(world_size),
+                        "map.world_size",
+                    ),
+                )
+            )
+        elif asset["kind"] == "collision_masked_material":
             material_id = f"ShaderMaterial_asset_{index:04d}"
             binding["material_id"] = material_id
             _, _, world_width, world_height = _rect(
@@ -2568,6 +4353,7 @@ def _scene_visual_asset_resources(
                     f'[sub_resource type="ShaderMaterial" id="{material_id}"]',
                     'shader = ExtResource("Shader_l05_ground")',
                     'shader_parameter/topology_mask = ExtResource("Texture_l05_solid")',
+                    'shader_parameter/surface_detail_mask = ExtResource("Texture_l05_surface_detail")',
                     f'shader_parameter/ground_texture = ExtResource("{texture_id}")',
                     "shader_parameter/texture_tiling = "
                     + _gd_vector(
@@ -2586,6 +4372,8 @@ def _append_visual_asset_groups(
 ) -> None:
     emitted: set[tuple[str, str]] = set()
     for binding in bindings:
+        if "structure_id" in binding:
+            continue
         asset: dict[str, Any] = binding["asset"]
         layer_id = str(asset["layer_id"])
         group_id = str(asset["group_id"])
@@ -2610,6 +4398,8 @@ def _append_visual_assets(
 ) -> None:
     _append_visual_asset_groups(lines, bindings)
     for binding in bindings:
+        if "structure_id" in binding:
+            continue
         asset: dict[str, Any] = binding["asset"]
         index = int(binding["index"])
         asset_id = str(asset["id"])
@@ -2645,21 +4435,35 @@ def _append_visual_assets(
                 f"metadata/source = {_gd_variant(asset)}",
             )
         )
-        if asset["kind"] == "texture_rect":
+        if binding.get("residency_contract") == STREAMED_BACKDROP_CONTRACT:
             lines.extend(
                 (
-                    "",
-                    f'[node name="Bitmap" type="TextureRect" parent="{element_path}"]',
-                    "offset_left = 0.0",
-                    "offset_top = 0.0",
-                    f"offset_right = {_gd_number(width)}",
-                    f"offset_bottom = {_gd_number(height)}",
-                    f'texture = ExtResource("{binding["texture_id"]}")',
+                    f"metadata/residency_contract = {_gd_string(STREAMED_BACKDROP_CONTRACT)}",
+                    f"metadata/resource_path = {_gd_string(str(binding['resource_path']))}",
+                    f"metadata/source_sha256 = {_gd_string(str(asset['sha256']))}",
+                )
+            )
+        if asset["kind"] == "texture_rect":
+            bitmap_lines = [
+                "",
+                f'[node name="Bitmap" type="TextureRect" parent="{element_path}"]',
+                "offset_left = 0.0",
+                "offset_top = 0.0",
+                f"offset_right = {_gd_number(width)}",
+                f"offset_bottom = {_gd_number(height)}",
+            ]
+            if "texture_id" in binding:
+                bitmap_lines.append(
+                    f'texture = ExtResource("{binding["texture_id"]}")'
+                )
+            bitmap_lines.extend(
+                (
                     "expand_mode = 1",
                     "stretch_mode = 0",
                     "mouse_filter = 2",
                 )
             )
+            lines.extend(bitmap_lines)
         elif asset["kind"] == COMPOSITION_PROXY_KIND:
             lines.extend(
                 (
@@ -2713,11 +4517,97 @@ def _append_visual_assets(
             )
 
 
+def _append_structure_visual_assets(
+    lines: list[str],
+    root_path: str,
+    structure_id: str,
+    bindings: list[dict[str, Any]],
+) -> None:
+    structure_bindings = [
+        binding
+        for binding in bindings
+        if binding.get("structure_id") == structure_id
+    ]
+    emitted_groups: set[tuple[str, str]] = set()
+    for binding in structure_bindings:
+        asset: dict[str, Any] = binding["asset"]
+        layer_id = str(asset["layer_id"])
+        group_id = str(asset["group_id"])
+        mount_name = (
+            "InteriorVisual"
+            if asset["kind"] == STRUCTURE_INTERIOR_TEXTURE_KIND
+            else "StructureVisual"
+        )
+        group_key = (mount_name, group_id)
+        group_path = f"{root_path}/{mount_name}/{group_id}"
+        if group_key not in emitted_groups:
+            emitted_groups.add(group_key)
+            lines.extend(
+                (
+                    "",
+                    f'[node name="{group_id}" type="Node2D" parent="{root_path}/{mount_name}"]',
+                    "position = Vector2(0, 0)",
+                    "scale = Vector2(1, 1)",
+                    f"metadata/group_id = {_gd_string(group_id)}",
+                    f"metadata/layer_id = {_gd_string(layer_id)}",
+                    f"metadata/structure_id = {_gd_string(structure_id)}",
+                )
+            )
+        index = int(binding["index"])
+        asset_id = str(asset["id"])
+        node_name = _safe_node_name(asset_id)
+        element_path = f"{group_path}/{node_name}"
+        x, y, width, height = _rect(
+            asset["local_rect"],
+            f"visual.assets[{index}].local_rect",
+        )
+        pixel_width, pixel_height = _pair(
+            asset["pixel_size"],
+            f"visual.assets[{index}].pixel_size",
+        )
+        lines.extend(
+            (
+                "",
+                f'[node name="{node_name}" type="Node2D" parent="{group_path}"]',
+                f"position = Vector2({_gd_number(x)}, {_gd_number(y)})",
+                "scale = Vector2(1, 1)",
+                f"visible = {'true' if asset['enabled'] else 'false'}",
+                f"metadata/asset_id = {_gd_string(asset_id)}",
+                f"metadata/structure_id = {_gd_string(structure_id)}",
+                f"metadata/layer_id = {_gd_string(layer_id)}",
+                f"metadata/group_id = {_gd_string(group_id)}",
+                f"metadata/kind = {_gd_string(asset['kind'])}",
+                "metadata/local_rect = Rect2("
+                f"{_gd_number(x)}, {_gd_number(y)}, "
+                f"{_gd_number(width)}, {_gd_number(height)})",
+                "metadata/pixel_size = Vector2i("
+                f"{int(pixel_width)}, {int(pixel_height)})",
+                f"metadata/topology_digest = {_gd_string(asset['topology_digest'])}",
+                f"metadata/partition_digest = {_gd_string(asset['partition_digest'])}",
+                f"metadata/source = {_gd_variant(asset)}",
+                "",
+                f'[node name="Bitmap" type="TextureRect" parent="{element_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
+                "offset_left = 0.0",
+                "offset_top = 0.0",
+                f"offset_right = {_gd_number(width)}",
+                f"offset_bottom = {_gd_number(height)}",
+                f'texture = ExtResource("{binding["texture_id"]}")',
+                f'material = SubResource("{binding["material_id"]}")',
+                "expand_mode = 1",
+                "stretch_mode = 0",
+                "mouse_filter = 2",
+            )
+        )
+
+
 def _append_structure_roots(
     lines: list[str],
     bindings: list[dict[str, Any]],
     manifest: dict[str, Any],
     topology_build: dict[str, Any],
+    visual_asset_bindings: list[dict[str, Any]],
 ) -> None:
     lines.extend(
         (
@@ -2761,6 +4651,7 @@ def _append_structure_roots(
                 f"metadata/size = {_gd_vector(source['size'], f'structures.instances.{instance_id}.size')}",
                 f"metadata/topology_digest = {_gd_string(source['topology_digest'])}",
                 f"metadata/partition_digest = {_gd_string(source['partition_digest'])}",
+                f"metadata/runtime = {_gd_variant(source.get('runtime', {}))}",
                 f"metadata/source = {_gd_variant(source)}",
                 "",
                 f'[node name="InteriorVisual" type="Node2D" parent="{root_path}"]',
@@ -2768,24 +4659,6 @@ def _append_structure_roots(
                 "scale = Vector2(1, 1)",
                 "z_index = -20",
                 'metadata/logical_layer_id = "L04"',
-                "",
-                f'[node name="Backwall" type="ColorRect" parent="{root_path}/InteriorVisual"]',
-                "offset_left = 0.0",
-                "offset_top = 0.0",
-                f"offset_right = {_gd_number(size_width)}",
-                f"offset_bottom = {_gd_number(size_height)}",
-                f"color = {_gd_color(STRUCTURE_INTERIOR_COLOR, 'structure.interior')}",
-                "mouse_filter = 2",
-                "",
-                f'[node name="Label" type="Label" parent="{root_path}/InteriorVisual"]',
-                "offset_left = 40.0",
-                "offset_top = 40.0",
-                'text = "PROXY"',
-                f"theme_override_colors/font_color = {_gd_color(STRUCTURE_LABEL_COLOR, 'structure.label')}",
-                "theme_override_colors/font_outline_color = Color(0, 0, 0, 1)",
-                "theme_override_constants/outline_size = 8",
-                "theme_override_font_sizes/font_size = 64",
-                "mouse_filter = 2",
                 "",
                 f'[node name="StructureVisual" type="Node2D" parent="{root_path}"]',
                 "position = Vector2(0, 0)",
@@ -2815,6 +4688,13 @@ def _append_structure_roots(
                     f"{x}, {y}, {width}, {height})",
                 )
             )
+
+        _append_structure_visual_assets(
+            lines,
+            root_path,
+            instance_id,
+            visual_asset_bindings,
+        )
 
         lines.extend(
             (
@@ -2864,6 +4744,207 @@ def _append_structure_roots(
                     f"metadata/source = {_gd_variant(record)}",
                 )
             )
+
+
+def _structure_scene_filesystem_path(instance: dict[str, Any]) -> Path:
+    resource_path = str(instance["source"]["structure_scene_path"])
+    prefix = "res://underwater_map_workbench/"
+    if not resource_path.startswith(prefix):
+        raise ManifestError(
+            f"structure {instance['id']} has an invalid generated scene path"
+        )
+    relative_path = resource_path[len(prefix) :]
+    resolved = (WORKBENCH_DIR / relative_path).resolve()
+    try:
+        resolved.relative_to(WORKBENCH_DIR.resolve())
+    except ValueError as error:
+        raise ManifestError("generated structure scene escapes the workbench") from error
+    return resolved
+
+
+def _render_structure_scene(
+    manifest: dict[str, Any],
+    topology_build: dict[str, Any],
+    instance: dict[str, Any],
+) -> str:
+    instance_id = str(instance["id"])
+    source: dict[str, Any] = instance["source"]
+    ext_resources, visual_sub_resources, asset_bindings = (
+        _scene_visual_asset_resources(
+            manifest,
+            structure_id_filter=instance_id,
+        )
+    )
+    shape_sub_resources: list[str] = []
+    binding: dict[str, Any] = {
+        "instance": instance,
+        "rectangles_px": _merged_structure_owner_rectangles(
+            topology_build,
+            instance,
+        ),
+    }
+    segments = _structure_owner_boundary_segments(topology_build, instance)
+    if segments:
+        shape_id = "ConcavePolygonShape2D_structure_local"
+        binding["shape_id"] = shape_id
+        shape_sub_resources.extend(
+            (
+                "",
+                f'[sub_resource type="ConcavePolygonShape2D" id="{shape_id}"]',
+                f"segments = {_gd_points(segments)}",
+            )
+        )
+    sub_resources = [*visual_sub_resources, *shape_sub_resources]
+    temporary_lines: list[str] = []
+    _append_structure_roots(
+        temporary_lines,
+        [binding],
+        manifest,
+        topology_build,
+        asset_bindings,
+    )
+    node_name = _safe_node_name(instance_id)
+    root_path = f"StructureRoots/{node_name}"
+    root_header = (
+        f'[node name="{node_name}" type="Node2D" parent="StructureRoots"]'
+    )
+    try:
+        start_index = temporary_lines.index(root_header)
+    except ValueError as error:
+        raise ManifestError(
+            f"cannot isolate generated structure root {instance_id}"
+        ) from error
+
+    body: list[str] = []
+    current_is_root = False
+    for original_line in temporary_lines[start_index:]:
+        line = original_line
+        if line.startswith("[node "):
+            current_is_root = line == root_header
+            if current_is_root:
+                body.extend(
+                    (
+                        '[node name="StructureRoot" type="Node2D"]',
+                        "position = Vector2(0, 0)",
+                        "scale = Vector2(1, 1)",
+                        "visible = true",
+                        "metadata/package_manifest_path = "
+                        + _gd_string(
+                            "res://underwater_map_workbench/"
+                            + str(source["package_path"])
+                        ),
+                        "metadata/package_manifest_sha256 = "
+                        + _gd_string(source["package_sha256"]),
+                        "metadata/local_topology_digest = "
+                        + _gd_string(source["local_topology_digest"]),
+                        "metadata/controller_script = "
+                        + _gd_string(source["controller_script"]),
+                    )
+                )
+                continue
+            line = line.replace(
+                f'parent="{root_path}"',
+                'parent="."',
+            ).replace(
+                f'parent="{root_path}/',
+                'parent="',
+            )
+            body.append(line)
+            continue
+        if current_is_root:
+            if line.startswith(("position = ", "scale = ", "visible = ")):
+                continue
+            if line.startswith(
+                (
+                    "metadata/landmark_id = ",
+                    "metadata/origin = ",
+                    "metadata/topology_digest = ",
+                    "metadata/partition_digest = ",
+                    "metadata/source = ",
+                )
+            ):
+                continue
+        body.append(line)
+
+    load_steps = 1 + len(ext_resources) + sum(
+        1 for line in sub_resources if line.startswith("[sub_resource")
+    )
+    lines = [
+        "; Generated by underwater_map_workbench/tools/build_underwater_map.py.",
+        "; Edit structure_manifest.json, never this file by hand.",
+        (
+            f"[gd_scene load_steps={load_steps} format=3]"
+            if ext_resources or sub_resources
+            else "[gd_scene format=3]"
+        ),
+    ]
+    if ext_resources or sub_resources:
+        lines.extend(("", *ext_resources, *sub_resources, ""))
+    else:
+        lines.append("")
+    lines.extend(body)
+    return "\n".join(lines) + "\n"
+
+
+def _render_structure_scenes(
+    manifest: dict[str, Any],
+    topology_build: dict[str, Any],
+) -> dict[Path, bytes]:
+    outputs: dict[Path, bytes] = {}
+    for instance in topology_build["structure_build"]["instances"]:
+        # A disabled package is still independently buildable and checkable.
+        outputs[_structure_scene_filesystem_path(instance)] = (
+            _render_structure_scene(
+                manifest,
+                topology_build,
+                instance,
+            ).encode("utf-8")
+        )
+    return outputs
+
+
+def _append_structure_scene_instances(
+    lines: list[str],
+    topology_build: dict[str, Any],
+    scene_resource_ids: dict[str, str],
+) -> None:
+    lines.extend(
+        (
+            "",
+            '[node name="StructureRoots" type="Node2D" parent="."]',
+            "position = Vector2(0, 0)",
+            "scale = Vector2(1, 1)",
+        )
+    )
+    for instance in topology_build["structure_build"]["instances"]:
+        if not instance["enabled"]:
+            continue
+        source: dict[str, Any] = instance["source"]
+        instance_id = str(instance["id"])
+        node_name = _safe_node_name(instance_id)
+        resource_id = scene_resource_ids[instance_id]
+        lines.extend(
+            (
+                "",
+                f'[node name="{node_name}" parent="StructureRoots" instance=ExtResource("{resource_id}")]',
+                f"position = {_gd_vector(source['origin'], f'structures.instances.{instance_id}.origin')}",
+                "scale = Vector2(1, 1)",
+                "visible = true",
+                f"metadata/structure_id = {_gd_string(instance_id)}",
+                f"metadata/template_id = {_gd_string(source['template_id'])}",
+                f"metadata/landmark_id = {_gd_variant(source.get('landmark_id'))}",
+                f"metadata/origin = {_gd_vector(source['origin'], f'structures.instances.{instance_id}.origin')}",
+                f"metadata/size = {_gd_vector(source['size'], f'structures.instances.{instance_id}.size')}",
+                f"metadata/topology_digest = {_gd_string(source['topology_digest'])}",
+                f"metadata/partition_digest = {_gd_string(source['partition_digest'])}",
+                f"metadata/runtime = {_gd_variant(source.get('runtime', {}))}",
+                f"metadata/controller_script = {_gd_string(source['controller_script'])}",
+                f"metadata/package_manifest_path = {_gd_string('res://underwater_map_workbench/' + source['package_path'])}",
+                f"metadata/package_manifest_sha256 = {_gd_string(source['package_sha256'])}",
+                f"metadata/local_topology_digest = {_gd_string(source['local_topology_digest'])}",
+                f"metadata/source = {_gd_variant(source)}",
+            )
+        )
 
 
 def _append_l00_content(
@@ -3104,12 +5185,23 @@ def render_scene(
     world_size = _pair(map_record["world_size"], "map.world_size")
     world_width, world_height = world_size
     ext_resources, sub_resources, asset_bindings = _scene_visual_asset_resources(
-        manifest
+        manifest,
+        include_structure_assets=False,
     )
-    structure_sub_resources, structure_bindings = _scene_structure_resources(
-        topology_build
-    )
-    sub_resources.extend(structure_sub_resources)
+    structure_scene_resource_ids: dict[str, str] = {}
+    for index, instance in enumerate(
+        topology_build["structure_build"]["instances"]
+    ):
+        if not instance["enabled"]:
+            continue
+        instance_id = str(instance["id"])
+        resource_id = f"PackedScene_structure_{index:04d}"
+        structure_scene_resource_ids[instance_id] = resource_id
+        ext_resources.append(
+            f'[ext_resource type="PackedScene" '
+            f'path="{instance["source"]["structure_scene_path"]}" '
+            f'id="{resource_id}"]'
+        )
     load_steps = 1 + len(ext_resources) + sum(
         1 for line in sub_resources if line.startswith("[sub_resource")
     )
@@ -3170,7 +5262,11 @@ def render_scene(
         elif layer_id == "L05" and topology_build.get("mode") == "open_world":
             _append_world_border(lines, manifest, world_size)
     _append_visual_assets(lines, asset_bindings)
-    _append_structure_roots(lines, structure_bindings, manifest, topology_build)
+    _append_structure_scene_instances(
+        lines,
+        topology_build,
+        structure_scene_resource_ids,
+    )
     _append_manifest_regions(lines, manifest)
     _append_manifest_markers(
         lines,
@@ -3180,8 +5276,267 @@ def render_scene(
     return "\n".join(lines) + "\n"
 
 
-def _write_outputs_atomically(outputs: dict[Path, bytes]) -> None:
+def _read_optional_bytes(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def _content_fingerprint(raw: bytes) -> str:
+    return f"{len(raw)}:{hashlib.sha256(raw).hexdigest()}"
+
+
+def _path_fingerprint(path: Path) -> str | None:
+    raw = _read_optional_bytes(path)
+    return None if raw is None else _content_fingerprint(raw)
+
+
+def _package_member_input_paths(
+    package: dict[str, Any],
+    package_directory: Path,
+    label: str,
+) -> list[Path]:
+    paths: list[Path] = []
+    for collection_name in ("visual_assets", "scripts", "references"):
+        for index, value in enumerate(
+            _array(package.get(collection_name), f"{label}.{collection_name}")
+        ):
+            record = _object(value, f"{label}.{collection_name}[{index}]")
+            _member_path, filesystem_path, _resource_path = (
+                _structure_package_member_path(
+                    package_directory,
+                    record.get("path"),
+                    f"{label}.{collection_name}[{index}].path",
+                )
+            )
+            paths.append(filesystem_path)
+    return paths
+
+
+def _capture_package_input_fingerprint(
+    package_path: Path,
+    package_raw: bytes,
+) -> dict[Path, str | None]:
+    try:
+        package_value = json.loads(package_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"invalid structure package JSON {package_path}: {error}") from error
+    package = _object(package_value, f"structure package {package_path.parent.name}")
+    paths = [
+        package_path,
+        *_package_member_input_paths(
+            package,
+            package_path.parent,
+            f"structure package {package_path.parent.name}",
+        ),
+    ]
+    fingerprints = {
+        path.resolve(): (
+            _content_fingerprint(package_raw)
+            if path.resolve() == package_path.resolve()
+            else _path_fingerprint(path.resolve())
+        )
+        for path in paths
+    }
+    _assert_input_fingerprint(fingerprints)
+    return fingerprints
+
+
+def _capture_manifest_input_fingerprint(
+    manifest_raw: bytes,
+    *,
+    include_map_visual_assets: bool,
+    structure_id_filter: str | None = None,
+) -> dict[Path, str | None]:
+    try:
+        manifest_value = json.loads(manifest_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"invalid JSON: {error}") from error
+    manifest = _object(manifest_value, "manifest")
+    fingerprints: dict[Path, str | None] = {
+        MANIFEST_PATH.resolve(): _content_fingerprint(manifest_raw)
+    }
+
+    topology = _object(manifest.get("topology"), "topology")
+    collision_source = _object(
+        topology.get("collision_source"),
+        "topology.collision_source",
+    )
+    collision_path_value = collision_source.get("path")
+    if collision_path_value:
+        _relative_path, collision_path = _package_asset_path(
+            collision_path_value,
+            "topology.collision_source.path",
+        )
+        fingerprints[collision_path.resolve()] = _path_fingerprint(
+            collision_path.resolve()
+        )
+
+    if include_map_visual_assets:
+        visual = _object(manifest.get("visual"), "visual")
+        for index, asset_value in enumerate(
+            _array(visual.get("assets"), "visual.assets")
+        ):
+            asset = _object(asset_value, f"visual.assets[{index}]")
+            asset_path_value = asset.get("path")
+            if not asset_path_value:
+                continue
+            _relative_path, asset_path = _package_asset_path(
+                asset_path_value,
+                f"visual.assets[{index}].path",
+            )
+            fingerprints[asset_path.resolve()] = _path_fingerprint(
+                asset_path.resolve()
+            )
+
+    registry = _object(manifest.get("structures"), "structures")
+    if set(registry) == STRUCTURE_REGISTRY_KEYS:
+        selected_structure_found = False
+        for index, record_value in enumerate(
+            _array(registry.get("instances"), "structures.instances")
+        ):
+            record = _object(record_value, f"structures.instances[{index}]")
+            structure_id = _non_empty_string(
+                record.get("id"),
+                f"structures.instances[{index}].id",
+            )
+            if structure_id_filter is not None and structure_id != structure_id_filter:
+                continue
+            selected_structure_found = True
+            package_reference = _object(
+                record.get("package"),
+                f"structures.instances[{index}].package",
+            )
+            package_relative = _non_empty_string(
+                package_reference.get("path"),
+                f"structures.instances[{index}].package.path",
+            )
+            package_path = (WORKBENCH_DIR / package_relative).resolve()
+            try:
+                package_path.relative_to(WORKBENCH_DIR.resolve())
+            except ValueError as error:
+                raise ManifestError(
+                    f"structures.instances[{index}].package.path escapes the workbench"
+                ) from error
+            package_raw = package_path.read_bytes()
+            package_fingerprints = _capture_package_input_fingerprint(
+                package_path,
+                package_raw,
+            )
+            fingerprints.update(package_fingerprints)
+        if structure_id_filter is not None and not selected_structure_found:
+            raise ManifestError(f"unknown structure package: {structure_id_filter}")
+
+    _assert_input_fingerprint(fingerprints)
+    return fingerprints
+
+
+def _assert_input_fingerprint(
+    expected: dict[Path, str | None],
+) -> None:
+    changed = [
+        path
+        for path, fingerprint in expected.items()
+        if _path_fingerprint(path) != fingerprint
+    ]
+    if changed:
+        labels = ", ".join(
+            str(path.relative_to(WORKBENCH_DIR))
+            if path.is_relative_to(WORKBENCH_DIR)
+            else str(path)
+            for path in changed
+        )
+        raise ManifestError(
+            "build inputs changed before publication; retry from a stable sealed "
+            f"snapshot: {labels}"
+        )
+
+
+def _restore_output_if_owned(
+    destination: Path,
+    written_content: bytes,
+    original_content: bytes | None,
+) -> bool:
+    """Restore one output only while it still contains our exact write."""
+    if _read_optional_bytes(destination) != written_content:
+        return False
+    if original_content is None:
+        try:
+            destination.unlink()
+        except FileNotFoundError:
+            return False
+        return True
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=destination.parent,
+        prefix=f".{destination.name}.rollback.",
+        suffix=".tmp",
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(original_content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if _read_optional_bytes(destination) != written_content:
+            return False
+        os.replace(temporary_path, destination)
+        return True
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _publish_outputs_with_cas(
+    outputs: dict[Path, bytes],
+    *,
+    expected_current: dict[Path, bytes | None] | None = None,
+    commit_marker: Path | None = None,
+) -> None:
+    """Publish with per-file atomic replace and set-level CAS/rollback.
+
+    The set is deliberately not described as filesystem-atomic: readers that
+    ignore the owner lock can observe intermediate files. Integration writers
+    must therefore hold the shared publication lock, keep the scene/receipt
+    marker last, and consumers must snapshot through that same boundary.
+    """
+    if not outputs:
+        return
+    if commit_marker is not None:
+        marker_content = outputs.get(commit_marker)
+        if marker_content is None:
+            raise ManifestError(
+                f"CAS publication commit marker is not an output: {commit_marker}"
+            )
+        outputs = {
+            **{
+                path: content
+                for path, content in outputs.items()
+                if path != commit_marker
+            },
+            commit_marker: marker_content,
+        }
+    if expected_current is not None and set(expected_current) != set(outputs):
+        raise ManifestError(
+            "expected_current must describe exactly every promoted output"
+        )
+    baseline = (
+        dict(expected_current)
+        if expected_current is not None
+        else {
+            destination: _read_optional_bytes(destination)
+            for destination in outputs
+        }
+    )
+    for destination, expected_content in baseline.items():
+        if _read_optional_bytes(destination) != expected_content:
+            raise ManifestError(
+                "concurrent edit detected before CAS publication: "
+                f"{destination}"
+            )
+
     temporary_paths: list[tuple[Path, Path]] = []
+    committed: list[Path] = []
     try:
         for destination, content in outputs.items():
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -3196,20 +5551,66 @@ def _write_outputs_atomically(outputs: dict[Path, bytes]) -> None:
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-        for temporary_path, destination in temporary_paths:
+        for index, (temporary_path, destination) in enumerate(temporary_paths):
+            for committed_path in committed:
+                if _read_optional_bytes(committed_path) != outputs[committed_path]:
+                    raise ManifestError(
+                        "concurrent edit detected during CAS publication: "
+                        f"{committed_path}"
+                    )
+            for _pending_path, pending_destination in temporary_paths[index:]:
+                if (
+                    _read_optional_bytes(pending_destination)
+                    != baseline[pending_destination]
+                ):
+                    raise ManifestError(
+                        "concurrent edit detected during CAS publication: "
+                        f"{pending_destination}"
+                    )
             os.replace(temporary_path, destination)
-    except BaseException:
+            committed.append(destination)
+        for destination, content in outputs.items():
+            if _read_optional_bytes(destination) != content:
+                raise ManifestError(
+                    "concurrent edit detected after CAS publication: "
+                    f"{destination}"
+                )
+    except BaseException as error:
         for temporary_path, _destination in temporary_paths:
             try:
                 temporary_path.unlink(missing_ok=True)
             except OSError:
                 pass
+        rollback_issues: list[str] = []
+        for destination in reversed(committed):
+            try:
+                restored = _restore_output_if_owned(
+                    destination,
+                    outputs[destination],
+                    baseline[destination],
+                )
+            except OSError as rollback_error:
+                rollback_issues.append(f"{destination}: {rollback_error}")
+                continue
+            if not restored:
+                rollback_issues.append(
+                    f"{destination}: rollback refused because bytes changed"
+                )
+        if rollback_issues:
+            raise ManifestError(
+                f"CAS publication failed ({error}); "
+                "rollback did not overwrite concurrent work: "
+                + "; ".join(rollback_issues)
+            ) from error
         raise
 
 
-def _refresh_l05_source() -> None:
-    original_raw = MANIFEST_PATH.read_bytes()
-    original_sha = hashlib.sha256(original_raw).hexdigest()
+def _prepare_l05_source_refresh(
+    original_raw: bytes,
+    *,
+    full_manifest_validation: bool,
+    verify_package_hashes: bool | None = None,
+) -> tuple[bytes, bool, str, str, str]:
     try:
         manifest = json.loads(original_raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -3220,10 +5621,18 @@ def _refresh_l05_source() -> None:
         raise ManifestError(
             f"--refresh-l05-source requires topology.mode={L05_MODE}"
     )
-    world_size = _validate_map(manifest)
-    structure_build = _validate_structures(manifest, world_size)
-    topology_build = _validate_topology(
+    resolved_manifest = _resolve_structure_packages(
         manifest,
+        verify_package_hashes=(
+            full_manifest_validation
+            if verify_package_hashes is None
+            else verify_package_hashes
+        ),
+    )
+    world_size = _validate_map(resolved_manifest)
+    structure_build = _validate_structures(resolved_manifest, world_size)
+    topology_build = _validate_topology(
+        resolved_manifest,
         world_size,
         structure_build,
         verify_declarations=False,
@@ -3237,7 +5646,11 @@ def _refresh_l05_source() -> None:
     active_l05_assets: list[dict[str, Any]] = []
     for index, asset_value in enumerate(assets):
         asset = _object(asset_value, f"visual.assets[{index}]")
-        if asset.get("layer_id") == "L05" and asset.get("enabled") is True:
+        if (
+            asset.get("kind") == "collision_masked_material"
+            and asset.get("layer_id") == "L05"
+            and asset.get("enabled") is True
+        ):
             active_l05_assets.append(asset)
     if len(active_l05_assets) != 1:
         raise ManifestError(
@@ -3256,56 +5669,411 @@ def _refresh_l05_source() -> None:
     if collision.get("partition_digest") != partition_digest:
         collision["partition_digest"] = partition_digest
         changed = True
-    for instance in structure_build["instances"]:
-        source: dict[str, Any] = instance["source"]
-        if source.get("topology_digest") != canonical_digest:
-            source["topology_digest"] = canonical_digest
-            changed = True
-        if source.get("partition_digest") != partition_digest:
-            source["partition_digest"] = partition_digest
-            changed = True
     active_l05_asset = active_l05_assets[0]
     if active_l05_asset.get("topology_digest") != canonical_digest:
         active_l05_asset["topology_digest"] = canonical_digest
         changed = True
 
-    if not changed:
-        load_and_validate_manifest()
-        if hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest() != original_sha:
-            raise ManifestError("no-op refresh unexpectedly changed map_manifest.json")
+    updated_raw = original_raw
+    if changed:
+        updated_raw = (
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n"
+        ).encode("utf-8")
+    if full_manifest_validation:
+        _load_and_validate_manifest_raw(updated_raw)
+    return (
+        updated_raw,
+        changed,
+        actual_sha,
+        canonical_digest,
+        partition_digest,
+    )
+
+
+def _refresh_l05_source(*, full_manifest_validation: bool = True) -> bytes:
+    original_raw = MANIFEST_PATH.read_bytes()
+    inputs = _capture_manifest_input_fingerprint(
+        original_raw,
+        include_map_visual_assets=full_manifest_validation,
+    )
+    (
+        updated_raw,
+        changed,
+        actual_sha,
+        canonical_digest,
+        partition_digest,
+    ) = _prepare_l05_source_refresh(
+        original_raw,
+        full_manifest_validation=full_manifest_validation,
+    )
+    if changed:
+        with _map_promotion_lock():
+            _assert_input_fingerprint(inputs)
+            _publish_outputs_with_cas(
+                {MANIFEST_PATH: updated_raw},
+                expected_current={MANIFEST_PATH: original_raw},
+                commit_marker=MANIFEST_PATH,
+            )
+    else:
+        _assert_input_fingerprint(inputs)
         print(
             "L05 source declarations are current; map_manifest.json unchanged "
             f"({actual_sha}, {canonical_digest}, {partition_digest})"
         )
-        return
-
-    updated_raw = (
-        json.dumps(
-            manifest,
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n"
-    ).encode("utf-8")
-    _write_outputs_atomically({MANIFEST_PATH: updated_raw})
-    try:
-        load_and_validate_manifest()
-    except (OSError, ManifestError) as error:
-        _write_outputs_atomically({MANIFEST_PATH: original_raw})
-        raise ManifestError(
-            f"refreshed L05 declarations failed full validation: {error}"
-        ) from error
+        return original_raw
     print(
         "Refreshed L05 source declarations in map_manifest.json "
         f"({actual_sha}, {canonical_digest}, {partition_digest})"
     )
+    return updated_raw
 
 
-def main() -> int:
+def _structure_package_path(structure_id: str) -> Path:
+    if re.fullmatch(r"[a-z][a-z0-9_]*", structure_id) is None:
+        raise ManifestError(
+            "structure package ID must be lowercase snake_case"
+        )
+    package_path = (
+        WORKBENCH_DIR
+        / "structures"
+        / structure_id
+        / "structure_manifest.json"
+    ).resolve()
+    try:
+        package_path.relative_to(WORKBENCH_DIR.resolve())
+    except ValueError as error:
+        raise ManifestError("structure package path escapes the workbench") from error
+    if not package_path.is_file():
+        raise ManifestError(
+            f"structure package does not exist: structures/{structure_id}"
+        )
+    return package_path
+
+
+def _prepare_structure_package_seal(
+    structure_id: str,
+    original_package_raw: bytes,
+    *,
+    validate_visuals: bool = True,
+) -> tuple[bytes, str, str]:
+    try:
+        package_value = json.loads(original_package_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ManifestError(
+            f"invalid structure package JSON for {structure_id}: {error}"
+        ) from error
+    package = _object(package_value, f"structure package {structure_id}")
+    if set(package) != STRUCTURE_PACKAGE_KEYS:
+        raise ManifestError(
+            f"structure package {structure_id} has an invalid exact key set"
+        )
+    if package.get("schema_version") != 1:
+        raise ManifestError(f"structure package {structure_id}.schema_version must be 1")
+    if package.get("format") != STRUCTURE_PACKAGE_FORMAT:
+        raise ManifestError(
+            f"structure package {structure_id}.format must be {STRUCTURE_PACKAGE_FORMAT}"
+        )
+    package_directory = _structure_package_path(structure_id).parent
+    changed = False
+
+    local_digest, _operations = _structure_local_topology(
+        package,
+        f"structure package {structure_id}",
+        verify_declaration=False,
+    )
+    if package.get("local_topology_digest") != local_digest:
+        package["local_topology_digest"] = local_digest
+        changed = True
+
+    for index, asset_value in enumerate(
+        _array(package["visual_assets"], "structure package visual_assets")
+    ):
+        asset = _object(asset_value, f"visual_assets[{index}]")
+        if set(asset) != STRUCTURE_PACKAGE_VISUAL_ASSET_KEYS:
+            raise ManifestError(f"visual_assets[{index}] has an invalid exact key set")
+        _path, filesystem_path, _resource_path = _structure_package_member_path(
+            package_directory,
+            asset["path"],
+            f"visual_assets[{index}].path",
+        )
+        if not filesystem_path.is_file():
+            raise ManifestError(f"visual_assets[{index}].path does not exist")
+        raw = filesystem_path.read_bytes()
+        actual_sha = hashlib.sha256(raw).hexdigest()
+        actual_size = _png_dimensions(raw, str(asset["path"]))
+        if validate_visuals:
+            _validate_structure_visual_png(
+                filesystem_path,
+                actual_size,
+                f"visual_assets[{index}]",
+            )
+        if asset.get("sha256") != actual_sha:
+            asset["sha256"] = actual_sha
+            changed = True
+        if asset.get("pixel_size") != list(actual_size):
+            asset["pixel_size"] = list(actual_size)
+            changed = True
+
+    for index, script_value in enumerate(
+        _array(package["scripts"], "structure package scripts")
+    ):
+        script = _object(script_value, f"scripts[{index}]")
+        if set(script) != STRUCTURE_PACKAGE_SCRIPT_KEYS:
+            raise ManifestError(f"scripts[{index}] has an invalid exact key set")
+        _path, filesystem_path, _resource_path = _structure_package_member_path(
+            package_directory,
+            script["path"],
+            f"scripts[{index}].path",
+        )
+        if not filesystem_path.is_file():
+            raise ManifestError(f"scripts[{index}].path does not exist")
+        actual_sha = hashlib.sha256(filesystem_path.read_bytes()).hexdigest()
+        if script.get("sha256") != actual_sha:
+            script["sha256"] = actual_sha
+            changed = True
+
+    for index, reference_value in enumerate(
+        _array(package["references"], "structure package references")
+    ):
+        reference = _object(reference_value, f"references[{index}]")
+        if set(reference) != STRUCTURE_PACKAGE_REFERENCE_KEYS_EXACT:
+            raise ManifestError(f"references[{index}] has an invalid exact key set")
+        _path, filesystem_path, _resource_path = _structure_package_member_path(
+            package_directory,
+            reference["path"],
+            f"references[{index}].path",
+        )
+        if not filesystem_path.is_file():
+            raise ManifestError(f"references[{index}].path does not exist")
+        actual_sha = hashlib.sha256(filesystem_path.read_bytes()).hexdigest()
+        if reference.get("sha256") != actual_sha:
+            reference["sha256"] = actual_sha
+            changed = True
+
+    updated_package_raw = (
+        (
+            json.dumps(package, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+        if changed
+        else original_package_raw
+    )
+    actual_package_sha = hashlib.sha256(updated_package_raw).hexdigest()
+    return updated_package_raw, actual_package_sha, local_digest
+
+
+def _seal_structure_package(structure_id: str) -> None:
+    package_path = _structure_package_path(structure_id)
+    original_package_raw = package_path.read_bytes()
+    inputs = _capture_package_input_fingerprint(
+        package_path,
+        original_package_raw,
+    )
+    updated_package_raw, package_sha, local_digest = (
+        _prepare_structure_package_seal(
+            structure_id,
+            original_package_raw,
+        )
+    )
+    if updated_package_raw == original_package_raw:
+        _assert_input_fingerprint(inputs)
+        print(
+            f"Structure package {structure_id} is already sealed "
+            f"({package_sha}, {local_digest})"
+        )
+        return
+    with InterprocessWorkspaceLock(
+        WORKBENCH_DIR.parent,
+        f"structure-seal-{structure_id}",
+    ):
+        _assert_input_fingerprint(inputs)
+        _publish_outputs_with_cas(
+            {package_path: updated_package_raw},
+            expected_current={package_path: original_package_raw},
+            commit_marker=package_path,
+        )
+    print(
+        f"Sealed structure package {structure_id} "
+        f"({package_sha}, {local_digest})"
+    )
+
+
+def _refresh_structure_packages(
+    structure_revisions: Iterable[tuple[str, str]],
+    *,
+    full_manifest_validation: bool,
+) -> None:
+    revisions = list(structure_revisions)
+    if not revisions:
+        raise ManifestError("structure refresh batch must not be empty")
+    requested_ids: set[str] = set()
+    normalized_revisions: list[tuple[str, str, Path]] = []
+    for structure_id, sealed_package_sha256 in revisions:
+        if structure_id in requested_ids:
+            raise ManifestError(
+                f"structure refresh batch contains duplicate ID: {structure_id}"
+            )
+        requested_ids.add(structure_id)
+        package_path = _structure_package_path(structure_id)
+        expected_package_sha = _sha256(
+            sealed_package_sha256,
+            f"--sealed-package-sha256 for {structure_id}",
+        )
+        normalized_revisions.append(
+            (structure_id, expected_package_sha, package_path)
+        )
+
+    original_manifest_raw = MANIFEST_PATH.read_bytes()
+    inputs = _capture_manifest_input_fingerprint(
+        original_manifest_raw,
+        include_map_visual_assets=full_manifest_validation,
+    )
+    try:
+        map_manifest_value = json.loads(original_manifest_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"invalid JSON: {error}") from error
+    map_manifest = _object(map_manifest_value, "manifest")
+    registry = _object(map_manifest.get("structures"), "structures")
+    if set(registry) != STRUCTURE_REGISTRY_KEYS:
+        raise ManifestError(
+            "--refresh-structure-package requires schema v6 package registry"
+        )
+    prepared_revisions: list[tuple[str, dict[str, Any], str, str]] = []
+    registry_instances = _array(registry["instances"], "structures.instances")
+    for structure_id, expected_package_sha, package_path in normalized_revisions:
+        matches = [
+            _object(value, "structure registry instance")
+            for value in registry_instances
+            if isinstance(value, dict) and value.get("id") == structure_id
+        ]
+        if len(matches) != 1:
+            raise ManifestError(
+                f"structure registry must contain exactly one {structure_id}"
+            )
+        registry_record = matches[0]
+        package_reference = _object(
+            registry_record.get("package"),
+            f"structure {structure_id}.package",
+        )
+        expected_path = f"structures/{structure_id}/structure_manifest.json"
+        if package_reference.get("path") != expected_path:
+            raise ManifestError(
+                f"structure {structure_id} package path must be {expected_path}"
+            )
+        original_package_raw = package_path.read_bytes()
+        sealed_raw, actual_package_sha, local_digest = (
+            _prepare_structure_package_seal(
+                structure_id,
+                original_package_raw,
+                validate_visuals=False,
+            )
+        )
+        if sealed_raw != original_package_raw:
+            raise ManifestError(
+                f"structure package {structure_id} is not sealed; run "
+                f"--seal-structure-package {structure_id} in its private workbench first"
+            )
+        if actual_package_sha != expected_package_sha:
+            raise ManifestError(
+                f"sealed hand-off for {structure_id} expected {expected_package_sha}, "
+                f"but the live private manifest is {actual_package_sha}"
+            )
+        prepared_revisions.append(
+            (structure_id, package_reference, actual_package_sha, local_digest)
+        )
+
+    # Apply every verified pin to one in-memory candidate before resolving any
+    # package. This avoids an impossible mixed revision when two or more live
+    # manifests have advanced together.
+    for _structure_id, package_reference, actual_package_sha, _digest in (
+        prepared_revisions
+    ):
+        package_reference["sha256"] = actual_package_sha
+    pinned_manifest_raw = (
+        json.dumps(map_manifest, ensure_ascii=False, indent=2) + "\n"
+    ).encode("utf-8")
+    (
+        updated_manifest_raw,
+        _l05_changed,
+        _payload_sha,
+        canonical_digest,
+        partition_digest,
+    ) = _prepare_l05_source_refresh(
+        pinned_manifest_raw,
+        full_manifest_validation=False,
+        verify_package_hashes=True,
+    )
+    if full_manifest_validation:
+        _load_and_validate_manifest_raw(updated_manifest_raw)
+
+    if updated_manifest_raw == original_manifest_raw:
+        _assert_input_fingerprint(inputs)
+        labels = ", ".join(
+            f"{structure_id}={actual_package_sha}"
+            for structure_id, _reference, actual_package_sha, _digest in (
+                prepared_revisions
+            )
+        )
+        print(
+            f"Structure package map pins are current ({labels})"
+        )
+        return
+    with _map_promotion_lock():
+        _assert_input_fingerprint(inputs)
+        _publish_outputs_with_cas(
+            {MANIFEST_PATH: updated_manifest_raw},
+            expected_current={MANIFEST_PATH: original_manifest_raw},
+            commit_marker=MANIFEST_PATH,
+        )
+    labels = ", ".join(
+        f"{structure_id}={actual_package_sha} ({local_digest})"
+        for structure_id, _reference, actual_package_sha, local_digest in (
+            prepared_revisions
+        )
+    )
+    print(
+        "Promoted sealed structure package batch into map authority "
+        f"({labels}; {canonical_digest}, {partition_digest})"
+    )
+
+
+def _refresh_structure_package(
+    structure_id: str,
+    sealed_package_sha256: str,
+) -> None:
+    # Preserve the established single-package API while the CLI may submit a
+    # closed multi-package batch.
+    _refresh_structure_packages(
+        [(structure_id, sealed_package_sha256)],
+        full_manifest_validation=False,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--build", action="store_true", help="write the deterministic scene")
     mode.add_argument("--check", action="store_true", help="verify that the scene is current")
+    mode.add_argument(
+        "--build-structure",
+        metavar="STRUCTURE_ID",
+        help=(
+            "write one package-local candidate set into this worktree's "
+            "ignored .godot staging lane"
+        ),
+    )
+    mode.add_argument(
+        "--check-structure",
+        metavar="STRUCTURE_ID",
+        help=(
+            "verify one package-local candidate set in this worktree's "
+            "ignored .godot staging lane"
+        ),
+    )
     mode.add_argument(
         "--refresh-l05-source",
         action="store_true",
@@ -3314,58 +6082,447 @@ def main() -> int:
             "in the manifest"
         ),
     )
-    args = parser.parse_args()
-    if args.refresh_l05_source:
-        try:
-            _refresh_l05_source()
-        except (OSError, ManifestError) as error:
-            print(f"underwater map manifest error: {error}", file=sys.stderr)
-            return 1
-        return 0
-    try:
-        (
+    mode.add_argument(
+        "--seal-structure-package",
+        metavar="STRUCTURE_ID",
+        help=(
+            "refresh only one private structure manifest's local digest and "
+            "member hashes"
+        ),
+    )
+    mode.add_argument(
+        "--refresh-structure-package",
+        metavar="STRUCTURE_ID",
+        action="append",
+        help=(
+            "promote an already sealed structure manifest into the map "
+            "registry pin and composed L05 declarations; repeat together "
+            "with --sealed-package-sha256 for one atomic batch"
+        ),
+    )
+    parser.add_argument(
+        "--sealed-package-sha256",
+        action="append",
+        help=(
+            "exact structure_manifest.json SHA-256 from the producer's "
+            "immutable/FROZEN hand-off; repeat in the same order as "
+            "--refresh-structure-package"
+        ),
+    )
+    return parser.parse_args()
+
+
+def _render_build_candidate(
+    manifest_raw: bytes,
+) -> tuple[
+    dict[Path, bytes],
+    dict[str, Any],
+    str,
+    str,
+    str,
+]:
+    (
+        manifest,
+        manifest_sha,
+        gameplay_signature,
+        presentation_fingerprint,
+        topology_build,
+    ) = _load_and_validate_manifest_raw(manifest_raw)
+    expected = render_scene(
+        manifest,
+        manifest_sha,
+        gameplay_signature,
+        presentation_fingerprint,
+        topology_build,
+    )
+    expected_outputs = _render_l05_artifacts(
+        topology_build,
+        manifest_sha,
+        manifest,
+    )
+    expected_outputs.update(
+        _render_structure_scenes(
             manifest,
-            manifest_sha,
-            gameplay_signature,
-            presentation_fingerprint,
-            topology_build,
-        ) = load_and_validate_manifest()
-        expected = render_scene(
-            manifest,
-            manifest_sha,
-            gameplay_signature,
-            presentation_fingerprint,
             topology_build,
         )
-        expected_outputs = _render_l05_artifacts(topology_build, manifest_sha)
-        expected_outputs[SCENE_PATH] = expected.encode("utf-8")
-    except (OSError, ManifestError) as error:
-        print(f"underwater map manifest error: {error}", file=sys.stderr)
-        return 1
-    if args.check:
-        for output_path, expected_bytes in expected_outputs.items():
-            if not output_path.exists():
-                print(f"generated output is missing: {output_path}", file=sys.stderr)
-                return 1
-            if output_path.read_bytes() != expected_bytes:
+    )
+    expected_outputs[SCENE_PATH] = expected.encode("utf-8")
+    return (
+        expected_outputs,
+        topology_build,
+        manifest_sha,
+        gameplay_signature,
+        presentation_fingerprint,
+    )
+
+
+def _render_structure_build_candidate(
+    manifest_raw: bytes,
+    structure_id: str,
+) -> tuple[dict[Path, bytes], dict[str, Any], str]:
+    package_path = _structure_package_path(structure_id)
+    package_raw = package_path.read_bytes()
+    sealed_raw, _package_sha, _local_digest = _prepare_structure_package_seal(
+        structure_id,
+        package_raw,
+        validate_visuals=False,
+    )
+    if sealed_raw != package_raw:
+        raise ManifestError(
+            f"structure package {structure_id} is not sealed; run "
+            f"--seal-structure-package {structure_id} first"
+        )
+    try:
+        manifest_value = json.loads(manifest_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"invalid JSON: {error}") from error
+    manifest = _object(manifest_value, "manifest")
+    if manifest.get("schema_version") != MAP_SCHEMA_VERSION:
+        raise ManifestError(f"schema_version must be {MAP_SCHEMA_VERSION}")
+    manifest = _resolve_structure_packages(
+        manifest,
+        verify_package_hashes=False,
+        structure_id_filter=structure_id,
+    )
+    world_size = _validate_map(manifest)
+    structure_build = _validate_structures(manifest, world_size)
+    topology_build = _validate_topology(
+        manifest,
+        world_size,
+        structure_build,
+        verify_declarations=False,
+    )
+    collision_declaration = _object(
+        _object(manifest["topology"], "topology")["collision_source"],
+        "topology.collision_source",
+    )
+    declared_payload_sha = _sha256(
+        collision_declaration["sha256"],
+        "topology.collision_source.sha256",
+    )
+    if topology_build.get("payload_sha256") != declared_payload_sha:
+        raise ManifestError(
+            "topology.collision_source.sha256 is stale; "
+            f"expected {topology_build.get('payload_sha256')}"
+        )
+    # The local raster intentionally omits other private packages. Generated
+    # package metadata still carries the public, map-owned integration digests.
+    topology_build["canonical_digest"] = collision_declaration["canonical_digest"]
+    topology_build["partition_digest"] = collision_declaration["partition_digest"]
+    instances = [
+        instance
+        for instance in structure_build["instances"]
+        if str(instance["id"]) == structure_id
+    ]
+    if len(instances) != 1:
+        raise ManifestError(f"unknown structure package: {structure_id}")
+    manifest_sha = hashlib.sha256(manifest_raw).hexdigest()
+    outputs = _render_l05_artifacts(
+        topology_build,
+        manifest_sha,
+        manifest,
+        structure_id_filter=structure_id,
+        include_map_artifacts=False,
+    )
+    instance = instances[0]
+    outputs[_structure_scene_filesystem_path(instance)] = (
+        _render_structure_scene(
+            manifest,
+            topology_build,
+            instance,
+        ).encode("utf-8")
+    )
+    if not outputs:
+        raise ManifestError(
+            f"no generated outputs for structure package {structure_id}"
+        )
+    return outputs, topology_build, manifest_sha
+
+
+def _structure_local_output_root(structure_id: str) -> Path:
+    if re.fullmatch(r"[a-z][a-z0-9_]*", structure_id) is None:
+        raise ManifestError("structure package ID must be lowercase snake_case")
+    return (
+        WORKBENCH_DIR.parent
+        / ".godot"
+        / "underwater_map_structure_builds"
+        / structure_id
+        / "generated"
+    ).resolve()
+
+
+def _remap_structure_outputs_to_local_lane(
+    outputs: dict[Path, bytes],
+    structure_id: str,
+) -> dict[Path, bytes]:
+    authority_root = (
+        WORKBENCH_DIR / "structures" / structure_id / "generated"
+    ).resolve()
+    local_root = _structure_local_output_root(structure_id)
+    remapped: dict[Path, bytes] = {}
+    for original_path, content in outputs.items():
+        resolved = original_path.resolve()
+        try:
+            relative = resolved.relative_to(authority_root)
+        except ValueError as error:
+            raise ManifestError(
+                f"structure-local renderer returned an output outside {authority_root}: "
+                f"{resolved}"
+            ) from error
+        destination = (local_root / relative).resolve()
+        try:
+            destination.relative_to(local_root)
+        except ValueError as error:
+            raise ManifestError("structure-local output escapes its staging lane") from error
+        remapped[destination] = content
+    return remapped
+
+
+@contextmanager
+def _structure_local_build_lock(structure_id: str) -> Iterable[None]:
+    # The scope is the current checkout and the lock name is package-specific:
+    # linked worktrees and different structure IDs never share this lane.
+    with InterprocessWorkspaceLock(
+        WORKBENCH_DIR.parent,
+        f"structure-local-build-{structure_id}",
+    ):
+        yield
+
+
+def _capture_publication_output_baseline(
+    *,
+    structure_id: str | None,
+) -> dict[Path, bytes | None]:
+    roots: list[Path]
+    explicit_paths: list[Path] = []
+    if structure_id is None:
+        roots = [L05_GENERATED_DIR, WORKBENCH_DIR / "structures"]
+        explicit_paths.append(SCENE_PATH)
+    else:
+        roots = [_structure_local_output_root(structure_id)]
+    paths: set[Path] = {path.resolve() for path in explicit_paths}
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file() or path.name.endswith(".import"):
+                continue
+            if any(
+                part.startswith(".") and ".tmp-" in part
+                for part in path.relative_to(root).parts
+            ):
+                continue
+            if structure_id is None and "generated" not in path.parts:
+                continue
+            paths.add(path.resolve())
+    return {
+        path: _read_optional_bytes(path)
+        for path in sorted(paths, key=lambda value: str(value).lower())
+    }
+
+
+def _expected_output_baseline(
+    expected_outputs: dict[Path, bytes],
+    captured: dict[Path, bytes | None],
+) -> dict[Path, bytes | None]:
+    return {
+        path: captured.get(path.resolve())
+        for path in expected_outputs
+    }
+
+
+def _check_expected_outputs(
+    expected_outputs: dict[Path, bytes],
+    inputs: dict[Path, str | None],
+    *,
+    structure_id: str | None,
+) -> int:
+    actual_outputs = {
+        path: _read_optional_bytes(path)
+        for path in expected_outputs
+    }
+    _assert_input_fingerprint(inputs)
+    for output_path, expected_bytes in expected_outputs.items():
+        actual_bytes = actual_outputs[output_path]
+        if actual_bytes is None:
+            print(f"generated output is missing: {output_path}", file=sys.stderr)
+            return 1
+        if actual_bytes != expected_bytes:
+            try:
                 relative_path = output_path.relative_to(WORKBENCH_DIR)
-                print(f"{relative_path} is stale; run with --build", file=sys.stderr)
-                return 1
+            except ValueError:
+                try:
+                    relative_path = output_path.relative_to(WORKBENCH_DIR.parent)
+                except ValueError:
+                    relative_path = output_path
+            if structure_id is not None:
+                print(
+                    f"{relative_path} is stale; run with --build-structure "
+                    f"{structure_id}",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"{relative_path} is stale; run with --build",
+                    file=sys.stderr,
+                )
+            return 1
+    return 0
+
+
+def _run_render_mode(args: argparse.Namespace) -> int:
+    structure_mode_id = args.build_structure or args.check_structure
+    manifest_raw = MANIFEST_PATH.read_bytes()
+    inputs = _capture_manifest_input_fingerprint(
+        manifest_raw,
+        include_map_visual_assets=structure_mode_id is None,
+        structure_id_filter=structure_mode_id,
+    )
+    captured_baseline: dict[Path, bytes | None] | None = None
+    if args.build:
+        with _map_promotion_lock():
+            captured_baseline = _capture_publication_output_baseline(
+                structure_id=None,
+            )
+    elif args.build_structure:
+        with _structure_local_build_lock(structure_mode_id):
+            captured_baseline = _capture_publication_output_baseline(
+                structure_id=structure_mode_id,
+            )
+
+    if structure_mode_id:
+        package_outputs, _topology_build, manifest_sha = (
+            _render_structure_build_candidate(
+                manifest_raw,
+                structure_mode_id,
+            )
+        )
+        package_outputs = _remap_structure_outputs_to_local_lane(
+            package_outputs,
+            structure_mode_id,
+        )
+        if args.check_structure:
+            result = _check_expected_outputs(
+                package_outputs,
+                inputs,
+                structure_id=structure_mode_id,
+            )
+            if result != 0:
+                return result
+            print(
+                f"Structure package {structure_mode_id} outputs are current "
+                f"({manifest_sha})"
+            )
+            return 0
+        if captured_baseline is None:
+            raise ManifestError("missing pre-render structure publication baseline")
+        baseline = _expected_output_baseline(
+            package_outputs,
+            captured_baseline,
+        )
+        with _structure_local_build_lock(structure_mode_id):
+            _assert_input_fingerprint(inputs)
+            _publish_outputs_with_cas(
+                package_outputs,
+                expected_current=baseline,
+                commit_marker=(
+                    _structure_local_output_root(structure_mode_id)
+                    / "structure.tscn"
+                ),
+            )
+        print(
+            f"Built structure package {structure_mode_id} candidate in "
+            f"{_structure_local_output_root(structure_mode_id)}"
+        )
+        return 0
+
+    (
+        expected_outputs,
+        _topology_build,
+        manifest_sha,
+        gameplay_signature,
+        presentation_fingerprint,
+    ) = _render_build_candidate(manifest_raw)
+    if args.check:
+        result = _check_expected_outputs(
+            expected_outputs,
+            inputs,
+            structure_id=None,
+        )
+        if result != 0:
+            return result
         print(
             "UnderwaterMap.tscn and generated L05 outputs are current "
             f"({manifest_sha}, {gameplay_signature}, {presentation_fingerprint})"
         )
         return 0
-    try:
-        _write_outputs_atomically(expected_outputs)
-    except OSError as error:
-        print(f"cannot write generated outputs atomically: {error}", file=sys.stderr)
-        return 1
+    if captured_baseline is None:
+        raise ManifestError("missing pre-render map publication baseline")
+    baseline = _expected_output_baseline(
+        expected_outputs,
+        captured_baseline,
+    )
+    with _map_promotion_lock():
+        _assert_input_fingerprint(inputs)
+        _publish_outputs_with_cas(
+            expected_outputs,
+            expected_current=baseline,
+            commit_marker=SCENE_PATH,
+        )
     print(
         f"Built {SCENE_PATH} from {MANIFEST_PATH} "
         f"({manifest_sha}, {gameplay_signature}, {presentation_fingerprint})"
     )
     return 0
+
+
+def main() -> int:
+    args = _parse_args()
+    try:
+        if args.seal_structure_package:
+            _seal_structure_package(args.seal_structure_package)
+            return 0
+        if args.refresh_l05_source:
+            _refresh_l05_source()
+            return 0
+        if args.refresh_structure_package:
+            if not args.sealed_package_sha256:
+                raise ManifestError(
+                    "--refresh-structure-package requires "
+                    "--sealed-package-sha256 from an immutable/FROZEN hand-off"
+                )
+            structure_ids = (
+                [args.refresh_structure_package]
+                if isinstance(args.refresh_structure_package, str)
+                else list(args.refresh_structure_package)
+            )
+            sealed_hashes = (
+                [args.sealed_package_sha256]
+                if isinstance(args.sealed_package_sha256, str)
+                else list(args.sealed_package_sha256)
+            )
+            if len(structure_ids) != len(sealed_hashes):
+                raise ManifestError(
+                    "every --refresh-structure-package requires exactly one "
+                    "--sealed-package-sha256 in the same order"
+                )
+            _refresh_structure_packages(
+                list(zip(structure_ids, sealed_hashes, strict=True)),
+                full_manifest_validation=len(structure_ids) > 1,
+            )
+            return 0
+        if args.sealed_package_sha256:
+            raise ManifestError(
+                "--sealed-package-sha256 is valid only with "
+                "--refresh-structure-package"
+            )
+        return _run_render_mode(args)
+    except WorkspaceLockError as error:
+        print(f"underwater map publication is busy: {error}", file=sys.stderr)
+        return 2
+    except (OSError, ManifestError) as error:
+        print(f"underwater map manifest error: {error}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

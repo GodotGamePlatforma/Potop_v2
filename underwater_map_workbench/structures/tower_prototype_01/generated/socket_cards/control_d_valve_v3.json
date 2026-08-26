@@ -1,0 +1,72 @@
+{
+  "authority": false,
+  "generated": true,
+  "kind": "fixed_interactable",
+  "local_rect": [
+    1960,
+    2040,
+    120,
+    120
+  ],
+  "local_topology_digest": "structure-topology-v1:35cec4f902213c0e5260db83ced132ae2a9a3a603d8fc1fb836ce09508ee7dc2",
+  "mapping": {
+    "local_origin": [
+      0,
+      0
+    ],
+    "pixel_reference": "pixel_edge",
+    "rounding": "floor",
+    "source_world_units_per_pixel": [
+      40,
+      40
+    ],
+    "world_units_per_pixel": [
+      1,
+      1
+    ],
+    "x_axis": "right",
+    "y_axis": "down"
+  },
+  "native_artifacts": {
+    "boundary_mask_native": {
+      "path": "structures/tower_prototype_01/generated/boundary_mask_native.png",
+      "sha256": "4d244259ef162ee9437b97ac8826c12e99a8d35af05eb6add5925f42d8052353"
+    },
+    "guide_native": {
+      "path": "structures/tower_prototype_01/generated/guide_native.png",
+      "sha256": "e3aeca3d5509a983608a9217f2a5b9d517b4dc412197408c9ff57b7ee08c6811"
+    },
+    "open_water_mask_native": {
+      "path": "structures/tower_prototype_01/generated/open_water_mask_native.png",
+      "sha256": "c1e1f744629c6a27dcc6c305a8bdbda15ed9be5a417796d459d831ea955b06c0"
+    },
+    "solid_mask_native": {
+      "path": "structures/tower_prototype_01/generated/solid_mask_native.png",
+      "sha256": "432f24645362defc1e3c2c01ad4d239628c753c673c20f301503b23ccdb72d84"
+    },
+    "surface_detail_mask_local": {
+      "path": "structures/tower_prototype_01/generated/surface_detail_mask_local.png",
+      "sha256": "2115bbeb0fcea23f3ed21a32a98bd82dee013650564b0c08940e34ddc8a6f88c"
+    }
+  },
+  "native_pixel_rect": [
+    1960,
+    2040,
+    120,
+    120
+  ],
+  "package_manifest_path": "structures/tower_prototype_01/structure_manifest.json",
+  "package_manifest_sha256": "f1e37a8f99502e9743ae3e26406fa7e6aab806b5a64f2d6b04317d42cc5cc626",
+  "panel_ids": [
+    "panel_0_0_2240_3680"
+  ],
+  "schema_version": 1,
+  "socket_id": "control_d_valve_v3",
+  "source_cell_rect": [
+    49,
+    51,
+    3,
+    3
+  ],
+  "structure_id": "tower_prototype_01"
+}

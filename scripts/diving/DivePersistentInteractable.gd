@@ -23,9 +23,13 @@ enum Kind {
 @export var completed: bool = false
 @export var campaign_completed: bool = false
 @export var gate_width: float = 170.0
+@export var unlocks_shortcut_id: String = ""
 
 var _gate_body: StaticBody2D
 var _sprite: Sprite2D
+var _availability_gate := Callable()
+var _availability_gate_required := false
+var _direct_interaction_allowed := true
 var _authored_visual_override := false
 var _visual_context: Dictionary = {}
 var _visual_region_id := "r1"
@@ -77,8 +81,24 @@ func mark_completed() -> void:
 	completed = true
 	_apply_completed_state()
 
+func set_unlocks_shortcut_id(shortcut_id: String) -> void:
+	unlocks_shortcut_id = shortcut_id.strip_edges()
+
+func set_availability_gate(gate: Callable) -> void:
+	_availability_gate = gate
+	_availability_gate_required = true
+
+
+func set_direct_interaction_allowed(allowed: bool) -> void:
+	_direct_interaction_allowed = allowed
+
+
 func can_interact() -> bool:
-	return not completed
+	if completed or not _direct_interaction_allowed:
+		return false
+	if not _availability_gate_required:
+		return true
+	return _availability_gate.is_valid() and bool(_availability_gate.call())
 
 func interaction_text() -> String:
 	var interact_prompt := InputPromptScript.action_text(&"dive_interact")

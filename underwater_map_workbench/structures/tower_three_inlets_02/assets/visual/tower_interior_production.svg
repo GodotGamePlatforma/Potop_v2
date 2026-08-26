@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="2400" height="3840" viewBox="0 0 2400 3840">
+  <defs>
+    <linearGradient id="metalEdge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9db0aa" stop-opacity="0.68"/>
+      <stop offset="0.45" stop-color="#4e625f" stop-opacity="0.54"/>
+      <stop offset="1" stop-color="#263a39" stop-opacity="0.36"/>
+    </linearGradient>
+    <linearGradient id="rustEdge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#344b49" stop-opacity="0.2"/>
+      <stop offset="0.48" stop-color="#815d43" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#3d4c48" stop-opacity="0.22"/>
+    </linearGradient>
+    <radialGradient id="lampPool" cx="50%" cy="0" r="92%">
+      <stop offset="0" stop-color="#a9eff1" stop-opacity="0.32"/>
+      <stop offset="0.42" stop-color="#5ba5aa" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#355d62" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="siltFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9a7956" stop-opacity="0"/>
+      <stop offset="1" stop-color="#765a3d" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="softGlow" x="-80%" y="-250%" width="260%" height="600%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <filter id="siltBlur" x="-25%" y="-70%" width="150%" height="240%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+
+    <g id="lamp">
+      <rect x="-54" y="-4" width="108" height="8" rx="4" fill="#a7c7c2" fill-opacity="0.44"/>
+      <rect x="-66" y="-8" width="132" height="16" rx="7" fill="#477a7a" fill-opacity="0.10" filter="url(#softGlow)"/>
+      <path d="M-62-8h124" fill="none" stroke="#4d605e" stroke-opacity="0.72" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    <g id="brokenGlass">
+      <path d="M0 0l32 22-12 34 46-20 24 42 8-58 44-12" fill="none" stroke="#9fc5c6" stroke-opacity="0.34" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M22 56l12 24 18-16m40-38 24 28 18-18" fill="none" stroke="#c1e0df" stroke-opacity="0.24" stroke-width="3"/>
+    </g>
+    <g id="hangingCable">
+      <path d="M0 0c16 26 4 52 22 77 18 24 12 52 2 79" fill="none" stroke="#1a2423" stroke-opacity="0.9" stroke-width="9" stroke-linecap="round"/>
+      <path d="M0 0c16 26 4 52 22 77 18 24 12 52 2 79" fill="none" stroke="#76614b" stroke-opacity="0.45" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="24" cy="158" r="5" fill="#a47d55" fill-opacity="0.55"/>
+    </g>
+    <g id="shortCable">
+      <path d="M0 0c34 12 62 5 91 22 27 16 54 12 82 4" fill="none" stroke="#1b2524" stroke-opacity="0.86" stroke-width="8" stroke-linecap="round"/>
+      <path d="M0 0c34 12 62 5 91 22 27 16 54 12 82 4" fill="none" stroke="#80664b" stroke-opacity="0.42" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="siltPatch">
+      <path d="M0 34c66-35 144-16 218-23 54-5 100 5 146 23v18H0z" fill="url(#siltFade)" filter="url(#siltBlur)"/>
+      <path d="M12 38c68-18 132-8 190-15 56-7 103-2 148 15" fill="none" stroke="#967453" stroke-opacity="0.34" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="72" cy="20" r="5" fill="#9a7959" fill-opacity="0.28"/>
+      <circle cx="184" cy="17" r="3" fill="#b09068" fill-opacity="0.25"/>
+      <circle cx="284" cy="25" r="4" fill="#806247" fill-opacity="0.3"/>
+    </g>
+    <g id="windowRemnant">
+      <path d="M0 96V0h150v96M75 0v78" fill="none" stroke="url(#metalEdge)" stroke-width="11" stroke-linecap="square"/>
+      <path d="M4 4h142M8 92h50m42 0h44" fill="none" stroke="#253534" stroke-opacity="0.7" stroke-width="4"/>
+      <path d="M72 4l-8 24 12 18-10 31" fill="none" stroke="#a5c6c5" stroke-opacity="0.24" stroke-width="3"/>
+    </g>
+    <g id="pipePair">
+      <path d="M0 0h176c28 0 34 12 34 34v28" fill="none" stroke="#1b2928" stroke-opacity="0.92" stroke-width="18" stroke-linecap="round"/>
+      <path d="M0 0h176c28 0 34 12 34 34v28" fill="none" stroke="#687a72" stroke-opacity="0.42" stroke-width="7" stroke-linecap="round"/>
+      <path d="M0 22h120c20 0 26 9 26 27v18" fill="none" stroke="#3d2c25" stroke-opacity="0.78" stroke-width="10" stroke-linecap="round"/>
+      <path d="M0 22h120c20 0 26 9 26 27v18" fill="none" stroke="#a06f4e" stroke-opacity="0.3" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <!-- Transparent static detail layer. Open-water alpha is applied by the production pipeline. -->
+  <g id="static-interior-detail">
+    <!-- Damaged balcony and upper rooms. -->
+    <path d="M82 102h286m44 0h214m54 0h244" fill="none" stroke="url(#rustEdge)" stroke-width="15" stroke-linecap="round"/>
+    <path d="M1402 102h318m86 0h302m48 0h148" fill="none" stroke="url(#metalEdge)" stroke-width="13" stroke-linecap="round"/>
+    <use xlink:href="#brokenGlass" transform="translate(102 122) rotate(-7)"/>
+    <use xlink:href="#brokenGlass" transform="translate(760 116) scale(.8) rotate(11)" opacity="0.72"/>
+    <use xlink:href="#shortCable" transform="translate(150 92) rotate(4)"/>
+    <use xlink:href="#hangingCable" transform="translate(912 104) scale(.74)"/>
+    <use xlink:href="#windowRemnant" transform="translate(1460 148) scale(.76)" opacity="0.62"/>
+    <use xlink:href="#windowRemnant" transform="translate(2030 146) scale(.72)" opacity="0.48"/>
+    <use xlink:href="#siltPatch" transform="translate(310 218) scale(1.45 .72)"/>
+    <use xlink:href="#siltPatch" transform="translate(1610 218) scale(1.25 .66)" opacity="0.7"/>
+
+    <!-- P.11: sparse frames, ceiling pipes and one surviving light. -->
+    <use xlink:href="#pipePair" transform="translate(126 382) scale(1.2 .9)"/>
+    <use xlink:href="#lamp" transform="translate(650 396)"/>
+    <path d="M410 394v94m238-94v58m212-58v86" fill="none" stroke="#5e706c" stroke-opacity="0.35" stroke-width="8"/>
+    <use xlink:href="#brokenGlass" transform="translate(722 448) scale(.72)" opacity="0.55"/>
+    <use xlink:href="#shortCable" transform="translate(1460 390) scale(1.15)" opacity="0.74"/>
+    <use xlink:href="#windowRemnant" transform="translate(2180 438) scale(.7)" opacity="0.4"/>
+    <path d="M1450 528c170-22 340 15 500-8 92-14 178-10 300 8" fill="none" stroke="#8e6b4d" stroke-opacity="0.22" stroke-width="9"/>
+
+    <!-- P.10 / inlet B room: only architectural remnants, no controls or current markers. -->
+    <path d="M92 662h210m540 0h138" fill="none" stroke="url(#metalEdge)" stroke-width="12"/>
+    <use xlink:href="#brokenGlass" transform="translate(430 712) scale(.55)" opacity="0.38"/>
+    <use xlink:href="#brokenGlass" transform="translate(760 712) scale(.5) rotate(-8)" opacity="0.34"/>
+    <use xlink:href="#hangingCable" transform="translate(936 660) scale(.55)" opacity="0.65"/>
+    <use xlink:href="#lamp" transform="translate(1660 674)" opacity="0.76"/>
+    <path d="M1440 818c116-18 222 8 330-5 110-13 224-5 514 4" fill="none" stroke="#8f7051" stroke-opacity="0.22" stroke-width="8"/>
+    <use xlink:href="#brokenGlass" transform="translate(2050 710) scale(.74) rotate(-8)" opacity="0.52"/>
+
+    <!-- P.09 and P.08. -->
+    <use xlink:href="#pipePair" transform="translate(1428 944) scale(1.28)" opacity="0.76"/>
+    <use xlink:href="#windowRemnant" transform="translate(1740 994) scale(.68)" opacity="0.44"/>
+    <use xlink:href="#brokenGlass" transform="translate(2110 1016) scale(.8)" opacity="0.55"/>
+    <use xlink:href="#siltPatch" transform="translate(1470 1064) scale(1.75 .65)" opacity="0.62"/>
+    <path d="M116 1222h304m96 0h344" fill="none" stroke="url(#rustEdge)" stroke-width="13"/>
+    <use xlink:href="#lamp" transform="translate(760 1236)" opacity="0.66"/>
+    <use xlink:href="#shortCable" transform="translate(1450 1226) rotate(-2)" opacity="0.72"/>
+    <use xlink:href="#hangingCable" transform="translate(2240 1224) scale(.6)" opacity="0.58"/>
+    <use xlink:href="#windowRemnant" transform="translate(1550 1280) scale(.7)" opacity="0.38"/>
+    <use xlink:href="#windowRemnant" transform="translate(1980 1280) scale(.67)" opacity="0.42"/>
+
+    <!-- P.07 / C: keep shortcut and interactable socket visually empty. -->
+    <path d="M94 1502h350m88 0h438" fill="none" stroke="url(#metalEdge)" stroke-width="12"/>
+    <use xlink:href="#brokenGlass" transform="translate(180 1550) scale(.7) rotate(8)" opacity="0.5"/>
+    <use xlink:href="#pipePair" transform="translate(1435 1500) scale(1.18 .82)" opacity="0.7"/>
+    <use xlink:href="#lamp" transform="translate(1650 1516)" opacity="0.72"/>
+    <path d="M1450 1640c94-18 186 4 278-7m208 4c106-13 220-8 332 2" fill="none" stroke="#8d6b4e" stroke-opacity="0.22" stroke-width="7"/>
+
+    <!-- P.06 and P.05. -->
+    <use xlink:href="#windowRemnant" transform="translate(130 1820) scale(.78)" opacity="0.46"/>
+    <use xlink:href="#windowRemnant" transform="translate(710 1818) scale(.66)" opacity="0.4"/>
+    <use xlink:href="#shortCable" transform="translate(420 1778) rotate(3)" opacity="0.76"/>
+    <use xlink:href="#siltPatch" transform="translate(150 1900) scale(1.9 .7)" opacity="0.66"/>
+    <use xlink:href="#lamp" transform="translate(1700 1795)" opacity="0.62"/>
+    <use xlink:href="#brokenGlass" transform="translate(2100 1822) scale(.7)" opacity="0.44"/>
+    <path d="M92 2062h260m84 0h480" fill="none" stroke="url(#rustEdge)" stroke-width="12"/>
+    <use xlink:href="#pipePair" transform="translate(1450 2060) scale(1.35 .85)" opacity="0.62"/>
+    <use xlink:href="#hangingCable" transform="translate(2160 2062) scale(.55)" opacity="0.56"/>
+    <path d="M1458 2198c180-26 344 12 494-8 96-13 186-4 316 8" fill="none" stroke="#997354" stroke-opacity="0.2" stroke-width="8"/>
+
+    <!-- P.04 / system D room. Dynamic cabinet and every control socket remain empty. -->
+    <path d="M90 2342h62m302 0h10m272 0h240" fill="none" stroke="url(#metalEdge)" stroke-width="12"/>
+    <use xlink:href="#hangingCable" transform="translate(920 2340) scale(.66)" opacity="0.6"/>
+    <use xlink:href="#brokenGlass" transform="translate(820 2444) scale(.64) rotate(-12)" opacity="0.42"/>
+    <use xlink:href="#lamp" transform="translate(1630 2356)" opacity="0.56"/>
+    <use xlink:href="#windowRemnant" transform="translate(2010 2390) scale(.68)" opacity="0.38"/>
+    <path d="M1450 2498c172-17 326 8 470-8 116-13 210 0 350 7" fill="none" stroke="#86664c" stroke-opacity="0.22" stroke-width="8"/>
+
+    <!-- Lower flooded floors: progressively darker, sparse remnants only. -->
+    <g opacity="0.78">
+      <use xlink:href="#pipePair" transform="translate(130 2640) scale(1.15 .8)"/>
+      <use xlink:href="#windowRemnant" transform="translate(650 2684) scale(.72)" opacity="0.42"/>
+      <use xlink:href="#shortCable" transform="translate(1450 2644) scale(1.08)" opacity="0.62"/>
+      <use xlink:href="#siltPatch" transform="translate(1620 2740) scale(1.55 .6)" opacity="0.58"/>
+    </g>
+    <g opacity="0.67">
+      <use xlink:href="#lamp" transform="translate(480 2928)" opacity="0.52"/>
+      <use xlink:href="#brokenGlass" transform="translate(780 2968) scale(.7)"/>
+      <use xlink:href="#pipePair" transform="translate(1450 2900) scale(1.26 .78)"/>
+      <use xlink:href="#hangingCable" transform="translate(2200 2904) scale(.62)"/>
+      <path d="M1480 3070c230-27 454 14 790-2" fill="none" stroke="#886a51" stroke-opacity="0.24" stroke-width="8"/>
+    </g>
+    <g opacity="0.58">
+      <use xlink:href="#windowRemnant" transform="translate(150 3240) scale(.76)"/>
+      <use xlink:href="#shortCable" transform="translate(600 3188) rotate(2)"/>
+      <use xlink:href="#windowRemnant" transform="translate(1540 3240) scale(.72)"/>
+      <use xlink:href="#brokenGlass" transform="translate(2070 3260) scale(.68)"/>
+      <use xlink:href="#siltPatch" transform="translate(260 3340) scale(1.75 .58)"/>
+    </g>
+
+    <!-- Central shaft: narrow local fragments only, leaving the current readable. -->
+    <path d="M1122 124v430m0 90v176m0 120v44m0 118v420m0 112v26m0 120v244m0 106v360m0 134v420m0 110v420"
+          fill="none" stroke="#5f7472" stroke-opacity="0.28" stroke-width="8"/>
+    <path d="M1278 118v260m0 128v314m0 156v430m0 126v128m0 120v70m0 142v420m0 204v206m0 136v380"
+          fill="none" stroke="#273634" stroke-opacity="0.62" stroke-width="11"/>
+    <use xlink:href="#hangingCable" transform="translate(1160 116) scale(.55)" opacity="0.54"/>
+    <use xlink:href="#hangingCable" transform="translate(1240 1120) scale(.48)" opacity="0.46"/>
+    <use xlink:href="#hangingCable" transform="translate(1154 2860) scale(.52)" opacity="0.42"/>
+    <circle cx="1170" cy="734" r="6" fill="#9dbfc0" fill-opacity="0.34"/>
+    <circle cx="1250" cy="2050" r="5" fill="#a37b58" fill-opacity="0.3"/>
+    <circle cx="1165" cy="3240" r="7" fill="#8caeae" fill-opacity="0.24"/>
+
+    <!-- Ground-floor lobby. Facade and egress sockets remain entirely dynamic/transparent. -->
+    <path d="M1420 3462h330m94 0h330" fill="none" stroke="url(#metalEdge)" stroke-width="14"/>
+    <use xlink:href="#lamp" transform="translate(1690 3480)" opacity="0.9"/>
+    <path d="M1580 3500h220v92h-220z" fill="none" stroke="#667a76" stroke-opacity="0.35" stroke-width="8"/>
+    <use xlink:href="#brokenGlass" transform="translate(1960 3508) scale(.78)" opacity="0.58"/>
+    <use xlink:href="#hangingCable" transform="translate(2180 3464) scale(.5)" opacity="0.46"/>
+    <use xlink:href="#siltPatch" transform="translate(1460 3610) scale(1.82 .7)" opacity="0.72"/>
+
+    <!-- Small suspended particles; sparse and local, not a full-frame water layer. -->
+    <g fill="#b3d1cf" fill-opacity="0.2">
+      <circle cx="310" cy="194" r="4"/><circle cx="902" cy="472" r="3"/>
+      <circle cx="1520" cy="214" r="4"/><circle cx="2200" cy="742" r="3"/>
+      <circle cx="470" cy="1040" r="4"/><circle cx="1720" cy="1320" r="3"/>
+      <circle cx="840" cy="1850" r="3"/><circle cx="2040" cy="2140" r="4"/>
+      <circle cx="220" cy="2700" r="3"/><circle cx="1840" cy="3000" r="4"/>
+      <circle cx="620" cy="3300" r="3"/><circle cx="2020" cy="3580" r="4"/>
+    </g>
+  </g>
+</svg>

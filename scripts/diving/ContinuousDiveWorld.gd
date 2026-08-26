@@ -30,6 +30,7 @@ var persistent_interactables: Array[DivePersistentInteractable] = []
 var lost_backpacks: Array[DiveLostBackpack] = []
 var dropped_loot_piles: Array[DiveDroppedLoot] = []
 var rescue_survivors: Array[DiveRescueSurvivor] = []
+var structure_controllers: Array[Node] = []
 var persistent_opened: Array[String] = []
 var persistent_remaining_contents: Dictionary = {}
 var active_sector_id: String = ""
@@ -53,6 +54,7 @@ var _loaded_collision_chunks: Dictionary = {}
 var _collision_chunks_root: Node2D
 var _structure_roots_container: Node2D
 var _structure_roots_by_id: Dictionary = {}
+var _structure_controllers_by_id: Dictionary = {}
 var _structure_collision_segments_by_id: Dictionary = {}
 var _collision_partition_active := false
 var _graphics_quality := "high"
@@ -125,6 +127,7 @@ func _runtime_add_child(node: Node) -> void:
 func _clear_runtime_dynamic() -> void:
 	_static_authored_visual_bindings.clear()
 	_structure_roots_by_id.clear()
+	_structure_controllers_by_id.clear()
 	_structure_collision_segments_by_id.clear()
 	_structure_roots_container = null
 	_collision_partition_active = false
@@ -154,21 +157,15 @@ func reset_attempt() -> void:
 	for rescue_survivor in rescue_survivors:
 		if rescue_survivor != null and is_instance_valid(rescue_survivor):
 			rescue_survivor.reset_attempt()
-	_reset_structure_dynamic_bodies()
+	_reset_structure_controllers()
 
 
-func _reset_structure_dynamic_bodies() -> void:
-	for root_value in _structure_roots_by_id.values():
-		if not root_value is Node2D:
+func _reset_structure_controllers() -> void:
+	for controller in structure_controllers:
+		if controller == null or not is_instance_valid(controller):
+			push_error("Zarejestrowany kontroler struktury nie istnieje podczas resetu próby.")
 			continue
-		var dynamic_bodies := (root_value as Node2D).get_node_or_null("DynamicBodies")
-		if dynamic_bodies == null:
-			continue
-		if dynamic_bodies.has_method("reset_attempt"):
-			dynamic_bodies.call("reset_attempt")
-		for descendant in dynamic_bodies.find_children("*", "", true, false):
-			if descendant.has_method("reset_attempt"):
-				descendant.call("reset_attempt")
+		controller.call("reset_attempt")
 
 func start_position() -> Vector2:
 	return _start_position
@@ -388,20 +385,67 @@ func get_nearest_interactable(world_position: Vector2, maximum_distance: float =
 	for node in get_tree().get_nodes_in_group("dive_interactable"):
 		if not is_ancestor_of(node) or not node.has_method("can_interact") or not node.can_interact():
 			continue
-		var distance := world_position.distance_to(node.global_position)
+		var distance := (
+			float(node.interaction_distance_to(world_position))
+			if node.has_method("interaction_distance_to")
+			else world_position.distance_to(node.global_position)
+		)
 		if distance <= nearest_distance:
 			nearest = node
 			nearest_distance = distance
 	return nearest
 
+
+func open_shortcut_for_attempt(shortcut_id: String) -> bool:
+	var resolved_id := shortcut_id.strip_edges()
+	if resolved_id.is_empty():
+		return false
+	for interactable in persistent_interactables:
+		if (
+			interactable == null
+			or not is_instance_valid(interactable)
+			or interactable.kind != DivePersistentInteractable.Kind.SHORTCUT
+			or interactable.persistent_id != resolved_id
+		):
+			continue
+		interactable.mark_completed()
+		return true
+	return false
+
+
+func _structure_gate_is_open(structure_id: String, gate_id: StringName) -> bool:
+	var controller_value: Variant = _structure_controllers_by_id.get(structure_id, null)
+	if not controller_value is Node:
+		return false
+	var controller := controller_value as Node
+	if not is_instance_valid(controller) or not controller.has_method("is_public_gate_open"):
+		return false
+	var result: Variant = controller.call("is_public_gate_open", gate_id)
+	return bool(result) if result is bool else false
+
 func current_at(world_position: Vector2) -> Vector2:
 	if _blueprint == null:
 		return Vector2.ZERO
+	var resolved_current := Vector2.ZERO
 	for zone in _blueprint.current_zones:
 		var rect: Rect2 = zone.get("rect", Rect2())
 		if rect.has_point(world_position):
-			return zone.get("velocity", Vector2.ZERO)
-	return Vector2.ZERO
+			resolved_current = zone.get("velocity", Vector2.ZERO)
+			break
+	for controller in structure_controllers:
+		if controller == null or not is_instance_valid(controller):
+			continue
+		if not controller.has_method("current_at_world_position"):
+			continue
+		var contribution_value: Variant = controller.call(
+			"current_at_world_position",
+			world_position,
+		)
+		if not contribution_value is Vector2:
+			push_error("Kontroler struktury zwrócił niepoprawny wkład prądu.")
+			continue
+		resolved_current += contribution_value as Vector2
+	return resolved_current
 
 
 func scout_signal_at(
@@ -797,6 +841,7 @@ func _rebuild_world() -> void:
 	threats.clear()
 	persistent_interactables.clear()
 	rescue_survivors.clear()
+	structure_controllers.clear()
 	lost_backpacks.clear()
 	dropped_loot_piles.clear()
 	exit_line = null
@@ -810,6 +855,7 @@ func _rebuild_world() -> void:
 	if not _snapshot_analysis_mode:
 		_build_source_visual_layers()
 		_build_source_structure_roots()
+		_build_structure_gameplay()
 	_build_navigation_from_source()
 	if not _snapshot_analysis_mode:
 		_build_authored_visual_prefabs()
@@ -844,6 +890,74 @@ func _build_source_structure_roots() -> void:
 			push_error("StructureRoots zawiera niepoprawne lub powtórzone structure_id.")
 			continue
 		_structure_roots_by_id[structure_id] = child
+
+
+func _build_structure_gameplay() -> void:
+	if _blueprint == null:
+		return
+	for structure_value: Variant in _blueprint.structure_spawns:
+		var structure := structure_value as Dictionary
+		var runtime_value: Variant = structure.get("runtime", null)
+		if not runtime_value is Dictionary or (runtime_value as Dictionary).is_empty():
+			continue
+		var structure_id := str(structure.get("id", ""))
+		var structure_root := _structure_roots_by_id.get(structure_id, null) as Node2D
+		if structure_root == null:
+			push_error("Nie można uruchomić gameplayu nieznanej struktury %s." % structure_id)
+			continue
+		var dynamic_bodies := structure_root.get_node_or_null("DynamicBodies") as Node2D
+		var interactives_root := structure_root.get_node_or_null("Interactives") as Node2D
+		if dynamic_bodies == null or interactives_root == null:
+			push_error("Struktura %s nie ma rootów DynamicBodies/Interactives." % structure_id)
+			continue
+		var controller_script_path_value: Variant = structure.get("controller_script", null)
+		var controller_script_path := str(controller_script_path_value).strip_edges()
+		if (
+			not controller_script_path_value is String
+			or controller_script_path.is_empty()
+			or not ResourceLoader.exists(controller_script_path, "Script")
+		):
+			push_error("Struktura %s nie publikuje dostępnego controller_script." % structure_id)
+			continue
+		var controller_script := ResourceLoader.load(
+			controller_script_path,
+			"Script",
+			ResourceLoader.CACHE_MODE_REUSE,
+		) as Script
+		if controller_script == null or not controller_script.can_instantiate():
+			push_error("Nie można utworzyć kontrolera struktury %s." % structure_id)
+			continue
+		var controller_value: Variant = controller_script.new()
+		if not controller_value is Node:
+			push_error("controller_script struktury %s musi tworzyć Node." % structure_id)
+			if controller_value is Object:
+				(controller_value as Object).free()
+			continue
+		var controller := controller_value as Node
+		if not controller.has_method("configure") or not controller.has_method("reset_attempt"):
+			push_error(
+				"Kontroler struktury %s musi publikować configure() i reset_attempt()."
+				% structure_id
+			)
+			controller.free()
+			continue
+		controller.name = "%sRuntime" % structure_id.to_pascal_case()
+		dynamic_bodies.add_child(controller)
+		var configure_result: Variant = controller.call("configure", structure, interactives_root)
+		if not configure_result is PackedStringArray:
+			push_error("Kontroler struktury %s zwrócił niepoprawny wynik configure()." % structure_id)
+			dynamic_bodies.remove_child(controller)
+			controller.free()
+			continue
+		var errors := configure_result as PackedStringArray
+		if not errors.is_empty():
+			for error_message: String in errors:
+				push_error("Runtime struktury %s: %s" % [structure_id, error_message])
+			dynamic_bodies.remove_child(controller)
+			controller.free()
+			continue
+		structure_controllers.append(controller)
+		_structure_controllers_by_id[structure_id] = controller
 
 func _build_authored_visual_prefabs() -> void:
 	if _blueprint == null:
@@ -1187,23 +1301,26 @@ func _configure_structure_collisions() -> void:
 		var expected_local_segments := PackedVector2Array()
 		for point in expected_global_segments:
 			expected_local_segments.append(root.to_local(to_global(point)))
-		if not _segment_sets_equal(actual_local_segments, expected_local_segments):
-			push_error("Lokalny kolider struktury %s nie odpowiada partycji L05." % structure_id)
+		if not _segment_set_contains_all(actual_local_segments, expected_local_segments):
+			push_error("Lokalny kolider struktury %s nie zawiera pełnej partycji L05." % structure_id)
 		TerrainOcclusionScript.attach_to(static_collision, actual_local_segments)
 	for structure_id_value in _structure_collision_segments_by_id.keys():
 		if not _structure_roots_by_id.has(structure_id_value):
 			push_error("Partycja L05 wskazuje brakujący korzeń struktury %s." % str(structure_id_value))
 
 
-func _segment_sets_equal(left: PackedVector2Array, right: PackedVector2Array) -> bool:
-	if left.size() != right.size() or left.size() % 2 != 0:
+func _segment_set_contains_all(
+	container: PackedVector2Array,
+	required: PackedVector2Array,
+) -> bool:
+	if container.size() % 2 != 0 or required.size() % 2 != 0:
 		return false
 	var counts: Dictionary = {}
-	for index in range(0, left.size(), 2):
-		var key := _segment_key(left[index], left[index + 1])
+	for index in range(0, container.size(), 2):
+		var key := _segment_key(container[index], container[index + 1])
 		counts[key] = int(counts.get(key, 0)) + 1
-	for index in range(0, right.size(), 2):
-		var key := _segment_key(right[index], right[index + 1])
+	for index in range(0, required.size(), 2):
+		var key := _segment_key(required[index], required[index + 1])
 		if not counts.has(key):
 			return false
 		var remaining := int(counts[key]) - 1
@@ -1211,7 +1328,7 @@ func _segment_sets_equal(left: PackedVector2Array, right: PackedVector2Array) ->
 			counts.erase(key)
 		else:
 			counts[key] = remaining
-	return counts.is_empty()
+	return true
 
 
 func _segment_key(from: Vector2, to: Vector2) -> Vector4:
@@ -1557,6 +1674,7 @@ func _build_shortcut_gates() -> void:
 			float(spawn.get("interaction_seconds", 2.1)),
 			maxf(float(spawn.get("width", 120.0)), 150.0)
 		)
+		gate.set_direct_interaction_allowed(not _is_linked_shortcut_target(shortcut_id))
 		gate.position = spawn.get("position", Vector2.ZERO)
 		gate.rotation = float(spawn.get("rotation", 0.0))
 		gate.z_index = 6
@@ -1607,9 +1725,19 @@ func _build_fixed_devices() -> void:
 			str(definition.get("interaction_action", "activate")),
 			float(definition.get("interaction_seconds", 1.5))
 		)
+		var unlocks_shortcut_id := str(definition.get("unlocks_shortcut_id", "")).strip_edges()
+		if not unlocks_shortcut_id.is_empty() and not _blueprint_has_shortcut(unlocks_shortcut_id):
+			push_error(
+				"Urządzenie %s wskazuje nieznany skrót %s."
+				% [device_id, unlocks_shortcut_id]
+			)
+			device.free()
+			continue
+		device.set_unlocks_shortcut_id(unlocks_shortcut_id)
 		var device_parent: Node = _runtime_root()
+		var structure_id := ""
 		if str(definition.get("position_space", "world")) == "structure_local":
-			var structure_id := str(definition.get("structure_id", ""))
+			structure_id = str(definition.get("structure_id", ""))
 			var structure_root := _structure_roots_by_id.get(structure_id, null) as Node2D
 			var interactives_root := (
 				structure_root.get_node_or_null("Interactives") as Node2D
@@ -1624,11 +1752,53 @@ func _build_fixed_devices() -> void:
 			device.position = definition.get("local_position", Vector2.ZERO)
 		else:
 			device.position = definition.get("position", Vector2.ZERO)
+		var structure_gate := str(definition.get("structure_gate", "")).strip_edges()
+		if not structure_gate.is_empty():
+			var controller_value: Variant = _structure_controllers_by_id.get(structure_id, null)
+			if (
+				structure_id.is_empty()
+				or not controller_value is Node
+				or not (controller_value as Node).has_method("is_public_gate_open")
+			):
+				push_error(
+					"Urządzenie %s nie może rozwiązać bramki %s struktury %s."
+					% [device_id, structure_gate, structure_id]
+				)
+				device.free()
+				continue
+			device.set_availability_gate(
+				Callable(self, "_structure_gate_is_open").bind(
+					structure_id,
+					StringName(structure_gate),
+				)
+			)
 		device.z_index = 6
 		device_parent.add_child(device)
 		_configure_interactable_presentation(device, definition, device_id)
 		_attach_authored_visual(device, definition)
 		persistent_interactables.append(device)
+
+
+func _blueprint_has_shortcut(shortcut_id: String) -> bool:
+	if _blueprint == null:
+		return false
+	for shortcut_value: Variant in _blueprint.shortcut_spawns:
+		if shortcut_value is Dictionary and str((shortcut_value as Dictionary).get("id", "")) == shortcut_id:
+			return true
+	return false
+
+
+func _is_linked_shortcut_target(shortcut_id: String) -> bool:
+	if _blueprint == null:
+		return false
+	for device_value: Variant in _blueprint.fixed_device_spawns:
+		if not device_value is Dictionary:
+			continue
+		var device := device_value as Dictionary
+		if str(device.get("unlocks_shortcut_id", "")).strip_edges() == shortcut_id:
+			return true
+	return false
+
 
 func _build_rescue_survivors() -> void:
 	for spawn in _blueprint.rescue_spawns:

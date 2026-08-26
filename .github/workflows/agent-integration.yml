@@ -1,0 +1,254 @@
+name: Agent integration report
+
+# This workflow publishes diagnostic evidence only. It does not configure branch
+# protection, required checks, merge queues, or any last-green reference.
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+  merge_group:
+    types:
+      - checks_requested
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-integration-report-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-evidence:
+    name: Windows integration evidence
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      GODOT_VERSION: 4.7.1-stable
+      GODOT_ARCHIVE_NAME: Godot_v4.7.1-stable_win64.exe.zip
+      GODOT_RELEASE_URL: https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip
+      # Official GitHub release-asset digest for the archive above.
+      GODOT_ARCHIVE_SHA256: c7a289051eaefb460b0106b60e9cd5bee0ef55fd102dcb2bed1eb356cf3d90a1
+
+    steps:
+      - name: Prepare external evidence directory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $reportRoot = Join-Path $env:RUNNER_TEMP "agent-integration-report"
+          New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
+          "REPORT_ROOT=$reportRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          @(
+            "kind=ci-reporting-evidence"
+            "repository=$env:GITHUB_REPOSITORY"
+            "event=$env:GITHUB_EVENT_NAME"
+            "run_id=$env:GITHUB_RUN_ID"
+            "run_attempt=$env:GITHUB_RUN_ATTEMPT"
+            "commit=$env:GITHUB_SHA"
+            "created_utc=$([DateTime]::UtcNow.ToString('o'))"
+          ) | Set-Content -LiteralPath (Join-Path $reportRoot "run-metadata.txt") -Encoding utf8
+
+      - name: Check out the candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Run infrastructure tests without Godot
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+
+          $logPath = Join-Path $env:REPORT_ROOT "infra-tests.log"
+          "started_utc=$([DateTime]::UtcNow.ToString('o'))" | Set-Content -LiteralPath $logPath -Encoding utf8
+
+          function Invoke-LoggedCommand {
+            param(
+              [Parameter(Mandatory = $true)][string]$Label,
+              [Parameter(Mandatory = $true)][string]$Executable,
+              [Parameter(Mandatory = $true)][string[]]$Arguments
+            )
+
+            "`n=== $Label ===" | Tee-Object -FilePath $logPath -Append
+            & $Executable @Arguments *>&1 | Tee-Object -FilePath $logPath -Append
+            $commandExitCode = $LASTEXITCODE
+            "exit_code=$commandExitCode" | Tee-Object -FilePath $logPath -Append
+            if ($commandExitCode -ne 0) {
+              throw "$Label failed with exit code $commandExitCode."
+            }
+          }
+
+          Invoke-LoggedCommand "workbench contract" "python" @("-B", "tests/workbench_contract_test.py")
+          Invoke-LoggedCommand "workbench lock" "python" @("-B", "tests/workbench_lock_test.py")
+          Invoke-LoggedCommand "freeze workbench revision" "python" @("-B", "tests/freeze_workbench_revision_test.py")
+          Invoke-LoggedCommand "map atomic write" "python" @("-B", "tests/map_atomic_write_test.py")
+          Invoke-LoggedCommand "setup agent worktree" "pwsh" @("-NoLogo", "-NoProfile", "-File", "tests/setup_agent_worktree_test.ps1")
+          Invoke-LoggedCommand "runner isolation" "pwsh" @("-NoLogo", "-NoProfile", "-File", "tests/runner_isolation_test.ps1")
+
+          $prePushTests = @(
+            Get-ChildItem -LiteralPath "tests" -Recurse -File |
+              Where-Object {
+                $_.BaseName -match "^pre[-_]?push.*test$" -and
+                $_.Extension -in ".py", ".ps1"
+              } |
+              Sort-Object -Property FullName
+          )
+          if ($prePushTests.Count -eq 0) {
+            "`n=== pre-push test ===`nnot present; not run" |
+              Tee-Object -FilePath $logPath -Append
+          }
+          else {
+            foreach ($prePushTest in $prePushTests) {
+              $relativePath = [System.IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $prePushTest.FullName)
+              if ($prePushTest.Extension -eq ".py") {
+                Invoke-LoggedCommand "pre-push: $relativePath" "python" @("-B", $relativePath)
+              }
+              else {
+                Invoke-LoggedCommand "pre-push: $relativePath" "powershell.exe" @(
+                  "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $relativePath
+                )
+              }
+            }
+          }
+
+          "completed_utc=$([DateTime]::UtcNow.ToString('o'))" |
+            Tee-Object -FilePath $logPath -Append
+
+      - name: Download and verify Godot 4.7.1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ProgressPreference = "SilentlyContinue"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+
+          $logPath = Join-Path $env:REPORT_ROOT "godot-install.log"
+          $archivePath = Join-Path $env:RUNNER_TEMP $env:GODOT_ARCHIVE_NAME
+          $installRoot = Join-Path $env:RUNNER_TEMP "godot-$env:GODOT_VERSION"
+          @(
+            "source=$env:GODOT_RELEASE_URL"
+            "expected_sha256=$env:GODOT_ARCHIVE_SHA256"
+          ) | Set-Content -LiteralPath $logPath -Encoding utf8
+
+          Invoke-WebRequest -Uri $env:GODOT_RELEASE_URL -OutFile $archivePath
+          $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "actual_sha256=$actualSha256" | Tee-Object -FilePath $logPath -Append
+          if ($actualSha256 -cne $env:GODOT_ARCHIVE_SHA256) {
+            throw "Godot archive checksum mismatch."
+          }
+
+          New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
+          Expand-Archive -LiteralPath $archivePath -DestinationPath $installRoot
+          $godotConsolePath = Join-Path $installRoot "Godot_v4.7.1-stable_win64_console.exe"
+          if (-not (Test-Path -LiteralPath $godotConsolePath -PathType Leaf)) {
+            throw "Expected Godot console executable is missing: $godotConsolePath"
+          }
+
+          $versionOutput = (& $godotConsolePath --version 2>&1 | Out-String).Trim()
+          $versionExitCode = $LASTEXITCODE
+          "version=$versionOutput" | Tee-Object -FilePath $logPath -Append
+          if ($versionExitCode -ne 0) {
+            throw "Godot --version failed with exit code $versionExitCode."
+          }
+          if (-not $versionOutput.StartsWith("4.7.1.stable", [System.StringComparison]::Ordinal)) {
+            throw "Unexpected Godot version: $versionOutput"
+          }
+
+          "GODOT_CONSOLE_PATH=$godotConsolePath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Prove two linked worktrees can run Godot concurrently
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+
+          $evidenceRoot = Join-Path $env:REPORT_ROOT "parallel-worktrees"
+          pwsh -NoLogo -NoProfile -File tests/parallel_worktree_godot_test.ps1 `
+            -GodotConsolePath $env:GODOT_CONSOLE_PATH `
+            -EvidenceRoot $evidenceRoot
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run the full isolated suite and emit a receipt
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+
+          $logPath = Join-Path $env:REPORT_ROOT "full-run.log"
+          $receiptPath = Join-Path $env:REPORT_ROOT "full-run.receipt"
+          "started_utc=$([DateTime]::UtcNow.ToString('o'))" | Set-Content -LiteralPath $logPath -Encoding utf8
+          $runnerArguments = @(
+            "-NoLogo"
+            "-NoProfile"
+            "-File"
+            (Join-Path $env:GITHUB_WORKSPACE "tests/run_all_tests.ps1")
+            "-GodotConsolePath"
+            $env:GODOT_CONSOLE_PATH
+            "-Full"
+            "-RunReceiptOutputPath"
+            $receiptPath
+          )
+
+          & pwsh @runnerArguments *>&1 | Tee-Object -FilePath $logPath -Append
+          $runnerExitCode = $LASTEXITCODE
+          "exit_code=$runnerExitCode" | Tee-Object -FilePath $logPath -Append
+          if ($runnerExitCode -ne 0) {
+            exit $runnerExitCode
+          }
+
+      - name: Bind the clean candidate commit to a publication receipt
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+
+          $inputList = Join-Path $env:REPORT_ROOT "candidate-inputs.list"
+          $outputList = Join-Path $env:REPORT_ROOT "candidate-outputs.list"
+          $candidateReceipt = Join-Path $env:REPORT_ROOT "candidate-receipt.json"
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          [IO.File]::WriteAllLines($inputList, @("project.godot"), $utf8NoBom)
+          [IO.File]::WriteAllLines(
+            $outputList,
+            @("underwater_map_workbench/UnderwaterMap.tscn"),
+            $utf8NoBom
+          )
+
+          python -B tools/workbench_contract.py publication create `
+            --input-list $inputList `
+            --output-list $outputList `
+            --input-root project.godot `
+            --output-root underwater_map_workbench/UnderwaterMap.tscn `
+            --receipt $candidateReceipt
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload reporting evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agent-integration-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-integration-report
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6

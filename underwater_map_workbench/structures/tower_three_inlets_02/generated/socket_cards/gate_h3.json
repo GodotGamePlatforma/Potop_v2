@@ -1,0 +1,72 @@
+{
+  "authority": false,
+  "generated": true,
+  "kind": "dynamic_door",
+  "local_rect": [
+    1080,
+    2520,
+    240,
+    80
+  ],
+  "local_topology_digest": "structure-topology-v1:21d7a04d9fb176e9c3d6f95e8ba8a7564029caccbf06a4379711e71e5c99e1e1",
+  "mapping": {
+    "local_origin": [
+      0,
+      0
+    ],
+    "pixel_reference": "pixel_edge",
+    "rounding": "floor",
+    "source_world_units_per_pixel": [
+      40,
+      40
+    ],
+    "world_units_per_pixel": [
+      1,
+      1
+    ],
+    "x_axis": "right",
+    "y_axis": "down"
+  },
+  "native_artifacts": {
+    "boundary_mask_native": {
+      "path": "structures/tower_three_inlets_02/generated/boundary_mask_native.png",
+      "sha256": "6dfcbdc080c1b1ee82ddb219a5e8b92b6874854fcd49904113169e4b148eb38c"
+    },
+    "guide_native": {
+      "path": "structures/tower_three_inlets_02/generated/guide_native.png",
+      "sha256": "b161c52178ac78cf48ec82c8aa4712230380b29bb31ef9ba067582f80747db51"
+    },
+    "open_water_mask_native": {
+      "path": "structures/tower_three_inlets_02/generated/open_water_mask_native.png",
+      "sha256": "2d68954b7a154a2980179f12e358ae5af100a0d5543840741847dc1a45d1c2fd"
+    },
+    "solid_mask_native": {
+      "path": "structures/tower_three_inlets_02/generated/solid_mask_native.png",
+      "sha256": "2d4d6c7a74f82b0ce3d9fe69902a5dd9d53f6467f265f67d3d760f9072836ee9"
+    },
+    "surface_detail_mask_local": {
+      "path": "structures/tower_three_inlets_02/generated/surface_detail_mask_local.png",
+      "sha256": "d8affff489479b792a15cbde68983c53181bc20c2bfcc2bd94ca6c6cab1d99e5"
+    }
+  },
+  "native_pixel_rect": [
+    1080,
+    2520,
+    240,
+    80
+  ],
+  "package_manifest_path": "structures/tower_three_inlets_02/structure_manifest.json",
+  "package_manifest_sha256": "c20e87fbda90f92e193cf613d72f36174c576bd746848800f9d9a02a2adf28cf",
+  "panel_ids": [
+    "panel_0_0_2400_3840"
+  ],
+  "schema_version": 1,
+  "socket_id": "gate_h3",
+  "source_cell_rect": [
+    27,
+    63,
+    6,
+    2
+  ],
+  "structure_id": "tower_three_inlets_02"
+}

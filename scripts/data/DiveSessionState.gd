@@ -53,6 +53,8 @@ var tutorial_opened_mandatory_orders: Array[int] = []
 var tutorial_baseline_step: int = -1
 var tutorial_state: TutorialState
 var tutorial_event_ids: Array[String] = []
+var safe_return_only_opened_shortcuts: Array[String] = []
+var safe_return_only_activated_fixed_devices: Array[String] = []
 
 func begin(expedition_setup) -> void:
 	setup = expedition_setup
@@ -96,6 +98,8 @@ func reset_attempt() -> void:
 	placed_buoys.clear()
 	opened_shortcuts.clear()
 	activated_fixed_devices.clear()
+	safe_return_only_opened_shortcuts.clear()
+	safe_return_only_activated_fixed_devices.clear()
 	marked_heavy_objects.clear()
 	recovered_backpacks.clear()
 	recovered_gear_ids.clear()
@@ -107,6 +111,20 @@ func reset_attempt() -> void:
 	combat_cooldown_left = 0.0
 	tutorial_opened_mandatory_orders.clear()
 	_reset_tutorial_attempt()
+
+
+func record_safe_return_only_world_link(device_id: String, shortcut_id: String) -> bool:
+	var resolved_device_id := device_id.strip_edges()
+	var resolved_shortcut_id := shortcut_id.strip_edges()
+	if resolved_device_id.is_empty() or resolved_shortcut_id.is_empty():
+		return false
+	if not activated_fixed_devices.has(resolved_device_id):
+		activated_fixed_devices.append(resolved_device_id)
+		safe_return_only_activated_fixed_devices.append(resolved_device_id)
+	if not opened_shortcuts.has(resolved_shortcut_id):
+		opened_shortcuts.append(resolved_shortcut_id)
+		safe_return_only_opened_shortcuts.append(resolved_shortcut_id)
+	return true
 
 func record_tutorial_container_opened(mandatory_order: int) -> void:
 	if mandatory_order >= 0 and not tutorial_opened_mandatory_orders.has(mandatory_order):

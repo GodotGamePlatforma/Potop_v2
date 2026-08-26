@@ -1,6 +1,35 @@
 class_name SectorPersistenceSystem
 extends RefCounted
 
+
+func record_fixed_device_completion_for_attempt(
+	session,
+	dive_map,
+	device_id: String,
+	shortcut_id: String,
+) -> bool:
+	if session == null:
+		return false
+	var resolved_device_id := device_id.strip_edges()
+	var resolved_shortcut_id := shortcut_id.strip_edges()
+	if resolved_device_id.is_empty():
+		return false
+	if resolved_shortcut_id.is_empty():
+		if not session.activated_fixed_devices.has(resolved_device_id):
+			session.activated_fixed_devices.append(resolved_device_id)
+		return true
+	if (
+		dive_map == null
+		or not dive_map.has_method("open_shortcut_for_attempt")
+		or not bool(dive_map.call("open_shortcut_for_attempt", resolved_shortcut_id))
+	):
+		return false
+	return session.record_safe_return_only_world_link(
+		resolved_device_id,
+		resolved_shortcut_id,
+	)
+
+
 func populate_result(session, result) -> void:
 	if session == null or result == null:
 		return
@@ -10,6 +39,9 @@ func populate_result(session, result) -> void:
 	result.placed_buoys.assign(session.placed_buoys)
 	result.opened_shortcuts.assign(session.opened_shortcuts)
 	result.activated_fixed_devices.assign(session.activated_fixed_devices)
+	if not _is_safe_return(result):
+		_erase_ids(result.opened_shortcuts, session.safe_return_only_opened_shortcuts)
+		_erase_ids(result.activated_fixed_devices, session.safe_return_only_activated_fixed_devices)
 	result.marked_heavy_objects.assign(session.marked_heavy_objects)
 	result.recovered_backpacks = session.recovered_backpacks.duplicate(true)
 	result.recovered_gear_ids.assign(session.recovered_gear_ids)
@@ -108,6 +140,16 @@ func apply_result(world, result) -> Dictionary:
 			summary.rescues += 1
 
 	return summary
+
+
+func _is_safe_return(result) -> bool:
+	return bool(result.returned_alive) and not bool(result.diver_dead) and not bool(result.emergency_extraction)
+
+
+func _erase_ids(values: Array[String], excluded_ids: Array[String]) -> void:
+	for excluded_id in excluded_ids:
+		values.erase(excluded_id)
+
 
 func _append_unique(values: Array[String], value: String) -> bool:
 	if value.is_empty() or values.has(value):

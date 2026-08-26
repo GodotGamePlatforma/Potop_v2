@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "source_archive": {
+    "filename": "Wiezowiec_02_Trzy_Wloty_Level0_KOMPLET.zip",
+    "sha256": "439b94f94c8699c0647d579836936afee4258a6a63d5d119fbb47ac7ddce5668",
+    "size_bytes": 1220775,
+    "authority": false
+  },
+  "corrected_reference": {
+    "path": "Wiezowiec_02_Trzy_Wloty_Level0_POPRAWIONY_V2.docx",
+    "sha256": "e5ba8ee1f177bf8ecaf20aad0c85b780e5ce13559e4f54c746a409fe047eb46b",
+    "authority": false,
+    "render_qa": {
+      "pages": 10,
+      "visual_review": "pass",
+      "accessibility_high": 0,
+      "accessibility_medium": 0,
+      "accessibility_low": 0
+    }
+  },
+  "source_files": [
+    {
+      "path": "source/01_Wiezowiec_02_mapa_labiryntu_2D.png",
+      "sha256": "405841dde72159c23b8421c95e4883e7365edb6b8e9b50e9b863c56c20f5b095"
+    },
+    {
+      "path": "source/02_Logika_przejscia_i_stany.png",
+      "sha256": "8a087d1ecb817ac395ec991d56319ddc2d2bed17f5791b37f28cb9aab6d222a3"
+    },
+    {
+      "path": "source/03_Zagadki_B_C_D.png",
+      "sha256": "f3978525cb01b00d2efa7b6fed73cce40711715e45eee358712abf3ac30c2171"
+    },
+    {
+      "path": "source/04_Parter_i_wyjscie_do_oceanu.png",
+      "sha256": "49663e83c82f07fa0c9c755450c7e0729f54c44ffc0fac6e90d5a1533aa72743"
+    },
+    {
+      "path": "source/walidacja_logiki.json",
+      "sha256": "57b2b6132c3f22db1f738d510ea8f2e49da3c679f4b8c873ea0437bbce660266"
+    },
+    {
+      "path": "source/MANIFEST_SHA256.txt",
+      "sha256": "78a0447e3c3eba26ce72d058836c46253e79940ad57e7d34ec2dd3a5e499dbcb"
+    }
+  ],
+  "canonicalization": {
+    "runtime_authority": "../structure_manifest.json",
+    "source_validation_scope": "conceptual_only_not_runtime_proof",
+    "resolved_discrepancies": [
+      "three_inlets_are_hydraulic_B_C_D_not_three_player_entries",
+      "single_player_entry_and_single_completion_egress",
+      "panel_A_is_read_only_status",
+      "no_checkpoint_no_persistence_no_elevator_no_basement",
+      "completion_state_unlocks_the_ground_floor_egress",
+      "inlet_B_uses_positive_X_current_physical_cover_pillars_and_negative_X_recovery"
+    ]
+  }
+}

@@ -1,0 +1,1228 @@
+{
+  "schema_version": 1,
+  "format": "enterable_structure_package_v1",
+  "template": {
+    "id": "enterable_tower_v1",
+    "kind": "enterable_tower",
+    "interior_layer_id": "L04",
+    "collider_layer_id": "L05",
+    "allowed_socket_kinds": [
+      "entry_opening",
+      "moving_elevator",
+      "dynamic_door",
+      "fixed_interactable"
+    ]
+  },
+  "size": [
+    2240,
+    3680
+  ],
+  "local_topology_digest": "structure-topology-v1:35cec4f902213c0e5260db83ced132ae2a9a3a603d8fc1fb836ce09508ee7dc2",
+  "collision": {
+    "format": "l05_structure_rect_ops_v1",
+    "base": "open_water",
+    "pixel_size": [
+      56,
+      92
+    ],
+    "world_units_per_pixel": [
+      40,
+      40
+    ],
+    "operations": [
+      {
+        "id": "tower_prototype_01_shell",
+        "op": "solid_rect",
+        "rect_px": [
+          0,
+          0,
+          56,
+          92
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_00_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          2,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_00_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          2,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_01_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          9,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_01_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          9,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_02_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          16,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_02_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          16,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_03_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          23,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_03_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          23,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_04_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          30,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_04_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          30,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_05_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          37,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_05_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          37,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_06_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          44,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_06_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          44,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_07_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          51,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_07_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          51,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_08_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          58,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_08_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          58,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_09_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          65,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_09_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          65,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_10_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          72,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_10_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          72,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_11_left",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          79,
+          22,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_floor_11_right",
+        "op": "open_rect",
+        "rect_px": [
+          40,
+          79,
+          14,
+          5
+        ]
+      },
+      {
+        "id": "tower_prototype_01_elevator_shaft_upper",
+        "op": "open_rect",
+        "rect_px": [
+          26,
+          2,
+          12,
+          40
+        ]
+      },
+      {
+        "id": "tower_prototype_01_basement_minus_1",
+        "op": "open_rect",
+        "rect_px": [
+          2,
+          86,
+          52,
+          4
+        ]
+      },
+      {
+        "id": "tower_route_entry",
+        "op": "open_rect",
+        "rect_px": [
+          0,
+          2,
+          2,
+          4
+        ]
+      },
+      {
+        "id": "tower_route_start_12_11",
+        "op": "open_rect",
+        "rect_px": [
+          4,
+          7,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_start_11_10",
+        "op": "open_rect",
+        "rect_px": [
+          18,
+          14,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_a_west",
+        "op": "open_rect",
+        "rect_px": [
+          24,
+          17,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "tower_route_a_east",
+        "op": "open_rect",
+        "rect_px": [
+          38,
+          17,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "tower_gate_red_west",
+        "op": "open_rect",
+        "rect_px": [
+          24,
+          24,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "tower_gate_red_east",
+        "op": "open_rect",
+        "rect_px": [
+          38,
+          24,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "tower_route_red_to_b",
+        "op": "open_rect",
+        "rect_px": [
+          18,
+          28,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_b_shortcut_upper",
+        "op": "open_rect",
+        "rect_px": [
+          4,
+          21,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_b_shortcut_lower",
+        "op": "open_rect",
+        "rect_px": [
+          4,
+          28,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_blue_upper",
+        "op": "open_rect",
+        "rect_px": [
+          42,
+          21,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_blue_lower",
+        "op": "open_rect",
+        "rect_px": [
+          42,
+          28,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_blue_to_c",
+        "op": "open_rect",
+        "rect_px": [
+          42,
+          35,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_c_shortcut_upper",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          21,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_c_shortcut_middle",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          28,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_c_shortcut_lower",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          35,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_yellow",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          42,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_yellow_to_d",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          49,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_gate_d_hatch",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          56,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_floor_4_cross",
+        "op": "open_rect",
+        "rect_px": [
+          24,
+          59,
+          16,
+          3
+        ]
+      },
+      {
+        "id": "tower_route_floor_4_3",
+        "op": "open_rect",
+        "rect_px": [
+          18,
+          63,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_floor_3_cross",
+        "op": "open_rect",
+        "rect_px": [
+          24,
+          66,
+          16,
+          3
+        ]
+      },
+      {
+        "id": "tower_route_floor_3_2",
+        "op": "open_rect",
+        "rect_px": [
+          48,
+          70,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_floor_2_cross",
+        "op": "open_rect",
+        "rect_px": [
+          24,
+          73,
+          16,
+          3
+        ]
+      },
+      {
+        "id": "tower_route_floor_2_1",
+        "op": "open_rect",
+        "rect_px": [
+          18,
+          77,
+          4,
+          2
+        ]
+      },
+      {
+        "id": "tower_route_floor_1_cross",
+        "op": "open_rect",
+        "rect_px": [
+          24,
+          80,
+          16,
+          3
+        ]
+      },
+      {
+        "id": "tower_route_basement_hatch",
+        "op": "open_rect",
+        "rect_px": [
+          30,
+          83,
+          4,
+          3
+        ]
+      }
+    ]
+  },
+  "sockets": [
+    {
+      "id": "entry_floor_12_broken_window",
+      "kind": "entry_opening",
+      "local_rect": [
+        0,
+        80,
+        80,
+        160
+      ]
+    },
+    {
+      "id": "elevator_upper_travel",
+      "kind": "moving_elevator",
+      "local_rect": [
+        1040,
+        80,
+        480,
+        1600
+      ]
+    },
+    {
+      "id": "gate_red_west",
+      "kind": "dynamic_door",
+      "local_rect": [
+        960,
+        960,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "gate_red_east",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1520,
+        960,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "gate_blue_upper",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1680,
+        840,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "gate_blue_lower",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1680,
+        1120,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "gate_yellow",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        1680,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "hatch_d",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        2240,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_b_upper",
+      "kind": "dynamic_door",
+      "local_rect": [
+        160,
+        840,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_b_lower",
+      "kind": "dynamic_door",
+      "local_rect": [
+        160,
+        1120,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_c_upper",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        840,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_c_middle",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        1120,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_c_lower",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        1400,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "hatch_basement",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1200,
+        3320,
+        160,
+        120
+      ]
+    },
+    {
+      "id": "control_a_distributor",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1760,
+        680,
+        320,
+        120
+      ]
+    },
+    {
+      "id": "control_b_red_relay",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        160,
+        1240,
+        320,
+        120
+      ]
+    },
+    {
+      "id": "control_c_blue_lock",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1720,
+        1520,
+        320,
+        120
+      ]
+    },
+    {
+      "id": "control_d_valve_v1",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1640,
+        2040,
+        120,
+        120
+      ]
+    },
+    {
+      "id": "control_d_valve_v2",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1800,
+        2040,
+        120,
+        120
+      ]
+    },
+    {
+      "id": "control_d_valve_v3",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1960,
+        2040,
+        120,
+        120
+      ]
+    },
+    {
+      "id": "control_d_reset",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1640,
+        2160,
+        240,
+        80
+      ]
+    },
+    {
+      "id": "control_basement_hatch",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1360,
+        3200,
+        240,
+        120
+      ]
+    }
+  ],
+  "runtime": {
+    "contract": "enterable_tower_sequence_v3",
+    "elevator": {
+      "id": "elevator_main",
+      "socket_id": "elevator_upper_travel",
+      "cabin_size": [
+        464,
+        200
+      ],
+      "travel_speed": 240,
+      "initial_stop_id": "floor_12",
+      "stops": [
+        {
+          "id": "floor_12",
+          "local_center": [
+            1280,
+            180
+          ]
+        },
+        {
+          "id": "floor_7",
+          "local_center": [
+            1280,
+            1580
+          ]
+        }
+      ]
+    },
+    "barrier_groups": [
+      {
+        "id": "red_route",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "gate_red_west",
+            "open_offset": [
+              0,
+              -160
+            ]
+          },
+          {
+            "socket_id": "gate_red_east",
+            "open_offset": [
+              0,
+              -160
+            ]
+          }
+        ]
+      },
+      {
+        "id": "blue_route",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "gate_blue_upper",
+            "open_offset": [
+              -160,
+              0
+            ]
+          },
+          {
+            "socket_id": "gate_blue_lower",
+            "open_offset": [
+              -160,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "yellow_route",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "gate_yellow",
+            "open_offset": [
+              -160,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "shortcut_b",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "shortcut_b_upper",
+            "open_offset": [
+              -160,
+              0
+            ]
+          },
+          {
+            "socket_id": "shortcut_b_lower",
+            "open_offset": [
+              -160,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "shortcut_c",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "shortcut_c_upper",
+            "open_offset": [
+              160,
+              0
+            ]
+          },
+          {
+            "socket_id": "shortcut_c_middle",
+            "open_offset": [
+              160,
+              0
+            ]
+          },
+          {
+            "socket_id": "shortcut_c_lower",
+            "open_offset": [
+              160,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hatch_d",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "hatch_d",
+            "open_offset": [
+              -160,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hatch_basement",
+        "travel_speed": 320,
+        "members": [
+          {
+            "socket_id": "hatch_basement",
+            "open_offset": [
+              -160,
+              0
+            ]
+          }
+        ]
+      }
+    ],
+    "interactives": [
+      {
+        "id": "a_distributor",
+        "socket_id": "control_a_distributor",
+        "kind": "power_distributor",
+        "display_name": "Rozdzielnia A",
+        "interaction_action": "activate",
+        "interaction_seconds": 1.0,
+        "power_logic": {
+          "contract": "three_lever_deduction_v2",
+          "evaluation": "on_toggle",
+          "levers": [
+            {
+              "id": "a_lever_1",
+              "display_name": "Dźwignia A1",
+              "initial_position": "up",
+              "local_rect": [
+                1776,
+                720,
+                72,
+                72
+              ]
+            },
+            {
+              "id": "a_lever_2",
+              "display_name": "Dźwignia A2",
+              "initial_position": "up",
+              "local_rect": [
+                1884,
+                720,
+                72,
+                72
+              ]
+            },
+            {
+              "id": "a_lever_3",
+              "display_name": "Dźwignia A3",
+              "initial_position": "up",
+              "local_rect": [
+                1992,
+                720,
+                72,
+                72
+              ]
+            }
+          ],
+          "circuits": {
+            "red": {
+              "positions": [
+                "down",
+                "down",
+                "down"
+              ],
+              "symbol": "circle",
+              "barrier_group_id": "red_route"
+            },
+            "blue": {
+              "positions": [
+                "up",
+                "down",
+                "up"
+              ],
+              "symbol": "triangle",
+              "barrier_group_id": "blue_route"
+            },
+            "yellow": {
+              "positions": [
+                "down",
+                "up",
+                "up"
+              ],
+              "symbol": "square",
+              "barrier_group_id": "yellow_route"
+            }
+          },
+          "clues": {
+            "red": "OBWÓD AWARYJNY: pozycja dolna domyka gałąź; wymagane są trzy domknięte gałęzie.",
+            "blue": "WÓZEK TECHNICZNY: tylko gałąź środkowa domyka tor serwisowy.",
+            "yellow": "INSTALACJA CIŚNIENIOWA: jedna gałąź pozostaje domknięta; środkowa jest zajęta, prawa odcięta."
+          },
+          "diagnostics": {
+            "all_branches_open": {
+              "positions": [
+                "up",
+                "up",
+                "up"
+              ],
+              "message": "PRZERWA: żadna gałąź nie domyka obwodu."
+            },
+            "right_branch_unterminated": {
+              "positions": [
+                "up",
+                "up",
+                "down"
+              ],
+              "message": "PRAWA GAŁĄŹ: brak dostępnego odbiornika."
+            },
+            "middle_right_overload": {
+              "positions": [
+                "up",
+                "down",
+                "down"
+              ],
+              "message": "PRZECIĄŻENIE: gałęzie środkowa i prawa obciążają wspólną szynę."
+            },
+            "split_outer_feed": {
+              "positions": [
+                "down",
+                "up",
+                "down"
+              ],
+              "message": "ROZDZIAŁ ZASILANIA: dwie skrajne gałęzie tworzą nieciągły tor."
+            },
+            "left_middle_crossfeed": {
+              "positions": [
+                "down",
+                "down",
+                "up"
+              ],
+              "message": "SPRZĘŻENIE: gałęzie lewa i środkowa zwierają tor sterujący."
+            }
+          }
+        }
+      },
+      {
+        "id": "b_red_relay",
+        "socket_id": "control_b_red_relay",
+        "kind": "red_relay",
+        "display_name": "Przekaźnik RED B",
+        "visual_role": "red_relay_bank",
+        "interaction_action": "latch",
+        "interaction_seconds": 1.0
+      },
+      {
+        "id": "c_blue_lock",
+        "socket_id": "control_c_blue_lock",
+        "kind": "blue_lock",
+        "display_name": "Blokada BLUE C",
+        "visual_role": "trolley_interlock",
+        "interaction_action": "lock",
+        "interaction_seconds": 1.0
+      },
+      {
+        "id": "d_valve_v1",
+        "socket_id": "control_d_valve_v1",
+        "kind": "d_valve",
+        "display_name": "Wyrównanie ciśnienia",
+        "visual_role": "pressure_equalization",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "step": 1
+      },
+      {
+        "id": "d_valve_v2",
+        "socket_id": "control_d_valve_v2",
+        "kind": "d_valve",
+        "display_name": "Zasilenie siłownika",
+        "visual_role": "actuator_power",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "step": 2
+      },
+      {
+        "id": "d_valve_v3",
+        "socket_id": "control_d_valve_v3",
+        "kind": "d_valve",
+        "display_name": "Zwolnienie rygla",
+        "visual_role": "bolt_release",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "step": 3
+      },
+      {
+        "id": "d_reset",
+        "socket_id": "control_d_reset",
+        "kind": "d_reset",
+        "display_name": "Reset układu D",
+        "visual_role": "d_reset_guard",
+        "interaction_action": "reset",
+        "interaction_seconds": 0.8
+      },
+      {
+        "id": "basement_hatch_control",
+        "socket_id": "control_basement_hatch",
+        "kind": "basement_hatch_control",
+        "display_name": "Sterowanie wejścia do Archiwum",
+        "visual_role": "archive_access",
+        "interaction_action": "open",
+        "interaction_seconds": 1.0
+      }
+    ]
+  },
+  "visual_assets": [
+    {
+      "id": "tower_prototype_01_interior",
+      "layer_id": "L04",
+      "group_id": "TowerArtwork",
+      "kind": "structure_interior_texture",
+      "path": "assets/visual/tower_interior.png",
+      "sha256": "978aac0f3edfe3b65a3afcc92226c0dad25ca7260f6fc14427a7b1645ec9b60c",
+      "pixel_size": [
+        2240,
+        3680
+      ],
+      "local_rect": [
+        0,
+        0,
+        2240,
+        3680
+      ],
+      "enabled": true,
+      "affordance": "open_water_clipped_interior"
+    },
+    {
+      "id": "tower_prototype_01_structure",
+      "layer_id": "L05",
+      "group_id": "TowerArtwork",
+      "kind": "structure_owner_masked_texture",
+      "path": "assets/visual/tower_structure.png",
+      "sha256": "72b9e46ea7b807d8eb7860987a2a041b3ebad04832b412c1fd6ce439fbe33e51",
+      "pixel_size": [
+        2240,
+        3680
+      ],
+      "local_rect": [
+        0,
+        0,
+        2240,
+        3680
+      ],
+      "enabled": true,
+      "affordance": "exact_owner_solid_surface"
+    }
+  ],
+  "scripts": [
+    {
+      "role": "controller",
+      "path": "runtime/DiveEnterableTowerController.gd",
+      "sha256": "00e933fbcdb8bf55fbdd7f5974edce57c4f11d4e1ff98d12ee128bd79932a19f"
+    },
+    {
+      "role": "power_panel",
+      "path": "runtime/DivePowerDistributorPanel.gd",
+      "sha256": "2b91afcf39fe4ffd7daac209f0d88e580413833f86395a3c21ac2ef826a09ae4"
+    },
+    {
+      "role": "interactable",
+      "path": "runtime/DiveStructureInteractable.gd",
+      "sha256": "9f9c3ea53fe1af9a2455414838b2ce39d12f080de8adf4959bab166038a52cb9"
+    },
+    {
+      "role": "mechanism_visual",
+      "path": "runtime/DiveTowerMechanismVisual.gd",
+      "sha256": "1cdfec7488b00b455160e3ab568d0856db9982342ad3ea483c09e58a8ccb4186"
+    }
+  ],
+  "attempt_state": {
+    "persistence": "none",
+    "checkpoint": "none",
+    "reset": "whole_structure_attempt"
+  },
+  "references": [
+    {
+      "path": "references/Wiezowiec_2D_Analiza_i_Dokumentacja_POPRAWIONA.docx",
+      "sha256": "ad20fb8f7c2a18cba5cfc33756eb8c0b059469a1b04049020235f7ec2932b67c",
+      "role": "design_reference_only",
+      "authority": false,
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
+    }
+  ]
+}

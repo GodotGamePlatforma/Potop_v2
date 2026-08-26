@@ -1,0 +1,573 @@
+{
+  "authority": false,
+  "controller_script": "res://underwater_map_workbench/structures/tower_three_inlets_02/scripts/DiveThreeInletsTowerController.gd",
+  "generated": true,
+  "local_topology_digest": "structure-topology-v1:21d7a04d9fb176e9c3d6f95e8ba8a7564029caccbf06a4379711e71e5c99e1e1",
+  "mapping": {
+    "local_origin": [
+      0,
+      0
+    ],
+    "pixel_reference": "pixel_edge",
+    "rounding": "floor",
+    "source_world_units_per_pixel": [
+      40,
+      40
+    ],
+    "world_units_per_pixel": [
+      1,
+      1
+    ],
+    "x_axis": "right",
+    "y_axis": "down"
+  },
+  "native_artifacts": {
+    "boundary_mask_native": {
+      "path": "structures/tower_three_inlets_02/generated/boundary_mask_native.png",
+      "sha256": "6dfcbdc080c1b1ee82ddb219a5e8b92b6874854fcd49904113169e4b148eb38c"
+    },
+    "guide_native": {
+      "path": "structures/tower_three_inlets_02/generated/guide_native.png",
+      "sha256": "b161c52178ac78cf48ec82c8aa4712230380b29bb31ef9ba067582f80747db51"
+    },
+    "open_water_mask_native": {
+      "path": "structures/tower_three_inlets_02/generated/open_water_mask_native.png",
+      "sha256": "2d68954b7a154a2980179f12e358ae5af100a0d5543840741847dc1a45d1c2fd"
+    },
+    "solid_mask_native": {
+      "path": "structures/tower_three_inlets_02/generated/solid_mask_native.png",
+      "sha256": "2d4d6c7a74f82b0ce3d9fe69902a5dd9d53f6467f265f67d3d760f9072836ee9"
+    },
+    "surface_detail_mask_local": {
+      "path": "structures/tower_three_inlets_02/generated/surface_detail_mask_local.png",
+      "sha256": "d8affff489479b792a15cbde68983c53181bc20c2bfcc2bd94ca6c6cab1d99e5"
+    }
+  },
+  "package_manifest_path": "structures/tower_three_inlets_02/structure_manifest.json",
+  "package_manifest_sha256": "c20e87fbda90f92e193cf613d72f36174c576bd746848800f9d9a02a2adf28cf",
+  "panels": [
+    {
+      "id": "panel_0_0_2400_3840",
+      "local_rect": [
+        0,
+        0,
+        2400,
+        3840
+      ],
+      "path": "structures/tower_three_inlets_02/generated/panels/panel_0_0_2400_3840.json",
+      "sha256": "2c2e5dc42f1a1372fb752a8c8e6be59a639e84cd2f75f9f46f1b0762dc44b39c"
+    }
+  ],
+  "runtime": {
+    "barriers": [
+      {
+        "id": "g1",
+        "label": "G1",
+        "open_offset": [
+          320,
+          0
+        ],
+        "socket_id": "gate_g1",
+        "symbol": "I",
+        "travel_speed": 320
+      },
+      {
+        "id": "c_shortcut",
+        "label": "SKRÓT C",
+        "open_offset": [
+          0,
+          -160
+        ],
+        "socket_id": "gate_c_shortcut",
+        "symbol": "▲",
+        "travel_speed": 240
+      },
+      {
+        "id": "g2",
+        "label": "G2",
+        "open_offset": [
+          320,
+          0
+        ],
+        "socket_id": "gate_g2",
+        "symbol": "II",
+        "travel_speed": 320
+      },
+      {
+        "id": "h3",
+        "label": "H3",
+        "open_offset": [
+          320,
+          0
+        ],
+        "socket_id": "gate_h3",
+        "symbol": "III",
+        "travel_speed": 320
+      },
+      {
+        "id": "facade",
+        "label": "FASADA",
+        "open_offset": [
+          0,
+          -240
+        ],
+        "socket_id": "facade_ground_floor",
+        "symbol": "WYJŚCIE",
+        "travel_speed": 280
+      }
+    ],
+    "cabinet": {
+      "id": "cabinet_d",
+      "label": "SZAFA D",
+      "move_down": [
+        0,
+        320
+      ],
+      "move_right": [
+        160,
+        0
+      ],
+      "safety_margin": 40,
+      "socket_id": "cabinet_d",
+      "symbol": "■",
+      "travel_speed": 200
+    },
+    "contract": "three_inlets_tower_sequence_v1",
+    "currents": {
+      "central_shaft": {
+        "socket_id": "current_central_shaft",
+        "stage_multipliers": [
+          1.0,
+          0.6666667,
+          0.3333333,
+          0.0
+        ],
+        "velocity": [
+          0,
+          -240
+        ]
+      },
+      "inlet_b": {
+        "active_stage": 0,
+        "cover_socket_ids": [
+          "current_b_cover_1",
+          "current_b_cover_2"
+        ],
+        "recovery_socket_id": "current_b_recovery",
+        "recovery_velocity": [
+          -260,
+          0
+        ],
+        "socket_id": "current_b_main",
+        "velocity": [
+          180,
+          0
+        ]
+      }
+    },
+    "egress_socket_id": "egress_ground_floor",
+    "interactives": [
+      {
+        "display_name": "Panel stanu A",
+        "id": "panel_a",
+        "interaction_action": "inspect",
+        "interaction_seconds": 0.5,
+        "kind": "status_panel",
+        "socket_id": "panel_a_status",
+        "symbol": "A ≡"
+      },
+      {
+        "display_name": "Wlot B •",
+        "id": "inlet_b",
+        "interaction_action": "close",
+        "interaction_seconds": 1.0,
+        "kind": "inlet_lever",
+        "socket_id": "inlet_b_lever",
+        "stage": 0,
+        "symbol": "B •"
+      },
+      {
+        "display_name": "Wlot C ▲",
+        "id": "inlet_c",
+        "interaction_action": "close",
+        "interaction_seconds": 1.0,
+        "kind": "inlet_lever",
+        "socket_id": "inlet_c_lever",
+        "stage": 1,
+        "symbol": "C ▲"
+      },
+      {
+        "display_name": "Zawór D V1 — w prawo",
+        "id": "d_v1",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "kind": "d_valve",
+        "socket_id": "d_valve_v1",
+        "symbol": "1 →"
+      },
+      {
+        "display_name": "Zawór D V2 — w dół",
+        "id": "d_v2",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "kind": "d_valve",
+        "socket_id": "d_valve_v2",
+        "symbol": "2 ↓"
+      },
+      {
+        "display_name": "RESET układu D",
+        "id": "d_reset",
+        "interaction_action": "reset",
+        "interaction_seconds": 0.8,
+        "kind": "d_reset",
+        "socket_id": "d_reset",
+        "symbol": "↺ RESET"
+      },
+      {
+        "display_name": "Wlot D ■",
+        "id": "inlet_d",
+        "interaction_action": "close",
+        "interaction_seconds": 1.0,
+        "kind": "inlet_lever",
+        "socket_id": "d_inlet_lever",
+        "stage": 2,
+        "symbol": "D ■"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "size": [
+    2400,
+    3840
+  ],
+  "socket_cards": [
+    {
+      "id": "entry_floor_12_damaged_balcony",
+      "kind": "entry_opening",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/entry_floor_12_damaged_balcony.json",
+      "sha256": "15bc5fe9adc33be10335409d18f4b3c10cdd738a584380e87ec886e4ff0bf085"
+    },
+    {
+      "id": "panel_a_status",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/panel_a_status.json",
+      "sha256": "81ddd27299a17557bbce28cdb30b8cc397702b07ae1a83a8ec06e3857e8db2c3"
+    },
+    {
+      "id": "inlet_b_lever",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/inlet_b_lever.json",
+      "sha256": "1fafc4d2a6d512246cf9a1cb6c08f4dbaa778043789e71455714b4a3a59e739f"
+    },
+    {
+      "id": "current_b_main",
+      "kind": "current_zone",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_main.json",
+      "sha256": "ef8f76371b9876510b292d647ab5dbff728850dc412be34e9ce72467dcc526a7"
+    },
+    {
+      "id": "current_b_cover_1",
+      "kind": "current_zone",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_cover_1.json",
+      "sha256": "064d6a721c7f53511ad28e9990a84e9089690f7ac23d1432ed2da0f098239480"
+    },
+    {
+      "id": "current_b_cover_2",
+      "kind": "current_zone",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_cover_2.json",
+      "sha256": "1bbe594444834f968671e33283172f70b05fac57711991c2d314c1a82643ba64"
+    },
+    {
+      "id": "current_b_recovery",
+      "kind": "current_zone",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_recovery.json",
+      "sha256": "3e7c6dc291b69a2a7873570aef82a402f1a654449d1ba2e3684c7d5de372f01f"
+    },
+    {
+      "id": "gate_g1",
+      "kind": "dynamic_door",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_g1.json",
+      "sha256": "7a0e857ffe36cd4d3cf03219975eb40c99f81673fbfe6a8c386bb1bd92d474cf"
+    },
+    {
+      "id": "inlet_c_lever",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/inlet_c_lever.json",
+      "sha256": "d8a700f0925c21934c5d1e8704538fad2c73f9e9ab1eeafd9642a120c792dd0d"
+    },
+    {
+      "id": "gate_c_shortcut",
+      "kind": "dynamic_door",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_c_shortcut.json",
+      "sha256": "83ab74a3c771400213246640b6ba294333012f06fe01a8953a580e3c49d82396"
+    },
+    {
+      "id": "gate_g2",
+      "kind": "dynamic_door",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_g2.json",
+      "sha256": "25549024538453173f9f516522b2256d4594cfb540164c66663575e1d35ad3ab"
+    },
+    {
+      "id": "d_valve_v1",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/d_valve_v1.json",
+      "sha256": "d6e4e559387ffe507381dffe6d982813290ca5058f3988df9e5f2c1969b89438"
+    },
+    {
+      "id": "d_valve_v2",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/d_valve_v2.json",
+      "sha256": "eac885924fea8f7243993bf9a1243791c24d3d623e2f762424739ce61591c6a0"
+    },
+    {
+      "id": "d_reset",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/d_reset.json",
+      "sha256": "fc8f7e6bcc5cace96bff8971b310f21448210fd2e035b9986905e93f9ea122b6"
+    },
+    {
+      "id": "d_inlet_lever",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/d_inlet_lever.json",
+      "sha256": "47bb829b4c63dcd3b5718eb463206c97e1921663148534d87e558dbecea8d830"
+    },
+    {
+      "id": "cabinet_d",
+      "kind": "moving_obstacle",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/cabinet_d.json",
+      "sha256": "8cf9f029ad72c085d3c590641e661cdfb01b19c7fca1cf1d6ae7b378d1bce09d"
+    },
+    {
+      "id": "gate_h3",
+      "kind": "dynamic_door",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_h3.json",
+      "sha256": "082bb7be0845a115819b64644aee4321d64ef5b2c1e81cdd6a041d2270fbf9b5"
+    },
+    {
+      "id": "current_central_shaft",
+      "kind": "current_zone",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/current_central_shaft.json",
+      "sha256": "63b0a5bce06209857ad0c09f839c32731c0347078d4c39eb430ef7b245b1e17e"
+    },
+    {
+      "id": "facade_ground_floor",
+      "kind": "dynamic_door",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/facade_ground_floor.json",
+      "sha256": "ca2bea31d8288f865ac74ede779af1f825ab15ae1669aa68076dd882db3dd0fa"
+    },
+    {
+      "id": "egress_ground_floor",
+      "kind": "building_egress",
+      "path": "structures/tower_three_inlets_02/generated/socket_cards/egress_ground_floor.json",
+      "sha256": "604b26a8de528cb6f0828d17f02807b567f8f2152f34f28cc8f1c4e56ee3d0c7"
+    }
+  ],
+  "sockets": [
+    {
+      "id": "entry_floor_12_damaged_balcony",
+      "kind": "entry_opening",
+      "local_rect": [
+        0,
+        80,
+        80,
+        160
+      ]
+    },
+    {
+      "id": "panel_a_status",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1760,
+        400,
+        400,
+        120
+      ]
+    },
+    {
+      "id": "inlet_b_lever",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        80,
+        680,
+        240,
+        120
+      ]
+    },
+    {
+      "id": "current_b_main",
+      "kind": "current_zone",
+      "local_rect": [
+        240,
+        640,
+        760,
+        200
+      ]
+    },
+    {
+      "id": "current_b_cover_1",
+      "kind": "current_zone",
+      "local_rect": [
+        360,
+        640,
+        160,
+        200
+      ]
+    },
+    {
+      "id": "current_b_cover_2",
+      "kind": "current_zone",
+      "local_rect": [
+        600,
+        640,
+        160,
+        200
+      ]
+    },
+    {
+      "id": "current_b_recovery",
+      "kind": "current_zone",
+      "local_rect": [
+        840,
+        640,
+        160,
+        200
+      ]
+    },
+    {
+      "id": "gate_g1",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1080,
+        840,
+        240,
+        80
+      ]
+    },
+    {
+      "id": "inlet_c_lever",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1960,
+        1520,
+        240,
+        120
+      ]
+    },
+    {
+      "id": "gate_c_shortcut",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1800,
+        1560,
+        80,
+        80
+      ]
+    },
+    {
+      "id": "gate_g2",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1080,
+        1680,
+        240,
+        80
+      ]
+    },
+    {
+      "id": "d_valve_v1",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        160,
+        2360,
+        120,
+        80
+      ]
+    },
+    {
+      "id": "d_valve_v2",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        320,
+        2360,
+        120,
+        80
+      ]
+    },
+    {
+      "id": "d_reset",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        160,
+        2440,
+        280,
+        80
+      ]
+    },
+    {
+      "id": "d_inlet_lever",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        640,
+        2360,
+        160,
+        120
+      ]
+    },
+    {
+      "id": "cabinet_d",
+      "kind": "moving_obstacle",
+      "local_rect": [
+        480,
+        2320,
+        320,
+        160
+      ]
+    },
+    {
+      "id": "gate_h3",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1080,
+        2520,
+        240,
+        80
+      ]
+    },
+    {
+      "id": "current_central_shaft",
+      "kind": "current_zone",
+      "local_rect": [
+        1080,
+        80,
+        240,
+        3600
+      ]
+    },
+    {
+      "id": "facade_ground_floor",
+      "kind": "dynamic_door",
+      "local_rect": [
+        2320,
+        3480,
+        80,
+        160
+      ]
+    },
+    {
+      "id": "egress_ground_floor",
+      "kind": "building_egress",
+      "local_rect": [
+        2320,
+        3480,
+        80,
+        160
+      ]
+    }
+  ],
+  "structure_id": "tower_three_inlets_02",
+  "template_id": "enterable_three_inlets_tower_v1",
+  "visual_asset_ids": [
+    "tower_three_inlets_02_interior_production",
+    "tower_three_inlets_02_structure_production"
+  ]
+}
