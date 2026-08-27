@@ -10,6 +10,7 @@ Ten plik przechowuje wyłącznie trwałe decyzje authoringu i integracji avatara
 | DIVER-ARD-0003 | radialna latarnia | Jedno centralne światło dookoła nurka; sprzęt root steruje promieniem, energią i stanem. |
 | DIVER-ARD-0005 | źródło aktywnej grafiki | Aktywne arkusze 2D i profile są jedynym authority; warsztat nie utrzymuje zatwierdzonego pipeline'u 3D/AI. |
 | DIVER-ARD-0006 | fizyczna koperta 105 × 60 | Stabilna kapsuła oraz mierzalna kalibracja aktywnej grafiki do większej, czytelnej koperty. |
+| DIVER-ARD-0007 | profesjonalna animacja rastra 2D | Stabilny korpus i dwie stałe anatomicznie nogi wykonują czytelne kopnięcie w przeciwfazie bez zmiany fizyki. |
 
 Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga symetrycznej relacji w starym i nowym wpisie.
 
@@ -88,12 +89,27 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 - Relacje: Zastępuje DIVER-ARD-0002 w całości | Zastąpiona przez: brak
 - Odwołania kontraktowe: uszczegóławia globalne ARD-0103 i ARD-0105/D7; centralny montaż światła pozostaje określony przez DIVER-ARD-0003
 - D1. Collider gracza jest jedną poziomą kapsułą o promieniu `30`, wysokości `105` i obrocie `PI/2`, co daje obwiednię świata `105 × 60`. Płetwy ani wtórny ruch animacji nie otrzymują colliderów per klatka.
-- D2. Widoczna alfa całej animacji ma docelową kopertę `105 × 60`. Aktywny profil ustawia wyłącznie gałąź wizualną na skalę `0.239` i pozycję `Vector2(5.497, -3.2265)`; korzeń `CharacterBody2D` pozostaje w skali `1`.
-- D3. Wszystkie 48 granic źródłowej alfy pozostaje wspólnym pomiarem runtime i testu. Unia `430 × 195 px` daje po kalibracji około `102.77 × 46.61` jednostki świata, pozostawiając kontrolowany margines na shader czytelności i zmiany pozy.
+- D2. Widoczna alfa całej animacji ma docelową kopertę `105 × 60`. Aktywny profil ustawia wyłącznie gałąź wizualną na skalę `0.239` i pozycję `Vector2(-0.717, -4.1825)`; korzeń `CharacterBody2D` pozostaje w skali `1`.
+- D3. Wszystkie 48 granic źródłowej alfy pozostaje wspólnym pomiarem runtime i testu. Unia `420 × 199 px` daje po kalibracji około `100.38 × 47.56` jednostki świata, pozostawiając kontrolowany margines na shader czytelności i zmiany pozy.
 - D4. Kontroler ogranicza wynikowy transform prezentacyjny wraz z `flip_h`, obrotem, stretch, cue, holowaniem i interakcją do aktywnej koperty bez animowania bryły fizycznej.
 - D5. `InteractionRange=112`, kamera `zoom=1.2`, parametry ruchu i publiczne API nie zmieniają się razem z kopertą. Ich znaczenie pozostaje globalnym kontraktem root.
 - D6. Profil 288 socketów dziedziczy dokładnie jeden transform grafiki. `LampSocket` pozostaje wyłącznie wizualny, a jedyny gameplayowy `DiveLight` pozostaje centralnie na originie zgodnie z DIVER-ARD-0003.
-- D7. Aktywne arkusze 2D i czasy klipów pozostają authority. Retarget koperty zachowuje PNG, `SpriteFrames`, mipmapy i filtrowanie; krok rimu jest dostrojony do około jednego piksela ekranowego, a wtórny ślad płetw wzmacnia naprzemienny rytm bez wpływu na gameplay.
+- D7. Aktywne arkusze 2D, czasy klipów, mipmapy i filtrowanie pozostają authority. Kontrakt stabilnego korpusu i dwóch nóg w przeciwfazie określa DIVER-ARD-0007; krok rimu pozostaje dostrojony do około jednego piksela ekranowego bez wpływu na gameplay.
 - D8. Odbiór lokalny wymaga pomiaru wszystkich klatek, obu kierunków, ośmiu kierunków ruchu, przejść `idle/swim/sprint`, rzeczywistego kontaktu z dwiema osiami przeszkód i obejrzanego capture'u latarni off/I/II. Lokalny PASS nie certyfikuje prześwitów ani pełnego przepłynięcia produkcyjnej mapy; to pozostaje osobnym krokiem integratora Root/Mapa.
 - Powód i skutek: poprzednia prezentacja miała zaledwie około `82.6 × 37.4 px` na ekranie 1280×720 i traciła czytelność detali. Wariant `105 × 60` przywraca ciężar i rozpoznawalność istniejącej, preferowanej grafiki 2D bez powrotu do dawnego rozjazdu sylwetki `146 × 65` z colliderem.
 - Odwołania: DIVER-ARD-0001, DIVER-ARD-0003 i DIVER-ARD-0005; `assets/profiles/diver_frame_envelope_profile.tres`; `README.md`.
+
+## DIVER-ARD-0007 - Stabilny raster zachowuje tożsamość nóg i prawdziwą przeciwfazę
+
+- Status / aktywny zakres: Obowiązuje; D1-D7
+- Zatwierdzenie: 2026-08-27
+- Relacje: Uszczegóławia DIVER-ARD-0005/D3 oraz DIVER-ARD-0006/D2-D8 | Zastąpiona przez: brak
+- D1. Aktywny avatar pozostaje realistycznym rastrem 2D w trzech arkuszach `idle/swim/sprint`, po 16 klatek `512 × 256`. Wymiana nie dodaje modelu 3D, drugiej sceny ani pipeline'u runtime.
+- D2. Korpus, hełm, zbiornik i wyposażenie zachowują jedno stabilne położenie między klatkami. Ruch pływacki powstaje z dwóch kompletnych, odrębnych zespołów noga+płetwa, a nie z losowo zmieniającej się sylwetki całej postaci.
+- D3. `fin_upper` oznacza stale nogę bliższą, subtelnie oznaczoną miedzią, a `fin_lower` stale nogę dalszą, oznaczoną przygaszonym cyjanem. Przy fazie około `0.25` noga bliższa jest u góry, a dalsza na dole; przy fazie około `0.75` położenia są odwrócone. Tożsamości nie zamieniają się między klatkami ani przy `flip_h`.
+- D4. `idle` trwa `2.0 s`, `swim` `1.0 s`, a `sprint` `0.8 s`; każdy klip jest 16-klatkową pętlą o równych wagach. Przejście stanu zachowuje znormalizowaną fazę kopnięcia.
+- D5. Każda klatka ma jedną połączoną sylwetkę alfy, bez odłączonych wysp, i zachowuje bezpieczny padding atlasu. Dokładne granice 48 klatek oraz strojenie świata należą do `definitions/DiverFrameEnvelope.gd` i aktywnego profilu koperty.
+- D6. Wszystkie 288 próbek socketów są ponownie dopasowane do nowego rastra. Dwa sockety płetw śledzą stałe anatomiczne nogi; sockety korpusu nie dryfują z ruchem płetw, a `lamp` pozostaje wyłącznie punktem wizualnym zgodnie z DIVER-ARD-0003.
+- D7. Zmiana `flip_h` podczas przekraczania pionu zachowuje ciągłość widocznego kierunku przez równoważne przestawienie reprezentacji kąta o `PI`. Korzeń pozostaje w skali `1`, kapsuła jest centralnie symetryczna, a ruch, kontakt, kamera, radialne światło i persistence nie zmieniają znaczenia.
+- Powód i skutek: czytelna anatomia i stabilny detal usuwają migotanie starego arkusza oraz pozorną zamianę nóg; ruch wygląda jak świadome pływanie, a test rastra mierzy dwie rzeczywiste masy płetw i ich odwrócenie, nie wyłącznie pomocnicze sockety.
+- Odwołania: DIVER-ARD-0003, DIVER-ARD-0005 i DIVER-ARD-0006; `assets/animation/diver_sprite_frames.tres`; `assets/profiles/diver_socket_profile.tres`; `tests/diver_presentation_test.gd`.

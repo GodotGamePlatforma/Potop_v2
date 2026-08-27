@@ -8,6 +8,7 @@ const CAPTURE_ROOT := "res://tmp/diver_presentation_qa/capture"
 const CAPTURE_FPS := 24
 const DURATION_SECONDS := 8.0
 const CAPTURE_RESOLUTION := Vector2i(1280, 720)
+const APPROVED_PHYSICAL_ENVELOPE := Vector2(105.0, 60.0)
 
 var _diver: DiverController
 var _visual_effects: Node
@@ -16,8 +17,10 @@ var _triggered: Dictionary = {}
 var _show_socket_overlay := false
 var _show_light_overlay := false
 var _show_envelope_overlay := false
+var _show_kick_overlay := false
 var _contact_wall_rect := Rect2()
 var _light_qa_geometry: Node2D
+var _preview_phase := 0.0
 
 
 func _ready() -> void:
@@ -51,6 +54,9 @@ func _ready() -> void:
 	if not await _capture_socket_matrix():
 		get_tree().quit(1)
 		return
+	if not await _capture_kick_matrix():
+		get_tree().quit(1)
+		return
 	if not await _capture_envelope_matrix():
 		get_tree().quit(1)
 		return
@@ -66,7 +72,7 @@ func _ready() -> void:
 		return
 	report_file.store_string(JSON.stringify(performance_report, "  "))
 	report_file.close()
-	print("Diver presentation capture saved: motion, quality/reduced matrix, sockets, %s envelope/contact matrix, radial lantern matrix and performance." % _physical_envelope_label())
+	print("Diver presentation capture saved: motion, quality/reduced matrix, sockets, raster kick extremes, %s envelope/contact matrix, radial lantern matrix and performance." % _physical_envelope_label())
 	print("DIVER_PRESENTATION_PERFORMANCE %s" % JSON.stringify(performance_report))
 	get_tree().quit(0)
 
@@ -83,6 +89,9 @@ func _draw() -> void:
 	draw_line(Vector2(640, 340), Vector2(640, 400), Color(0.95, 0.70, 0.26, 0.34), 1.0)
 	if _show_envelope_overlay:
 		_draw_envelope_qa_overlay()
+	if _show_kick_overlay:
+		_draw_kick_qa_overlay()
+		return
 	if not _show_socket_overlay or _diver == null or not _diver.has_method("visual_socket_global"):
 		return
 	var socket_colors := {
@@ -102,6 +111,22 @@ func _draw() -> void:
 		draw_line(point - Vector2(0, 8), point + Vector2(0, 8), color, 1.0)
 
 
+func _draw_kick_qa_overlay() -> void:
+	if _diver == null or not _diver.has_method("visual_socket_global"):
+		return
+	var tracks := {
+		&"fin_upper": Color("c28662"),
+		&"fin_lower": Color("45bac4"),
+	}
+	for socket_id: StringName in tracks:
+		var point: Vector2 = _diver.visual_socket_global(socket_id)
+		var color: Color = tracks[socket_id]
+		draw_circle(point, 7.0, Color(color.r, color.g, color.b, 0.24))
+		draw_arc(point, 10.0, 0.0, TAU, 24, color, 2.0)
+		draw_line(point - Vector2(11.0, 0.0), point + Vector2(11.0, 0.0), color, 1.4)
+		draw_line(point - Vector2(0.0, 11.0), point + Vector2(0.0, 11.0), color, 1.4)
+
+
 func _draw_envelope_qa_overlay() -> void:
 	if _diver == null:
 		return
@@ -111,7 +136,7 @@ func _draw_envelope_qa_overlay() -> void:
 	var center := _diver.global_position
 	var root_rotation := _diver.global_rotation
 	var body_shape := (_diver.get_node("CollisionShape2D") as CollisionShape2D).shape as CapsuleShape2D
-	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
+	var target_size := APPROVED_PHYSICAL_ENVELOPE
 	var half_target := target_size * 0.5
 	var half_segment := body_shape.height * 0.5 - body_shape.radius
 	var target_corners := PackedVector2Array([
@@ -211,6 +236,7 @@ func _draw_light_qa_background() -> void:
 
 func _set_profile(quality: String, reduced_motion: bool) -> void:
 	_diver.reset_at(Vector2(640, 370))
+	_preview_phase = 0.0
 	_diver.set_reduced_motion(reduced_motion)
 	if _visual_effects != null:
 		if _visual_effects.has_method("set_graphics_quality"):
@@ -298,8 +324,8 @@ func _apply_preview_state(preview_time: float, delta: float) -> void:
 	if _diver.has_method("set_visual_context"):
 		_diver.set_visual_context(leak_intensity, interaction_action, interaction_progress, towing)
 	_diver._update_visual(delta)
-	var phase := fposmod((preview_time - state_start) / loop_duration, 1.0)
-	_diver._set_animation_phase(_diver.animated_sprite, phase)
+	_preview_phase = fposmod(_preview_phase + maxf(delta, 0.0) / loop_duration, 1.0)
+	_diver._set_animation_phase(_diver.animated_sprite, _preview_phase)
 	_diver.animated_sprite.pause()
 	_diver._update_presentation_pose(delta)
 	if _diver.has_method("_update_socket_markers"):
@@ -370,6 +396,36 @@ func _capture_socket_matrix() -> bool:
 	return true
 
 
+func _capture_kick_matrix() -> bool:
+	_set_profile("high", false)
+	_show_socket_overlay = false
+	_show_kick_overlay = true
+	if _visual_effects != null:
+		_visual_effects.visible = false
+	for animation_name: StringName in [&"swim", &"sprint"]:
+		for frame: int in [4, 12]:
+			for flip_h: bool in [false, true]:
+				_diver.reset_at(Vector2(640, 370))
+				_diver.animated_sprite.play(animation_name)
+				_diver.animated_sprite.pause()
+				_diver.animated_sprite.flip_h = flip_h
+				_diver.animated_sprite.set_frame_and_progress(frame, 0.0)
+				_diver._update_presentation_pose(0.0)
+				_diver._update_socket_markers()
+				queue_redraw()
+				_status.text = "KOPNIĘCIE W PRZECIWFAZIE — %s  |  FRAME %02d  |  %s\nMIEDŹ: NOGA BLIŻSZA  •  CYJAN: NOGA DALSZA" % [animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
+				await get_tree().process_frame
+				await RenderingServer.frame_post_draw
+				var side := "left" if flip_h else "right"
+				if not _save_viewport_png("%s/kick_%s_%02d_%s.png" % [CAPTURE_ROOT, animation_name, frame, side]):
+					return false
+	_show_kick_overlay = false
+	if _visual_effects != null:
+		_visual_effects.visible = true
+	queue_redraw()
+	return true
+
+
 func _capture_envelope_matrix() -> bool:
 	_set_profile("high", false)
 	_show_socket_overlay = false
@@ -388,7 +444,7 @@ func _capture_envelope_matrix() -> bool:
 				_diver._update_presentation_pose(0.0)
 				_diver._update_socket_markers()
 				queue_redraw()
-				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL AABB" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
+				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: NIEZALEŻNY TARGET AABB" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
 				await get_tree().process_frame
 				await RenderingServer.frame_post_draw
 				var side := "left" if flip_h else "right"
@@ -457,7 +513,7 @@ func _capture_contact_case(
 		return false
 	_diver._update_presentation_pose(0.0)
 	_diver._update_socket_markers()
-	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL %s" % [label, _physical_envelope_label()]
+	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: NIEZALEŻNY TARGET %s" % [label, _physical_envelope_label()]
 	queue_redraw()
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
@@ -469,10 +525,7 @@ func _capture_contact_case(
 
 
 func _physical_envelope_label() -> String:
-	if _diver == null or _diver.frame_envelope_profile == null:
-		return "? × ?"
-	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
-	return "%d × %d" % [roundi(target_size.x), roundi(target_size.y)]
+	return "%d × %d" % [roundi(APPROVED_PHYSICAL_ENVELOPE.x), roundi(APPROVED_PHYSICAL_ENVELOPE.y)]
 
 
 func _capture_lantern_matrix() -> bool:
