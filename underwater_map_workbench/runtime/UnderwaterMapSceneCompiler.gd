@@ -44,6 +44,12 @@ const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap
 const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
+const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v1"
+const PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID := "L04"
+const PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS := ["L01", "L02"]
+const PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS := 5
+const PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS := 1
+const PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS := 2
 const L05_TOPOLOGY_MODE := "l05_mask_v1"
 const L05_SOURCE_FORMAT := "l05_owned_rect_ops_v2"
 const L05_PIXEL_SIZE := Vector2i(576, 324)
@@ -1006,6 +1012,12 @@ func _generated_scene_errors(
 		var expected_visual: Dictionary = expected_manifest.get("visual", {})
 		var expected_layers: Array = expected_visual.get("layers", [])
 		errors.append_array(_generated_visual_layer_errors(visual_layers, expected_layers))
+		errors.append_array(
+			_generated_portal_backdrop_clearance_errors(
+				visual_layers,
+				expected_visual,
+			)
+		)
 	var structure_roots := root.get_node_or_null("StructureRoots") as Node2D
 	if structure_roots == null:
 		errors.append("Scena mapy nie zawiera StructureRoots.")
@@ -2204,6 +2216,7 @@ func _manifest_identities(manifest: Dictionary) -> Dictionary:
 	var map_record: Dictionary = manifest.get("map", {})
 	var presentation_payload := {
 		"presentation_revision": revision.get("presentation_revision", ""),
+		"portal_backdrop_clearance_contract": PORTAL_BACKDROP_CLEARANCE_CONTRACT,
 		"map": {
 			"grid": (map_record.get("grid", {}) as Dictionary).duplicate(true),
 			"world_size": (map_record.get("world_size", []) as Array).duplicate(true),
@@ -2393,6 +2406,174 @@ func _generated_visual_layer_errors(visual_layers: Node2D, expected_layers: Arra
 			errors.append("Warstwa %s sceny ma nieaktualny scroll_scale." % layer_id)
 		if layer_id == RESERVED_VISUAL_LAYER_ID and node.get_child_count() != 0:
 			errors.append("Zarezerwowana warstwa L10 sceny musi pozostać pusta.")
+	return errors
+
+
+func _generated_portal_backdrop_clearance_errors(
+	visual_layers: Node2D,
+	expected_visual: Dictionary,
+) -> PackedStringArray:
+	var errors := PackedStringArray()
+	var host_layer := visual_layers.get_node_or_null(
+		PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID
+	) as Node2D
+	if host_layer == null:
+		errors.append("Scena mapy nie zawiera hosta L04 dla clearance wejść.")
+		return errors
+	var clearance_root := host_layer.get_node_or_null(
+		"PortalBackdropClearances"
+	) as Node2D
+	if clearance_root == null:
+		errors.append("Scena mapy nie zawiera typowanego PortalBackdropClearances.")
+		return errors
+	if (
+		clearance_root.position != Vector2.ZERO
+		or clearance_root.rotation != 0.0
+		or clearance_root.scale != Vector2.ONE
+	):
+		errors.append("PortalBackdropClearances musi zachować identity transform.")
+	if clearance_root.z_as_relative:
+		errors.append("PortalBackdropClearances musi używać absolutnego world-locked z-indexu.")
+
+	var backdrop_z := -2_147_483_648
+	var host_z := 2_147_483_647
+	var found_backdrop_layers := 0
+	var layers_value: Variant = expected_visual.get("layers", [])
+	if layers_value is Array:
+		for layer_value: Variant in layers_value as Array:
+			if not layer_value is Dictionary:
+				continue
+			var layer := layer_value as Dictionary
+			var layer_id := str(layer.get("id", ""))
+			if layer_id in PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS:
+				backdrop_z = maxi(backdrop_z, int(layer.get("z_index", backdrop_z)))
+				found_backdrop_layers += 1
+			elif layer_id == PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID:
+				host_z = int(layer.get("z_index", host_z))
+	if (
+		found_backdrop_layers != PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS.size()
+		or host_z == 2_147_483_647
+		or clearance_root.z_index <= backdrop_z
+		or clearance_root.z_index >= host_z
+	):
+		errors.append("PortalBackdropClearances musi być nad L01/L02 i pod L04.")
+	if str(clearance_root.get_meta("contract", "")) != PORTAL_BACKDROP_CLEARANCE_CONTRACT:
+		errors.append("PortalBackdropClearances ma nieaktualny kontrakt geometrii.")
+	if str(clearance_root.get_meta("role", "")) != "portal_backdrop_clearance":
+		errors.append("PortalBackdropClearances ma nieaktualną rolę prezentacyjną.")
+	if str(clearance_root.get_meta("space", "")) != "world_locked":
+		errors.append("PortalBackdropClearances musi być world-locked.")
+	if not bool(clearance_root.get_meta("visual_only", false)):
+		errors.append("PortalBackdropClearances musi jawnie pozostawać visual-only.")
+	if (
+		clearance_root.get_meta("occluded_layer_ids", PackedStringArray())
+		!= PackedStringArray(PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS)
+	):
+		errors.append("PortalBackdropClearances może zasłaniać wyłącznie L01/L02.")
+	if (
+		str(clearance_root.get_meta("host_layer_id", ""))
+		!= PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID
+	):
+		errors.append("PortalBackdropClearances musi publikować host L04.")
+	if (
+		int(clearance_root.get_meta("normal_core_cells", 0))
+		!= PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS
+		or int(clearance_root.get_meta("tangent_padding_cells", 0))
+		!= PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS
+		or int(clearance_root.get_meta("feather_cells", 0))
+		!= PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS
+	):
+		errors.append("PortalBackdropClearances ma nieaktualne ograniczenia paddingu/feather.")
+
+	var geometry_records: Array = []
+	var previous_digest := ""
+	var expected_visual_children := PackedStringArray([
+		"Core", "FeatherLeft", "FeatherRight", "FeatherTop", "FeatherBottom",
+	])
+	for child: Node in clearance_root.get_children():
+		if not child is Node2D:
+			errors.append("PortalBackdropClearances może zawierać wyłącznie Node2D.")
+			continue
+		var clearance := child as Node2D
+		var geometry_digest := str(clearance.get_meta("geometry_digest", ""))
+		if not _valid_sha256(geometry_digest, false):
+			errors.append("Portal clearance wymaga poprawnego geometry_digest.")
+		elif not previous_digest.is_empty() and geometry_digest <= previous_digest:
+			errors.append("Portal clearances muszą mieć deterministyczną kolejność digestów.")
+		previous_digest = geometry_digest
+		if str(clearance.name) != "Clearance_%s" % geometry_digest:
+			errors.append("Portal clearance musi używać nazwy wyłącznie z digestu geometrii.")
+		var geometry_value: Variant = clearance.get_meta("source_geometry", null)
+		if not geometry_value is Dictionary:
+			errors.append("Portal clearance wymaga anonimowego source_geometry.")
+			continue
+		var geometry := geometry_value as Dictionary
+		if not _dictionary_has_exact_keys(geometry, [
+			"contract", "axis", "boundary_cell", "run_start_cell", "run_end_cell",
+			"outward_cell", "cell_size",
+		]):
+			errors.append("Portal clearance source_geometry ma nieaktualny typowany schema.")
+		if str(geometry.get("contract", "")) != PORTAL_BACKDROP_CLEARANCE_CONTRACT:
+			errors.append("Portal clearance source_geometry ma nieaktualny kontrakt.")
+		if _canonical_sha256(geometry) != geometry_digest:
+			errors.append("Portal clearance geometry_digest nie odpowiada geometrii.")
+		geometry_records.append(geometry.duplicate(true))
+		var opening_center_value: Variant = clearance.get_meta("opening_center", null)
+		var outward_value: Variant = clearance.get_meta("outward", null)
+		if not opening_center_value is Vector2 or not (opening_center_value as Vector2).is_finite():
+			errors.append("Portal clearance wymaga skończonego opening_center.")
+		if (
+			not outward_value is Vector2
+			or (outward_value as Vector2) not in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]
+		):
+			errors.append("Portal clearance wymaga osiowego kierunku outward.")
+		if float(clearance.get_meta("span", 0.0)) <= 0.0:
+			errors.append("Portal clearance wymaga dodatniego span.")
+		var core_rect_value: Variant = clearance.get_meta("core_rect", null)
+		var outer_rect_value: Variant = clearance.get_meta("outer_rect", null)
+		if not core_rect_value is Rect2 or not outer_rect_value is Rect2:
+			errors.append("Portal clearance wymaga core_rect i outer_rect.")
+		else:
+			var core_rect := core_rect_value as Rect2
+			var outer_rect := outer_rect_value as Rect2
+			if (
+				core_rect.size.x <= 0.0
+				or core_rect.size.y <= 0.0
+				or outer_rect.size.x <= core_rect.size.x
+				or outer_rect.size.y <= core_rect.size.y
+				or outer_rect.position.x > core_rect.position.x
+				or outer_rect.position.y > core_rect.position.y
+				or outer_rect.end.x < core_rect.end.x
+				or outer_rect.end.y < core_rect.end.y
+			):
+				errors.append("Portal clearance outer_rect musi być ograniczonym featherem core_rect.")
+		if not bool(clearance.get_meta("visual_only", false)):
+			errors.append("Każdy portal clearance musi jawnie pozostać visual-only.")
+		var actual_visual_children := PackedStringArray()
+		for visual_child: Node in clearance.get_children():
+			actual_visual_children.append(str(visual_child.name))
+			if not visual_child is Polygon2D:
+				errors.append("Portal clearance może zawierać wyłącznie Polygon2D.")
+			elif (visual_child as Polygon2D).polygon.size() != 4:
+				errors.append("Portal clearance polygon musi być deterministycznym quadem.")
+		if actual_visual_children != expected_visual_children:
+			errors.append("Portal clearance ma nieaktualny zestaw Core/Feather.")
+		var descendants: Array[Node] = [clearance]
+		descendants.append_array(clearance.find_children("*", "", true, false))
+		for descendant: Node in descendants:
+			if (
+				descendant is CollisionObject2D
+				or descendant is CollisionShape2D
+				or descendant is CollisionPolygon2D
+			):
+				errors.append("PortalBackdropClearances nie może zawierać fizyki ani Area2D.")
+	if int(clearance_root.get_meta("clearance_count", -1)) != clearance_root.get_child_count():
+		errors.append("PortalBackdropClearances ma nieaktualną liczbę pochodnych otworów.")
+	var aggregate_digest := str(clearance_root.get_meta("geometry_digest", ""))
+	if not _valid_sha256(aggregate_digest, false):
+		errors.append("PortalBackdropClearances wymaga aggregate geometry_digest.")
+	elif aggregate_digest != _canonical_sha256(geometry_records):
+		errors.append("PortalBackdropClearances aggregate digest nie odpowiada dzieciom.")
 	return errors
 
 
