@@ -23,6 +23,32 @@ Root zachowuje kampanię, ogólne mechaniki nurkowania, dane, zapis, UI i testy 
 
 Aktualne rewizje, format schema, globalne pozycje, liczności, podpisy i wynik ostatniej weryfikacji znajdują się w `map_manifest.json` oraz `.ai/PROJECT_CONTEXT.md`. Lokalna zawartość budynku pochodzi z jego `structure_manifest.json`; trwałe zasady topologii, warstw i pakietów struktur znajdują się w `.ai/DECISIONS.md`.
 
+## Bootstrap worktree agenta
+
+Zadanie Mapy rozpoczynaj w osobnym worktree utworzonym z potwierdzonej pary candidate/full-run. Z CWD istniejącego `underwater_map_workbench/`:
+
+```powershell
+..\tools\setup_agent_worktree.ps1 `
+  -CandidateReceipt <candidate.json> -RunReceipt <full.receipt> `
+  -Owner map -TaskSlug <slug> -Destination <absolute-path> `
+  -Branch codex/map/<slug> -Create
+```
+
+Po wejściu do nowego warsztatu, jeszcze przed pierwszym zapisem, zadeklaruj zamknięty write-set i uruchom:
+
+```powershell
+python -B ..\tools\workbench_contract.py --repo .. doctor --owner map --intent author
+```
+
+Przed hand-offem pobierz aktualne refy i zweryfikuj pełny diff względem ownera:
+
+```powershell
+git -C .. fetch --prune
+python -B ..\tools\workbench_contract.py --repo .. validate --owner map --diff
+```
+
+Następnie wykonaj logiczny commit i wypchnij wyłącznie własną gałąź `codex/map/<slug>`; nie pushuj bezpośrednio do `main`, nie rebase'uj ani nie force-pushuj przekazanej rewizji.
+
 ## Szybki start
 
 Z CWD `underwater_map_workbench/`:
