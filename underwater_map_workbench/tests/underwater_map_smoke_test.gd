@@ -17,6 +17,7 @@ const STREAMED_BACKDROP_CONTRACT := "camera_windowed_texture_v1"
 const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v1"
 const PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID := "L04"
 const PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS := ["L01", "L02"]
+const PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS := ["L03", "L04"]
 const PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS := 5
 const PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS := 1
 const PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS := 2
@@ -152,6 +153,11 @@ func _initialize() -> void:
 			manifest,
 			navigation_base,
 			"scena",
+		)
+		_assert_portal_backdrop_schema_fails_closed(
+			compiler,
+			generated_visual_layers,
+			visual,
 		)
 	_assert_structure_roots(
 		map_root.get_node_or_null("StructureRoots"),
@@ -2911,10 +2917,20 @@ func _assert_portal_backdrop_clearances(
 	if clearance_root == null:
 		return
 	_assert(
-		clearance_root.position == Vector2.ZERO
+		clearance_root.get_class() == "Node2D"
+		and clearance_root.visible
+		and clearance_root.position == Vector2.ZERO
 		and is_zero_approx(clearance_root.rotation)
+		and is_zero_approx(clearance_root.skew)
 		and clearance_root.scale == Vector2.ONE,
-		"%s PortalBackdropClearances musi zachować identity transform." % owner_label,
+		"%s PortalBackdropClearances musi być dokładnym visible Node2D z identity transform."
+		% owner_label,
+	)
+	_assert(
+		clearance_root.modulate.is_equal_approx(Color.WHITE)
+		and clearance_root.self_modulate.is_equal_approx(Color.WHITE),
+		"%s PortalBackdropClearances musi zachować neutralny biały CanvasItem state."
+		% owner_label,
 	)
 	_assert(
 		not clearance_root.z_as_relative,
@@ -2929,14 +2945,15 @@ func _assert_portal_backdrop_clearances(
 	for layer_id: String in PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS:
 		var layer: Dictionary = layers_by_id.get(layer_id, {})
 		backdrop_z = maxi(backdrop_z, int(layer.get("z_index", backdrop_z)))
-	var host_record: Dictionary = layers_by_id.get(
-		PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID,
-		{},
-	)
+	var foreground_z := 2_147_483_647
+	for layer_id: String in PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS:
+		var layer: Dictionary = layers_by_id.get(layer_id, {})
+		foreground_z = mini(foreground_z, int(layer.get("z_index", foreground_z)))
 	_assert(
 		clearance_root.z_index > backdrop_z
-		and clearance_root.z_index < int(host_record.get("z_index", 0)),
-		"%s PortalBackdropClearances musi być nad L01/L02 i pod L04." % owner_label,
+		and clearance_root.z_index < foreground_z,
+		"%s PortalBackdropClearances musi być nad L01/L02 i pod L03/L04."
+		% owner_label,
 	)
 	_assert(
 		str(clearance_root.get_meta("contract", ""))
@@ -3013,10 +3030,25 @@ func _assert_portal_backdrop_clearances(
 		Color.TRANSPARENT,
 	)
 	for clearance_value: Node in clearance_root.get_children():
-		_assert(clearance_value is Node2D, "%s clearance musi być Node2D." % owner_label)
-		if not clearance_value is Node2D:
+		_assert(
+			clearance_value is Node2D and clearance_value.get_class() == "Node2D",
+			"%s clearance musi być dokładnie Node2D." % owner_label,
+		)
+		if not clearance_value is Node2D or clearance_value.get_class() != "Node2D":
 			continue
 		var clearance := clearance_value as Node2D
+		_assert(
+			clearance.visible
+			and clearance.position == Vector2.ZERO
+			and is_zero_approx(clearance.rotation)
+			and is_zero_approx(clearance.skew)
+			and clearance.scale == Vector2.ONE
+			and clearance.z_index == 0
+			and clearance.z_as_relative
+			and clearance.modulate.is_equal_approx(Color.WHITE)
+			and clearance.self_modulate.is_equal_approx(Color.WHITE),
+			"%s clearance musi zachować neutralny visible identity state." % owner_label,
+		)
 		var geometry_digest := str(clearance.get_meta("geometry_digest", ""))
 		_assert(
 			_valid_lower_sha256(geometry_digest),
@@ -3042,6 +3074,11 @@ func _assert_portal_backdrop_clearances(
 				"outward_cell", "cell_size",
 			]),
 			"%s clearance source_geometry nie może zawierać ID, ścieżki ani nazwy pakietu."
+			% owner_label,
+		)
+		_assert(
+			_portal_source_geometry_is_exact_l05(geometry),
+			"%s clearance source_geometry musi używać dokładnych całkowitych komórek L05."
 			% owner_label,
 		)
 		_assert(
@@ -3164,10 +3201,28 @@ func _assert_portal_backdrop_clearances(
 		var actual_visual_children := PackedStringArray()
 		for visual_child: Node in clearance.get_children():
 			actual_visual_children.append(str(visual_child.name))
-			_assert(visual_child is Polygon2D, "%s clearance może zawierać wyłącznie Polygon2D." % owner_label)
-			if visual_child is Polygon2D:
+			_assert(
+				visual_child is Polygon2D and visual_child.get_class() == "Polygon2D",
+				"%s clearance może zawierać wyłącznie dokładne Polygon2D." % owner_label,
+			)
+			if visual_child is Polygon2D and visual_child.get_class() == "Polygon2D":
 				var polygon := visual_child as Polygon2D
 				var visual_name := str(polygon.name)
+				_assert(
+					polygon.visible
+					and polygon.position == Vector2.ZERO
+					and is_zero_approx(polygon.rotation)
+					and is_zero_approx(polygon.skew)
+					and polygon.scale == Vector2.ONE
+					and polygon.z_index == 0
+					and polygon.z_as_relative
+					and polygon.modulate.is_equal_approx(Color.WHITE)
+					and polygon.self_modulate.is_equal_approx(Color.WHITE)
+					and polygon.material == null
+					and polygon.antialiased,
+					"%s %s musi zachować neutralny render state bez shadera."
+					% [owner_label, visual_name],
+				)
 				_assert(
 					expected_polygons.has(visual_name)
 					and polygon.polygon == (expected_polygons[visual_name] as PackedVector2Array),
@@ -3221,6 +3276,105 @@ func _portal_opening_key(center: Vector2, outward: Vector2, span: float) -> Stri
 	return "%.3f,%.3f|%.0f,%.0f|%.3f" % [
 		center.x, center.y, outward.x, outward.y, span,
 	]
+
+
+func _assert_portal_backdrop_schema_fails_closed(
+	compiler: RefCounted,
+	visual_layers: Node2D,
+	expected_visual: Dictionary,
+) -> void:
+	var mutations := [
+		{"label": "integral float", "field": "boundary_cell"},
+		{"label": "fractional cell scale", "field": "cell_size"},
+	]
+	for mutation_value: Variant in mutations:
+		var mutation := mutation_value as Dictionary
+		var visual_copy := visual_layers.duplicate() as Node2D
+		_assert(visual_copy != null, "Fixture portal clearance musi się duplikować.")
+		if visual_copy == null:
+			continue
+		var clearance_root := visual_copy.get_node_or_null(
+			"%s/PortalBackdropClearances" % PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID
+		) as Node2D
+		_assert(
+			clearance_root != null and clearance_root.get_child_count() > 0,
+			"Fixture fail-closed wymaga co najmniej jednego portal clearance.",
+		)
+		if clearance_root == null or clearance_root.get_child_count() == 0:
+			visual_copy.free()
+			continue
+		var clearance := clearance_root.get_child(0) as Node2D
+		var geometry := (
+			clearance.get_meta("source_geometry", {}) as Dictionary
+		).duplicate(true)
+		if str(mutation.get("field", "")) == "boundary_cell":
+			geometry["boundary_cell"] = float(int(geometry.get("boundary_cell", 0)))
+		else:
+			var cell_size := (geometry.get("cell_size", []) as Array).duplicate(true)
+			cell_size[0] = 40.5
+			geometry["cell_size"] = cell_size
+		clearance.set_meta("source_geometry", geometry)
+		var errors_value: Variant = compiler.call(
+			"_generated_portal_backdrop_clearance_errors",
+			visual_copy,
+			expected_visual,
+		)
+		_assert(
+			errors_value is PackedStringArray,
+			"Compiler portal clearance musi zwracać PackedStringArray błędów.",
+		)
+		var found_schema_error := false
+		if errors_value is PackedStringArray:
+			for error_text: String in errors_value as PackedStringArray:
+				if "dokładnych całkowitych komórek L05" in error_text:
+					found_schema_error = true
+					break
+		_assert(
+			found_schema_error,
+			"Compiler musi fail-closed odrzucać %s w source_geometry."
+			% str(mutation.get("label", "mutation")),
+		)
+		visual_copy.free()
+
+
+func _portal_source_geometry_is_exact_l05(geometry: Dictionary) -> bool:
+	var axis := str(geometry.get("axis", ""))
+	if axis not in ["vertical", "horizontal"]:
+		return false
+	for key: String in ["boundary_cell", "run_start_cell", "run_end_cell"]:
+		if typeof(geometry.get(key, null)) != TYPE_INT:
+			return false
+	var boundary_cell := int(geometry["boundary_cell"])
+	var run_start_cell := int(geometry["run_start_cell"])
+	var run_end_cell := int(geometry["run_end_cell"])
+	if boundary_cell < 0 or run_start_cell < 0 or run_end_cell <= run_start_cell:
+		return false
+	var outward_value: Variant = geometry.get("outward_cell", null)
+	if not outward_value is Array or (outward_value as Array).size() != 2:
+		return false
+	var outward_array := outward_value as Array
+	if typeof(outward_array[0]) != TYPE_INT or typeof(outward_array[1]) != TYPE_INT:
+		return false
+	var outward := Vector2i(int(outward_array[0]), int(outward_array[1]))
+	var cell_size_value: Variant = geometry.get("cell_size", null)
+	if not cell_size_value is Array or (cell_size_value as Array).size() != 2:
+		return false
+	var cell_size_array := cell_size_value as Array
+	if typeof(cell_size_array[0]) != TYPE_INT or typeof(cell_size_array[1]) != TYPE_INT:
+		return false
+	if Vector2(int(cell_size_array[0]), int(cell_size_array[1])) != L05_CELL_SIZE:
+		return false
+	if axis == "vertical":
+		return (
+			outward in [Vector2i.LEFT, Vector2i.RIGHT]
+			and boundary_cell < L05_PIXEL_SIZE.x
+			and run_end_cell <= L05_PIXEL_SIZE.y
+		)
+	return (
+		outward in [Vector2i.UP, Vector2i.DOWN]
+		and boundary_cell < L05_PIXEL_SIZE.y
+		and run_end_cell <= L05_PIXEL_SIZE.x
+	)
 
 
 func _dictionary_has_only_keys(value: Dictionary, expected_keys: Array) -> bool:

@@ -181,7 +181,28 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertEqual(2, rendered.count('metadata/role = "portal_backdrop_clearance_core"'))
         self.assertEqual(8, rendered.count('metadata/role = "portal_backdrop_clearance_feather"'))
 
+    def test_clearance_must_remain_below_l03_and_l04(self) -> None:
+        invalid_manifest = _manifest()
+        for layer in invalid_manifest["visual"]["layers"]:
+            if layer["id"] == "L03":
+                layer["z_index"] = -85
+
+        with self.assertRaisesRegex(
+            BUILDER.ManifestError,
+            "below L03/L04",
+        ):
+            BUILDER._append_portal_backdrop_clearances(
+                [],
+                invalid_manifest,
+                _fixture(),
+            )
+
     def test_no_structure_or_no_open_continuity_produces_no_clearance(self) -> None:
+        self.assertEqual(
+            [],
+            BUILDER._portal_backdrop_clearances({"mode": "open_world"}),
+        )
+
         no_structure = _fixture()
         no_structure["structure_build"]["instances"] = []
         self.assertEqual([], BUILDER._portal_backdrop_clearances(no_structure))
@@ -190,6 +211,32 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         width, height = sealed["pixel_size"]
         sealed["cells"] = bytes([sealed["encoding"]["solid"]] * (width * height))
         self.assertEqual([], BUILDER._portal_backdrop_clearances(sealed))
+        sealed_lines: list[str] = []
+        BUILDER._append_portal_backdrop_clearances(
+            sealed_lines,
+            _manifest(),
+            sealed,
+        )
+        sealed_render = "\n".join(sealed_lines)
+        self.assertIn("metadata/clearance_count = 0", sealed_render)
+        self.assertNotIn('[node name="Clearance_', sealed_render)
+
+    def test_duplicate_enabled_geometry_fails_closed(self) -> None:
+        duplicated = _fixture()
+        second_instance = copy.deepcopy(
+            duplicated["structure_build"]["instances"][0]
+        )
+        second_instance["id"] = "structure_beta"
+        second_instance["source"]["package_path"] = (
+            "structures/structure_beta/structure_manifest.json"
+        )
+        duplicated["structure_build"]["instances"].append(second_instance)
+
+        with self.assertRaisesRegex(
+            BUILDER.ManifestError,
+            "duplicate portal backdrop clearance geometry",
+        ):
+            BUILDER._portal_backdrop_clearances(duplicated)
 
 
 if __name__ == "__main__":

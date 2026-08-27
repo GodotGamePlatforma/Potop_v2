@@ -132,6 +132,7 @@ STRUCTURE_OWNER_AFFORDANCE = "exact_owner_solid_surface"
 PORTAL_BACKDROP_CLEARANCE_CONTRACT = "raster_boundary_opening_clearance_v1"
 PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID = "L04"
 PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS = ("L01", "L02")
+PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS = ("L03", "L04")
 PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS = 5
 PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS = 1
 PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS = 2
@@ -5222,7 +5223,7 @@ def _append_portal_backdrop_clearances(
         layer_id
         for layer_id in (
             *PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS,
-            PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID,
+            *PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS,
         )
         if layer_id not in layers_by_id
     ]
@@ -5235,13 +5236,15 @@ def _append_portal_backdrop_clearances(
         int(layers_by_id[layer_id]["z_index"])
         for layer_id in PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS
     )
-    host_z = int(
-        layers_by_id[PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID]["z_index"]
+    foreground_z = min(
+        int(layers_by_id[layer_id]["z_index"])
+        for layer_id in PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS
     )
     clearance_z = backdrop_z + 1
-    if clearance_z >= host_z:
+    if clearance_z >= foreground_z:
         raise ManifestError(
-            "portal backdrop clearance requires z-order above L01/L02 and below L04"
+            "portal backdrop clearance requires z-order above L01/L02 "
+            "and below L03/L04"
         )
     clearances = _portal_backdrop_clearances(topology_build)
     aggregate_digest = _canonical_sha256(
