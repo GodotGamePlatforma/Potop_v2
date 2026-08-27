@@ -18,6 +18,7 @@ const CAPTURE_FILES := {
 	&"tower_shaft": "tower_prototype_01_shaft.png",
 	&"tower_basement": "tower_prototype_01_basement.png",
 	&"runtime_initial": "tower_prototype_01_runtime_initial.png",
+	&"runtime_door_closed": "tower_prototype_01_runtime_door_closed.png",
 	&"runtime_door_mid": "tower_prototype_01_runtime_door_mid.png",
 	&"runtime_door_open": "tower_prototype_01_runtime_door_open.png",
 	&"runtime_b_latched": "tower_prototype_01_runtime_b_latched.png",
@@ -54,6 +55,13 @@ const TOWER_INTERIOR_TEXTURE_PATH := "res://underwater_map_workbench/structures/
 const TOWER_CAPTURE_MARGIN := Vector2(240.0, 240.0)
 const VIEWPORT_READY_FRAME_LIMIT := 60
 const RENDER_SETTLE_FRAMES := 4
+const DOOR_MATERIAL_DISTANCE_THRESHOLD := 0.06
+const DOOR_CLOSED_COVER_MIN := 0.45
+const DOOR_MID_COVER_MIN := 0.10
+const DOOR_OPEN_COVER_MAX := 0.08
+const DOOR_COVER_STEP_MIN := 0.10
+const DOOR_ADJACENT_MASK_DIFFERENCE_MIN := 0.10
+const DOOR_ENDPOINT_MASK_DIFFERENCE_MIN := 0.30
 
 var _capture_host: Node2D
 var _map: Node2D
@@ -300,6 +308,13 @@ func _json_vector(value: Variant) -> Array:
 	return []
 
 
+func _json_rect(value: Variant) -> Array:
+	if value is Rect2:
+		var rect := value as Rect2
+		return [rect.position.x, rect.position.y, rect.size.x, rect.size.y]
+	return []
+
+
 func _configure_capture_viewport() -> bool:
 	root.gui_disable_input = true
 	RenderingServer.set_default_clear_color(Color("071d2a"))
@@ -527,10 +542,41 @@ func _capture_runtime_tower_states(
 		return false
 	if not await _capture_all_power_diagnostics(controller, lever_ids, captures):
 		return false
+	var red_door := _runtime_barrier_body(controller, "gate_red_east")
+	if red_door == null:
+		return false
+	var red_door_closed_position := red_door.position
+	var red_door_open_offset := _runtime_barrier_open_offset("red_route", "gate_red_east")
+	if not red_door_open_offset.is_finite() or red_door_open_offset.is_zero_approx():
+		_fail("RED door capture could not resolve a finite, non-zero manifest open offset.")
+		return false
+	var red_door_open_position := red_door_closed_position + red_door_open_offset
+	var door_closed_capture_index := captures.size()
+	if not await _capture_runtime_door_state(
+		controller,
+		red_door,
+		_capture_file(&"runtime_door_closed"),
+		"tower_runtime_door_closed",
+		"closed",
+		true,
+		false,
+		true,
+		0.0,
+		0.02,
+		red_door_closed_position,
+		red_door_open_position,
+		captures,
+	):
+		return false
+	var red_door_closed_image := _last_capture_image.duplicate() as Image
+	var red_door_closed_background := await _capture_runtime_door_background(red_door)
+	if red_door_closed_background == null:
+		return false
 	for lever_id: String in lever_ids:
 		if not _activate_runtime_power_lever(controller, lever_id):
 			return false
-	if not await _capture_runtime_power_state(
+	controller.set_physics_process(false)
+	var red_power_capture_ok := await _capture_runtime_power_state(
 		controller,
 		_capture_file(&"power_red_active"),
 		"tower_runtime_power_red_active",
@@ -540,32 +586,86 @@ func _capture_runtime_tower_states(
 		"active",
 		{"red": "active", "blue": "locked", "yellow": "locked"},
 		captures,
+	)
+	controller.set_physics_process(true)
+	if not red_power_capture_ok:
+		return false
+	if not await _await_runtime_barrier_travel_window(
+		controller,
+		red_door,
+		red_door_closed_position,
+		red_door_open_position,
+		0.40,
+		0.60,
 	):
 		return false
-	for _frame_index: int in range(12):
-		await physics_frame
-	if bool(controller.call("barrier_group_reached_target", "red_route")):
-		_fail("RED door reached its target before the mid-opening capture.")
-		return false
-	if not await _capture_runtime_detail(
+	controller.set_physics_process(false)
+	var red_door_mid_position := red_door.position
+	var door_mid_capture_index := captures.size()
+	var door_mid_capture_ok := await _capture_runtime_door_state(
 		controller,
+		red_door,
 		_capture_file(&"runtime_door_mid"),
 		"tower_runtime_door_mid",
-		"tower_red_door",
+		"opening",
+		false,
+		true,
+		false,
+		0.40,
+		0.60,
+		red_door_closed_position,
+		red_door_open_position,
 		captures,
-	):
+	)
+	var red_door_mid_image: Image = null
+	var red_door_mid_background: Image = null
+	if door_mid_capture_ok:
+		red_door_mid_image = _last_capture_image.duplicate() as Image
+		red_door_mid_background = await _capture_runtime_door_background(red_door)
+	controller.set_physics_process(true)
+	if not door_mid_capture_ok or red_door_mid_background == null:
 		return false
 	if not await _await_runtime_barrier_group_settle(controller, "red_route"):
 		_fail("RED door did not reach its open target before the open-state capture.")
 		return false
-	if not await _capture_runtime_detail(
+	var door_open_capture_index := captures.size()
+	if not await _capture_runtime_door_state(
 		controller,
+		red_door,
 		_capture_file(&"runtime_door_open"),
 		"tower_runtime_door_open",
-		"tower_red_door",
+		"open",
+		true,
+		true,
+		true,
+		0.98,
+		1.02,
+		red_door_closed_position,
+		red_door_open_position,
 		captures,
 	):
 		return false
+	var red_door_open_image := _last_capture_image.duplicate() as Image
+	var red_door_open_background := await _capture_runtime_door_background(red_door)
+	if red_door_open_background == null:
+		return false
+	var door_triptych_proof := _runtime_door_triptych_roi_proof(
+		red_door,
+		red_door_closed_position,
+		red_door_mid_position,
+		red_door_open_position,
+		red_door_closed_image,
+		red_door_closed_background,
+		red_door_mid_image,
+		red_door_mid_background,
+		red_door_open_image,
+		red_door_open_background,
+	)
+	if door_triptych_proof.is_empty():
+		return false
+	for capture_index: int in [door_closed_capture_index, door_mid_capture_index, door_open_capture_index]:
+		var door_capture: Dictionary = captures[capture_index]
+		door_capture["dynamic_door_triptych_roi_proof"] = door_triptych_proof.duplicate(true)
 	for lever_index: int in [0, 2]:
 		if not _activate_runtime_power_lever(controller, lever_ids[lever_index]):
 			return false
@@ -978,6 +1078,163 @@ func _capture_runtime_detail(
 	return true
 
 
+func _capture_runtime_door_state(
+	controller: Node,
+	door: AnimatableBody2D,
+	file_name: String,
+	capture_id: String,
+	expected_visual_state: String,
+	expected_reached_target: bool,
+	expected_group_open: bool,
+	expected_group_reached_target: bool,
+	minimum_travel_fraction: float,
+	maximum_travel_fraction: float,
+	closed_position: Vector2,
+	open_position: Vector2,
+	captures: Array[Dictionary],
+) -> bool:
+	var state := _validated_runtime_door_state(
+		controller,
+		door,
+		capture_id,
+		expected_visual_state,
+		expected_reached_target,
+		expected_group_open,
+		expected_group_reached_target,
+		minimum_travel_fraction,
+		maximum_travel_fraction,
+		closed_position,
+		open_position,
+	)
+	if state.is_empty():
+		return false
+	if not await _capture_runtime_detail(
+		controller,
+		file_name,
+		capture_id,
+		"tower_red_door",
+		captures,
+	):
+		return false
+	var capture: Dictionary = captures[captures.size() - 1]
+	capture["dynamic_door_state"] = state
+	return true
+
+
+func _validated_runtime_door_state(
+	controller: Node,
+	door: AnimatableBody2D,
+	capture_id: String,
+	expected_visual_state: String,
+	expected_reached_target: bool,
+	expected_group_open: bool,
+	expected_group_reached_target: bool,
+	minimum_travel_fraction: float,
+	maximum_travel_fraction: float,
+	closed_position: Vector2,
+	open_position: Vector2,
+) -> Dictionary:
+	var visual_state := str(door.get_meta(&"visual_state", ""))
+	var reached_target := bool(door.get_meta(&"reached_target", false))
+	var target_open := bool(door.get_meta(&"target_open", false))
+	var target_position_value: Variant = door.get_meta(&"target_position", null)
+	var mechanism_visual := _runtime_door_visual(door)
+	var mechanism_visual_state := (
+		str(mechanism_visual.get_meta(&"visual_state", ""))
+		if mechanism_visual != null
+		else ""
+	)
+	var native_visual_rect_value: Variant = (
+		mechanism_visual.get_meta(&"native_visual_rect", null)
+		if mechanism_visual != null
+		else null
+	)
+	var group_open := bool(controller.call("barrier_group_is_open", "red_route"))
+	var group_reached_target := bool(controller.call("barrier_group_reached_target", "red_route"))
+	var travel_fraction := _barrier_travel_fraction(door.position, closed_position, open_position)
+	var expected_target_position := open_position if expected_group_open else closed_position
+	var projected_position := closed_position + (open_position - closed_position) * travel_fraction
+	var perpendicular_drift := door.position.distance_to(projected_position)
+	var state := {
+		"barrier_group_id": str(door.get_meta(&"barrier_group_id", "")),
+		"socket_id": str(door.get_meta(&"socket_id", "")),
+		"visual_state": visual_state,
+		"mechanism_visual_state": mechanism_visual_state,
+		"native_visual_rect": _json_rect(native_visual_rect_value),
+		"reached_target": reached_target,
+		"target_open": target_open,
+		"group_open": group_open,
+		"group_reached_target": group_reached_target,
+		"travel_fraction": travel_fraction,
+		"position": _json_vector(door.position),
+		"closed_position": _json_vector(closed_position),
+		"open_position": _json_vector(open_position),
+	}
+	if (
+		str(state["barrier_group_id"]) != "red_route"
+		or str(state["socket_id"]) != "gate_red_east"
+		or visual_state != expected_visual_state
+		or mechanism_visual == null
+		or mechanism_visual_state != expected_visual_state
+		or not native_visual_rect_value is Rect2
+		or (native_visual_rect_value as Rect2).size.x <= 0.0
+		or (native_visual_rect_value as Rect2).size.y <= 0.0
+		or reached_target != expected_reached_target
+		or target_open != expected_group_open
+		or group_open != expected_group_open
+		or group_reached_target != expected_group_reached_target
+		or not is_finite(travel_fraction)
+		or travel_fraction < minimum_travel_fraction
+		or travel_fraction > maximum_travel_fraction
+		or perpendicular_drift > 0.05
+		or not target_position_value is Vector2
+		or (target_position_value as Vector2).distance_to(expected_target_position) > 0.05
+	):
+		_fail(
+			"Dynamic RED door capture %s does not match its semantic state contract: %s."
+			% [capture_id, state]
+		)
+		return {}
+	return state
+
+
+func _runtime_barrier_body(controller: Node, socket_id: String) -> AnimatableBody2D:
+	for body_value: Variant in controller.find_children("*", "AnimatableBody2D", true, false):
+		var body := body_value as AnimatableBody2D
+		if (
+			str(body.get_meta(&"dynamic_kind", "")) == "dynamic_door"
+			and str(body.get_meta(&"socket_id", "")) == socket_id
+		):
+			return body
+	_fail("Runtime capture could not find dynamic door body for socket %s." % socket_id)
+	return null
+
+
+func _runtime_door_visual(door: AnimatableBody2D) -> Node2D:
+	for visual_value: Variant in door.find_children("*", "Node2D", true, false):
+		var visual := visual_value as Node2D
+		if visual.has_meta(&"native_visual_rect") and visual.has_meta(&"visual_state"):
+			return visual
+	return null
+
+
+func _runtime_barrier_open_offset(group_id: String, socket_id: String) -> Vector2:
+	var runtime := _package_manifest.get("runtime", {}) as Dictionary
+	for group_value: Variant in runtime.get("barrier_groups", []):
+		if not group_value is Dictionary:
+			continue
+		var group := group_value as Dictionary
+		if str(group.get("id", "")) != group_id:
+			continue
+		for member_value: Variant in group.get("members", []):
+			if not member_value is Dictionary:
+				continue
+			var member := member_value as Dictionary
+			if str(member.get("socket_id", "")) == socket_id:
+				return _manifest_vector2(member.get("open_offset", null))
+	return Vector2(NAN, NAN)
+
+
 func _capture_runtime_trolley_state(
 	controller: Node,
 	file_name: String,
@@ -1208,6 +1465,57 @@ func _await_runtime_elevator_stop(controller: Node, stop_id: String) -> bool:
 	return false
 
 
+func _await_runtime_barrier_travel_window(
+	controller: Node,
+	door: AnimatableBody2D,
+	closed_position: Vector2,
+	open_position: Vector2,
+	minimum_fraction: float,
+	maximum_fraction: float,
+) -> bool:
+	for _frame in range(180):
+		if not is_instance_valid(door):
+			_fail("RED door disappeared before the deterministic MID capture.")
+			return false
+		var travel_fraction := _barrier_travel_fraction(door.position, closed_position, open_position)
+		var visual_state := str(door.get_meta(&"visual_state", ""))
+		var reached_target := bool(door.get_meta(&"reached_target", false))
+		if travel_fraction > maximum_fraction:
+			_fail(
+				"RED door skipped the deterministic MID window: fraction=%.4f state=%s reached=%s."
+				% [travel_fraction, visual_state, reached_target]
+			)
+			return false
+		if travel_fraction >= minimum_fraction:
+			if (
+				visual_state != "opening"
+				or reached_target
+				or not bool(controller.call("barrier_group_is_open", "red_route"))
+				or bool(controller.call("barrier_group_reached_target", "red_route"))
+			):
+				_fail(
+					"RED door entered the MID travel window without opening semantics: fraction=%.4f state=%s reached=%s."
+					% [travel_fraction, visual_state, reached_target]
+				)
+				return false
+			return true
+		await physics_frame
+	_fail("RED door did not enter the deterministic 40-60 percent MID window.")
+	return false
+
+
+func _barrier_travel_fraction(
+	position: Vector2,
+	closed_position: Vector2,
+	open_position: Vector2,
+) -> float:
+	var travel := open_position - closed_position
+	var travel_length_squared := travel.length_squared()
+	if travel_length_squared <= 0.0001:
+		return NAN
+	return (position - closed_position).dot(travel) / travel_length_squared
+
+
 func _await_runtime_barrier_group_settle(controller: Node, group_id: String) -> bool:
 	for _frame in range(180):
 		if bool(controller.call("barrier_group_reached_target", group_id)):
@@ -1326,6 +1634,239 @@ func _capture_frame(
 		],
 	})
 	return true
+
+
+func _capture_runtime_door_background(door: AnimatableBody2D) -> Image:
+	var mechanism_visual := _runtime_door_visual(door)
+	if mechanism_visual == null:
+		_fail("Dynamic door ROI proof could not find its MechanismVisual.")
+		return null
+	var was_visible := mechanism_visual.visible
+	mechanism_visual.visible = false
+	await process_frame
+	await RenderingServer.frame_post_draw
+	var background_image := root.get_texture().get_image()
+	mechanism_visual.visible = was_visible
+	await process_frame
+	await RenderingServer.frame_post_draw
+	if (
+		background_image == null
+		or background_image.is_empty()
+		or background_image.get_size() != CAPTURE_RESOLUTION
+	):
+		_fail("Dynamic door ROI proof could not render a matching background reference.")
+		return null
+	return background_image
+
+
+func _runtime_door_triptych_roi_proof(
+	door: AnimatableBody2D,
+	closed_position: Vector2,
+	mid_position: Vector2,
+	open_position: Vector2,
+	closed_image: Image,
+	closed_background: Image,
+	mid_image: Image,
+	mid_background: Image,
+	open_image: Image,
+	open_background: Image,
+) -> Dictionary:
+	var mechanism_visual := _runtime_door_visual(door)
+	if mechanism_visual == null:
+		_fail("Dynamic door triptych proof could not find its material visual.")
+		return {}
+	var native_visual_rect_value: Variant = mechanism_visual.get_meta(&"native_visual_rect", null)
+	if not native_visual_rect_value is Rect2:
+		_fail("Dynamic door triptych proof has no native visual rect.")
+		return {}
+	var native_visual_rect := native_visual_rect_value as Rect2
+	var closed_screen_rect := _runtime_door_screen_rect(
+		door,
+		mechanism_visual,
+		closed_position,
+		native_visual_rect,
+	)
+	var mid_screen_rect := _runtime_door_screen_rect(
+		door,
+		mechanism_visual,
+		mid_position,
+		native_visual_rect,
+	)
+	var open_screen_rect := _runtime_door_screen_rect(
+		door,
+		mechanism_visual,
+		open_position,
+		native_visual_rect,
+	)
+	var opening_roi := _clipped_capture_roi(closed_screen_rect.grow(-8.0))
+	var swept_roi := _clipped_capture_roi(
+		closed_screen_rect.merge(mid_screen_rect).merge(open_screen_rect).grow(4.0)
+	)
+	if opening_roi.size.x <= 0 or opening_roi.size.y <= 0 or swept_roi.size.x <= 0 or swept_roi.size.y <= 0:
+		_fail("Dynamic door triptych proof produced an empty screen ROI.")
+		return {}
+	var closed_material := _door_material_mask(closed_image, closed_background, opening_roi)
+	var mid_material := _door_material_mask(mid_image, mid_background, opening_roi)
+	var open_material := _door_material_mask(open_image, open_background, opening_roi)
+	if closed_material.is_empty() or mid_material.is_empty() or open_material.is_empty():
+		return {}
+	var sample_count := int(closed_material.get("sample_count", 0))
+	if sample_count <= 0:
+		_fail("Dynamic door triptych proof sampled no opening pixels.")
+		return {}
+	var closed_cover := float(closed_material.get("material_count", 0)) / float(sample_count)
+	var mid_cover := float(mid_material.get("material_count", 0)) / float(sample_count)
+	var open_cover := float(open_material.get("material_count", 0)) / float(sample_count)
+	var closed_mask: PackedByteArray = closed_material.get("mask", PackedByteArray())
+	var mid_mask: PackedByteArray = mid_material.get("mask", PackedByteArray())
+	var open_mask: PackedByteArray = open_material.get("mask", PackedByteArray())
+	var closed_mid_difference := _binary_mask_difference_ratio(closed_mask, mid_mask)
+	var mid_open_difference := _binary_mask_difference_ratio(mid_mask, open_mask)
+	var closed_open_difference := _binary_mask_difference_ratio(closed_mask, open_mask)
+	if (
+		closed_cover < DOOR_CLOSED_COVER_MIN
+		or mid_cover < DOOR_MID_COVER_MIN
+		or open_cover > DOOR_OPEN_COVER_MAX
+		or closed_cover - mid_cover < DOOR_COVER_STEP_MIN
+		or mid_cover - open_cover < DOOR_COVER_STEP_MIN
+		or closed_mid_difference < DOOR_ADJACENT_MASK_DIFFERENCE_MIN
+		or mid_open_difference < DOOR_ADJACENT_MASK_DIFFERENCE_MIN
+		or closed_open_difference < DOOR_ENDPOINT_MASK_DIFFERENCE_MIN
+	):
+		_fail(
+			"Dynamic door triptych must visibly clear its material opening: cover closed=%.3f mid=%.3f open=%.3f; mask delta closed-mid=%.3f mid-open=%.3f closed-open=%.3f."
+			% [
+				closed_cover,
+				mid_cover,
+				open_cover,
+				closed_mid_difference,
+				mid_open_difference,
+				closed_open_difference,
+			]
+		)
+		return {}
+	return {
+		"contract": "closed_mid_open_material_cover_progression",
+		"socket_id": "gate_red_east",
+		"barrier_group_id": "red_route",
+		"opening_roi_screen": _json_rect(Rect2(opening_roi.position, opening_roi.size)),
+		"swept_roi_screen": _json_rect(Rect2(swept_roi.position, swept_roi.size)),
+		"state_screen_rects": {
+			"closed": _json_rect(closed_screen_rect),
+			"mid": _json_rect(mid_screen_rect),
+			"open": _json_rect(open_screen_rect),
+		},
+		"travel_fraction": {
+			"closed": _barrier_travel_fraction(closed_position, closed_position, open_position),
+			"mid": _barrier_travel_fraction(mid_position, closed_position, open_position),
+			"open": _barrier_travel_fraction(open_position, closed_position, open_position),
+		},
+		"material_cover_ratio": {
+			"closed": closed_cover,
+			"mid": mid_cover,
+			"open": open_cover,
+		},
+		"material_pixel_count": {
+			"closed": int(closed_material.get("material_count", 0)),
+			"mid": int(mid_material.get("material_count", 0)),
+			"open": int(open_material.get("material_count", 0)),
+		},
+		"mask_difference_ratio": {
+			"closed_mid": closed_mid_difference,
+			"mid_open": mid_open_difference,
+			"closed_open": closed_open_difference,
+		},
+		"sample_count": sample_count,
+	}
+
+
+func _runtime_door_screen_rect(
+	door: AnimatableBody2D,
+	mechanism_visual: Node2D,
+	body_position: Vector2,
+	local_visual_rect: Rect2,
+) -> Rect2:
+	var parent_canvas := door.get_parent() as CanvasItem
+	if parent_canvas == null or mechanism_visual.get_parent() != door:
+		return Rect2()
+	var body_transform := door.transform
+	body_transform.origin = body_position
+	var local_to_screen := (
+		parent_canvas.get_global_transform_with_canvas()
+		* body_transform
+		* mechanism_visual.transform
+	)
+	return _transformed_rect_aabb(local_visual_rect, local_to_screen)
+
+
+func _transformed_rect_aabb(rect: Rect2, transform: Transform2D) -> Rect2:
+	var corners := [
+		transform * rect.position,
+		transform * Vector2(rect.end.x, rect.position.y),
+		transform * rect.end,
+		transform * Vector2(rect.position.x, rect.end.y),
+	]
+	var minimum: Vector2 = corners[0]
+	var maximum: Vector2 = corners[0]
+	for corner_value: Variant in corners:
+		var corner := corner_value as Vector2
+		minimum = minimum.min(corner)
+		maximum = maximum.max(corner)
+	return Rect2(minimum, maximum - minimum)
+
+
+func _clipped_capture_roi(screen_rect: Rect2) -> Rect2i:
+	var minimum := Vector2i(
+		maxi(0, floori(screen_rect.position.x)),
+		maxi(0, floori(screen_rect.position.y)),
+	)
+	var maximum := Vector2i(
+		mini(CAPTURE_RESOLUTION.x, ceili(screen_rect.end.x)),
+		mini(CAPTURE_RESOLUTION.y, ceili(screen_rect.end.y)),
+	)
+	var size := maximum - minimum
+	return Rect2i(minimum, Vector2i(maxi(0, size.x), maxi(0, size.y)))
+
+
+func _door_material_mask(image: Image, background: Image, roi: Rect2i) -> Dictionary:
+	if (
+		image == null
+		or background == null
+		or image.is_empty()
+		or background.is_empty()
+		or image.get_size() != CAPTURE_RESOLUTION
+		or background.get_size() != CAPTURE_RESOLUTION
+	):
+		_fail("Dynamic door material proof received mismatched images.")
+		return {}
+	var sample_count := roi.size.x * roi.size.y
+	if sample_count <= 0:
+		return {}
+	var mask := PackedByteArray()
+	mask.resize(sample_count)
+	var material_count := 0
+	var sample_index := 0
+	for y: int in range(roi.position.y, roi.end.y):
+		for x: int in range(roi.position.x, roi.end.x):
+			if _rgb_distance(image.get_pixel(x, y), background.get_pixel(x, y)) > DOOR_MATERIAL_DISTANCE_THRESHOLD:
+				mask[sample_index] = 1
+				material_count += 1
+			sample_index += 1
+	return {
+		"mask": mask,
+		"material_count": material_count,
+		"sample_count": sample_count,
+	}
+
+
+func _binary_mask_difference_ratio(first: PackedByteArray, second: PackedByteArray) -> float:
+	if first.is_empty() or first.size() != second.size():
+		return 0.0
+	var difference_count := 0
+	for index: int in range(first.size()):
+		if first[index] != second[index]:
+			difference_count += 1
+	return float(difference_count) / float(first.size())
 
 
 func _trolley_open_aperture_capture_proof(controller: Node) -> Dictionary:
