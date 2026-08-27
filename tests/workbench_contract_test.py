@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -604,6 +605,176 @@ class PublicationReceiptTest(unittest.TestCase):
                 "output list is not closed",
             ):
                 _create_receipt(candidate)
+
+
+class LastGreenRefTest(unittest.TestCase):
+    def test_last_green_ref_is_shared_by_linked_worktrees(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            candidate = _publication_candidate(parent)
+            repository = candidate["repository"]
+            head = _git(repository, "rev-parse", "HEAD")
+            linked = parent / "linked"
+            _git(repository, "worktree", "add", "--detach", str(linked), head)
+
+            _git(repository, "update-ref", contract.LAST_GREEN_REF, head)
+
+            self.assertEqual(contract.last_green_head(repository), head)
+            self.assertEqual(contract.last_green_head(linked), head)
+
+    def test_resolve_requires_existing_matching_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+
+            with self.assertRaisesRegex(contract.ContractError, "ref is missing"):
+                contract.resolve_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=Path(temporary) / "unused-run.json",
+                )
+
+            parent = _git(repository, "rev-parse", "HEAD^")
+            _git(repository, "update-ref", contract.LAST_GREEN_REF, parent)
+            with self.assertRaisesRegex(contract.ContractError, "differs from"):
+                contract.resolve_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=Path(temporary) / "unused-run.json",
+                )
+            self.assertNotEqual(receipt["head"], parent)
+
+    def test_symbolic_last_green_ref_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            branch = _git(repository, "branch", "--show-current")
+            _git(
+                repository,
+                "symbolic-ref",
+                contract.LAST_GREEN_REF,
+                f"refs/heads/{branch}",
+            )
+
+            with self.assertRaisesRegex(contract.ContractError, "symbolic ref"):
+                contract.last_green_head(repository)
+
+    def test_promote_and_resolve_verified_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+            run_receipt = Path(temporary) / "run.json"
+
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ) as verifier:
+                promoted = contract.promote_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=run_receipt,
+                    expected_old=None,
+                )
+                resolved = contract.resolve_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=run_receipt,
+                )
+
+            self.assertEqual(promoted["status"], "PROMOTED")
+            self.assertEqual(promoted["head"], receipt["head"])
+            self.assertEqual(resolved["head"], receipt["head"])
+            self.assertEqual(contract.last_green_head(repository), receipt["head"])
+            self.assertEqual(verifier.call_count, 2)
+
+    def test_failed_run_evidence_cannot_move_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            candidate = _publication_candidate(parent)
+            first_receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+            _git(
+                repository,
+                "update-ref",
+                contract.LAST_GREEN_REF,
+                str(first_receipt["head"]),
+            )
+
+            (repository / "source" / "input.txt").write_bytes(b"next\n")
+            _commit_all(repository, "next candidate")
+            candidate["receipt"] = parent / "publication_receipt_next.json"
+            next_receipt = _create_receipt(candidate)
+
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=contract.ContractError("full run is not PASS"),
+            ):
+                with self.assertRaisesRegex(contract.ContractError, "not PASS"):
+                    contract.promote_last_green(
+                        repository,
+                        candidate_receipt=candidate["receipt"],
+                        run_receipt=parent / "failed-run.json",
+                        expected_old=str(first_receipt["head"]),
+                    )
+
+            self.assertNotEqual(first_receipt["head"], next_receipt["head"])
+            self.assertEqual(
+                contract.last_green_head(repository), first_receipt["head"]
+            )
+
+    def test_stale_compare_and_swap_does_not_verify_or_move(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+            _git(
+                repository,
+                "update-ref",
+                contract.LAST_GREEN_REF,
+                str(receipt["head"]),
+            )
+
+            stale = _git(repository, "rev-parse", "HEAD^")
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ) as verifier:
+                with self.assertRaisesRegex(
+                    contract.ContractError, "compare-and-swap mismatch"
+                ):
+                    contract.promote_last_green(
+                        repository,
+                        candidate_receipt=candidate["receipt"],
+                        run_receipt=Path(temporary) / "run.json",
+                        expected_old=stale,
+                    )
+
+            verifier.assert_not_called()
+            self.assertEqual(contract.last_green_head(repository), receipt["head"])
+
+    def test_non_fast_forward_candidate_cannot_move_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            _create_receipt(candidate)
+            repository = candidate["repository"]
+            tree = _git(repository, "rev-parse", "HEAD^{tree}")
+            unrelated = _git(repository, "commit-tree", tree, "-m", "unrelated")
+            _git(repository, "update-ref", contract.LAST_GREEN_REF, unrelated)
+
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ) as verifier:
+                with self.assertRaisesRegex(contract.ContractError, "fast-forward"):
+                    contract.promote_last_green(
+                        repository,
+                        candidate_receipt=candidate["receipt"],
+                        run_receipt=Path(temporary) / "run.json",
+                        expected_old=unrelated,
+                    )
+
+            verifier.assert_not_called()
+            self.assertEqual(contract.last_green_head(repository), unrelated)
 
 
 class TrackedEolCheckTest(unittest.TestCase):

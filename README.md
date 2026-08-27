@@ -26,7 +26,7 @@ git lfs pull
 
 ## Równoległa praca agentów
 
-Każdy jednocześnie zapisujący agent pracuje w osobnym pełnym Git worktree i na gałęzi `codex/<owner>/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem oraz zgodnym pełnym run receiptem `PASS`. Osobny katalog roboczy wewnątrz tego samego checkoutu nie izoluje indeksu Git, plików ani Godota. Nie twórz baseline'u z bieżącego dirty stanu ani nie traktuj samego `HEAD` lub candidate receiptu jako dowodu zielonych testów.
+Każdy jednocześnie zapisujący agent pracuje w osobnym pełnym Git worktree i na gałęzi `codex/<owner>/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem, zgodnym pełnym run receiptem `PASS` oraz lokalnym refem `refs/last-green/integration`. Osobny katalog roboczy wewnątrz tego samego checkoutu nie izoluje indeksu Git, plików ani Godota. Nie twórz baseline'u z bieżącego dirty stanu ani nie traktuj samego `HEAD` lub candidate receiptu jako dowodu zielonych testów.
 
 Sprawdzenie właściciela i planowanego diffu:
 
@@ -59,12 +59,23 @@ python -B .\tools\workbench_contract.py publication create `
   --output-root underwater_map_workbench/UnderwaterMap.tscn `
   --receipt $candidateReceipt
 
+$expectedOld = (& git rev-parse --verify --quiet refs/last-green/integration 2>$null)
+if ([string]::IsNullOrWhiteSpace($expectedOld)) { $expectedOld = "missing" }
+python -B .\tools\workbench_contract.py lkg promote `
+  --candidate-receipt $candidateReceipt --run-receipt $runReceipt `
+  --expected-old $expectedOld
+if ($LASTEXITCODE -ne 0) { throw "Lokalna promocja LKG nie przeszła." }
+python -B .\tools\workbench_contract.py lkg resolve `
+  --candidate-receipt $candidateReceipt --run-receipt $runReceipt
+
 .\tools\setup_agent_worktree.ps1 -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt -Owner map -TaskSlug map-art-pass -Destination ..\agent-worktrees\map-map-art-pass
 .\tools\setup_agent_worktree.ps1 -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt -Owner map -TaskSlug map-art-pass -Destination ..\agent-worktrees\map-map-art-pass -Create
 .\tools\setup_agent_worktree.ps1 -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt -Owner structure:tower_prototype_01 -TaskSlug tower-audio -Destination ..\agent-worktrees\tower-prototype-01-tower-audio -Create
 ```
 
-Listy w przykładzie są zamkniętymi kotwicami wejścia/wyjścia, a candidate receipt dodatkowo przypina cały exact `HEAD^{tree}`. Nowe zadanie otrzymuje gałąź `codex/<owner>/<task-slug>`. Przed użyciem kandydata jako zielonej podstawy integrator musi dodatkowo zweryfikować pełny run receipt związany z tym samym HEAD/tree; targeted `PASS` nie wystarcza. Osobne worktrees przeznacz dla integracji oraz ręcznego edytora/playtestu. Producent przekazuje integratorowi niezmienny commit albo zweryfikowaną rewizję FROZEN i może od razu rozwijać N+1. Wspólny lock jest potrzebny tylko przy krótkiej publikacji wieloplikowego wyniku Mapy, nie podczas prywatnego authoringu ani testów.
+Listy w przykładzie są zamkniętymi kotwicami wejścia/wyjścia, a candidate receipt dodatkowo przypina cały exact `HEAD^{tree}`. `lkg promote` ponownie weryfikuje oba receipty i przesuwa ref wyłącznie fast-forward przez compare-and-swap względem jawnego `--expected-old`; nie uruchamia ponownie Godota. `setup_agent_worktree.ps1` sprawdza przed i po materializacji, że candidate HEAD, pełny run HEAD i ref są nadal identyczne, a wyścig wycofuje nowe drzewo. Nowe zadanie otrzymuje gałąź `codex/<owner>/<task-slug>`. Targeted `PASS` nie wystarcza. Pierwsza migracja wymaga nowego pełnego green na rewizji zawierającej resolver i promocji z `--expected-old missing`; historyczny candidate bez resolvera nie jest automatycznie uznawany za LKG.
+
+`refs/last-green/integration` jest wyłącznie lokalnym authority wspólnego Git common-dir: widzą go wszystkie linked worktrees tego klonu, ale nie jest przesyłany przez clone, fetch ani push. Zdalny LKG wymagałby osobnego chronionego refspecu albo authority CI i nie jest tutaj wdrożony. Osobne worktrees przeznacz dla integracji oraz ręcznego edytora/playtestu. Producent przekazuje integratorowi niezmienny commit albo zweryfikowaną rewizję FROZEN i może od razu rozwijać N+1. Wspólny lock jest potrzebny tylko przy krótkiej publikacji wieloplikowego wyniku Mapy, nie podczas prywatnego authoringu ani testów.
 
 Repozytoryjny hook blokuje bezpośrednie pushe agentów do `main`, tagi, kasowanie refów i non-fast-forward/force-push istniejących gałęzi `codex/*`. Ten sam zachowany strumień rekordów push najpierw przechodzi lokalną politykę refów, a po jej akceptacji trafia do `git lfs pre-push`; brak albo błąd Git LFS blokuje push. Instalator jest domyślnie plan-only; właściwa instalacja ustawia współdzielone przez linked worktrees `core.hooksPath=.githooks`:
 
