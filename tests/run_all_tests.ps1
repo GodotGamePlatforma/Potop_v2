@@ -377,6 +377,7 @@ $fullHeadlessScriptTests = @(
     "campaign_map_contract_test.gd"
     "workbench_boundary_test.gd"
     "structure_world_link_test.gd"
+    "structure_real_diver_completion_loop_test.gd"
     "campaign_story_system_test.gd"
     "career_progression_system_test.gd"
     "competency_system_test.gd"
