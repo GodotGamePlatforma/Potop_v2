@@ -344,6 +344,7 @@
         "socket_id": "gate_g1",
         "label": "G1",
         "symbol": "I",
+        "visual_role": "solid_panel",
         "open_offset": [320, 0],
         "travel_speed": 320
       },
@@ -352,6 +353,7 @@
         "socket_id": "gate_c_shortcut",
         "label": "SKRÓT C",
         "symbol": "▲",
+        "visual_role": "solid_panel",
         "open_offset": [0, -160],
         "travel_speed": 240
       },
@@ -360,6 +362,7 @@
         "socket_id": "gate_g2",
         "label": "G2",
         "symbol": "II",
+        "visual_role": "solid_panel",
         "open_offset": [320, 0],
         "travel_speed": 320
       },
@@ -368,6 +371,7 @@
         "socket_id": "gate_h3",
         "label": "H3",
         "symbol": "III",
+        "visual_role": "solid_panel",
         "open_offset": [320, 0],
         "travel_speed": 320
       },
@@ -376,6 +380,7 @@
         "socket_id": "facade_ground_floor",
         "label": "FASADA",
         "symbol": "WYJŚCIE",
+        "visual_role": "egress_grille",
         "open_offset": [0, -240],
         "travel_speed": 280
       }
@@ -385,6 +390,7 @@
       "socket_id": "cabinet_d",
       "label": "SZAFA D",
       "symbol": "■",
+      "visual_role": "solid_panel",
       "move_right": [160, 0],
       "move_down": [0, 320],
       "travel_speed": 200,
@@ -508,7 +514,7 @@
     {
       "role": "controller",
       "path": "scripts/DiveThreeInletsTowerController.gd",
-      "sha256": "fcb458092a760395e2d1599a91e6478538626c2a6275aec09d894c0f4c2ed961"
+      "sha256": "f6ce13e6ce2813c7e84e46cf27ac9328bcfc483f9d395414f56fee7c6415e208"
     },
     {
       "role": "interactable",
@@ -518,7 +524,7 @@
     {
       "role": "moving_body",
       "path": "scripts/DiveThreeInletsMovingBody.gd",
-      "sha256": "b7fbbcb2fb7b331f4d6cdc192a649602b7a08c2e371305643a6f47cd37ceb5fc"
+      "sha256": "435f0521536642cf99ba2e11e8c21eb0bac67c86bf46d09f7977e1220a4253fb"
     }
   ],
   "attempt_state": {
