@@ -133,9 +133,19 @@ Wartość „1 dzień” oznacza ostatni pełny dzień planowania i ostatnią mo
 
 Gra prowadzi jedną bieżącą kampanię. Autosave, zapis ręczny, rozliczenia i finał trafiają do tego samego bezpiecznego zapisu; uszkodzony albo niepełny kandydat nie zastępuje ostatniej poprawnej kopii tej kampanii.
 
-`KONTYNUUJ` jest dostępne tylko dla poprawnej bieżącej kampanii. `NOWA GRA` wymaga jasnego potwierdzenia, że usuwa całą bieżącą kampanię i rozpoczyna nową od początku. Gra nie importuje, nie przekształca ani nie zachowuje poprzednich kampanii jako ukrytego archiwum.
+`KONTYNUUJ` jest dostępne tylko dla poprawnej, jednoznacznie zatwierdzonej bieżącej kampanii. Gra nie importuje ani nie przekształca dawnych formatów i nie prowadzi selektora archiwalnych kampanii.
 
-To jest obietnica produktu, nie specyfikacja formatu. Bezpieczny zapis i warunki odrzucenia należą do architektury, sekcja 11; normatywny kontrakt ustanawia ARD-0092.
+[AKTYWNE] — BEZPIECZNE I ODZYSKIWALNE ZASTĄPIENIE KAMPANII
+
+Po potwierdzeniu `NOWA GRA` najpierw przygotowuje, sprawdza i bezpiecznie zapisuje nową kampanię. Poprzednia poprawna kampania pozostaje dostępna aż do pełnego zatwierdzenia nowej. Jeżeli przed próbą istniała poprawna kampania, każda zwykła porażka zachowuje możliwość `KONTYNUUJ`; bez niej `KONTYNUUJ` pozostaje wyłączone. Każda porażka podaje konkretną przyczynę, natomiast sukces nie pozostawia poprzedniej kampanii jako ukrytego archiwum ani awaryjnego powrotu.
+
+Jeżeli istniała poprawna kampania, błąd ma postać `Nie udało się rozpocząć nowej kampanii: <konkretny powód>. Dotychczasowa kampania pozostała bez zmian.` Bez poprzedniej kampanii końcówka brzmi `Nie utworzono kampanii.` Dozwolone dokładne powody to: `dane gry są niekompletne lub uszkodzone`, `wybrany poziom trudności jest nieprawidłowy`, `dane mapy są nieaktualne lub niespójne`, `stan startowy nie przeszedł kontroli poprawności` oraz `nie udało się bezpiecznie zapisać zmian`.
+
+Jeżeli nie można jednoznacznie potwierdzić wyniku zastąpienia kampanii ani bezpiecznie zdjąć trwałej blokady zapisu, gra nie przedstawia tego stanu jako zwykłej porażki ani sukcesu. Pokazuje dokładnie: `Nie udało się jednoznacznie ustalić wyniku zapisu nowej kampanii. KONTYNUUJ zostało wyłączone; ponów NOWĄ GRĘ, aby bezpiecznie uzgodnić zapis.` Aktywny przebieg pozostaje bez zmian, a `KONTYNUUJ` pozostaje wyłączone również po ponownym uruchomieniu gry i po nieudanej kolejnej próbie. Dopiero poprawnie zakończone ponowienie `NOWA GRA` bezpiecznie uzgadnia pliki i przywraca możliwość kontynuacji.
+
+Potwierdzenie jest wymagane również wtedy, gdy w bieżącej przestrzeni znajdują się tylko nieprawidłowe dane zapisu. Komunikat wyjaśnia wtedy: `Na dysku są nieprawidłowe dane zapisu. Nowa kampania zastąpi je dopiero po poprawnym utworzeniu.` Takie dane nie włączają `KONTYNUUJ`.
+
+To jest obietnica produktu, nie specyfikacja formatu. Bezpieczny zapis i warunki odrzucenia należą do architektury, sekcja 11; normatywny kontrakt ustanawiają ARD-0092 i ARD-0111.
 
 2.2. PAUZA, ZAPIS RĘCZNY I WYJŚCIE
 

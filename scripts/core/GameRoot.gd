@@ -20,6 +20,17 @@ const MissionSystemScript := preload("res://scripts/base/MissionSystem.gd")
 const UserSettingsScript := preload("res://scripts/core/UserSettings.gd")
 const NarrativeContentScript := preload("res://scripts/ui/NarrativeContent.gd")
 const NarrativeSpeakerResolverScript := preload("res://scripts/ui/NarrativeSpeakerResolver.gd")
+const NEW_CAMPAIGN_IN_DOUBT_TEXT := "Nie udało się jednoznacznie ustalić wyniku zapisu nowej kampanii. KONTYNUUJ zostało wyłączone; ponów NOWĄ GRĘ, aby bezpiecznie uzgodnić zapis."
+
+enum NewCampaignFailure {
+	NONE,
+	GAME_DATA,
+	PROFILE,
+	MAP_SETUP,
+	CANDIDATE_VALIDATION,
+	PERSISTENCE,
+	PERSISTENCE_IN_DOUBT,
+}
 
 @onready var scene_mount: Node = $SceneMount
 @onready var narrative_dialogue_panel: NarrativeDialoguePanel = $NarrativeLayer/NarrativeDialoguePanel
@@ -37,6 +48,10 @@ var _paused_by_pause_menu: bool = false
 var _seen_narrative_keys: Dictionary = {}
 var _narrative_sync_queued: bool = false
 var _narrative_previous_focus: Control
+var last_new_campaign_failure: int = NewCampaignFailure.NONE
+var last_new_campaign_failure_details: PackedStringArray = PackedStringArray()
+var _last_new_campaign_had_previous_save: bool = false
+var _next_new_campaign_map_compiler_for_tests
 
 func _ready() -> void:
 	narrative_dialogue_panel.dismissed.connect(_on_narrative_dismissed)
@@ -73,47 +88,135 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 	open_pause_menu()
 
-func start_new_campaign(profile_id: String = "standard", campaign_seed: int = 0, persist_initial_state: bool = true, play_intro: bool = false, replace_existing_campaign: bool = false) -> bool:
+func start_new_campaign(profile_id: String = "standard", campaign_seed: int = 0, persist_initial_state: bool = true, play_intro: bool = false, _replace_existing_campaign: bool = false) -> bool:
+	_begin_new_campaign_attempt()
 	if not GameDatabase.is_valid():
-		return false
+		return _fail_new_campaign(NewCampaignFailure.GAME_DATA)
 	var profile = GameDatabase.get_difficulty_profile(profile_id)
 	if profile == null:
-		return false
-	return _start_new_campaign_with_profile(profile, campaign_seed, persist_initial_state, play_intro, replace_existing_campaign)
+		return _fail_new_campaign(NewCampaignFailure.PROFILE)
+	return _start_new_campaign_with_profile(profile, campaign_seed, persist_initial_state, play_intro)
 
 
-func start_new_campaign_with_profile(profile: Resource, campaign_seed: int = 0, persist_initial_state: bool = true, play_intro: bool = false, replace_existing_campaign: bool = false) -> bool:
+func start_new_campaign_with_profile(profile: Resource, campaign_seed: int = 0, persist_initial_state: bool = true, play_intro: bool = false, _replace_existing_campaign: bool = false) -> bool:
+	_begin_new_campaign_attempt()
 	if not GameDatabase.is_valid() or profile == null:
-		return false
+		return _fail_new_campaign(NewCampaignFailure.GAME_DATA if not GameDatabase.is_valid() else NewCampaignFailure.PROFILE)
 	if not profile.has_method("is_valid") or not profile.is_valid():
-		return false
-	return _start_new_campaign_with_profile(profile, campaign_seed, persist_initial_state, play_intro, replace_existing_campaign)
+		return _fail_new_campaign(NewCampaignFailure.PROFILE)
+	return _start_new_campaign_with_profile(profile, campaign_seed, persist_initial_state, play_intro)
 
 
-func _start_new_campaign_with_profile(profile: Resource, campaign_seed: int, persist_initial_state: bool, play_intro: bool, replace_existing_campaign: bool) -> bool:
+func _start_new_campaign_with_profile(profile: Resource, campaign_seed: int, persist_initial_state: bool, play_intro: bool) -> bool:
+	var candidate = GameStateScript.new()
+	var map_compiler = _next_new_campaign_map_compiler_for_tests
+	_next_new_campaign_map_compiler_for_tests = null
+	var setup_errors: PackedStringArray = candidate.setup_new_campaign(campaign_seed, profile, map_compiler)
+	if not setup_errors.is_empty():
+		return _fail_new_campaign(NewCampaignFailure.MAP_SETUP, setup_errors)
+	if candidate.difficulty_profile == null or not candidate.difficulty_profile.has_method("has_valid_configuration_signature") or not candidate.difficulty_profile.has_valid_configuration_signature():
+		return _fail_new_campaign(
+			NewCampaignFailure.CANDIDATE_VALIDATION,
+			PackedStringArray(["Snapshot profilu trudności nie ma poprawnej pieczęci konfiguracji."])
+		)
+	var candidate_errors: PackedStringArray = candidate.load_validation_errors()
+	if not candidate_errors.is_empty():
+		return _fail_new_campaign(NewCampaignFailure.CANDIDATE_VALIDATION, candidate_errors)
+	if persist_initial_state:
+		# Every persisted GameState created as a new campaign uses the same
+		# replacement transaction. The retained fifth public argument is only
+		# source compatibility for existing callers; it can no longer bypass the
+		# safe path by keeping its historical default value.
+		var save_error := SaveManager.replace_campaign(candidate)
+		if save_error != OK:
+			var persistence_details: PackedStringArray = SaveManager.last_replacement_failure_details.duplicate()
+			persistence_details.append("%s (%d)" % [error_string(save_error), save_error])
+			var persistence_failure := (
+				NewCampaignFailure.PERSISTENCE_IN_DOUBT
+				if SaveManager.last_replacement_outcome == SaveManager.CampaignReplacementOutcome.IN_DOUBT
+				else NewCampaignFailure.PERSISTENCE
+			)
+			return _fail_new_campaign(persistence_failure, persistence_details)
+		# The transaction hands off the exact canonical object that it committed.
+		# A second disk read here would introduce a new failure boundary after the
+		# old campaign may already be irreversibly replaced.
+		var committed_candidate = SaveManager.take_last_replacement_committed_state()
+		if committed_candidate != null:
+			candidate = committed_candidate
+		else:
+			# This is an internal contract breach, not a reversible persistence
+			# failure: replace_campaign() already returned a committed result. Never
+			# claim that the old campaign survived after that point.
+			push_warning("SaveManager zatwierdził kampanię bez kanonicznego handoffu; runtime użyje zwalidowanego kandydata wejściowego.")
 	_reset_narrative_session()
 	campaign_persistence_enabled = persist_initial_state
-	if persist_initial_state and replace_existing_campaign:
-		if SaveManager.delete_campaign_storage() != OK:
-			return false
-	game_state = GameStateScript.new()
-	game_state.setup_new_campaign(campaign_seed, profile)
-	if game_state.difficulty_profile == null or not game_state.difficulty_profile.has_method("has_valid_configuration_signature") or not game_state.difficulty_profile.has_valid_configuration_signature():
-		game_state = null
-		return false
-	if persist_initial_state:
-		var save_error := SaveManager.save_game(game_state)
-		if save_error != OK:
-			game_state = null
-			return false
+	game_state = candidate
+	_clear_new_campaign_failure()
 	if play_intro:
 		show_intro()
 	else:
 		show_base()
 	return true
 
+
+func last_new_campaign_failure_text() -> String:
+	if has_unresolved_campaign_replacement():
+		return NEW_CAMPAIGN_IN_DOUBT_TEXT
+	if last_new_campaign_failure == NewCampaignFailure.NONE:
+		return ""
+	if last_new_campaign_failure == NewCampaignFailure.PERSISTENCE_IN_DOUBT:
+		return NEW_CAMPAIGN_IN_DOUBT_TEXT
+	var reason := "wystąpił nieznany błąd"
+	match last_new_campaign_failure:
+		NewCampaignFailure.GAME_DATA:
+			reason = "dane gry są niekompletne lub uszkodzone"
+		NewCampaignFailure.PROFILE:
+			reason = "wybrany poziom trudności jest nieprawidłowy"
+		NewCampaignFailure.MAP_SETUP:
+			reason = "dane mapy są nieaktualne lub niespójne"
+		NewCampaignFailure.CANDIDATE_VALIDATION:
+			reason = "stan startowy nie przeszedł kontroli poprawności"
+		NewCampaignFailure.PERSISTENCE:
+			reason = "nie udało się bezpiecznie zapisać zmian"
+	var suffix := (
+		"Dotychczasowa kampania pozostała bez zmian."
+		if _last_new_campaign_had_previous_save
+		else "Nie utworzono kampanii."
+	)
+	return "Nie udało się rozpocząć nowej kampanii: %s. %s" % [reason, suffix]
+
+
+func use_next_new_campaign_map_compiler_for_tests(map_compiler) -> void:
+	_next_new_campaign_map_compiler_for_tests = map_compiler
+
+
+func _begin_new_campaign_attempt() -> void:
+	_clear_new_campaign_failure()
+	_last_new_campaign_had_previous_save = SaveManager.has_save()
+
+
+func _clear_new_campaign_failure() -> void:
+	last_new_campaign_failure = NewCampaignFailure.NONE
+	last_new_campaign_failure_details = PackedStringArray()
+
+
+func _fail_new_campaign(failure: int, details: PackedStringArray = PackedStringArray()) -> bool:
+	# A durable replacement guard outranks the local preflight category. This can
+	# happen when a retry after restart fails before reaching SaveManager (for
+	# example because the map becomes invalid). The exact local cause remains in
+	# diagnostics, but the player must still see the fail-closed disk-state truth.
+	last_new_campaign_failure = (
+		NewCampaignFailure.PERSISTENCE_IN_DOUBT
+		if SaveManager.has_unresolved_campaign_replacement()
+		else failure
+	)
+	last_new_campaign_failure_details = details.duplicate()
+	return false
+
 func continue_campaign() -> bool:
 	if not GameDatabase.is_valid():
+		return false
+	if not SaveManager.has_save():
 		return false
 	var loaded = SaveManager.load_game()
 	if loaded == null:
@@ -127,6 +230,10 @@ func continue_campaign() -> bool:
 
 func has_saved_campaign() -> bool:
 	return SaveManager.has_save()
+
+
+func has_unresolved_campaign_replacement() -> bool:
+	return SaveManager.has_unresolved_campaign_replacement()
 
 
 func has_campaign_storage_for_new_campaign() -> bool:
