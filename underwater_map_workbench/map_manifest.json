@@ -1008,7 +1008,7 @@
         "package": {
           "format": "structure_package_v1",
           "path": "structures/tower_three_inlets_02/structure_manifest.json",
-          "sha256": "6e592e135575ce548b6aab5e2fa40b60096e56ebcfe89d70abded1c5e1e4ed42"
+          "sha256": "770fee3b89615fd7ccd5a12d3593bcbb197fa87aea86422a88cb1ec0b446a9bd"
         }
       }
     ]
