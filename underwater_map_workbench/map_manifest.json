@@ -995,7 +995,7 @@
         "package": {
           "format": "structure_package_v1",
           "path": "structures/tower_prototype_01/structure_manifest.json",
-          "sha256": "8bb70c39c302e1e8a8cdb5f806487b2c408882b052feadbbeb3a654aaffed9a2"
+          "sha256": "b637a3ed00bfab939a45e2331b17710a1314261fc11c4230e56ad6478d0591c7"
         }
       },
       {
