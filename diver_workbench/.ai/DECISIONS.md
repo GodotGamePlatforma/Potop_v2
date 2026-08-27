@@ -33,8 +33,8 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 
 - Status / aktywny zakres: Zastąpiona; brak aktywnego zakresu
 - Zatwierdzenie / zastąpienie: 2026-08-26 / 2026-08-27
-- Relacja zastąpienia: Zastąpiona przez DIVER-ARD-0006
-- Relacje pozostałe: historycznie uszczegóławiała globalne ARD-0103 i ARD-0105/D7; punkt emisji i montaż światła uszczegółowił DIVER-ARD-0003
+- Relacje: Zastąpiona przez: DIVER-ARD-0006
+- Odwołania historyczne: uszczegóławiała globalne ARD-0103 i ARD-0105/D7; punkt emisji i montaż światła uszczegółowił DIVER-ARD-0003
 - D1. Collider gracza jest jedną prostą, stabilną bryłą obejmującą sztywną część postaci. Płetwy i wtórny ruch animacji nie otrzymują colliderów per klatka.
 - D2. Widoczna alfa całej animacji ma docelową kopertę `70 × 40`, zgodną z obwiednią stabilnego collidera. Nie skaluje się całego korzenia `CharacterBody2D`; aktywne strojenie skali i wycentrowania gałęzi wizualnej należy do walidowanego `assets/profiles/diver_frame_envelope_profile.tres`.
 - D3. Każdy aktywny klip i każda klatka podlegają pomiarowi widocznej alfy. Zmierzone granice są współdzielone przez runtime i test, a kontroler ogranicza wynikowy transform prezentacyjny — wraz z `flip_h`, obrotem, stretch, cue, holowaniem i interakcją — do zatwierdzonej koperty bez zmiany bryły fizycznej.
@@ -85,8 +85,8 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 
 - Status / aktywny zakres: Obowiązuje; D1-D8
 - Zatwierdzenie: 2026-08-27
-- Relacja zastąpienia: Zastępuje DIVER-ARD-0002 w całości
-- Relacje pozostałe: uszczegóławia globalne ARD-0103 i ARD-0105/D7; centralny montaż światła pozostaje określony przez DIVER-ARD-0003
+- Relacje: Zastępuje DIVER-ARD-0002 w całości | Zastąpiona przez: brak
+- Odwołania kontraktowe: uszczegóławia globalne ARD-0103 i ARD-0105/D7; centralny montaż światła pozostaje określony przez DIVER-ARD-0003
 - D1. Collider gracza jest jedną poziomą kapsułą o promieniu `30`, wysokości `105` i obrocie `PI/2`, co daje obwiednię świata `105 × 60`. Płetwy ani wtórny ruch animacji nie otrzymują colliderów per klatka.
 - D2. Widoczna alfa całej animacji ma docelową kopertę `105 × 60`. Aktywny profil ustawia wyłącznie gałąź wizualną na skalę `0.239` i pozycję `Vector2(5.497, -3.2265)`; korzeń `CharacterBody2D` pozostaje w skali `1`.
 - D3. Wszystkie 48 granic źródłowej alfy pozostaje wspólnym pomiarem runtime i testu. Unia `430 × 195 px` daje po kalibracji około `102.77 × 46.61` jednostki świata, pozostawiając kontrolowany margines na shader czytelności i zmiany pozy.
