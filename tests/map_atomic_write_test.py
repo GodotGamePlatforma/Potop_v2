@@ -12,7 +12,7 @@ import sys
 import tempfile
 import threading
 import unittest
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from unittest import mock
 
@@ -850,6 +850,411 @@ class MapAtomicWriteTest(unittest.TestCase):
             self.assertIn(target_package.resolve(), fingerprints)
             self.assertNotIn(unrelated_package.resolve(), fingerprints)
 
+    def test_map_build_admission_uses_only_git_common_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project_root = Path(temporary).resolve()
+            workbench = project_root / "underwater_map_workbench"
+            common_directory = project_root / "shared.git"
+            entered: list[tuple[Path, str]] = []
+
+            class RecordingLock:
+                def __init__(self, scope: Path, name: str) -> None:
+                    self.scope = Path(scope)
+                    self.name = name
+
+                def __enter__(self) -> "RecordingLock":
+                    entered.append((self.scope, self.name))
+                    return self
+
+                def __exit__(self, *_args: object) -> None:
+                    return None
+
+            with (
+                mock.patch.object(builder, "WORKBENCH_DIR", workbench),
+                mock.patch.object(
+                    builder,
+                    "_git_common_directory",
+                    return_value=common_directory,
+                ),
+                mock.patch.object(
+                    builder,
+                    "InterprocessWorkspaceLock",
+                    side_effect=RecordingLock,
+                ),
+            ):
+                with builder._map_build_admission_lock():
+                    pass
+
+            self.assertEqual(
+                entered,
+                [(common_directory, "map-build-admission")],
+            )
+
+    def test_non_full_render_modes_do_not_take_map_build_admission(self) -> None:
+        modes = (
+            argparse.Namespace(
+                build=False,
+                check=True,
+                build_structure=None,
+                check_structure=None,
+            ),
+            argparse.Namespace(
+                build=False,
+                check=False,
+                build_structure="tower_a",
+                check_structure=None,
+            ),
+            argparse.Namespace(
+                build=False,
+                check=False,
+                build_structure=None,
+                check_structure="tower_a",
+            ),
+        )
+        with (
+            mock.patch.object(builder, "_map_build_admission_lock") as admission,
+            mock.patch.object(
+                builder,
+                "_run_render_mode_admitted",
+                return_value=0,
+            ) as admitted,
+        ):
+            for args in modes:
+                self.assertEqual(builder._run_render_mode(args), 0)
+
+        admission.assert_not_called()
+        self.assertEqual(admitted.call_count, len(modes))
+
+    def test_two_full_builds_only_one_enters_render(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workbench = (Path(temporary) / "underwater_map_workbench").resolve()
+            manifest_path = workbench / "map_manifest.json"
+            scene_path = workbench / "UnderwaterMap.tscn"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_bytes(b"manifest")
+            admission_gate = threading.Lock()
+            render_started = threading.Event()
+            release_render = threading.Event()
+            render_count = 0
+            first_results: list[int] = []
+            first_errors: list[BaseException] = []
+
+            class AdmissionContext:
+                def __init__(self) -> None:
+                    self.owned = False
+
+                def __enter__(self) -> "AdmissionContext":
+                    self.owned = admission_gate.acquire(blocking=False)
+                    if not self.owned:
+                        raise builder.WorkspaceLockError(
+                            "Workspace lock 'map-build-admission' is already active. "
+                            "Last owner record: thread=first-build, pid=123."
+                        )
+                    return self
+
+                def __exit__(self, *_args: object) -> None:
+                    if self.owned:
+                        admission_gate.release()
+                        self.owned = False
+
+            def render(
+                _raw: bytes,
+            ) -> tuple[dict[Path, bytes], dict[str, object], str, str, str]:
+                nonlocal render_count
+                render_count += 1
+                render_started.set()
+                if not release_render.wait(timeout=10):
+                    raise AssertionError("first render was not released")
+                return {scene_path: b"new"}, {}, "sha", "gameplay", "presentation"
+
+            args = argparse.Namespace(
+                build=True,
+                check=False,
+                build_structure=None,
+                check_structure=None,
+            )
+
+            def run_first() -> None:
+                try:
+                    first_results.append(builder._run_render_mode(args))
+                except BaseException as error:
+                    first_errors.append(error)
+
+            with (
+                mock.patch.object(builder, "WORKBENCH_DIR", workbench),
+                mock.patch.object(builder, "MANIFEST_PATH", manifest_path),
+                mock.patch.object(builder, "SCENE_PATH", scene_path),
+                mock.patch.object(
+                    builder,
+                    "_map_build_admission_lock",
+                    side_effect=AdmissionContext,
+                ),
+                mock.patch.object(
+                    builder,
+                    "_capture_manifest_input_fingerprint",
+                    return_value={},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_capture_publication_output_baseline",
+                    return_value={scene_path: b"old"},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_render_build_candidate",
+                    side_effect=render,
+                ),
+                mock.patch.object(
+                    builder,
+                    "_map_promotion_lock",
+                    side_effect=lambda: nullcontext(),
+                ),
+                mock.patch.object(builder, "_publish_outputs_with_cas"),
+            ):
+                first = threading.Thread(target=run_first, daemon=True)
+                first.start()
+                self.assertTrue(render_started.wait(timeout=5))
+                try:
+                    with self.assertRaisesRegex(
+                        builder.WorkspaceLockError,
+                        r"thread=first-build, pid=123",
+                    ):
+                        builder._run_render_mode(args)
+                finally:
+                    release_render.set()
+                first.join(timeout=10)
+
+            self.assertFalse(first.is_alive())
+            self.assertEqual(first_errors, [])
+            self.assertEqual(first_results, [0])
+            self.assertEqual(render_count, 1)
+
+    def test_map_build_admission_releases_after_render_exception(self) -> None:
+        active = False
+        entered = 0
+        released = 0
+
+        @contextmanager
+        def admission() -> object:
+            nonlocal active, entered, released
+            if active:
+                raise AssertionError("admission lease was not released")
+            active = True
+            entered += 1
+            try:
+                yield
+            finally:
+                active = False
+                released += 1
+
+        args = argparse.Namespace(build=True)
+        with (
+            mock.patch.object(
+                builder,
+                "_map_build_admission_lock",
+                side_effect=admission,
+            ),
+            mock.patch.object(
+                builder,
+                "_run_render_mode_admitted",
+                side_effect=(builder.ManifestError("render failed"), 0),
+            ),
+        ):
+            with self.assertRaisesRegex(builder.ManifestError, "render failed"):
+                builder._run_render_mode(args)
+            self.assertFalse(active)
+            self.assertEqual(builder._run_render_mode(args), 0)
+
+        self.assertFalse(active)
+        self.assertEqual(entered, 2)
+        self.assertEqual(released, 2)
+
+    def test_final_promotion_transient_busy_reuses_rendered_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workbench = (Path(temporary) / "underwater_map_workbench").resolve()
+            manifest_path = workbench / "map_manifest.json"
+            scene_path = workbench / "UnderwaterMap.tscn"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_bytes(b"manifest")
+            rendered_outputs = {scene_path: b"new"}
+            promotion_calls = 0
+
+            class BusyContext:
+                def __enter__(self) -> None:
+                    raise builder.WorkspaceLockError(
+                        "Workspace lock 'map-promotion' is already active. "
+                        "Last owner record: thread=holder, pid=456."
+                    )
+
+                def __exit__(self, *_args: object) -> None:
+                    return None
+
+            def promotion_context() -> object:
+                nonlocal promotion_calls
+                promotion_calls += 1
+                if promotion_calls == 2:
+                    return BusyContext()
+                return nullcontext()
+
+            args = argparse.Namespace(
+                build=True,
+                check=False,
+                build_structure=None,
+                check_structure=None,
+            )
+            with (
+                mock.patch.object(builder, "WORKBENCH_DIR", workbench),
+                mock.patch.object(builder, "MANIFEST_PATH", manifest_path),
+                mock.patch.object(builder, "SCENE_PATH", scene_path),
+                mock.patch.object(
+                    builder,
+                    "_map_build_admission_lock",
+                    side_effect=lambda: nullcontext(),
+                ),
+                mock.patch.object(
+                    builder,
+                    "_capture_manifest_input_fingerprint",
+                    return_value={},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_capture_publication_output_baseline",
+                    return_value={scene_path: b"old"},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_render_build_candidate",
+                    return_value=(
+                        rendered_outputs,
+                        {},
+                        "sha",
+                        "gameplay",
+                        "presentation",
+                    ),
+                ) as render,
+                mock.patch.object(
+                    builder,
+                    "_map_promotion_lock",
+                    side_effect=promotion_context,
+                ),
+                mock.patch.object(builder.time, "sleep") as sleep,
+                mock.patch.object(
+                    builder,
+                    "_publish_outputs_with_cas",
+                ) as publish,
+            ):
+                self.assertEqual(builder._run_render_mode(args), 0)
+
+            render.assert_called_once_with(b"manifest")
+            publish.assert_called_once()
+            self.assertIs(publish.call_args.args[0], rendered_outputs)
+            sleep.assert_called_once_with(
+                builder.FINAL_MAP_PROMOTION_INITIAL_BACKOFF_SECONDS
+            )
+            self.assertEqual(promotion_calls, 3)
+
+    def test_final_promotion_persistent_busy_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workbench = (Path(temporary) / "underwater_map_workbench").resolve()
+            manifest_path = workbench / "map_manifest.json"
+            scene_path = workbench / "UnderwaterMap.tscn"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_bytes(b"manifest")
+            promotion_calls = 0
+
+            class BusyContext:
+                def __enter__(self) -> None:
+                    raise builder.WorkspaceLockError(
+                        "Workspace lock 'map-promotion' is already active. "
+                        "Last owner record: thread=holder, pid=456."
+                    )
+
+                def __exit__(self, *_args: object) -> None:
+                    return None
+
+            def promotion_context() -> object:
+                nonlocal promotion_calls
+                promotion_calls += 1
+                if promotion_calls == 1:
+                    return nullcontext()
+                return BusyContext()
+
+            args = argparse.Namespace(
+                build=True,
+                check=False,
+                build_structure=None,
+                check_structure=None,
+            )
+            with (
+                mock.patch.object(builder, "WORKBENCH_DIR", workbench),
+                mock.patch.object(builder, "MANIFEST_PATH", manifest_path),
+                mock.patch.object(builder, "SCENE_PATH", scene_path),
+                mock.patch.object(
+                    builder,
+                    "_map_build_admission_lock",
+                    side_effect=lambda: nullcontext(),
+                ),
+                mock.patch.object(
+                    builder,
+                    "_capture_manifest_input_fingerprint",
+                    return_value={},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_capture_publication_output_baseline",
+                    return_value={scene_path: b"old"},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_render_build_candidate",
+                    return_value=(
+                        {scene_path: b"new"},
+                        {},
+                        "sha",
+                        "gameplay",
+                        "presentation",
+                    ),
+                ) as render,
+                mock.patch.object(
+                    builder,
+                    "_map_promotion_lock",
+                    side_effect=promotion_context,
+                ),
+                mock.patch.object(
+                    builder,
+                    "FINAL_MAP_PROMOTION_LOCK_ATTEMPTS",
+                    3,
+                ),
+                mock.patch.object(
+                    builder,
+                    "FINAL_MAP_PROMOTION_INITIAL_BACKOFF_SECONDS",
+                    0.01,
+                ),
+                mock.patch.object(
+                    builder,
+                    "FINAL_MAP_PROMOTION_MAX_BACKOFF_SECONDS",
+                    0.02,
+                ),
+                mock.patch.object(builder.time, "sleep") as sleep,
+                mock.patch.object(
+                    builder,
+                    "_publish_outputs_with_cas",
+                ) as publish,
+            ):
+                with self.assertRaisesRegex(
+                    builder.WorkspaceLockError,
+                    r"after 3 bounded attempts.*thread=holder, pid=456",
+                ):
+                    builder._run_render_mode(args)
+
+            render.assert_called_once_with(b"manifest")
+            publish.assert_not_called()
+            self.assertEqual(
+                sleep.call_args_list,
+                [mock.call(0.01), mock.call(0.02)],
+            )
+            self.assertEqual(promotion_calls, 4)
+
     def test_build_captures_output_baseline_before_render(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             # TemporaryDirectory may expose an 8.3 alias on Windows runners.
@@ -863,11 +1268,17 @@ class MapAtomicWriteTest(unittest.TestCase):
             events: list[str] = []
 
             class RecordingContext:
+                def __init__(self, enter_label: str, exit_label: str = "") -> None:
+                    self.enter_label = enter_label
+                    self.exit_label = exit_label
+
                 def __enter__(self) -> "RecordingContext":
-                    events.append("lock")
+                    events.append(self.enter_label)
                     return self
 
                 def __exit__(self, *_args: object) -> None:
+                    if self.exit_label:
+                        events.append(self.exit_label)
                     return None
 
             def render(_raw: bytes) -> tuple[dict[Path, bytes], dict[str, object], str, str, str]:
@@ -895,6 +1306,14 @@ class MapAtomicWriteTest(unittest.TestCase):
                 mock.patch.object(builder, "SCENE_PATH", scene_path),
                 mock.patch.object(
                     builder,
+                    "_map_build_admission_lock",
+                    side_effect=lambda: RecordingContext(
+                        "admission",
+                        "admission-release",
+                    ),
+                ),
+                mock.patch.object(
+                    builder,
                     "_capture_manifest_input_fingerprint",
                     return_value={},
                 ),
@@ -913,7 +1332,7 @@ class MapAtomicWriteTest(unittest.TestCase):
                 mock.patch.object(
                     builder,
                     "_map_promotion_lock",
-                    side_effect=lambda: RecordingContext(),
+                    side_effect=lambda: RecordingContext("lock"),
                 ),
                 mock.patch.object(
                     builder,
@@ -925,7 +1344,15 @@ class MapAtomicWriteTest(unittest.TestCase):
 
             self.assertEqual(
                 events,
-                ["lock", "baseline", "render", "lock", "publish"],
+                [
+                    "admission",
+                    "lock",
+                    "baseline",
+                    "render",
+                    "lock",
+                    "publish",
+                    "admission-release",
+                ],
             )
 
     def test_build_cas_rejects_edit_during_render_with_event_barrier(self) -> None:
@@ -973,6 +1400,11 @@ class MapAtomicWriteTest(unittest.TestCase):
                 mock.patch.object(builder, "MANIFEST_PATH", manifest_path),
                 mock.patch.object(builder, "SCENE_PATH", scene_path),
                 mock.patch.object(builder, "L05_GENERATED_DIR", l05_generated_dir),
+                mock.patch.object(
+                    builder,
+                    "_map_build_admission_lock",
+                    side_effect=lambda: nullcontext(),
+                ),
                 mock.patch.object(
                     builder,
                     "_capture_manifest_input_fingerprint",
