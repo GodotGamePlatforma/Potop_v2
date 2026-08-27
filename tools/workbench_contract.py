@@ -21,13 +21,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
-from workbench_lock import InterprocessWorkspaceLock
+from workbench_lock import InterprocessWorkspaceLock, WorkspaceLockError
 
 
 OWNER_ROOT = "root"
@@ -44,6 +46,9 @@ PUBLICATION_RECEIPT_STATUS = "PUBLICATION_READY"
 ASSIGNMENT_SCHEMA_VERSION = 1
 ASSIGNMENT_STORE_RELATIVE = Path("codex-agent-assignments") / "v1"
 ASSIGNMENT_LOCK_NAME = "agent-assignments"
+ASSIGNMENT_LOCK_WAIT_SECONDS = 5.0
+ASSIGNMENT_LOCK_INITIAL_BACKOFF_SECONDS = 0.01
+ASSIGNMENT_LOCK_MAX_BACKOFF_SECONDS = 0.1
 ASSIGNMENT_ID_PATTERN = re.compile(r"[0-9a-f]{32}\Z")
 ASSIGNMENT_DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 ASSIGNMENT_WAITING = "WAITING_ACK"
@@ -1088,6 +1093,40 @@ def assignment_lock(repository: str | Path = ".") -> InterprocessWorkspaceLock:
     return publication_lock(repository, ASSIGNMENT_LOCK_NAME)
 
 
+@contextmanager
+def assignment_metadata_lock(
+    repository: str | Path = ".",
+    *,
+    wait_seconds: float = ASSIGNMENT_LOCK_WAIT_SECONDS,
+) -> Iterator[InterprocessWorkspaceLock]:
+    """Acquire the short shared assignment metadata window with bounded retry."""
+
+    if wait_seconds < 0:
+        raise ValueError("Assignment lock wait must not be negative.")
+    lock = assignment_lock(repository)
+    deadline = time.monotonic() + wait_seconds
+    delay = ASSIGNMENT_LOCK_INITIAL_BACKOFF_SECONDS
+    last_error: WorkspaceLockError | None = None
+    while True:
+        try:
+            lock.acquire()
+            break
+        except WorkspaceLockError as error:
+            last_error = error
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ContractError(
+                    "Timed out waiting for the short shared assignment metadata "
+                    f"window after {wait_seconds:.3f} seconds."
+                ) from last_error
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, ASSIGNMENT_LOCK_MAX_BACKOFF_SECONDS)
+    try:
+        yield lock
+    finally:
+        lock.release()
+
+
 def _assignment_task_hash(task_id: str) -> str:
     return hashlib.sha256(task_id.encode("utf-8")).hexdigest()
 
@@ -1440,7 +1479,7 @@ def assignment_status(
     now: datetime | None = None,
 ) -> dict[str, object]:
     root = repository_root(repository)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         return _assignment_status_unlocked(bundle, now=now or _utc_now())
 
@@ -1466,11 +1505,34 @@ def _assert_assignment_evidence(
     run_receipt: str | Path,
     head: str,
     tree: str,
-) -> None:
-    candidate = _publication_receipt_header(repository, candidate_receipt)
+) -> tuple[str, str]:
+    before_candidate_sha = _file_sha256(candidate_receipt, "candidate receipt")
+    before_run_sha = _file_sha256(run_receipt, "run receipt")
+    before_last_green = last_green_head(repository)
+    if before_last_green != head:
+        raise ContractError(
+            "Assignment HEAD must remain the authoritative last-green candidate."
+        )
+    candidate = verify_publication_receipt(repository, candidate_receipt)
     if candidate["head"] != head or candidate["tree"] != tree:
         raise ContractError("Assignment candidate receipt does not bind the exact HEAD/tree.")
     _verify_full_run_receipt(repository, candidate_receipt, run_receipt)
+    after_last_green = last_green_head(repository)
+    if after_last_green != before_last_green or after_last_green != head:
+        raise ContractError(
+            "Authoritative last-green moved while assignment evidence was verified."
+        )
+    after_candidate_sha = _file_sha256(candidate_receipt, "candidate receipt")
+    after_run_sha = _file_sha256(run_receipt, "run receipt")
+    if (
+        before_candidate_sha != after_candidate_sha
+        or before_run_sha != after_run_sha
+    ):
+        raise ContractError(
+            "Candidate or run receipt bytes changed while assignment evidence "
+            "was verified."
+        )
+    return before_candidate_sha, before_run_sha
 
 
 def create_assignment(
@@ -1530,7 +1592,7 @@ def create_assignment(
             "Assignment write-set crosses its owner boundary: "
             + ", ".join(item.path for item in violations)
         )
-    _assert_assignment_evidence(
+    candidate_receipt_sha, run_receipt_sha = _assert_assignment_evidence(
         root,
         candidate_receipt=candidate_receipt,
         run_receipt=run_receipt,
@@ -1551,10 +1613,8 @@ def create_assignment(
         "tree": tree,
         "write_set": list(write_set),
         "write_set_digest": _write_set_digest(write_set),
-        "candidate_receipt_sha256": _file_sha256(
-            candidate_receipt, "candidate receipt"
-        ),
-        "run_receipt_sha256": _file_sha256(run_receipt, "run receipt"),
+        "candidate_receipt_sha256": candidate_receipt_sha,
+        "run_receipt_sha256": run_receipt_sha,
         "created_at": _utc_text(created_at),
         "ack_deadline": _utc_text(deadline),
     }
@@ -1564,7 +1624,7 @@ def create_assignment(
     record = dict(payload)
     record["assignment_digest"] = _canonical_digest(payload)
 
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         task_directory = assignment_store(root) / str(record["task_id_sha256"])
         task_directory.mkdir(parents=True, exist_ok=True)
         existing_bundles = [
@@ -1631,7 +1691,7 @@ def acknowledge_assignment(
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_owner = normalize_owner(owner)
     write_set = _closed_write_set(write_set_path)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=acknowledged_at)
         assignment = status["assignment"]
@@ -1720,7 +1780,7 @@ def redispatch_assignment(
         raise ContractError("Redispatch ACK deadline must be in the future.")
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_reason = _assignment_text(reason, "redispatch reason", 2000)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=redispatched_at)
         assignment = status["assignment"]
@@ -1761,7 +1821,7 @@ def close_assignment(
     closed_at = (now or _utc_now()).astimezone(timezone.utc)
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_reason = _assignment_text(reason, "close reason", 2000)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=closed_at)
         assignment = status["assignment"]
@@ -1795,7 +1855,7 @@ def assignment_gc_plan(
     current = (now or _utc_now()).astimezone(timezone.utc)
     cutoff = current - timedelta(days=retention_days)
     eligible: list[dict[str, object]] = []
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         for bundle in _all_assignment_bundles(root):
             status = _assignment_status_unlocked(bundle, now=current)
             if status["state"] != ASSIGNMENT_CLOSED:
@@ -1841,7 +1901,7 @@ def validate_assignment_context(
     root = repository_root(repository)
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_owner = normalize_owner(owner)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=now or _utc_now())
         assignment = status["assignment"]
@@ -2209,75 +2269,112 @@ def verify_publication_receipt(
 ) -> dict[str, object]:
     root = repository_root(repository)
     target = _receipt_target(root, receipt_path)
-    with publication_lock(root):
-        _assert_clean_publication_candidate(root)
-        _assert_tracked_text_bytes_reproducible(root)
-        try:
-            receipt = json.loads(target.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ContractError(f"Publication receipt is unreadable: {error}") from error
-        required_keys = {
-            "schema_version",
-            "status",
-            "head",
-            "tree",
-            "branch",
-            "input_roots",
-            "output_roots",
-            "inputs",
-            "outputs",
-            "input_digest",
-            "output_digest",
-        }
-        if not isinstance(receipt, dict) or set(receipt) != required_keys:
-            raise ContractError("Publication receipt has an invalid exact key set.")
-        if (
-            receipt["schema_version"] != PUBLICATION_RECEIPT_SCHEMA_VERSION
-            or receipt["status"] != PUBLICATION_RECEIPT_STATUS
-        ):
-            raise ContractError("Publication receipt schema/status is invalid.")
-        current_head = _git_text(root, "rev-parse", "HEAD")
-        current_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
-        if receipt["head"] != current_head or receipt["tree"] != current_tree:
-            raise ContractError(
-                "Publication receipt HEAD/tree does not match the candidate."
-            )
-        input_roots, actual_input_paths = _closed_root_inventory(
-            root, receipt["input_roots"], "input"
+    before_head = _git_text(root, "rev-parse", "HEAD")
+    before_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    try:
+        before_receipt_bytes = target.read_bytes()
+        receipt = json.loads(before_receipt_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContractError(f"Publication receipt is unreadable: {error}") from error
+
+    _assert_clean_publication_candidate(root)
+    _assert_tracked_text_bytes_reproducible(root)
+    required_keys = {
+        "schema_version",
+        "status",
+        "head",
+        "tree",
+        "branch",
+        "input_roots",
+        "output_roots",
+        "inputs",
+        "outputs",
+        "input_digest",
+        "output_digest",
+    }
+    if not isinstance(receipt, dict) or set(receipt) != required_keys:
+        raise ContractError("Publication receipt has an invalid exact key set.")
+    if (
+        receipt["schema_version"] != PUBLICATION_RECEIPT_SCHEMA_VERSION
+        or receipt["status"] != PUBLICATION_RECEIPT_STATUS
+    ):
+        raise ContractError("Publication receipt schema/status is invalid.")
+    if receipt["head"] != before_head or receipt["tree"] != before_tree:
+        raise ContractError(
+            "Publication receipt HEAD/tree does not match the candidate."
         )
-        output_roots, actual_output_paths = _closed_root_inventory(
-            root, receipt["output_roots"], "output"
+    input_roots, actual_input_paths = _closed_root_inventory(
+        root, receipt["input_roots"], "input"
+    )
+    output_roots, actual_output_paths = _closed_root_inventory(
+        root, receipt["output_roots"], "output"
+    )
+    if tuple(receipt["input_roots"]) != input_roots:
+        raise ContractError("Publication receipt input roots are not canonical.")
+    if tuple(receipt["output_roots"]) != output_roots:
+        raise ContractError("Publication receipt output roots are not canonical.")
+    expected_inputs = _receipt_records(receipt["inputs"], "inputs")
+    expected_outputs = _receipt_records(receipt["outputs"], "outputs")
+    if tuple(record.path for record in expected_inputs) != actual_input_paths:
+        raise ContractError(
+            "Publication input set changed (extra or omitted file)."
         )
-        if tuple(receipt["input_roots"]) != input_roots:
-            raise ContractError("Publication receipt input roots are not canonical.")
-        if tuple(receipt["output_roots"]) != output_roots:
-            raise ContractError("Publication receipt output roots are not canonical.")
-        expected_inputs = _receipt_records(receipt["inputs"], "inputs")
-        expected_outputs = _receipt_records(receipt["outputs"], "outputs")
-        if tuple(record.path for record in expected_inputs) != actual_input_paths:
-            raise ContractError(
-                "Publication input set changed (extra or omitted file)."
-            )
-        if tuple(record.path for record in expected_outputs) != actual_output_paths:
-            raise ContractError(
-                "Publication output set changed (extra or omitted file)."
-            )
-        _assert_publication_paths_tracked(
-            root,
-            actual_input_paths,
-            actual_output_paths,
+    if tuple(record.path for record in expected_outputs) != actual_output_paths:
+        raise ContractError(
+            "Publication output set changed (extra or omitted file)."
         )
-        actual_inputs = _publication_records(root, actual_input_paths)
-        actual_outputs = _publication_records(root, actual_output_paths)
-        if expected_inputs != actual_inputs:
-            raise ContractError("Publication input file content changed.")
-        if expected_outputs != actual_outputs:
-            raise ContractError("Publication output file content changed.")
-        if receipt["input_digest"] != _records_digest(actual_inputs):
-            raise ContractError("Publication input digest is invalid.")
-        if receipt["output_digest"] != _records_digest(actual_outputs):
-            raise ContractError("Publication output digest is invalid.")
-        return receipt
+    _assert_publication_paths_tracked(
+        root,
+        actual_input_paths,
+        actual_output_paths,
+    )
+    actual_inputs = _publication_records(root, actual_input_paths)
+    actual_outputs = _publication_records(root, actual_output_paths)
+    if expected_inputs != actual_inputs:
+        raise ContractError("Publication input file content changed.")
+    if expected_outputs != actual_outputs:
+        raise ContractError("Publication output file content changed.")
+    if receipt["input_digest"] != _records_digest(actual_inputs):
+        raise ContractError("Publication input digest is invalid.")
+    if receipt["output_digest"] != _records_digest(actual_outputs):
+        raise ContractError("Publication output digest is invalid.")
+
+    # Verification is deliberately lock-free: immutable candidate worktrees do
+    # not share files, so a repository-global writer lock needlessly couples
+    # otherwise disjoint agent setup. Re-snapshot every relevant identity and
+    # byte set instead, and fail closed if any cooperative writer raced us.
+    after_input_roots, after_input_paths = _closed_root_inventory(
+        root, receipt["input_roots"], "input"
+    )
+    after_output_roots, after_output_paths = _closed_root_inventory(
+        root, receipt["output_roots"], "output"
+    )
+    after_inputs = _publication_records(root, after_input_paths)
+    after_outputs = _publication_records(root, after_output_paths)
+    _assert_clean_publication_candidate(root)
+    _assert_tracked_text_bytes_reproducible(root)
+    after_head = _git_text(root, "rev-parse", "HEAD")
+    after_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    try:
+        after_receipt_bytes = target.read_bytes()
+    except OSError as error:
+        raise ContractError(f"Publication receipt is unreadable: {error}") from error
+    if (
+        before_head != after_head
+        or before_tree != after_tree
+        or before_receipt_bytes != after_receipt_bytes
+        or input_roots != after_input_roots
+        or output_roots != after_output_roots
+        or actual_input_paths != after_input_paths
+        or actual_output_paths != after_output_paths
+        or actual_inputs != after_inputs
+        or actual_outputs != after_outputs
+    ):
+        raise ContractError(
+            "Publication candidate HEAD/tree, receipt or file bytes changed "
+            "during lock-free verification."
+        )
+    return receipt
 
 
 def _publication_receipt_header(
