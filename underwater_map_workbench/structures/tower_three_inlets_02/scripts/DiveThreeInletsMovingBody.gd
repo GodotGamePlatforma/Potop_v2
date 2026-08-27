@@ -26,7 +26,8 @@ var _safety_envelope: Area2D
 func configure(
 	definition: Dictionary,
 	socket_rect: Rect2,
-	structure_id: String
+	structure_id: String,
+	visual_style: String = VISUAL_STYLE_INDUSTRIAL_PANEL
 ) -> PackedStringArray:
 	var errors := PackedStringArray()
 	body_id = str(definition.get("id", ""))
@@ -40,7 +41,7 @@ func configure(
 	_safety_margin = float(definition.get("safety_margin", 40.0))
 	if _safety_margin < 0.0:
 		errors.append("Ruchome ciało %s ma ujemny safety_margin." % body_id)
-	_visual_style = str(definition.get("visual_style", VISUAL_STYLE_INDUSTRIAL_PANEL))
+	_visual_style = visual_style
 	if _visual_style not in [VISUAL_STYLE_INDUSTRIAL_PANEL, VISUAL_STYLE_EGRESS_GRILLE]:
 		errors.append("Ruchome ciało %s ma nieobsługiwany visual_style: %s." % [body_id, _visual_style])
 	_open_offset = _vector_from_value(definition.get("open_offset", []))

@@ -688,7 +688,6 @@
         "socket_id": "facade_ground_floor",
         "label": "FASADA",
         "symbol": "WYJŚCIE",
-        "visual_style": "egress_grille",
         "open_offset": [
           0,
           -240
@@ -860,7 +859,7 @@
     {
       "role": "controller",
       "path": "scripts/DiveThreeInletsTowerController.gd",
-      "sha256": "fcb458092a760395e2d1599a91e6478538626c2a6275aec09d894c0f4c2ed961"
+      "sha256": "fce3894e60fe05fd3860b6ba81c08546c9f510a492d5f05c486b1711c3d5db51"
     },
     {
       "role": "interactable",
@@ -870,7 +869,7 @@
     {
       "role": "moving_body",
       "path": "scripts/DiveThreeInletsMovingBody.gd",
-      "sha256": "38eda391033ac3809c1e58b3f86fa700ff98afba9a1a688b04f01ff1509bb4a5"
+      "sha256": "d31101d1636ac97f0ee6ae54e9ce5dbe821b3fb4985e4d2cea45a9e891812d8b"
     }
   ],
   "attempt_state": {
