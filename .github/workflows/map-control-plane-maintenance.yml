@@ -417,7 +417,7 @@ jobs:
 
   audit-merged-main:
     name: Dispatch exact-main audit after manual maintenance merge
-    if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true }}
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'codex/map/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -436,7 +436,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $repository = $env:GITHUB_REPOSITORY
-          $pull = $env:GITHUB_EVENT_PATH | Get-Content -Raw | ConvertFrom-Json | Select-Object -ExpandProperty pull_request
+          $pull = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json | Select-Object -ExpandProperty pull_request
           if (-not [bool]$pull.merged -or
               $pull.base.ref -cne "main" -or
               $pull.head.repo.full_name -cne $repository -or

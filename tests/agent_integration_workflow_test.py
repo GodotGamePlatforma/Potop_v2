@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import ast
+import json
+import os
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -311,6 +314,18 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         self.assertNotIn("complete-agent-handoff", workflow)
         self.assertNotIn("verify-map-control-plane-candidate", controller)
         self.assertIn("github.event.pull_request.merged == true", post_merge)
+        self.assertIn(
+            "startsWith(github.event.pull_request.head.ref, 'codex/map/')",
+            post_merge,
+        )
+        self.assertIn(
+            "Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw",
+            post_merge,
+        )
+        self.assertNotIn(
+            "$env:GITHUB_EVENT_PATH | Get-Content",
+            post_merge,
+        )
         self.assertIn("control-plane-v2:", post_merge)
         self.assertIn("control-plane-handoff-v1:", post_merge)
         self.assertIn("one to three unique, non-renamed files", post_merge)
@@ -350,6 +365,48 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
             },
             exact_paths,
         )
+
+    def test_map_maintenance_post_merge_reads_the_real_event_file(self) -> None:
+        post_merge = _job(
+            _workflow("map-control-plane-maintenance.yml"), "audit-merged-main"
+        )
+        parser = re.search(
+            r"(?m)^\s*(\$pull = Get-Content -LiteralPath "
+            r"\$env:GITHUB_EVENT_PATH -Raw \| ConvertFrom-Json \| "
+            r"Select-Object -ExpandProperty pull_request)\s*$",
+            post_merge,
+        )
+        self.assertIsNotNone(parser, "exact event-file parser is missing")
+        powershell = shutil.which("pwsh") or shutil.which("powershell")
+        self.assertIsNotNone(powershell, "PowerShell is required for workflow policy tests")
+        payload = {
+            "pull_request": {
+                "number": 17,
+                "merged": True,
+                "head": {"ref": "codex/map/verifier-fix"},
+            }
+        }
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            event_path = Path(temporary_directory) / "event.json"
+            event_path.write_text(json.dumps(payload), encoding="utf-8")
+            environment = os.environ.copy()
+            environment["GITHUB_EVENT_PATH"] = str(event_path)
+            script = "\n".join(
+                (
+                    '$ErrorActionPreference = "Stop"',
+                    parser.group(1),
+                    'if ([int]$pull.number -ne 17) { throw "event parse mismatch" }',
+                )
+            )
+            result = subprocess.run(
+                [str(powershell), "-NoProfile", "-NonInteractive", "-Command", "-"],
+                input=script,
+                text=True,
+                capture_output=True,
+                env=environment,
+                check=False,
+            )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_main_audit_has_one_automatic_trigger_and_reuses_its_check(self) -> None:
         integration = _workflow("agent-integration.yml")
