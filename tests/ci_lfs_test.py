@@ -66,15 +66,21 @@ def _new_repository(parent: Path) -> tuple[Path, dict[str, bytes], list[str]]:
         check=True,
         capture_output=True,
     )
-    _git(repository, "config", "user.email", "ci-lfs-test@example.invalid")
-    _git(repository, "config", "user.name", "CI LFS Test")
-    _git(repository, "config", "core.autocrlf", "false")
     # Keep fixtures independent of a machine-wide Git LFS installation while
-    # still exercising Git's cached filter=lfs attributes.
-    _git(repository, "config", "filter.lfs.required", "false")
-    _git(repository, "config", "filter.lfs.process", "")
-    _git(repository, "config", "filter.lfs.clean", "")
-    _git(repository, "config", "filter.lfs.smudge", "")
+    # still exercising Git's cached filter=lfs attributes. Writing the exact
+    # local fixture config once avoids seven process launches per repository.
+    (repository / ".git" / "config").write_bytes(
+        b"[core]\n"
+        b"\tautocrlf = false\n"
+        b"[user]\n"
+        b"\temail = ci-lfs-test@example.invalid\n"
+        b"\tname = CI LFS Test\n"
+        b"[filter \"lfs\"]\n"
+        b"\trequired = false\n"
+        b"\tprocess =\n"
+        b"\tclean =\n"
+        b"\tsmudge =\n"
+    )
 
     (repository / ".gitattributes").write_bytes(
         b"* text=auto eol=lf\n"
