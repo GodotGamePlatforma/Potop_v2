@@ -636,7 +636,7 @@ func _effective_structure_record() -> Dictionary:
 	var runtime := (_package_manifest.get("runtime", {}) as Dictionary).duplicate(true)
 	var egress_socket_id := str(runtime.get("egress_socket_id", ""))
 	var egress_socket := _record_by_id(sockets, egress_socket_id)
-	var egress_rect := _rect_from_value(egress_socket.get("local_rect", []))
+	var egress_rect: Rect2 = _rect2(egress_socket.get("local_rect", []))
 	var barriers := runtime.get("barriers", []) as Array
 	var typed_barrier: Dictionary = {}
 	var typed_barrier_socket_id := ""
@@ -646,7 +646,7 @@ func _effective_structure_record() -> Dictionary:
 		var barrier_socket := _record_by_id(sockets, barrier_socket_id)
 		if (
 			str(barrier_socket.get("kind", "")) == "dynamic_door"
-			and _rect_from_value(barrier_socket.get("local_rect", [])) == egress_rect
+			and _rect2(barrier_socket.get("local_rect", [])) == egress_rect
 		):
 			typed_barrier = barrier
 			typed_barrier_socket_id = barrier_socket_id
