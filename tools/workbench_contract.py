@@ -1188,12 +1188,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         if args.command == "validate":
+            selector_supplied = bool(
+                args.path or args.write_set or args.diff or args.base
+            )
             paths: set[str] = {normalize_repo_path(path) for path in args.path}
             for write_set_path in args.write_set:
                 paths.update(read_write_set(write_set_path))
             if args.diff or args.base:
                 paths.update(changed_paths(root, args.base))
-            if not paths:
+            if not selector_supplied:
                 raise ContractError(
                     "validate requires --path, --write-set, --diff or --base"
                 )
