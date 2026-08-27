@@ -10,10 +10,13 @@ single domain.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -36,6 +39,11 @@ DEFAULT_PUBLICATION_LOCK = "integration-publish"
 LAST_GREEN_REF = "refs/last-green/integration"
 PUBLICATION_RECEIPT_SCHEMA_VERSION = 1
 PUBLICATION_RECEIPT_STATUS = "PUBLICATION_READY"
+ISOLATED_EOL_PROOF_SCHEMA_VERSION = 1
+ISOLATED_EOL_PROOF_KIND = "isolated-git-eol-proof"
+ISOLATED_EOL_PROOF_PURPOSE = "structure-target-build"
+ISOLATED_EOL_PROOF_KEY_ENV = "OSTATNI_POMOST_ISOLATED_EOL_PROOF_KEY"
+ISOLATED_EOL_PROOF_PATH_ENV = "OSTATNI_POMOST_ISOLATED_EOL_PROOF_PATH"
 
 
 class ContractError(RuntimeError):
@@ -536,6 +544,382 @@ def assert_tracked_lf_eol(repository: str | Path = ".") -> int:
             + ", ".join(f"{path} ({state})" for path, state in violations)
         )
     return checked
+
+
+def _isolated_snapshot_file_records(
+    snapshot_root: Path,
+    paths: Iterable[str],
+) -> tuple[tuple[dict[str, object], ...], str, int, int]:
+    """Hash an explicit Git-closed path set using the runner's snapshot format."""
+
+    root = snapshot_root.resolve(strict=True)
+    if not root.is_dir():
+        raise ContractError(f"Snapshot root must be a directory: {root}")
+    normalized_paths = tuple(normalize_repo_path(path) for path in paths)
+    if tuple(sorted(normalized_paths)) != normalized_paths:
+        raise ContractError("Snapshot proof paths must be canonical and ordered.")
+    if len(set(normalized_paths)) != len(normalized_paths):
+        raise ContractError("Snapshot proof paths contain duplicates.")
+
+    records: list[dict[str, object]] = []
+    canonical_records: list[str] = []
+    file_count = 0
+    missing_count = 0
+    for relative_path in normalized_paths:
+        candidate = root.joinpath(*PurePosixPath(relative_path).parts)
+        if candidate.is_symlink():
+            raise ContractError(
+                f"Snapshot proof path cannot be a symlink: {relative_path}"
+            )
+        resolved = candidate.resolve(strict=False)
+        if not resolved.is_relative_to(root):
+            raise ContractError(f"Snapshot proof path escapes root: {relative_path}")
+        path_token = base64.b64encode(relative_path.encode("utf-8")).decode("ascii")
+        if not candidate.exists():
+            missing_count += 1
+            record = {
+                "path": relative_path,
+                "exists": False,
+                "size": 0,
+                "sha256": "",
+            }
+            canonical_records.append(f"M\t{path_token}")
+        else:
+            if not candidate.is_file():
+                raise ContractError(
+                    f"Snapshot proof path must be a regular file: {relative_path}"
+                )
+            raw = candidate.read_bytes()
+            file_count += 1
+            record = {
+                "path": relative_path,
+                "exists": True,
+                "size": len(raw),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+            }
+            canonical_records.append(
+                f"F\t{path_token}\t{len(raw)}\t{record['sha256']}"
+            )
+        records.append(record)
+    digest = hashlib.sha256("\n".join(canonical_records).encode("utf-8")).hexdigest()
+    return tuple(records), digest, file_count, missing_count
+
+
+def _isolated_snapshot_actual_file_paths(snapshot_root: Path) -> tuple[str, ...]:
+    """Return every regular file in a non-Git snapshot, rejecting links."""
+
+    root = snapshot_root.resolve(strict=True)
+    paths: list[str] = []
+    for candidate in root.rglob("*"):
+        relative = candidate.relative_to(root).as_posix()
+        if candidate.is_symlink():
+            raise ContractError(
+                f"Isolated snapshot cannot contain a symlink: {relative}"
+            )
+        if candidate.is_dir():
+            continue
+        if not candidate.is_file():
+            raise ContractError(
+                f"Isolated snapshot entry must be a regular file: {relative}"
+            )
+        paths.append(normalize_repo_path(relative))
+    return tuple(sorted(paths))
+
+
+def _assert_isolated_snapshot_closed(
+    snapshot_root: Path,
+    records: Iterable[dict[str, object]],
+    *,
+    permitted_extra: str | None = None,
+) -> None:
+    expected = {
+        str(record["path"])
+        for record in records
+        if record["exists"] is True
+    }
+    if permitted_extra is not None:
+        expected.add(normalize_repo_path(permitted_extra))
+    actual = set(_isolated_snapshot_actual_file_paths(snapshot_root))
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise ContractError(
+            "Isolated EOL proof snapshot inventory changed: "
+            f"missing={missing}, extra={extra}."
+        )
+
+
+def _isolated_eol_secret(secret_hex: str | None = None) -> bytes:
+    value = secret_hex or os.environ.get(ISOLATED_EOL_PROOF_KEY_ENV, "")
+    if re.fullmatch(r"[0-9a-fA-F]{64}", value) is None:
+        raise ContractError(
+            f"{ISOLATED_EOL_PROOF_KEY_ENV} must contain one ephemeral 256-bit hex key."
+        )
+    return bytes.fromhex(value)
+
+
+def _isolated_eol_proof_path(
+    snapshot_root: Path,
+    proof_path: str | Path,
+    *,
+    must_exist: bool,
+) -> Path:
+    root = snapshot_root.resolve(strict=True)
+    candidate = Path(proof_path)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    if candidate.is_symlink():
+        raise ContractError("Isolated EOL proof cannot be a symlink.")
+    try:
+        resolved = candidate.resolve(strict=must_exist)
+    except OSError as error:
+        raise ContractError(f"Isolated EOL proof does not exist: {candidate}") from error
+    allowed_parent = (root / ".godot" / "isolated_eol_proofs").resolve(
+        strict=False
+    )
+    if resolved.parent != allowed_parent or resolved.suffix.lower() != ".json":
+        raise ContractError(
+            "Isolated EOL proof must be one JSON file directly under "
+            "<snapshot>/.godot/isolated_eol_proofs/."
+        )
+    return resolved
+
+
+def _assert_non_git_snapshot(snapshot_root: Path) -> None:
+    try:
+        boundary = _find_git_boundary(snapshot_root)
+    except ContractError:
+        return
+    raise ContractError(
+        "Isolated EOL proof is valid only for a non-Git snapshot; "
+        f"found Git boundary {boundary}."
+    )
+
+
+def _isolated_eol_canonical_payload(payload: dict[str, object]) -> bytes:
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def create_isolated_eol_proof(
+    repository: str | Path,
+    *,
+    snapshot_root: str | Path,
+    expected_snapshot_sha256: str,
+    structure_id: str,
+    proof_path: str | Path,
+    secret_hex: str | None = None,
+) -> dict[str, object]:
+    """Attest one exact non-Git runner snapshot after Git's LF preflight."""
+
+    source_root = repository_root(repository)
+    isolated_root = Path(snapshot_root).resolve(strict=True)
+    _assert_non_git_snapshot(isolated_root)
+    if STRUCTURE_ID_PATTERN.fullmatch(structure_id) is None:
+        raise ContractError(f"Invalid structure ID for isolated EOL proof: {structure_id}")
+    expected_digest = expected_snapshot_sha256.lower()
+    if re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None:
+        raise ContractError("Expected isolated snapshot SHA-256 is invalid.")
+    secret = _isolated_eol_secret(secret_hex)
+
+    checked_lf_paths = assert_tracked_lf_eol(source_root)
+    paths = inventory_paths(source_root)
+    source_records, source_digest, source_files, source_missing = (
+        _isolated_snapshot_file_records(source_root, paths)
+    )
+    isolated_records, isolated_digest, isolated_files, isolated_missing = (
+        _isolated_snapshot_file_records(isolated_root, paths)
+    )
+    if source_digest != expected_digest or isolated_digest != expected_digest:
+        raise ContractError(
+            "Isolated EOL proof source/snapshot digest mismatch: "
+            f"expected={expected_digest}, source={source_digest}, "
+            f"snapshot={isolated_digest}."
+        )
+    if source_records != isolated_records:
+        raise ContractError("Isolated EOL proof source and snapshot byte records differ.")
+    if (source_files, source_missing) != (isolated_files, isolated_missing):
+        raise ContractError("Isolated EOL proof source and snapshot counts differ.")
+    _assert_isolated_snapshot_closed(isolated_root, isolated_records)
+
+    head = os.fsdecode(_run_git(source_root, "rev-parse", "--verify", "HEAD").stdout).strip().lower()
+    tree = os.fsdecode(
+        _run_git(source_root, "rev-parse", "--verify", "HEAD^{tree}").stdout
+    ).strip().lower()
+    status = _run_git(
+        source_root,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "-z",
+    ).stdout
+    payload: dict[str, object] = {
+        "schema_version": ISOLATED_EOL_PROOF_SCHEMA_VERSION,
+        "kind": ISOLATED_EOL_PROOF_KIND,
+        "purpose": ISOLATED_EOL_PROOF_PURPOSE,
+        "structure_id": structure_id,
+        "snapshot_root": str(isolated_root),
+        "source_head": head,
+        "source_tree": tree,
+        "source_status_sha256": hashlib.sha256(status).hexdigest(),
+        "source_snapshot_sha256": isolated_digest,
+        "path_count": len(paths),
+        "file_count": isolated_files,
+        "missing_count": isolated_missing,
+        "tracked_eol_lf_count": checked_lf_paths,
+        "nonce": secrets.token_hex(16),
+        "files": list(isolated_records),
+    }
+    signature = hmac.new(
+        secret,
+        _isolated_eol_canonical_payload(payload),
+        hashlib.sha256,
+    ).hexdigest()
+    receipt = dict(payload)
+    receipt["hmac_sha256"] = signature
+
+    destination = _isolated_eol_proof_path(
+        isolated_root,
+        proof_path,
+        must_exist=False,
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with destination.open("xb") as stream:
+            stream.write(
+                json.dumps(receipt, ensure_ascii=False, sort_keys=True, indent=2).encode(
+                    "utf-8"
+                )
+            )
+            stream.write(b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError as error:
+        raise ContractError(f"Isolated EOL proof already exists: {destination}") from error
+    return receipt
+
+
+def verify_isolated_eol_proof(
+    snapshot_root: str | Path,
+    *,
+    proof_path: str | Path,
+    structure_id: str,
+    secret_hex: str | None = None,
+) -> dict[str, object]:
+    """Verify an ephemeral HMAC proof and rehash every attested snapshot byte."""
+
+    isolated_root = Path(snapshot_root).resolve(strict=True)
+    _assert_non_git_snapshot(isolated_root)
+    secret = _isolated_eol_secret(secret_hex)
+    source = _isolated_eol_proof_path(
+        isolated_root,
+        proof_path,
+        must_exist=True,
+    )
+    if source.stat().st_size > 16 * 1024 * 1024:
+        raise ContractError("Isolated EOL proof exceeds the fail-closed size limit.")
+    try:
+        receipt = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContractError(f"Invalid isolated EOL proof JSON: {error}") from error
+    if not isinstance(receipt, dict):
+        raise ContractError("Isolated EOL proof must be a JSON object.")
+    signature = receipt.get("hmac_sha256")
+    if not isinstance(signature, str) or re.fullmatch(r"[0-9a-f]{64}", signature) is None:
+        raise ContractError("Isolated EOL proof HMAC is missing or invalid.")
+    payload = dict(receipt)
+    del payload["hmac_sha256"]
+    expected_signature = hmac.new(
+        secret,
+        _isolated_eol_canonical_payload(payload),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        raise ContractError("Isolated EOL proof HMAC verification failed.")
+
+    expected_keys = {
+        "schema_version",
+        "kind",
+        "purpose",
+        "structure_id",
+        "snapshot_root",
+        "source_head",
+        "source_tree",
+        "source_status_sha256",
+        "source_snapshot_sha256",
+        "path_count",
+        "file_count",
+        "missing_count",
+        "tracked_eol_lf_count",
+        "nonce",
+        "files",
+    }
+    if set(payload) != expected_keys:
+        raise ContractError("Isolated EOL proof fields do not match the closed schema.")
+    if payload["schema_version"] != ISOLATED_EOL_PROOF_SCHEMA_VERSION or payload["kind"] != ISOLATED_EOL_PROOF_KIND:
+        raise ContractError("Isolated EOL proof schema or kind is unsupported.")
+    if payload["purpose"] != ISOLATED_EOL_PROOF_PURPOSE:
+        raise ContractError("Isolated EOL proof purpose is invalid.")
+    if payload["structure_id"] != structure_id:
+        raise ContractError("Isolated EOL proof belongs to a different structure.")
+    if Path(str(payload["snapshot_root"])).resolve(strict=False) != isolated_root:
+        raise ContractError("Isolated EOL proof belongs to a different snapshot root.")
+    for digest_name in (
+        "source_head",
+        "source_tree",
+        "source_status_sha256",
+        "source_snapshot_sha256",
+    ):
+        pattern = r"[0-9a-f]{40,64}" if digest_name in {"source_head", "source_tree"} else r"[0-9a-f]{64}"
+        if not isinstance(payload[digest_name], str) or re.fullmatch(pattern, str(payload[digest_name])) is None:
+            raise ContractError(f"Isolated EOL proof has invalid {digest_name}.")
+    if not isinstance(payload["nonce"], str) or re.fullmatch(r"[0-9a-f]{32}", str(payload["nonce"])) is None:
+        raise ContractError("Isolated EOL proof nonce is invalid.")
+    if not isinstance(payload["files"], list):
+        raise ContractError("Isolated EOL proof files must be a list.")
+    records: list[dict[str, object]] = []
+    paths: list[str] = []
+    for value in payload["files"]:
+        if not isinstance(value, dict) or set(value) != {"path", "exists", "size", "sha256"}:
+            raise ContractError("Isolated EOL proof contains an invalid file record.")
+        if not isinstance(value["exists"], bool) or not isinstance(value["size"], int):
+            raise ContractError("Isolated EOL proof contains invalid file metadata.")
+        path = normalize_repo_path(str(value["path"]))
+        sha256 = str(value["sha256"])
+        if value["exists"]:
+            if value["size"] < 0 or re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
+                raise ContractError("Isolated EOL proof contains invalid present-file metadata.")
+        elif value["size"] != 0 or sha256:
+            raise ContractError("Isolated EOL proof contains invalid missing-file metadata.")
+        normalized_record = {
+            "path": path,
+            "exists": value["exists"],
+            "size": value["size"],
+            "sha256": sha256,
+        }
+        records.append(normalized_record)
+        paths.append(path)
+    current_records, current_digest, file_count, missing_count = (
+        _isolated_snapshot_file_records(isolated_root, paths)
+    )
+    if tuple(records) != current_records:
+        raise ContractError("Isolated EOL proof snapshot bytes changed after attestation.")
+    _assert_isolated_snapshot_closed(
+        isolated_root,
+        records,
+        permitted_extra=source.relative_to(isolated_root).as_posix(),
+    )
+    if payload["source_snapshot_sha256"] != current_digest:
+        raise ContractError("Isolated EOL proof snapshot digest does not match current bytes.")
+    if payload["path_count"] != len(paths) or payload["file_count"] != file_count or payload["missing_count"] != missing_count:
+        raise ContractError("Isolated EOL proof path/file counts do not match current bytes.")
+    if not isinstance(payload["tracked_eol_lf_count"], int) or payload["tracked_eol_lf_count"] < 0:
+        raise ContractError("Isolated EOL proof tracked LF count is invalid.")
+    return receipt
 
 
 def changed_paths(
@@ -1397,6 +1781,23 @@ def _parser() -> argparse.ArgumentParser:
         help="reject tracked eol=lf files with CRLF or mixed worktree bytes",
     )
 
+    eol_proof = commands.add_parser(
+        "eol-proof",
+        help="create an ephemeral proof for one exact non-Git runner snapshot",
+    )
+    eol_proof_commands = eol_proof.add_subparsers(
+        dest="eol_proof_command",
+        required=True,
+    )
+    eol_proof_create = eol_proof_commands.add_parser(
+        "create",
+        help="attest source LF state and an exact copied snapshot",
+    )
+    eol_proof_create.add_argument("--snapshot-root", required=True)
+    eol_proof_create.add_argument("--snapshot-digest", required=True)
+    eol_proof_create.add_argument("--structure-id", required=True)
+    eol_proof_create.add_argument("--proof", required=True)
+
     publication = commands.add_parser(
         "publication",
         help="create or verify a fail-closed publication receipt",
@@ -1604,6 +2005,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "eol-check":
             checked = assert_tracked_lf_eol(root)
             print(f"PASS tracked_eol_lf={checked}")
+            return 0
+        if args.command == "eol-proof":
+            if args.eol_proof_command != "create":
+                raise ContractError(
+                    f"Unsupported EOL proof command: {args.eol_proof_command}"
+                )
+            receipt = create_isolated_eol_proof(
+                root,
+                snapshot_root=args.snapshot_root,
+                expected_snapshot_sha256=args.snapshot_digest,
+                structure_id=args.structure_id,
+                proof_path=args.proof,
+            )
+            print(
+                "PASS isolated_eol_proof "
+                f"snapshot={receipt['source_snapshot_sha256']} "
+                f"structure={receipt['structure_id']} "
+                f"proof={Path(args.proof).resolve(strict=True)}"
+            )
             return 0
         raise ContractError(f"Unsupported command: {args.command}")
     except (ContractError, OSError) as error:

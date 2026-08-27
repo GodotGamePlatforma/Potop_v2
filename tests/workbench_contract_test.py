@@ -851,5 +851,104 @@ class TrackedEolCheckTest(unittest.TestCase):
                 contract.assert_tracked_lf_eol(repository)
 
 
+class IsolatedEolProofTest(unittest.TestCase):
+    def _fixture(self, parent: Path) -> tuple[Path, Path, str]:
+        repository = _new_repository(parent)
+        (repository / ".gitattributes").write_bytes(b"* text=auto eol=lf\n")
+        (repository / "nested").mkdir()
+        (repository / "nested" / "input.txt").write_bytes(b"one\ntwo\n")
+        _commit_all(repository, "isolated EOL proof fixture")
+
+        snapshot = parent / "snapshot"
+        snapshot.mkdir()
+        paths = contract.inventory_paths(repository)
+        for relative_path in paths:
+            source = repository.joinpath(*Path(relative_path).parts)
+            destination = snapshot.joinpath(*Path(relative_path).parts)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
+        _records, digest, _files, _missing = contract._isolated_snapshot_file_records(
+            snapshot,
+            paths,
+        )
+        return repository, snapshot, digest
+
+    def test_valid_proof_verifies_and_missing_proof_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, snapshot, digest = self._fixture(Path(temporary))
+            proof = snapshot / ".godot" / "isolated_eol_proofs" / "tower.json"
+            secret = "ab" * 32
+
+            created = contract.create_isolated_eol_proof(
+                repository,
+                snapshot_root=snapshot,
+                expected_snapshot_sha256=digest,
+                structure_id="tower_local",
+                proof_path=proof,
+                secret_hex=secret,
+            )
+            verified = contract.verify_isolated_eol_proof(
+                snapshot,
+                proof_path=proof,
+                structure_id="tower_local",
+                secret_hex=secret,
+            )
+
+            self.assertEqual(created["hmac_sha256"], verified["hmac_sha256"])
+            self.assertEqual(digest, verified["source_snapshot_sha256"])
+            with self.assertRaisesRegex(contract.ContractError, "does not exist"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof.with_name("missing.json"),
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+    def test_proof_tamper_and_snapshot_drift_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, snapshot, digest = self._fixture(Path(temporary))
+            proof = snapshot / ".godot" / "isolated_eol_proofs" / "tower.json"
+            secret = "cd" * 32
+            contract.create_isolated_eol_proof(
+                repository,
+                snapshot_root=snapshot,
+                expected_snapshot_sha256=digest,
+                structure_id="tower_local",
+                proof_path=proof,
+                secret_hex=secret,
+            )
+            original_proof = proof.read_bytes()
+            tampered = json.loads(original_proof.decode("utf-8"))
+            tampered["file_count"] += 1
+            proof.write_text(json.dumps(tampered), encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "HMAC verification failed"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof,
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+            proof.write_bytes(original_proof)
+            (snapshot / "nested" / "input.txt").write_bytes(b"drift\n")
+            with self.assertRaisesRegex(contract.ContractError, "bytes changed"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof,
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+            (snapshot / "nested" / "input.txt").write_bytes(b"one\ntwo\n")
+            (snapshot / "unexpected.txt").write_bytes(b"added after proof\n")
+            with self.assertRaisesRegex(contract.ContractError, "inventory changed"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof,
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
