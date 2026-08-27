@@ -66,6 +66,7 @@ $requiredFunctions = @(
     "New-IsolatedTargetWorkspace",
     "Set-IsolatedGodotTargetConfiguration",
     "Copy-TestCaseForWorkspace",
+    "Set-NativeShardDummyAudio",
     "Set-TrustedChildEnvironment",
     "New-RunnerKillOnCloseJob",
     "Complete-RunnerJob",
@@ -177,6 +178,66 @@ Assert-RunnerInvariant `
         '(?m)^\s+"underwater_map_workbench/tests/underwater_map_smoke_test\.gd"\s*$'
     ).Count -eq 1) `
     "The closed full-suite manifest must contain map smoke exactly once."
+Assert-RunnerInvariant `
+    ([regex]::Matches(
+        $runnerText,
+        '(?m)^\s{4}if \(\$shardMode\) \{\r?$\n\s{8}Set-NativeShardDummyAudio `'
+    ).Count -eq 1) `
+    "Dummy audio configuration must be invoked exactly once and only from shard execution."
+Assert-RunnerInvariant `
+    ($runnerText.Contains('$engineErrorLines = @($lines | Where-Object { $_ -match "^\s*(?:SCRIPT ERROR|ERROR):" })') -and
+        $runnerText.Contains('$reasons.Add("engine output contains ERROR:/SCRIPT ERROR:")')) `
+    "Native dummy audio must not weaken fail-closed ERROR:/SCRIPT ERROR: handling."
+
+$headlessArguments = [string[]]@("--headless", "--path", "C:\fixture", "--script", "res://tests/headless.gd")
+$headlessCase = [pscustomobject]@{
+    Name = "headless.gd"
+    NativeWindow = $false
+    Arguments = $headlessArguments
+}
+$headlessArgumentsBefore = [string]::Join("`n", @($headlessCase.Arguments))
+Set-NativeShardDummyAudio -TestCases @($headlessCase) -ShardLane "headless"
+Assert-RunnerInvariant `
+    ([string]::Join("`n", @($headlessCase.Arguments)) -ceq $headlessArgumentsBefore) `
+    "Headless shard arguments changed while configuring native dummy audio."
+
+$nativeArguments = [string[]]@("--path", "C:\fixture", "--script", "res://tests/native.gd")
+$nativeCase = [pscustomobject]@{
+    Name = "native.gd"
+    NativeWindow = $true
+    Arguments = $nativeArguments
+}
+Set-NativeShardDummyAudio -TestCases @($nativeCase) -ShardLane "native"
+Assert-RunnerInvariant `
+    ([string]::Join("`n", @($nativeCase.Arguments)) -ceq
+        [string]::Join("`n", @("--audio-driver", "Dummy") + $nativeArguments)) `
+    "Native shard did not prepend exactly one explicit Dummy audio-driver selection."
+
+$mixedNativeLaneRejected = $false
+try {
+    Set-NativeShardDummyAudio `
+        -TestCases @([pscustomobject]@{
+            Name = "unexpected-headless.gd"
+            NativeWindow = $false
+            Arguments = [string[]]@("--headless", "--path", "C:\fixture")
+        }) `
+        -ShardLane "native"
+}
+catch { $mixedNativeLaneRejected = $_.Exception.Message.Contains("contains non-native target") }
+Assert-RunnerInvariant $mixedNativeLaneRejected "Native shard accepted a non-native target."
+
+$existingAudioDriverRejected = $false
+try {
+    Set-NativeShardDummyAudio `
+        -TestCases @([pscustomobject]@{
+            Name = "preconfigured-native.gd"
+            NativeWindow = $true
+            Arguments = [string[]]@("--audio-driver", "Other", "--path", "C:\fixture")
+        }) `
+        -ShardLane "native"
+}
+catch { $existingAudioDriverRejected = $_.Exception.Message.Contains("already declares an audio driver") }
+Assert-RunnerInvariant $existingAudioDriverRejected "Native shard accepted a second audio-driver declaration."
 
 $tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd([char[]]"\/")
 $fixtureRoot = [System.IO.Path]::GetFullPath((Join-Path $tempParent ("ostatni_pomost_runner_test_" + [Guid]::NewGuid().ToString("N"))))
