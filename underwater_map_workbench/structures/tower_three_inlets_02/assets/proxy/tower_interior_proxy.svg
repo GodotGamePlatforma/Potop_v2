@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="3840" viewBox="0 0 2400 3840">
+  <defs>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12384a"/>
+      <stop offset="0.5" stop-color="#0b2b3a"/>
+      <stop offset="1" stop-color="#061b27"/>
+    </linearGradient>
+    <linearGradient id="room" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1b5667" stop-opacity="0.62"/>
+      <stop offset="0.5" stop-color="#103b4d" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#1b5667" stop-opacity="0.62"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#66d7df" stroke-opacity="0.055" stroke-width="2"/>
+    </pattern>
+    <pattern id="shaftArrows" width="240" height="240" patternUnits="userSpaceOnUse">
+      <path d="M120 190V58M72 108l48-52 48 52" fill="none" stroke="#86e7ee" stroke-opacity="0.55" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    </pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      .floor { fill:url(#room); stroke:#5bc7d1; stroke-opacity:.42; stroke-width:5; }
+      .label { fill:#d8fbff; font-family:'Segoe UI',sans-serif; font-size:42px; font-weight:700; letter-spacing:2px; }
+      .small { fill:#9fd9df; font-family:'Segoe UI',sans-serif; font-size:27px; font-weight:600; letter-spacing:1px; }
+      .route { fill:none; stroke:#aeeff3; stroke-opacity:.42; stroke-width:12; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:22 18; }
+      .gate { fill:#b14d3f; stroke:#ffb287; stroke-width:7; }
+      .control { fill:#16313d; stroke:#8cebf0; stroke-width:7; }
+    </style>
+  </defs>
+
+  <rect width="2400" height="3840" fill="url(#water)"/>
+  <rect width="2400" height="3840" fill="url(#grid)"/>
+
+  <g id="rooms">
+    <rect class="floor" x="80" y="80" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="80" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="360" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="360" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="640" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="640" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="920" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="920" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="1200" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="1200" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="1480" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="1480" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="1760" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="1760" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="2040" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="2040" width="920" height="200" rx="24"/>
+    <rect class="floor" x="80" y="2320" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="2320" width="920" height="200" rx="24"/>
+    <rect class="floor" x="1400" y="3440" width="920" height="240" rx="24"/>
+  </g>
+
+  <rect x="1080" y="80" width="240" height="3600" rx="32" fill="#0d3344" stroke="#70dbe3" stroke-opacity=".58" stroke-width="8"/>
+  <rect x="1080" y="80" width="240" height="3600" fill="url(#shaftArrows)"/>
+  <text class="small" x="1200" y="330" text-anchor="middle" transform="rotate(-90 1200 330)">SZYB CENTRALNY • PRĄD</text>
+
+  <path class="route" d="M40 160H380V450H800V740H1180V1020H2160V1580H1840H1180V1860H400V2140H800V2420H1180V3560H2320"/>
+
+  <g id="entry">
+    <path d="M0 112h94v96H0" fill="#2d7f8a" stroke="#ffa94d" stroke-width="10"/>
+    <path d="M24 160h170" stroke="#ffa94d" stroke-width="18" stroke-linecap="round"/>
+    <text class="small" x="112" y="130">WEJŚCIE • P.12</text>
+  </g>
+
+  <g id="labels">
+    <text class="small" x="104" y="120">P.12 • START</text>
+    <text class="small" x="1424" y="120">P.12 • BALKON USZKODZONY</text>
+    <text class="small" x="104" y="400">P.11 • ŁĄCZNIK</text>
+    <text class="label" x="1850" y="475" text-anchor="middle">A  ≡</text>
+    <text class="small" x="104" y="680">P.10 • WLOT B</text>
+    <text class="small" x="1424" y="680">P.10 • POWRÓT DO SZYBU</text>
+    <text class="small" x="1424" y="960">P.09 • DOJŚCIE DO C</text>
+    <text class="small" x="1424" y="1240">P.08 • SZYB SERWISOWY</text>
+    <text class="small" x="1424" y="1520">P.07 • WLOT C / SKRÓT</text>
+    <text class="small" x="104" y="1800">P.06 • TRASA DO D</text>
+    <text class="small" x="104" y="2080">P.05 • ŁĄCZNIK</text>
+    <text class="small" x="104" y="2344">P.04 • UKŁAD D</text>
+    <text class="small" x="1424" y="3480">PARTER • WYJŚCIE DO OCEANU</text>
+  </g>
+
+  <g id="panel-a" filter="url(#glow)">
+    <rect class="control" x="1760" y="400" width="400" height="120" rx="18"/>
+    <circle cx="1830" cy="460" r="20" fill="#61e7d5"/>
+    <text class="label" x="1910" y="475">A ≡</text>
+    <path d="M2000 430h110M2000 460h80M2000 490h100" stroke="#9fe8ec" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <g id="inlet-b">
+    <rect class="control" x="80" y="680" width="240" height="120" rx="18"/>
+    <circle cx="140" cy="740" r="30" fill="#6de3d1"/>
+    <text class="label" x="240" y="755" text-anchor="middle">B •</text>
+    <path d="M300 700h560" stroke="#85e9ef" stroke-width="16" stroke-linecap="round" opacity=".55"/>
+    <path d="M498 670l62 30-62 30M698 670l62 30-62 30" fill="none" stroke="#85e9ef" stroke-width="12"/>
+    <rect x="360" y="640" width="160" height="200" fill="#275a5e" opacity=".38" stroke="#7affc7" stroke-width="5" stroke-dasharray="14 10"/>
+    <rect x="600" y="640" width="160" height="200" fill="#275a5e" opacity=".38" stroke="#7affc7" stroke-width="5" stroke-dasharray="14 10"/>
+    <rect x="840" y="640" width="160" height="200" fill="#234b63" opacity=".42" stroke="#68c6ff" stroke-width="7"/>
+    <path d="M970 785h-84m28-25l-30 25 30 25" fill="none" stroke="#68c6ff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- G1, skrót C, G2, H3 i fasada są rysowane wyłącznie przez ruchome ciała runtime. -->
+
+  <g id="inlet-c">
+    <rect x="2160" y="1200" width="160" height="480" rx="22" fill="#16495a" stroke="#70dce3" stroke-width="7"/>
+    <path d="M2240 1600V1270M2205 1310l35-44 35 44" fill="none" stroke="#9beef2" stroke-width="12"/>
+    <rect class="control" x="1960" y="1520" width="240" height="120" rx="18"/>
+    <path d="M2012 1608l48-72 48 72z" fill="#79e8de"/>
+    <text class="label" x="2140" y="1595" text-anchor="middle">C ▲</text>
+  </g>
+
+  <g id="system-d">
+    <rect x="400" y="2320" width="600" height="480" rx="24" fill="#102f3d" stroke="#5dcbd4" stroke-width="7" stroke-dasharray="18 14"/>
+    <rect class="control" x="160" y="2360" width="120" height="80" rx="16"/>
+    <text class="small" x="220" y="2410" text-anchor="middle">V1 →</text>
+    <rect class="control" x="320" y="2360" width="120" height="80" rx="16"/>
+    <text class="small" x="380" y="2410" text-anchor="middle">V2 ↓</text>
+    <rect class="control" x="160" y="2440" width="280" height="80" rx="14"/>
+    <text class="small" x="300" y="2492" text-anchor="middle">↺ RESET</text>
+    <rect class="control" x="640" y="2360" width="160" height="120" rx="16"/>
+    <text class="label" x="720" y="2438" text-anchor="middle">D ■</text>
+    <path d="M640 2600h160M760 2560l42 40-42 40" fill="none" stroke="#ffb287" stroke-width="12" stroke-linecap="round"/>
+    <path d="M840 2640v120M805 2720l35 42 35-42" fill="none" stroke="#ffb287" stroke-width="12" stroke-linecap="round"/>
+    <text class="small" x="700" y="2770" text-anchor="middle">TOR RUCHU SZAFA D ■</text>
+  </g>
+
+  <g id="egress" filter="url(#glow)">
+    <path d="M2220 3560h145M2315 3510l55 50-55 50" fill="none" stroke="#79f2c2" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <text class="small" x="2040" y="3635" text-anchor="middle">WYJŚCIE PO B+C+D</text>
+  </g>
+
+  <g opacity=".4" fill="#a9eff2">
+    <circle cx="260" cy="1020" r="9"/><circle cx="460" cy="1340" r="6"/><circle cx="920" cy="1860" r="8"/>
+    <circle cx="1540" cy="720" r="7"/><circle cx="2040" cy="1080" r="10"/><circle cx="1520" cy="2160" r="7"/>
+    <circle cx="2140" cy="2440" r="8"/><circle cx="1660" cy="3180" r="10"/><circle cx="2120" cy="3540" r="6"/>
+  </g>
+
+  <g opacity=".82">
+    <rect x="80" y="3720" width="2240" height="72" rx="20" fill="#09212d" stroke="#ffb24f" stroke-width="5"/>
+    <text x="1200" y="3768" text-anchor="middle" fill="#ffd9a1" font-family="'Segoe UI',sans-serif" font-size="30" font-weight="700" letter-spacing="4">PROXY W02 • UKŁAD DO AKCEPTACJI • NIE JEST FINALNĄ GRAFIKĄ</text>
+  </g>
+</svg>

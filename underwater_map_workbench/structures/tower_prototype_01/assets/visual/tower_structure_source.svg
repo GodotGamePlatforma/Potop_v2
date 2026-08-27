@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2240" height="3680" viewBox="0 0 2240 3680">
+  <defs>
+    <linearGradient id="concrete" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#526d79"/><stop offset=".18" stop-color="#304b58"/>
+      <stop offset=".52" stop-color="#182f3a"/><stop offset=".82" stop-color="#0b202b"/><stop offset="1" stop-color="#06151d"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0" stop-color="#315e72"/><stop offset=".32" stop-color="#173a4c"/>
+      <stop offset=".7" stop-color="#0a2635"/><stop offset="1" stop-color="#041720"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f8790"/><stop offset=".12" stop-color="#344e59"/>
+      <stop offset=".5" stop-color="#122b36"/><stop offset=".84" stop-color="#263f49"/><stop offset="1" stop-color="#071821"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bd7a38" stop-opacity=".9"/><stop offset=".45" stop-color="#77401f" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#2a2018" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="concreteNoise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".016 .11" numOctaves="3" seed="41" result="noise"/>
+      <feColorMatrix in="noise" type="matrix" values=".28 0 0 0 .04  0 .32 0 0 .06  0 0 .36 0 .08  0 0 0 .26 0" result="tint"/>
+      <feBlend in="SourceGraphic" in2="tint" mode="overlay"/>
+    </filter>
+    <filter id="corrosionNoise" x="-30%" y="-10%" width="160%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".025 .08" numOctaves="3" seed="19" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="B"/>
+    </filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14" result="blur"/><feOffset in="blur" dy="12" result="offset"/>
+      <feFlood flood-color="#01080b" flood-opacity=".85" result="color"/><feComposite in="color" in2="offset" operator="in" result="shade"/>
+      <feMerge><feMergeNode in="shade"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="facade" width="320" height="280" patternUnits="userSpaceOnUse">
+      <rect width="320" height="280" fill="url(#concrete)"/>
+      <rect x="20" y="30" width="280" height="151" rx="5" fill="url(#glass)" stroke="#6e8995" stroke-opacity=".68" stroke-width="7"/>
+      <path d="M67 32V181M113 32V181M160 32V181M207 32V181M253 32V181" stroke="#294957" stroke-width="7"/>
+      <path d="M20 105H300" stroke="#284b5c" stroke-width="5"/>
+      <path d="M31 46L147 168M92 38L226 174M192 37L286 132" stroke="#9bc1cb" stroke-opacity=".12" stroke-width="4"/>
+      <rect y="194" width="320" height="62" fill="url(#steel)"/>
+      <path d="M0 198H320M0 249H320" stroke="#8ea1a7" stroke-opacity=".35" stroke-width="6"/>
+      <path d="M0 270H320" stroke="#030f15" stroke-width="20"/>
+    </pattern>
+    <pattern id="mullions" width="160" height="280" patternUnits="userSpaceOnUse">
+      <path d="M0 0V280M80 0V280M160 0V280" stroke="#6f8993" stroke-opacity=".35" stroke-width="7"/>
+      <path d="M0 8H160M0 272H160" stroke="#030e14" stroke-width="16"/>
+    </pattern>
+  </defs>
+
+  <rect width="2240" height="3680" fill="url(#facade)"/>
+  <rect width="2240" height="3680" fill="url(#mullions)" opacity=".7"/>
+
+  <g filter="url(#shadow)">
+    <rect x="984" width="592" height="3680" fill="url(#steel)" opacity=".94"/>
+    <rect x="1032" y="36" width="496" height="3608" rx="8" fill="#0a202a" stroke="#82939a" stroke-opacity=".48" stroke-width="10"/>
+    <path d="M1090 44V3636M1210 44V3636M1350 44V3636M1470 44V3636" stroke="#31515e" stroke-width="12"/>
+    <path d="M1040 270H1520M1040 550H1520M1040 830H1520M1040 1110H1520M1040 1390H1520M1040 1670H1520M1040 1950H1520M1040 2230H1520M1040 2510H1520M1040 2790H1520M1040 3070H1520M1040 3350H1520" stroke="#748891" stroke-opacity=".32" stroke-width="8"/>
+  </g>
+
+  <g fill="url(#steel)" stroke="#96a6aa" stroke-opacity=".3" stroke-width="6" filter="url(#concreteNoise)">
+    <rect width="2240" height="86"/><rect y="262" width="2240" height="34"/><rect y="542" width="2240" height="34"/>
+    <rect y="822" width="2240" height="34"/><rect y="1102" width="2240" height="34"/><rect y="1382" width="2240" height="34"/>
+    <rect y="1662" width="2240" height="34"/><rect y="1942" width="2240" height="34"/><rect y="2222" width="2240" height="34"/>
+    <rect y="2502" width="2240" height="34"/><rect y="2782" width="2240" height="34"/><rect y="3062" width="2240" height="34"/>
+    <rect y="3342" width="2240" height="34"/><rect y="3594" width="2240" height="86"/>
+  </g>
+
+  <g transform="translate(0 74)" filter="url(#shadow)">
+    <path d="M0 0H244L216 51L252 98L178 126L225 188L142 218L174 278L88 264L50 316L0 306Z" fill="#071923" stroke="#7f969e" stroke-width="12"/>
+    <path d="M24 22L102 98L63 142L148 210L105 270M186 34L137 95L205 154L155 216" fill="none" stroke="#b5d0d4" stroke-opacity=".66" stroke-width="8"/>
+    <path d="M31 12L32 306M90 28L52 286M226 22L176 286" stroke="#7f4626" stroke-width="13"/>
+    <path d="M12 70L122 42L214 81L171 117L230 170L147 184L188 240L84 226" fill="none" stroke="#bdd8dc" stroke-opacity=".34" stroke-width="5"/>
+  </g>
+
+  <g fill="#081922" stroke="#778f98" stroke-opacity=".7" stroke-width="8">
+    <path d="M2118 407L2240 370V710L2168 682L2192 616L2136 558L2198 492Z"/>
+    <path d="M0 1746L106 1700L82 1792L146 1846L96 1920L0 1900Z"/>
+    <path d="M2150 2625L2240 2580V2880L2162 2840L2192 2764L2138 2702Z"/>
+  </g>
+  <g fill="none" stroke="#8c4d29" stroke-width="12">
+    <path d="M2185 402L2178 696M2218 386L2205 706M34 1740L44 1904M71 1720L85 1894M2190 2602L2176 2860M2220 2590L2204 2880"/>
+  </g>
+
+  <g fill="url(#rust)" opacity=".78" filter="url(#corrosionNoise)">
+    <path d="M12 70H122L106 306L72 562L42 298Z"/><path d="M480 260H610L584 510L548 704L514 468Z"/>
+    <path d="M908 536H1022L1004 858L962 982L946 720Z"/><path d="M1518 820H1634L1610 1102L1574 1316L1556 1042Z"/>
+    <path d="M2012 1100H2148L2118 1400L2076 1576L2050 1320Z"/><path d="M252 1940H380L352 2268L312 2410L294 2154Z"/>
+    <path d="M1770 2502H1910L1880 2784L1838 3014L1810 2704Z"/><path d="M706 3062H860L824 3408L778 3576L754 3292Z"/>
+  </g>
+
+  <!-- asymetryczna historia materiału: naprawy, odpryski i mineralne zacieki -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M336 86C292 276 368 418 320 646S356 948 304 1180" stroke="#a9bbb0" stroke-opacity=".16" stroke-width="22"/>
+    <path d="M346 90C318 292 380 452 336 654S360 936 322 1168" stroke="#604733" stroke-opacity=".34" stroke-width="7"/>
+    <path d="M1884 604C1830 824 1910 1012 1852 1242S1890 1540 1838 1770" stroke="#9eafa5" stroke-opacity=".14" stroke-width="19"/>
+    <path d="M1892 610C1854 830 1918 1022 1872 1248S1902 1532 1856 1762" stroke="#66452f" stroke-opacity=".32" stroke-width="6"/>
+  </g>
+  <g stroke-linejoin="round">
+    <path d="M362 814L438 804L492 822L548 810L602 836L574 862L476 850L398 866L346 844Z" fill="#061821" stroke="#899da2" stroke-opacity=".46" stroke-width="7"/>
+    <path d="M1668 2214L1750 2200L1818 2226L1896 2212L1958 2244L1918 2272L1804 2256L1718 2274L1652 2244Z" fill="#071923" stroke="#899da2" stroke-opacity=".42" stroke-width="7"/>
+    <path d="M636 3054L714 3044L786 3064L852 3050L900 3078L862 3100L770 3088L690 3102L626 3078Z" fill="#061821" stroke="#87999e" stroke-opacity=".4" stroke-width="7"/>
+  </g>
+  <g fill="none" stroke="#925534" stroke-width="9">
+    <path d="M384 822H570M418 806V858M474 808V856M530 812V860"/>
+    <path d="M1688 2228H1930M1736 2210V2264M1800 2210V2264M1866 2212V2268"/>
+  </g>
+  <g fill="#1a323c" stroke="#7d9197" stroke-opacity=".62" stroke-width="6">
+    <rect x="958" y="1740" width="82" height="226" rx="4"/><rect x="1528" y="2558" width="82" height="238" rx="4"/>
+    <rect x="18" y="1168" width="38" height="224" rx="3"/><rect x="2184" y="2910" width="38" height="226" rx="3"/>
+  </g>
+  <g fill="#a7b3b4" fill-opacity=".46">
+    <circle cx="974" cy="1764" r="6"/><circle cx="1024" cy="1764" r="6"/><circle cx="974" cy="1940" r="6"/><circle cx="1024" cy="1940" r="6"/>
+    <circle cx="1544" cy="2582" r="6"/><circle cx="1594" cy="2582" r="6"/><circle cx="1544" cy="2770" r="6"/><circle cx="1594" cy="2770" r="6"/>
+  </g>
+  <g fill="none" stroke="#bdd1d5" stroke-opacity=".22" stroke-width="5">
+    <path d="M1688 314L1780 378L1712 446L1828 520M1778 378L1852 330M1712 446L1648 486"/>
+    <path d="M616 2562L694 2630L642 2714L738 2782M694 2630L772 2588M642 2714L580 2756"/>
+  </g>
+  <g fill="#617954" opacity=".72">
+    <path d="M0 250Q72 206 142 262T282 250L262 306Q210 328 154 300T0 320Z"/>
+    <path d="M398 544Q470 502 562 548T742 540L716 602Q634 618 548 586T392 612Z"/>
+    <path d="M1640 1104Q1740 1054 1834 1112T2048 1094L2018 1164Q1904 1184 1810 1146T1630 1180Z"/>
+    <path d="M86 2220Q176 2174 284 2232T508 2222L478 2290Q366 2308 260 2266T72 2300Z"/>
+    <path d="M1450 3342Q1580 3282 1720 3350T2018 3338L1978 3418Q1830 3442 1696 3388T1432 3422Z"/>
+  </g>
+
+  <g fill="none" stroke="#b2c5c8" stroke-opacity=".24" stroke-width="7">
+    <path d="M612 90L564 154L620 208L548 286L588 352L520 440"/><path d="M1850 640L1792 704L1832 786L1764 844L1808 928"/>
+    <path d="M370 1380L430 1450L382 1518L458 1590L404 1672"/><path d="M1990 1960L1918 2030L1974 2100L1890 2180L1936 2258"/>
+    <path d="M638 2784L572 2850L626 2926L550 3010L604 3082"/>
+  </g>
+
+  <g fill="url(#steel)" stroke="#84989f" stroke-opacity=".36" stroke-width="8">
+    <rect x="12" width="46" height="3680"/><rect x="2182" width="46" height="3680"/>
+    <rect x="948" width="40" height="3680"/><rect x="1572" width="40" height="3680"/>
+  </g>
+  <g fill="#a9b5b7" fill-opacity=".48">
+    <circle cx="36" cy="146" r="9"/><circle cx="2204" cy="146" r="9"/><circle cx="36" cy="706" r="9"/><circle cx="2204" cy="706" r="9"/>
+    <circle cx="36" cy="1266" r="9"/><circle cx="2204" cy="1266" r="9"/><circle cx="36" cy="1826" r="9"/><circle cx="2204" cy="1826" r="9"/>
+    <circle cx="36" cy="2386" r="9"/><circle cx="2204" cy="2386" r="9"/><circle cx="36" cy="2946" r="9"/><circle cx="2204" cy="2946" r="9"/>
+    <circle cx="36" cy="3506" r="9"/><circle cx="2204" cy="3506" r="9"/>
+  </g>
+</svg>

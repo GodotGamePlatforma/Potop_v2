@@ -1,9 +1,9 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "revision": {
-    "revision_id": "center-station-right-city-tower-route-v9",
-    "topology_revision": "l05-owned-tower-route-v4",
-    "presentation_revision": "center-station-right-city-tower-route-v9"
+    "revision_id": "center-station-right-city-two-tower-runtime-v13",
+    "topology_revision": "l05-owned-two-tower-route-v5",
+    "presentation_revision": "center-station-right-city-two-tower-production-v15"
   },
   "map": {
     "id": "underwater_map_clean_12x12",
@@ -873,7 +873,7 @@
         ],
         "enabled": true,
         "affordance": "exact_solid_surface",
-        "topology_digest": "topology-v1:3cc0f2b4711fcb03a4bc8564711cbac6c41b086feb1143e037b81d43a56c1462"
+        "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
       }
     ]
   },
@@ -955,9 +955,9 @@
     "collision_source": {
       "format": "l05_owned_rect_ops_v2",
       "path": "assets/topology/l05_ground_mask_source.json",
-      "sha256": "9c20e27a15147c275a3917daaf6b9e3f4b50f4daf53d939241260e53e4297d57",
-      "canonical_digest": "topology-v1:3cc0f2b4711fcb03a4bc8564711cbac6c41b086feb1143e037b81d43a56c1462",
-      "partition_digest": "partition-v1:049f26db35d1709c60ad166b039fcb0a8f21e4b29a7e486332515204fa1600a6",
+      "sha256": "75b8bf49fdb01934b40eff429c5f8c29bb6a5f40cecdf4755507b7c6f923533d",
+      "canonical_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e",
+      "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
       "pixel_size": [
         576,
         324
@@ -984,257 +984,32 @@
     "protected_corridors": []
   },
   "structures": {
-    "templates": [
-      {
-        "id": "enterable_tower_v1",
-        "kind": "enterable_tower",
-        "interior_layer_id": "L04",
-        "collider_layer_id": "L05",
-        "allowed_socket_kinds": [
-          "entry_opening",
-          "moving_elevator",
-          "dynamic_door",
-          "fixed_interactable"
-        ]
-      }
-    ],
     "instances": [
       {
         "id": "tower_prototype_01",
-        "template_id": "enterable_tower_v1",
         "origin": [
           7760,
           3120
         ],
-        "size": [
-          2240,
-          3680
+        "enabled": true,
+        "package": {
+          "format": "structure_package_v1",
+          "path": "structures/tower_prototype_01/structure_manifest.json",
+          "sha256": "f1e37a8f99502e9743ae3e26406fa7e6aab806b5a64f2d6b04317d42cc5cc626"
+        }
+      },
+      {
+        "id": "tower_three_inlets_02",
+        "origin": [
+          13200,
+          2800
         ],
         "enabled": true,
-        "topology_digest": "topology-v1:3cc0f2b4711fcb03a4bc8564711cbac6c41b086feb1143e037b81d43a56c1462",
-        "partition_digest": "partition-v1:049f26db35d1709c60ad166b039fcb0a8f21e4b29a7e486332515204fa1600a6",
-        "sockets": [
-          {
-            "id": "entry_floor_12_broken_window",
-            "kind": "entry_opening",
-            "local_rect": [
-              0,
-              80,
-              80,
-              160
-            ]
-          },
-          {
-            "id": "elevator_upper_travel",
-            "kind": "moving_elevator",
-            "local_rect": [
-              1040,
-              80,
-              480,
-              1600
-            ]
-          },
-          {
-            "id": "gate_red_west",
-            "kind": "dynamic_door",
-            "local_rect": [
-              960,
-              960,
-              80,
-              120
-            ]
-          },
-          {
-            "id": "gate_red_east",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1520,
-              960,
-              80,
-              120
-            ]
-          },
-          {
-            "id": "gate_blue_upper",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1680,
-              840,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "gate_blue_lower",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1680,
-              1120,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "gate_yellow",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1920,
-              1680,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "hatch_d",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1920,
-              2240,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "shortcut_b_upper",
-            "kind": "dynamic_door",
-            "local_rect": [
-              160,
-              840,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "shortcut_b_lower",
-            "kind": "dynamic_door",
-            "local_rect": [
-              160,
-              1120,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "shortcut_c_upper",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1920,
-              840,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "shortcut_c_middle",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1920,
-              1120,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "shortcut_c_lower",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1920,
-              1400,
-              160,
-              80
-            ]
-          },
-          {
-            "id": "hatch_basement",
-            "kind": "dynamic_door",
-            "local_rect": [
-              1200,
-              3320,
-              160,
-              120
-            ]
-          },
-          {
-            "id": "control_a_distributor",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1760,
-              680,
-              320,
-              120
-            ]
-          },
-          {
-            "id": "control_b_red_relay",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              160,
-              1240,
-              320,
-              120
-            ]
-          },
-          {
-            "id": "control_c_blue_lock",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1720,
-              1520,
-              320,
-              120
-            ]
-          },
-          {
-            "id": "control_d_valve_v1",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1640,
-              2040,
-              120,
-              120
-            ]
-          },
-          {
-            "id": "control_d_valve_v2",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1800,
-              2040,
-              120,
-              120
-            ]
-          },
-          {
-            "id": "control_d_valve_v3",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1960,
-              2040,
-              120,
-              120
-            ]
-          },
-          {
-            "id": "control_d_reset",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1640,
-              2160,
-              240,
-              80
-            ]
-          },
-          {
-            "id": "control_basement_hatch",
-            "kind": "fixed_interactable",
-            "local_rect": [
-              1360,
-              3440,
-              240,
-              120
-            ]
-          }
-        ]
+        "package": {
+          "format": "structure_package_v1",
+          "path": "structures/tower_three_inlets_02/structure_manifest.json",
+          "sha256": "c20e87fbda90f92e193cf613d72f36174c576bd746848800f9d9a02a2adf28cf"
+        }
       }
     ]
   },

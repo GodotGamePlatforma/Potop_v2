@@ -46,6 +46,17 @@ func _run() -> void:
 	_assert(dive.tutorial_step() == TutorialStateScript.Step.DIVE_MOVEMENT, "Start pierwszego zejścia musi rozpocząć lokalne prowadzenie ruchem.")
 	_assert(game.game_state.tutorial.step == TutorialStateScript.Step.START_FIRST_DIVE, "Aktywna próba nie może przesuwać kursora tutoriala w GameState.")
 	_assert(not game.tutorial_event(TutorialDirectorScript.DIVE_STARTED) and game.game_state.tutorial.step == TutorialStateScript.Step.START_FIRST_DIVE, "GameRoot musi odrzucać bezpośrednią mutację tutoriala podczas aktywnego nurkowania.")
+	var live_diver := dive.diver as DiverController
+	live_diver.set_visual_context(0.0, &"repair", 0.65, false)
+	dive._ending = true
+	dive._process(0.016)
+	var terminal_presentation: Dictionary = live_diver.presentation_state()
+	_assert(
+		terminal_presentation.get("interaction_action") == &""
+		and is_zero_approx(float(terminal_presentation.get("interaction_progress", -1.0))),
+		"Terminalny stan root musi wyczyścić kontekst działania przez publiczną granicę Nurka."
+	)
+	dive._ending = false
 
 	var food_crate = _find_container(dive, "tutorial_market_crate")
 	var workshop_crate = _find_container(dive, "tutorial_workshop_case")

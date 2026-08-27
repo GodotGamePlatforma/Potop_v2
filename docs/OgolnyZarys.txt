@@ -1013,13 +1013,25 @@ MISJA — MAPA WSPÓLNEJ SIECI
 
 Poniższe etapy Archiwum, Leona, R-3, C-4 i Rozdzielacza zachowują aktywną kolejność kampanii, zasady interakcji, ekonomię oraz skutki fabularne. Archiwum, panel diagnostyczny i Generator R-3 oraz C-4 są wymagane, Leon i wykonanie Rozdzielacza opcjonalni, natomiast promowalna mapa zapewnia również osiągalne gniazdo jego montażu. Konkretne instancje i położenia pochodzą wyłącznie z manifestu; dawne nazwy rejonów, identyfikatory pozycyjne i współrzędne nie mają authority.
 
-Klara przekazuje aktywny cel Archiwum, a manifest wyznacza jego konkretną instancję oraz osiągalną drogę. W bieżącym zakresie Archiwum pozostaje globalnym celem mapy z własnym terminalem; neutralny prototyp wieżowca nie jest celem kampanii i nie zawiera urządzenia Wspólnej Linii.
+Klara przekazuje aktywny cel Archiwum, a manifest wyznacza jego konkretną instancję oraz osiągalną drogę. Docelowe przypisanie Archiwum do piwnicy pierwszego wieżowca jest zatwierdzone poniżej, ale do chwili wdrożenia i odbioru obowiązuje bieżąca instancja wynikająca z manifestu.
 
-[DOCELOWE] — ARCHIWUM W WIEŻOWCU
+[AKTYWNE] — BIEŻĄCY NEUTRALNY PROTOTYP WIEŻOWCA
 
-Po osobnym wdrożeniu i odbiorze trasy Archiwum może zostać przypisane do zalanego, pokazanego centralnie w przekroju 2D wieżowca, do którego nurek wpływa przez czytelne uszkodzone wejście i porusza się wewnątrz pomiędzy kondygnacjami. Bliski budynek naturalnie zasłania istniejące dalekie plany miasta; nie usuwa ich ani nie zastępuje. Do tego czasu neutralny wieżowiec pozostaje prototypem świata, a aktywne Archiwum zachowuje położenie wynikające z manifestu.
+Pierwszy bliski wieżowiec jest pokazany centralnie jako czytelny przekrój 2D na wysokości nurka. Zasłania fragment istniejącego miasta tylko własną bryłą i wnętrzem; dalekie plany L01/L02 pozostają aktywne za nim i wokół niego. Nurek wpływa przez uszkodzone wejście i może swobodnie poruszać się po wszystkich otwartych pomieszczeniach oraz wracać tą samą drogą.
 
-W docelowym wieżowcu nie ma checkpointów ani lokalnego odrodzenia. Wyczerpanie tlenu zabija nurka zgodnie z ogólną zasadą wyprawy, a wymagany etap nadal obejmuje fizyczny powrót do aktywnej liny. Docelowe urządzenia, ruchoma winda i zmienne blokady wewnątrz budynku mają własne czytelne stany, lecz nie zmieniają tej zasady śmierci i powrotu.
+Bieżący runtime zachowuje prywatną sekwencję A–D, pokazuje rozwiązania układów bez pełnej dedukcji, używa ruchomej windy jako przejścia między poziomami i kończy się w neutralnej piwnicy. Ten stan pozostaje opisem wdrożonego prototypu do czasu zastąpienia go poniższym, zatwierdzonym kontraktem.
+
+Stan windy, drzwi i urządzeń obowiązuje wyłącznie podczas bieżącej próby. Wieżowiec nie daje checkpointu ani lokalnego odrodzenia i niczego nie zapisuje po śmierci lub rezygnacji z wyprawy. Wyczerpanie tlenu nadal zabija nurka zgodnie z ogólną zasadą, a bezpieczne ukończenie wyprawy nadal wymaga fizycznego powrotu do aktywnej liny. Prototyp nie jest Archiwum i nie zawiera jego terminala.
+
+[DOCELOWE] — ARCHIWUM W PIWNICY I DEDUKCYJNA SEKWENCJA A–D
+
+Piwnica pierwszego wieżowca jest Archiwum. Trasa prowadzi START → A → B → A → C → A → D → Archiwum, a po uruchomieniu terminala pozwala wrócić przez otwarte skróty do aktywnej liny. Nie ma checkpointu, lokalnego odrodzenia ani punktu bez powrotu; śmierć lub rezygnacja zeruje prywatny stan próby A–D.
+
+Rozdzielnia A nie podaje gotowych kodów. Gracz przed każdą akcją otrzymuje w świecie wystarczające przesłanki do jednoznacznego wyprowadzenia rozwiązania: RED `↓↓↓` wynika z zasady zamykania gałęzi położeniem dolnym i potrzeby wszystkich trzech gałęzi obwodu awaryjnego; B ujawnia, że pusty wózek techniczny używa tylko linii środkowej, więc BLUE ma układ `↑↓↑`; C ujawnia, że YELLOW ma użyć dokładnie jednej linii, przy zajętej linii środkowej i niedostępnej prawej, więc rozwiązaniem jest `↓↑↑`. Pięć niepoprawnych ustawień daje diagnostyczną przyczynę błędu zamiast wspólnego, nieinformacyjnego komunikatu.
+
+Po aktywacji BLUE pusty wózek techniczny zjeżdża na piętro 7 i fizycznie oraz telemetrycznie domyka styk wymagany przez C. Wózek nie przewozi nurka; jego ruch, osiągnięcie pozycji i stan styku mają jednoznaczny sygnał wizualny i dźwiękowy. Urządzenia D zachowują kolejność V1 → V2 → V3, lecz są przedstawione jako WYRÓWNANIE CIŚNIENIA → ZASILENIE SIŁOWNIKA → ZWOLNIENIE RYGLA. Manometry i stany urządzeń pokazują przyczynowość, a błędna kolejność uruchamia zabezpieczenie i wymaga lokalnego RESET D bez kasowania postępu B ani C.
+
+Pierwsza poprawna aktywacja terminala Archiwum otwiera podczas tej próby bezpośredni skrót z piwnicy na zewnątrz do oceanu. Po bezpiecznym powrocie ten skrót i aktywacja terminala zostają utrwalone i pozostają dostępne w kolejnych wyprawach. Z piwnicy nurek może także płynąć dalej do podziemnych tuneli; ich osiągalność nie może usuwać fizycznej drogi powrotnej przez wieżowiec i aktywną linę.
 
 Nurek:
 

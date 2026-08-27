@@ -11,11 +11,51 @@ const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd"
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")
-const DiverScene := preload("res://scenes/diving/Diver.tscn")
-const DiverSpriteFrames := preload("res://underwater_map_workbench/assets/gameplay/diver/diver_sprite_frames.tres")
+const DiverScene := preload("res://diver_workbench/runtime/Diver.tscn")
 const DiveCurrentVisualScript := preload("res://scripts/diving/DiveCurrentVisual.gd")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
 const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
+const ContinuousDiveWorldScript := preload("res://scripts/diving/ContinuousDiveWorld.gd")
+const WorldBlueprintScript := preload("res://scripts/data/WorldBlueprint.gd")
+const PersistentInteractableScript := preload("res://scripts/diving/DivePersistentInteractable.gd")
+const SectorPersistenceSystemScript := preload("res://scripts/diving/SectorPersistenceSystem.gd")
+
+
+class StructureResetProbe:
+	extends Node
+
+	var reset_calls := 0
+
+	func reset_attempt() -> void:
+		reset_calls += 1
+
+
+class StructureCurrentProbe:
+	extends Node
+
+	var contribution := Vector2.ZERO
+	var sampled_positions: Array[Vector2] = []
+
+	func _init(initial_contribution: Vector2 = Vector2.ZERO) -> void:
+		contribution = initial_contribution
+
+	func current_at_world_position(world_position: Vector2) -> Vector2:
+		sampled_positions.append(world_position)
+		return contribution
+
+
+class StructureGateProbe:
+	extends Node
+
+	var gate_open := false
+	var requested_gates: Array[StringName] = []
+
+	func is_public_gate_open(gate_id: StringName) -> bool:
+		requested_gates.append(gate_id)
+		return gate_open and gate_id == &"attempt_complete"
+
+	func reset_attempt() -> void:
+		gate_open = false
 
 var _failed := false
 
@@ -54,6 +94,258 @@ func _run() -> void:
 	_assert(session.collected_world_item_ids.is_empty(), "Retry should restore freestanding items collected during the attempt.")
 	_assert(session.oxygen_left == 100.0, "Retry should refill oxygen.")
 	_assert(session.health == 82, "Retry should restore health to the start-of-dive snapshot.")
+	var structure_reset_world = ContinuousDiveWorldScript.new()
+	var structure_reset_probe := StructureResetProbe.new()
+	structure_reset_world.structure_controllers.append(structure_reset_probe)
+	structure_reset_world.call("_reset_structure_controllers")
+	_assert(
+		structure_reset_probe.reset_calls == 1,
+		"Attempt reset must call each registered structure controller exactly once.",
+	)
+	structure_reset_probe.free()
+	structure_reset_world.free()
+	var structure_current_world = ContinuousDiveWorldScript.new()
+	var current_blueprint = WorldBlueprintScript.new()
+	var current_zones: Array[Dictionary] = [
+		{"rect": Rect2(0.0, 0.0, 80.0, 80.0), "velocity": Vector2(10.0, 20.0)},
+		{"rect": Rect2(0.0, 0.0, 80.0, 80.0), "velocity": Vector2(100.0, 200.0)},
+	]
+	current_blueprint.current_zones = current_zones
+	structure_current_world._blueprint = current_blueprint
+	var position_in_base_current := Vector2(20.0, 20.0)
+	_assert(
+		structure_current_world.current_at(position_in_base_current) == Vector2(10.0, 20.0),
+		"Overlapping base currents must retain first-match precedence.",
+	)
+	var first_current_probe := StructureCurrentProbe.new(Vector2(3.0, -2.0))
+	var second_current_probe := StructureCurrentProbe.new(Vector2(-1.0, 5.0))
+	var controller_without_current_hook := Node.new()
+	var current_controllers: Array[Node] = [
+		first_current_probe,
+		controller_without_current_hook,
+		second_current_probe,
+	]
+	structure_current_world.structure_controllers.assign(current_controllers)
+	_assert(
+		structure_current_world.current_at(position_in_base_current) == Vector2(12.0, 23.0),
+		"Structure current contributions must add to the first matching base current.",
+	)
+	var position_outside_base_current := Vector2(120.0, 120.0)
+	_assert(
+		structure_current_world.current_at(position_outside_base_current) == Vector2(2.0, 3.0),
+		"Structure currents must remain active outside global base-current zones.",
+	)
+	for probe in [first_current_probe, second_current_probe]:
+		_assert(
+			probe.sampled_positions == [position_in_base_current, position_outside_base_current],
+			"Each opted-in structure controller must receive every unchanged world sample exactly once.",
+		)
+	structure_current_world.structure_controllers.clear()
+	first_current_probe.free()
+	second_current_probe.free()
+	controller_without_current_hook.free()
+	structure_current_world.free()
+
+	var structure_gate_world = ContinuousDiveWorldScript.new()
+	var structure_gate_probe := StructureGateProbe.new()
+	structure_gate_world._structure_controllers_by_id["fixture_structure"] = structure_gate_probe
+	var linked_blueprint = WorldBlueprintScript.new()
+	var linked_fixed_devices: Array[Dictionary] = [{
+		"id": "future_fixture_device",
+		"available_from_day": 99,
+		"unlocks_shortcut_id": "fixture_shortcut",
+	}]
+	linked_blueprint.fixed_device_spawns = linked_fixed_devices
+	structure_gate_world._blueprint = linked_blueprint
+	var gated_device = PersistentInteractableScript.new()
+	gated_device.configure(
+		PersistentInteractableScript.Kind.FIXED_DEVICE,
+		"fixture_device",
+		"Fixture device",
+		false,
+	)
+	gated_device.set_unlocks_shortcut_id("fixture_shortcut")
+	gated_device.set_availability_gate(
+		Callable(structure_gate_world, "_structure_gate_is_open").bind(
+			"fixture_structure",
+			&"attempt_complete",
+		)
+	)
+	_assert(not gated_device.can_interact(), "A public structure device must fail closed before its generic gate opens.")
+	structure_gate_probe.gate_open = true
+	_assert(gated_device.can_interact(), "A public structure device must become interactable when its generic gate opens.")
+	_assert(
+		structure_gate_probe.requested_gates == [&"attempt_complete", &"attempt_complete"],
+		"Root must query only the declared public gate, without reading private structure state.",
+	)
+	var linked_shortcut = PersistentInteractableScript.new()
+	linked_shortcut.configure(
+		PersistentInteractableScript.Kind.SHORTCUT,
+		"fixture_shortcut",
+		"Fixture shortcut",
+		false,
+	)
+	linked_shortcut.set_direct_interaction_allowed(
+		not bool(structure_gate_world.call("_is_linked_shortcut_target", "fixture_shortcut"))
+	)
+	var ordinary_shortcut = PersistentInteractableScript.new()
+	ordinary_shortcut.configure(
+		PersistentInteractableScript.Kind.SHORTCUT,
+		"ordinary_shortcut",
+		"Ordinary shortcut",
+		false,
+	)
+	ordinary_shortcut.set_direct_interaction_allowed(
+		not bool(structure_gate_world.call("_is_linked_shortcut_target", "ordinary_shortcut"))
+	)
+	_assert(
+		not linked_shortcut.can_interact() and ordinary_shortcut.can_interact(),
+		"A linked shortcut must reject direct interaction even before its future device becomes available, while ordinary shortcuts remain usable.",
+	)
+	structure_gate_world.persistent_interactables.append(linked_shortcut)
+	var linked_session = DiveSessionStateScript.new()
+	linked_session.begin(setup)
+	var sector_persistence = SectorPersistenceSystemScript.new()
+	var invalid_device = PersistentInteractableScript.new()
+	invalid_device.configure(
+		PersistentInteractableScript.Kind.FIXED_DEVICE,
+		" ",
+		"Invalid device",
+		false,
+	)
+	invalid_device.set_unlocks_shortcut_id("fixture_shortcut")
+	_assert(
+		not sector_persistence.record_fixed_device_completion_for_attempt(
+			linked_session,
+			structure_gate_world,
+			invalid_device.persistent_id,
+			invalid_device.unlocks_shortcut_id,
+		)
+		and not linked_shortcut.completed,
+		"An empty device ID must fail before opening its physical shortcut.",
+	)
+	_assert(
+		sector_persistence.record_fixed_device_completion_for_attempt(
+			linked_session,
+			structure_gate_world,
+			gated_device.persistent_id,
+			gated_device.unlocks_shortcut_id,
+		),
+		"A linked fixed device must atomically resolve its existing shortcut.",
+	)
+	_assert(
+		linked_session.activated_fixed_devices == ["fixture_device"]
+		and linked_session.opened_shortcuts == ["fixture_shortcut"]
+		and linked_session.safe_return_only_activated_fixed_devices == ["fixture_device"]
+		and linked_session.safe_return_only_opened_shortcuts == ["fixture_shortcut"]
+		and linked_shortcut.completed,
+		"The local dive result must receive the device and shortcut once while the physical gate opens immediately.",
+	)
+	_assert(
+		sector_persistence.record_fixed_device_completion_for_attempt(
+			linked_session,
+			structure_gate_world,
+			gated_device.persistent_id,
+			gated_device.unlocks_shortcut_id,
+		)
+		and linked_session.activated_fixed_devices.size() == 1
+		and linked_session.opened_shortcuts.size() == 1,
+		"Repeating a linked completion must remain idempotent.",
+	)
+	var missing_shortcut_device = PersistentInteractableScript.new()
+	missing_shortcut_device.configure(
+		PersistentInteractableScript.Kind.FIXED_DEVICE,
+		"fixture_missing_device",
+		"Missing shortcut fixture",
+		false,
+	)
+	missing_shortcut_device.set_unlocks_shortcut_id("missing_shortcut")
+	_assert(
+		not sector_persistence.record_fixed_device_completion_for_attempt(
+			linked_session,
+			structure_gate_world,
+			missing_shortcut_device.persistent_id,
+			missing_shortcut_device.unlocks_shortcut_id,
+		)
+		and not linked_session.activated_fixed_devices.has("fixture_missing_device")
+		and not linked_session.opened_shortcuts.has("missing_shortcut"),
+		"A missing public shortcut must fail atomically without partial session state.",
+	)
+	linked_session.activated_fixed_devices.append("ordinary_device")
+	linked_session.opened_shortcuts.append("ordinary_shortcut")
+	var safe_result = DiveResultScript.new()
+	sector_persistence.populate_result(linked_session, safe_result)
+	_assert(
+		safe_result.activated_fixed_devices == ["fixture_device", "ordinary_device"]
+		and safe_result.opened_shortcuts == ["fixture_shortcut", "ordinary_shortcut"],
+		"A normal safe return must carry both linked and ordinary world effects.",
+	)
+	var death_result = DiveResultScript.new()
+	death_result.returned_alive = false
+	death_result.diver_dead = true
+	sector_persistence.populate_result(linked_session, death_result)
+	_assert(
+		death_result.activated_fixed_devices == ["ordinary_device"]
+		and death_result.opened_shortcuts == ["ordinary_shortcut"],
+		"Death must discard only safe-return-linked effects and preserve existing ordinary persistence semantics.",
+	)
+	var extraction_result = DiveResultScript.new()
+	extraction_result.emergency_extraction = true
+	sector_persistence.populate_result(linked_session, extraction_result)
+	_assert(
+		extraction_result.activated_fixed_devices == ["ordinary_device"]
+		and extraction_result.opened_shortcuts == ["ordinary_shortcut"],
+		"Emergency extraction must not commit effects that require a physical safe return.",
+	)
+	var linked_world = GameStateScript.new().underwater_world
+	var first_apply: Dictionary = sector_persistence.apply_result(linked_world, safe_result)
+	var second_apply: Dictionary = sector_persistence.apply_result(linked_world, safe_result)
+	_assert(
+		linked_world.activated_fixed_devices.count("fixture_device") == 1
+		and linked_world.opened_shortcuts.count("fixture_shortcut") == 1
+		and int(first_apply.get("fixed_devices", 0)) == 2
+		and int(first_apply.get("shortcuts", 0)) == 2
+		and int(second_apply.get("fixed_devices", 0)) == 0
+		and int(second_apply.get("shortcuts", 0)) == 0,
+		"Applying a safe result repeatedly must keep every persisted ID unique.",
+	)
+	var restored_shortcut = PersistentInteractableScript.new()
+	restored_shortcut.configure(
+		PersistentInteractableScript.Kind.SHORTCUT,
+		"fixture_shortcut",
+		"Restored fixture shortcut",
+		linked_world.opened_shortcuts.has("fixture_shortcut"),
+	)
+	restored_shortcut.reset_attempt()
+	_assert(
+		restored_shortcut.completed,
+		"A later dive must restore a safely committed shortcut as open across attempt resets.",
+	)
+	structure_gate_probe.reset_attempt()
+	_assert(
+		not gated_device.can_interact(),
+		"A fresh structure attempt must close its private completion gate even when the public shortcut is already persisted.",
+	)
+	linked_session.reset_attempt()
+	linked_shortcut.reset_attempt()
+	_assert(
+		linked_session.activated_fixed_devices.is_empty()
+		and linked_session.opened_shortcuts.is_empty()
+		and linked_session.safe_return_only_activated_fixed_devices.is_empty()
+		and linked_session.safe_return_only_opened_shortcuts.is_empty()
+		and not linked_shortcut.completed,
+		"Retry must clear both local effects and close a shortcut not yet committed by a safe return.",
+	)
+	structure_gate_world.persistent_interactables.clear()
+	structure_gate_world._structure_controllers_by_id.clear()
+	gated_device.free()
+	linked_shortcut.free()
+	ordinary_shortcut.free()
+	restored_shortcut.free()
+	invalid_device.free()
+	missing_shortcut_device.free()
+	structure_gate_probe.free()
+	structure_gate_world.free()
 
 	var oxygen = OxygenSystemScript.new()
 	var idle_rate: float = oxygen.consumption_rate(false, false, 0.0, false)
@@ -161,9 +453,6 @@ func _run() -> void:
 			_assert(item_definition.world_pickup_texture != null, "Every freestanding resource type should define a real pickup texture: %s." % loot_id)
 			_assert(item_definition.world_pickup_texture.get_size() == Vector2(128, 128), "Freestanding pickup textures should use the canonical 128 x 128 canvas: %s." % loot_id)
 
-	for animation_name: StringName in [&"idle", &"swim", &"sprint"]:
-		_assert(DiverSpriteFrames.get_frame_count(animation_name) == 16, "Diver animation %s should contain sixteen frames." % animation_name)
-		_assert(DiverSpriteFrames.get_animation_loop(animation_name), "Diver animation %s should loop." % animation_name)
 	var direction_cases := [
 		{"vector": Vector2.RIGHT, "symbol": "→"},
 		{"vector": Vector2(1, 1), "symbol": "↘"},
@@ -201,18 +490,18 @@ func _run() -> void:
 	_assert(current_visual.get_child_count() == 0, "The procedural current layer should remain presentation-only and contain no physics children.")
 	current_visual.queue_free()
 	var diver = DiverScene.instantiate()
+	_assert(diver is CharacterBody2D, "DiveScene integration must instantiate one physical diver body from the public workshop scene.")
+	_assert(
+		diver.has_method("simulate_motion_tick")
+		and diver.has_method("reset_at")
+		and diver.has_method("light_source")
+		and diver.has_signal("surface_contacts_reported"),
+		"The public Diver boundary must expose movement, reset, light and contact integration without publishing presentation children."
+	)
 	root.add_child(diver)
 	await process_frame
 	await physics_frame
-	var visual_effects = diver.get_node("VisualEffects")
-	diver.set_lantern_presentation(true, Color(0.72, 0.9, 1.0, 1.0), 350.0, 1.0)
-	var lantern_state: Dictionary = diver.lantern_presentation_state()
-	_assert(bool(lantern_state.get("visible", false)), "Włączona latarnia musi mieć czytelny, prezentacyjny stożek światła.")
-	_assert(int(lantern_state.get("z_index", 0)) == -21 and not bool(lantern_state.get("z_as_relative", true)), "Stożek latarni ma pozostać nad dalekim tłem, ale pod semantycznym terenem.")
-	diver.set_lantern_presentation(false, Color.WHITE, 350.0, 0.0)
-	_assert(not bool(diver.lantern_presentation_state().get("visible", true)), "Wyłączenie latarni musi natychmiast ukryć jej stożek.")
-	var breath_emitter := visual_effects.get_node_or_null("BreathEmitter") as GPUParticles2D
-	_assert(breath_emitter != null and not breath_emitter.local_coords, "Diver bubbles should use a world-space particle emitter so released bubbles do not rotate or travel with the diver.")
+	_assert(diver.light_source() is PointLight2D, "The public Diver boundary must provide the light consumed by root equipment systems.")
 	diver.velocity = Vector2.ZERO
 	var baseline_motion: Dictionary = diver.simulate_motion_tick(Vector2.RIGHT, false, Vector2.ZERO, 1.0, 1.0)
 	diver.reset_at(Vector2.ZERO)
@@ -265,13 +554,6 @@ func _run() -> void:
 			_assert(float(reported_contact.get("opposition_speed", 0.0)) > 0.0, "Kontakt prezentacyjny musi zachować dodatnią prędkość skierowaną w ścianę.")
 	root.remove_child(contact_wall)
 	contact_wall.free()
-	diver.animated_sprite = diver.get_node("AnimatedSprite2D")
-	diver.movement_input = Vector2.UP
-	diver._update_visual(1.0)
-	_assert(is_equal_approx(diver.rotation, -PI / 2.0), "Diver should rotate fully toward an upward swim direction.")
-	diver.movement_input = Vector2.LEFT
-	diver._update_visual(1.0)
-	_assert(diver.animated_sprite.flip_h and is_zero_approx(diver.rotation), "Diver should face left without being rendered upside down.")
 	diver.queue_free()
 
 	var state = GameStateScript.new()

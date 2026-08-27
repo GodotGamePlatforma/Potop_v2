@@ -5,13 +5,14 @@ const LocalRuntimeScript := preload("res://underwater_map_workbench/runtime/Unde
 const WorldStateScript := preload("res://scripts/data/UnderwaterWorldState.gd")
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 
-const EXPECTED_SCHEMA_VERSION := 5
+const EXPECTED_SCHEMA_VERSION := 6
 const EXPECTED_LAYER_IDS := [
 	"L00", "L01", "L02", "L03", "L04", "L05", "L06", "L07", "L08", "L09", "L10",
 ]
 const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
+const STREAMED_BACKDROP_CONTRACT := "camera_windowed_texture_v1"
 const NO_BLOCKING_AFFORDANCE_POLICY := "no_visual_blockage_in_protected_water"
 const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap_open_water"
 const COMPOSITION_PROXY_KIND := "composition_proxy"
@@ -36,73 +37,14 @@ const L05_TOPOLOGY_MODE := "l05_mask_v1"
 const L05_SOURCE_FORMAT := "l05_owned_rect_ops_v2"
 const L05_PIXEL_SIZE := Vector2i(576, 324)
 const L05_CELL_SIZE := Vector2(40.0, 40.0)
-const STRUCTURE_TEMPLATE_ID := "enterable_tower_v1"
-const STRUCTURE_INSTANCE_ID := "tower_prototype_01"
-const STRUCTURE_ORIGIN := Vector2(7760.0, 3120.0)
-const STRUCTURE_SIZE := Vector2(2240.0, 3680.0)
-const REQUIRED_TOWER_SOCKETS := {
-	"entry_floor_12_broken_window": ["entry_opening", [0, 80, 80, 160]],
-	"elevator_upper_travel": ["moving_elevator", [1040, 80, 480, 1600]],
-	"gate_red_west": ["dynamic_door", [960, 960, 80, 120]],
-	"gate_red_east": ["dynamic_door", [1520, 960, 80, 120]],
-	"gate_blue_upper": ["dynamic_door", [1680, 840, 160, 80]],
-	"gate_blue_lower": ["dynamic_door", [1680, 1120, 160, 80]],
-	"gate_yellow": ["dynamic_door", [1920, 1680, 160, 80]],
-	"hatch_d": ["dynamic_door", [1920, 2240, 160, 80]],
-	"shortcut_b_upper": ["dynamic_door", [160, 840, 160, 80]],
-	"shortcut_b_lower": ["dynamic_door", [160, 1120, 160, 80]],
-	"shortcut_c_upper": ["dynamic_door", [1920, 840, 160, 80]],
-	"shortcut_c_middle": ["dynamic_door", [1920, 1120, 160, 80]],
-	"shortcut_c_lower": ["dynamic_door", [1920, 1400, 160, 80]],
-	"hatch_basement": ["dynamic_door", [1200, 3320, 160, 120]],
-	"control_a_distributor": ["fixed_interactable", [1760, 680, 320, 120]],
-	"control_b_red_relay": ["fixed_interactable", [160, 1240, 320, 120]],
-	"control_c_blue_lock": ["fixed_interactable", [1720, 1520, 320, 120]],
-	"control_d_valve_v1": ["fixed_interactable", [1640, 2040, 120, 120]],
-	"control_d_valve_v2": ["fixed_interactable", [1800, 2040, 120, 120]],
-	"control_d_valve_v3": ["fixed_interactable", [1960, 2040, 120, 120]],
-	"control_d_reset": ["fixed_interactable", [1640, 2160, 240, 80]],
-	"control_basement_hatch": ["fixed_interactable", [1360, 3440, 240, 120]],
-}
-const TOWER_ROUTE_OPEN_RECTS_PX := {
-	"entry": [0, 2, 2, 4],
-	"start_12_11": [4, 7, 4, 2],
-	"start_11_10": [18, 14, 4, 2],
-	"a_west": [24, 17, 2, 3],
-	"a_east": [38, 17, 2, 3],
-	"red_west": [24, 24, 2, 3],
-	"red_east": [38, 24, 2, 3],
-	"red_to_b": [18, 28, 4, 2],
-	"b_shortcut_upper": [4, 21, 4, 2],
-	"b_shortcut_lower": [4, 28, 4, 2],
-	"blue_upper": [42, 21, 4, 2],
-	"blue_lower": [42, 28, 4, 2],
-	"blue_to_c": [42, 35, 4, 2],
-	"c_shortcut_upper": [48, 21, 4, 2],
-	"c_shortcut_middle": [48, 28, 4, 2],
-	"c_shortcut_lower": [48, 35, 4, 2],
-	"yellow": [48, 42, 4, 2],
-	"yellow_to_d": [48, 49, 4, 2],
-	"d_hatch": [48, 56, 4, 2],
-	"floor_4_cross": [24, 59, 16, 3],
-	"floor_4_3": [18, 63, 4, 2],
-	"floor_3_cross": [24, 66, 16, 3],
-	"floor_3_2": [48, 70, 4, 2],
-	"floor_2_cross": [24, 73, 16, 3],
-	"floor_2_1": [18, 77, 4, 2],
-	"floor_1_cross": [24, 80, 16, 3],
-	"basement_hatch": [30, 83, 4, 3],
-	"basement_minus_1": [2, 86, 52, 4],
-}
-const TOWER_SEQUENCE_GUARD_SOLID_RECTS_PX := {
-	"shaft_bulkhead": [26, 42, 12, 2],
-	"floor_8_west_shaft_wall": [24, 30, 2, 5],
-	"floor_8_east_shaft_wall": [38, 30, 2, 5],
-	"floor_7_west_shaft_wall": [24, 37, 2, 5],
-	"floor_7_east_shaft_wall": [38, 37, 2, 5],
-}
-const ARCHIVE_WORLD_POSITION := Vector2(6600.0, 4400.0)
-const ARCHIVE_LANDMARK_SIZE := Vector2(960.0, 560.0)
+const L05_SURFACE_DETAIL_MASK_PATH := "res://underwater_map_workbench/assets/generated/l05/surface_detail_mask.png"
+const STRUCTURE_PACKAGE_REFERENCE_FORMAT := "structure_package_v1"
+const STRUCTURE_PACKAGE_FORMAT := "enterable_structure_package_v1"
+const STRUCTURE_REGISTRY_PRIVATE_FIELDS := [
+	"template_id", "size", "topology_digest", "partition_digest", "sockets", "runtime",
+	"controller_script", "package_path", "package_sha256", "local_topology_digest",
+	"collision_operations", "structure_scene_path",
+]
 const WORLD_COLLISION_OWNER_ID := "world"
 const OPEN_WATER_OWNER_INDEX := 0
 const WORLD_OWNER_INDEX := 1
@@ -111,9 +53,15 @@ var _failed := false
 
 
 func _initialize() -> void:
+	var raw_manifest := _load_json_resource(CompilerScript.MANIFEST_PATH, "surowy manifest mapy")
+	_assert(not raw_manifest.is_empty(), "Surowy map_manifest.json musi być poprawnym obiektem JSON.")
+	if raw_manifest.is_empty():
+		_finish()
+		return
 	var compiler = CompilerScript.new()
 	var manifest := compiler.manifest_snapshot()
-	_assert(not manifest.is_empty(), "Manifest mapy musi przejść walidację runtime.")
+	_assert(not manifest.is_empty(), "Rozwinięty snapshot manifestu mapy musi przejść walidację runtime.")
+	_assert_raw_structure_registry(compiler, raw_manifest, manifest)
 	if manifest.is_empty() or not _assert_manifest_contract(manifest):
 		_finish()
 		return
@@ -158,10 +106,8 @@ func _initialize() -> void:
 	_assert_source_dependencies(compiler, manifest)
 	var navigation_base: Dictionary = compiler.navigation_base_raster()
 	_assert_l05_navigation_base(navigation_base, topology, manifest)
-	_assert_tower_socket_occupancy(manifest, navigation_base)
-	_assert_tower_route_rects(manifest, navigation_base)
-	_assert_tower_sequence_guard_solids(manifest, navigation_base)
 	_validate_manifest_fixtures_if_supported(compiler, manifest)
+	_assert_streamed_backdrops_are_scene_stubs(manifest)
 
 	var packed_map := ResourceLoader.load(
 		CompilerScript.MAP_SCENE_PATH,
@@ -249,11 +195,12 @@ func _initialize() -> void:
 		"persistent_id",
 		"archive_terminal",
 	) if runtime_dynamic != null else null
+	var compiled_archive_terminal := _record_by_id(blueprint.fixed_device_spawns, "archive_terminal")
 	_assert(runtime_archive_terminal is Node2D, "Runtime musi utworzyć globalny archive_terminal.")
-	if runtime_archive_terminal is Node2D:
+	if runtime_archive_terminal is Node2D and not compiled_archive_terminal.is_empty():
 		_assert(
-			(runtime_archive_terminal as Node2D).position == ARCHIVE_WORLD_POSITION,
-			"Runtime archive_terminal musi zachować globalne position [6600,4400].",
+			(runtime_archive_terminal as Node2D).position == _vector(compiled_archive_terminal.get("position", [])),
+			"Runtime archive_terminal musi wyprowadzać pozycję z bieżącego blueprintu.",
 		)
 	var navigation = runtime.navigation_snapshot()
 	_assert(navigation.is_valid(), "Lokalny runtime musi wystawić poprawną migawkę nawigacji.")
@@ -274,15 +221,203 @@ func _initialize() -> void:
 		_assert_reduced_motion_round_trip(runtime, runtime_visual_layers)
 	_assert_runtime_structure_partition(runtime, manifest, navigation_base)
 
-	_assert_root_integration_remains_loadable()
 	root.remove_child(runtime)
 	runtime.free()
 	_finish()
 
 
+func _assert_raw_structure_registry(
+	compiler,
+	raw_manifest: Dictionary,
+	resolved_manifest: Dictionary,
+) -> void:
+	_assert(
+		int(raw_manifest.get("schema_version", 0)) == EXPECTED_SCHEMA_VERSION,
+		"Surowy map_manifest.json musi używać schema_version=6.",
+	)
+	var structures_value = raw_manifest.get("structures", null)
+	_assert(structures_value is Dictionary, "Surowy schema v6 wymaga registry structures.")
+	if not structures_value is Dictionary:
+		return
+	var registry := structures_value as Dictionary
+	_assert_exact_dictionary_keys(registry, ["instances"], "surowy structures registry")
+	var instances_value = registry.get("instances", null)
+	_assert(instances_value is Array, "Surowy structures.instances musi być tablicą registry.")
+	if not instances_value is Array:
+		return
+	var resolved_structures := resolved_manifest.get("structures", {}) as Dictionary
+	_assert_exact_dictionary_keys(
+		resolved_structures,
+		["templates", "instances"],
+		"rozwinięty compiler.manifest_snapshot().structures",
+	)
+	var resolved_instances := resolved_structures.get("instances", []) as Array
+	_assert(
+		resolved_instances.size() == (instances_value as Array).size(),
+		"Rozwinięty snapshot musi zachować liczność registry struktur.",
+	)
+	for index in range((instances_value as Array).size()):
+		var instance_value = (instances_value as Array)[index]
+		_assert(instance_value is Dictionary, "Surowy structures.instances[%d] musi być obiektem." % index)
+		if not instance_value is Dictionary:
+			continue
+		var registry_instance := instance_value as Dictionary
+		var label := "surowy structures.instances[%d]" % index
+		_assert_required_and_optional_dictionary_keys(
+			registry_instance,
+			["id", "origin", "enabled", "package"],
+			["landmark_id"],
+			label,
+		)
+		for private_field in STRUCTURE_REGISTRY_PRIVATE_FIELDS:
+			_assert(
+				not registry_instance.has(private_field),
+				"%s nie może publikować prywatnego pola rozwiniętego %s."
+				% [label, private_field],
+			)
+		var structure_id := str(registry_instance.get("id", ""))
+		var package_reference_value = registry_instance.get("package", null)
+		_assert(package_reference_value is Dictionary, "%s.package musi być obiektem." % label)
+		if not package_reference_value is Dictionary:
+			continue
+		var package_reference := package_reference_value as Dictionary
+		_assert_exact_dictionary_keys(package_reference, ["format", "path", "sha256"], "%s.package" % label)
+		_assert(
+			str(package_reference.get("format", "")) == STRUCTURE_PACKAGE_REFERENCE_FORMAT,
+			"%s.package.format musi mieć wartość %s."
+			% [label, STRUCTURE_PACKAGE_REFERENCE_FORMAT],
+		)
+		var package_path := str(package_reference.get("path", ""))
+		var expected_package_path := "structures/%s/structure_manifest.json" % structure_id
+		_assert(package_path == expected_package_path, "%s.package.path musi być kanoniczne." % label)
+		var package_resource_path := "res://underwater_map_workbench/%s" % package_path
+		_assert(FileAccess.file_exists(package_resource_path), "Registry wskazuje brakujący pakiet %s." % package_path)
+		var declared_sha := str(package_reference.get("sha256", ""))
+		var actual_sha := FileAccess.get_sha256(package_resource_path).to_lower()
+		_assert(
+			declared_sha.length() == 64
+			and declared_sha == declared_sha.to_lower()
+			and declared_sha == actual_sha,
+			"%s.package.sha256 musi odpowiadać dokładnym bajtom pakietu." % label,
+		)
+		var package := _load_json_resource(package_resource_path, "pakiet struktury %s" % structure_id)
+		var resolved_instance := _record_by_id(resolved_instances, structure_id)
+		_assert(not resolved_instance.is_empty(), "Snapshot musi rozwinąć pakiet %s." % structure_id)
+		_assert_structure_package_authority(
+			package,
+			registry_instance,
+			resolved_instance,
+			package_path,
+			actual_sha,
+		)
+
+	_assert(
+		compiler.has_method("validate_manifest_for_tests"),
+		"Compiler musi publikować walidator fixture registry.",
+	)
+	if compiler.has_method("validate_manifest_for_tests") and not (instances_value as Array).is_empty():
+		for private_field in STRUCTURE_REGISTRY_PRIVATE_FIELDS:
+			var fixture := raw_manifest.duplicate(true)
+			var fixture_instances := ((fixture.get("structures", {}) as Dictionary).get("instances", []) as Array)
+			if fixture_instances.is_empty() or not fixture_instances[0] is Dictionary:
+				break
+			(fixture_instances[0] as Dictionary)[private_field] = true
+			var errors: PackedStringArray = compiler.call("validate_manifest_for_tests", fixture)
+			_assert(
+				not errors.is_empty(),
+				"Schema v6 musi odrzucać prywatne pole registry %s." % private_field,
+			)
+
+
+func _assert_structure_package_authority(
+	package: Dictionary,
+	registry_instance: Dictionary,
+	resolved_instance: Dictionary,
+	package_path: String,
+	package_sha: String,
+) -> void:
+	var structure_id := str(registry_instance.get("id", ""))
+	_assert(str(package.get("format", "")) == STRUCTURE_PACKAGE_FORMAT, "Pakiet %s ma niepoprawny format." % structure_id)
+	_assert(
+		str(resolved_instance.get("package_path", "")) == package_path
+		and str(resolved_instance.get("package_sha256", "")) == package_sha,
+		"Rozwinięty snapshot %s musi zachować ścieżkę i SHA registry." % structure_id,
+	)
+	_assert(not resolved_instance.has("package"), "Rozwinięta instancja %s nie może zachować surowego package ref." % structure_id)
+	var collision_value = package.get("collision", null)
+	_assert(collision_value is Dictionary, "Pakiet %s musi publikować lokalną kolizję." % structure_id)
+	if not collision_value is Dictionary:
+		return
+	var collision := collision_value as Dictionary
+	_assert_exact_dictionary_keys(
+		collision,
+		["format", "base", "pixel_size", "world_units_per_pixel", "operations"],
+		"pakiet %s collision" % structure_id,
+	)
+	_assert(str(collision.get("format", "")) == "l05_structure_rect_ops_v1", "Pakiet %s ma niepoprawny lokalny format kolizji." % structure_id)
+	_assert(str(collision.get("base", "")) == "open_water", "Pakiet %s musi zaczynać lokalnie od open_water." % structure_id)
+	var pixel_size := Vector2i(_vector(collision.get("pixel_size", [])))
+	_assert(pixel_size.x > 0 and pixel_size.y > 0, "Pakiet %s musi publikować dodatni lokalny pixel_size." % structure_id)
+	_assert(_vector(collision.get("world_units_per_pixel", [])) == L05_CELL_SIZE, "Pakiet %s musi mapować lokalny piksel na 40 x 40." % structure_id)
+	var operations_value = collision.get("operations", null)
+	_assert(operations_value is Array and not (operations_value as Array).is_empty(), "Pakiet %s musi publikować lokalne operations." % structure_id)
+	if not operations_value is Array:
+		return
+	var operation_ids := {}
+	for operation_index in range((operations_value as Array).size()):
+		var operation_value = (operations_value as Array)[operation_index]
+		_assert(operation_value is Dictionary, "Pakiet %s collision.operations[%d] musi być obiektem." % [structure_id, operation_index])
+		if not operation_value is Dictionary:
+			continue
+		var operation := operation_value as Dictionary
+		_assert_exact_dictionary_keys(operation, ["id", "op", "rect_px"], "pakiet %s collision.operations[%d]" % [structure_id, operation_index])
+		_assert(not operation.has("space") and not operation.has("structure_id"), "Pakiet %s może publikować wyłącznie operacje lokalne." % structure_id)
+		var operation_id := str(operation.get("id", ""))
+		_assert(not operation_id.is_empty() and not operation_ids.has(operation_id), "Lokalne operation IDs pakietu %s muszą być unikalne." % structure_id)
+		operation_ids[operation_id] = true
+		_assert(str(operation.get("op", "")) in ["solid_rect", "open_rect"], "Pakiet %s ma niepoprawny lokalny op." % structure_id)
+		var rect := operation.get("rect_px", []) as Array
+		_assert(
+			rect.size() == 4
+			and int(rect[0]) >= 0 and int(rect[1]) >= 0
+			and int(rect[2]) > 0 and int(rect[3]) > 0
+			and int(rect[0]) + int(rect[2]) <= pixel_size.x
+			and int(rect[1]) + int(rect[3]) <= pixel_size.y,
+			"Pakiet %s ma operację poza lokalnym rastrem." % structure_id,
+		)
+	var resolved_operations := resolved_instance.get("collision_operations", []) as Array
+	_assert(resolved_operations.size() == (operations_value as Array).size(), "Snapshot %s musi rozwinąć wszystkie lokalne operacje." % structure_id)
+	for resolved_operation_value in resolved_operations:
+		var resolved_operation := resolved_operation_value as Dictionary
+		_assert_exact_dictionary_keys(
+			resolved_operation,
+			["id", "op", "space", "structure_id", "rect_px"],
+			"snapshot %s collision operation" % structure_id,
+		)
+		_assert(
+			str(resolved_operation.get("space", "")) == "structure_local_px"
+			and str(resolved_operation.get("structure_id", "")) == structure_id,
+			"Snapshot %s może rozwijać package collision wyłącznie jako structure_local_px." % structure_id,
+		)
+	var generated_root := "res://underwater_map_workbench/structures/%s/generated" % structure_id
+	for generated_name in [
+		"solid_mask_native.png", "open_water_mask_native.png", "boundary_mask_native.png",
+		"guide_native.png", "surface_detail_mask_local.png", "structure.tscn",
+	]:
+		_assert(
+			FileAccess.file_exists("%s/%s" % [generated_root, generated_name]),
+			"Pakiet %s wymaga pochodnej structures/%s/generated/%s."
+			% [structure_id, structure_id, generated_name],
+		)
+	_assert(
+		str(resolved_instance.get("structure_scene_path", "")) == "%s/structure.tscn" % generated_root,
+		"Snapshot %s musi wskazywać package-local generated/structure.tscn." % structure_id,
+	)
+
+
 func _assert_manifest_contract(manifest: Dictionary) -> bool:
 	var schema_ok := int(manifest.get("schema_version", 0)) == EXPECTED_SCHEMA_VERSION
-	_assert(schema_ok, "Manifest musi używać schema_version=5.")
+	_assert(schema_ok, "Rozwinięty manifest musi używać schema_version=6.")
 	var revision_value = manifest.get("revision", null)
 	var map_value = manifest.get("map", null)
 	var regions_value = manifest.get("regions", null)
@@ -309,7 +444,7 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 		and landmarks_value is Array
 		and depth_value is Array
 	)
-	_assert(root_types_ok, "Manifest v5 musi publikować kompletne rekordy root, w tym structures.")
+	_assert(root_types_ok, "Rozwinięty manifest v6 musi publikować kompletne rekordy root, w tym structures.")
 	if not schema_ok or not root_types_ok:
 		return false
 
@@ -368,7 +503,7 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 	var topology := topology_value as Dictionary
 	_assert(
 		str(topology.get("mode", "")) in ["open_world", L05_TOPOLOGY_MODE],
-		"Topologia v5 musi używać open_world albo edytowalnego l05_mask_v1.",
+		"Topologia v6 musi używać open_world albo edytowalnego l05_mask_v1.",
 	)
 	_assert(
 		topology.get("collision_source", null) is Dictionary,
@@ -426,7 +561,7 @@ func _assert_manifest_contract(manifest: Dictionary) -> bool:
 			"affordance_policy", "geometry_role", "rgb_modulate",
 		]:
 			_assert(layer.has(key), "Warstwa %s nie publikuje pola %s." % [str(layer.get("id", "?")), key])
-	_assert_layer_policy_records(layers, assets_value as Array, topology)
+	_assert_layer_policy_records(layers, assets_value as Array, topology, manifest)
 	return true
 
 
@@ -445,8 +580,8 @@ func _assert_structure_manifest_contract(
 		return
 	var templates := templates_value as Array
 	var instances := instances_value as Array
-	_assert(not templates.is_empty(), "Schema v5 musi publikować co najmniej jeden template struktury.")
-	_assert(not instances.is_empty(), "Schema v5 musi publikować co najmniej jedną instancję struktury.")
+	_assert(not templates.is_empty(), "Rozwinięty schema v6 musi publikować co najmniej jeden template struktury.")
+	_assert(not instances.is_empty(), "Rozwinięty schema v6 musi publikować co najmniej jedną instancję struktury.")
 	var template_ids := {}
 	for index in range(templates.size()):
 		var template_value = templates[index]
@@ -485,7 +620,9 @@ func _assert_structure_manifest_contract(
 			instance,
 			[
 				"id", "template_id", "origin", "size", "enabled",
-				"topology_digest", "partition_digest", "sockets",
+				"topology_digest", "partition_digest", "sockets", "runtime",
+				"controller_script", "package_path", "package_sha256",
+				"local_topology_digest", "collision_operations", "structure_scene_path",
 			],
 			["landmark_id"],
 			"structures.instances[%d]" % index,
@@ -524,6 +661,27 @@ func _assert_structure_manifest_contract(
 			"Instancja %s musi wiązać aktualny partition_digest." % structure_id,
 		)
 		_assert(typeof(instance.get("enabled", null)) == TYPE_BOOL, "Instancja %s musi publikować logiczne enabled." % structure_id)
+		_assert(
+			str(instance.get("package_path", "")) == "structures/%s/structure_manifest.json" % structure_id,
+			"Rozwinięta instancja %s musi zachować package_path registry." % structure_id,
+		)
+		_assert(str(instance.get("package_sha256", "")).length() == 64, "Rozwinięta instancja %s musi zachować package_sha256." % structure_id)
+		_assert(
+			str(instance.get("controller_script", "")).begins_with(
+				"res://underwater_map_workbench/structures/%s/" % structure_id
+			),
+			"Rozwinięta instancja %s musi wskazywać package-local controller_script." % structure_id,
+		)
+		_assert(
+			str(instance.get("local_topology_digest", "")).begins_with("structure-topology-v1:"),
+			"Rozwinięta instancja %s musi publikować lokalny digest topologii." % structure_id,
+		)
+		_assert(instance.get("collision_operations", null) is Array, "Rozwinięta instancja %s musi publikować lokalne collision_operations." % structure_id)
+		_assert(
+			str(instance.get("structure_scene_path", ""))
+			== "res://underwater_map_workbench/structures/%s/generated/structure.tscn" % structure_id,
+			"Rozwinięta instancja %s musi wskazywać package-local generated scene." % structure_id,
+		)
 		var sockets_value = instance.get("sockets", null)
 		_assert(sockets_value is Array, "Instancja %s musi publikować sockets jako tablicę." % structure_id)
 		if sockets_value is Array and template_ids.has(template_id):
@@ -533,18 +691,11 @@ func _assert_structure_manifest_contract(
 				size,
 				structure_id,
 			)
-
-	var tower_template: Dictionary = template_ids.get(STRUCTURE_TEMPLATE_ID, {})
-	var tower_instance: Dictionary = instance_ids.get(STRUCTURE_INSTANCE_ID, {})
-	_assert(not tower_template.is_empty(), "Schema v5 musi zawierać template enterable_tower_v1.")
-	_assert(not tower_instance.is_empty(), "Schema v5 musi zawierać tower_prototype_01.")
-	if not tower_instance.is_empty():
-		_assert(str(tower_instance.get("template_id", "")) == STRUCTURE_TEMPLATE_ID, "Prototyp wieżowca musi używać enterable_tower_v1.")
-		_assert(not tower_instance.has("landmark_id"), "Neutralny tower_prototype_01 nie może być semantycznie powiązany z landmarkiem kampanii.")
-		_assert(_vector(tower_instance.get("origin", [])) == STRUCTURE_ORIGIN, "Prototyp wieżowca musi mieć zatwierdzony origin [7760,3120].")
-		_assert(_vector(tower_instance.get("size", [])) == STRUCTURE_SIZE, "Prototyp wieżowca musi mieć zatwierdzony size [2240,3680].")
-		_assert(bool(tower_instance.get("enabled", false)), "Prototyp wieżowca musi być aktywny.")
-		_assert_required_tower_sockets(tower_instance.get("sockets", []) as Array)
+		_assert(
+			instance.get("runtime", null) is Dictionary,
+			"Instancja %s musi publikować runtime jako nieprzezroczysty słownik pakietu."
+			% structure_id,
+		)
 
 
 func _assert_structure_sockets(
@@ -581,26 +732,12 @@ func _assert_structure_sockets(
 		)
 
 
-func _assert_required_tower_sockets(sockets: Array) -> void:
-	var sockets_by_id := {}
-	for socket_value in sockets:
-		if socket_value is Dictionary:
-			var socket := socket_value as Dictionary
-			sockets_by_id[str(socket.get("id", ""))] = socket
-	for socket_id in REQUIRED_TOWER_SOCKETS:
-		_assert(sockets_by_id.has(socket_id), "Prototyp wieżowca nie publikuje wymaganego socketu %s." % socket_id)
-		if not sockets_by_id.has(socket_id):
-			continue
-		var socket: Dictionary = sockets_by_id[socket_id]
-		var expected: Array = REQUIRED_TOWER_SOCKETS[socket_id]
-		_assert(str(socket.get("kind", "")) == str(expected[0]), "Socket %s ma niepoprawny kind." % socket_id)
-		_assert(
-			_manifest_value_matches(socket.get("local_rect", []), expected[1]),
-			"Socket %s ma niepoprawny local_rect." % socket_id,
-		)
-
-
-func _assert_layer_policy_records(layers: Array, assets: Array, topology: Dictionary) -> void:
+func _assert_layer_policy_records(
+	layers: Array,
+	assets: Array,
+	topology: Dictionary,
+	manifest: Dictionary,
+) -> void:
 	var authority_layer_id := str(topology.get("authority_layer", ""))
 	var authority_layer := _record_by_id(layers, authority_layer_id)
 	_assert(authority_layer_id == "L05", "Topologia musi wskazywać L05 jako authority collidera.")
@@ -660,9 +797,43 @@ func _assert_layer_policy_records(layers: Array, assets: Array, topology: Dictio
 				["L02", "texture_rect"],
 				["L02", COMPOSITION_PROXY_KIND],
 				["L05", "collision_masked_material"],
+				["L04", "structure_interior_texture"],
+				["L05", "structure_owner_masked_texture"],
 			],
 			"Asset %s ma nieobsługiwaną parę layer_id/kind." % asset_id,
 		)
+		if kind in ["structure_interior_texture", "structure_owner_masked_texture"]:
+			_assert_structure_visual_asset_record(asset, topology, manifest)
+
+
+func _assert_structure_visual_asset_record(
+	asset: Dictionary,
+	topology: Dictionary,
+	manifest: Dictionary,
+) -> void:
+	var asset_id := str(asset.get("id", ""))
+	_assert_exact_dictionary_keys(
+		asset,
+		[
+			"id", "layer_id", "group_id", "kind", "path", "sha256", "pixel_size",
+			"local_rect", "enabled", "affordance", "topology_digest", "partition_digest",
+			"structure_id",
+		],
+		"visual.assets[%s]" % asset_id,
+	)
+	var kind := str(asset.get("kind", ""))
+	var expected_layer_id := "L04" if kind == "structure_interior_texture" else "L05"
+	_assert(str(asset.get("layer_id", "")) == expected_layer_id, "Asset struktury %s ma niepoprawną warstwę." % asset_id)
+	var structure_id := str(asset.get("structure_id", ""))
+	var structure_instance := _structure_instance(manifest, structure_id)
+	_assert(not structure_instance.is_empty(), "Asset struktury %s musi wskazywać istniejącą instancję." % asset_id)
+	var local_rect := _rect(asset.get("local_rect", []))
+	var structure_size := _vector(structure_instance.get("size", []))
+	_assert(Rect2(Vector2.ZERO, structure_size).encloses(local_rect), "Asset struktury %s local_rect musi mieścić się w strukturze." % asset_id)
+	_assert(_vector(asset.get("pixel_size", [])) == local_rect.size, "Asset struktury %s musi zachować pixel_size/local_rect 1:1." % asset_id)
+	var collision: Dictionary = topology.get("collision_source", {})
+	_assert(str(asset.get("topology_digest", "")) == str(collision.get("canonical_digest", "")), "Asset struktury %s musi wiązać topology_digest." % asset_id)
+	_assert(str(asset.get("partition_digest", "")) == str(collision.get("partition_digest", "")), "Asset struktury %s musi wiązać partition_digest." % asset_id)
 
 
 func _assert_source_dependencies(compiler, manifest: Dictionary) -> void:
@@ -682,6 +853,26 @@ func _assert_source_dependencies(compiler, manifest: Dictionary) -> void:
 			dependencies.has("res://underwater_map_workbench/assets/shaders/l05_ground_masked.gdshader"),
 			"Zależności muszą zawierać shader spinający materiał z maską L05.",
 		)
+	var structures := manifest.get("structures", {}) as Dictionary
+	for instance_value in structures.get("instances", []):
+		if not instance_value is Dictionary:
+			continue
+		var instance := instance_value as Dictionary
+		var structure_id := str(instance.get("id", ""))
+		var package_resource_path := "res://underwater_map_workbench/%s" % str(instance.get("package_path", ""))
+		var structure_scene_path := str(instance.get("structure_scene_path", ""))
+		var generated_root := "res://underwater_map_workbench/structures/%s/generated" % structure_id
+		_assert(dependencies.has(package_resource_path), "Zależności muszą zawierać package manifest %s." % structure_id)
+		_assert(dependencies.has(structure_scene_path), "Zależności muszą zawierać package PackedScene %s." % structure_id)
+		for mask_name in [
+			"solid_mask_native.png",
+			"open_water_mask_native.png",
+			"surface_detail_mask_local.png",
+		]:
+			_assert(
+				dependencies.has("%s/%s" % [generated_root, mask_name]),
+				"Zależności muszą zawierać package-local maskę %s/%s." % [structure_id, mask_name],
+			)
 	for asset_value in (manifest.get("visual", {}) as Dictionary).get("assets", []):
 		if asset_value is Dictionary:
 			var asset := asset_value as Dictionary
@@ -736,11 +927,18 @@ func _assert_l05_navigation_base(
 		runtime_owner_cells = owner_cells_value as PackedInt32Array
 	_assert(runtime_owner_ids == expected_owner_ids, "Raster L05 musi zachować deterministyczną kolejność owner_ids.")
 	_assert(runtime_owner_cells == expected_owner_cells, "Raster L05 musi zachować owner każdego solid cell 1:1.")
-	_assert(runtime_owner_ids.size() >= 3, "Raster L05 musi rozdzielać open, world i co najmniej jedną strukturę.")
+	var structure_instances: Array = (manifest.get("structures", {}) as Dictionary).get("instances", [])
+	_assert(
+		runtime_owner_ids.size() == 2 + structure_instances.size(),
+		"Raster L05 musi publikować open, world i po jednym owner ID dla każdej zarejestrowanej struktury.",
+	)
 	if runtime_owner_ids.size() >= 2:
 		_assert(runtime_owner_ids[OPEN_WATER_OWNER_INDEX].is_empty(), "owner_ids[0] musi oznaczać open_water.")
 		_assert(runtime_owner_ids[WORLD_OWNER_INDEX] == WORLD_COLLISION_OWNER_ID, "owner_ids[1] musi oznaczać world.")
-	_assert(runtime_owner_ids.has(STRUCTURE_INSTANCE_ID), "owner_ids musi zawierać tower_prototype_01.")
+	for instance_value in structure_instances:
+		if instance_value is Dictionary:
+			var structure_id := str((instance_value as Dictionary).get("id", ""))
+			_assert(runtime_owner_ids.has(structure_id), "owner_ids musi zawierać strukturę %s." % structure_id)
 	_assert(runtime_owner_cells.size() == runtime_cells.size(), "Owner raster i navigation cells muszą mieć ten sam rozmiar.")
 	var solid_count := 0
 	var open_count := 0
@@ -761,159 +959,10 @@ func _assert_l05_navigation_base(
 	_assert(open_count > 0, "Bieżący payload L05 musi pozostawiać otwartą wodę.")
 
 
-func _assert_tower_socket_occupancy(manifest: Dictionary, navigation_base: Dictionary) -> void:
-	var tower := _structure_instance(manifest, STRUCTURE_INSTANCE_ID)
-	_assert(not tower.is_empty(), "Kontrola socketów wymaga tower_prototype_01.")
-	if tower.is_empty():
-		return
-	var origin := _vector(tower.get("origin", []))
-	var origin_px := Vector2i(
-		roundi(origin.x / L05_CELL_SIZE.x),
-		roundi(origin.y / L05_CELL_SIZE.y),
-	)
-	var sockets_value = tower.get("sockets", null)
-	_assert(sockets_value is Array, "Kontrola occupancy wymaga tablicy socketów wieżowca.")
-	if not sockets_value is Array:
-		return
-	for socket_value in sockets_value as Array:
-		if not socket_value is Dictionary:
-			continue
-		var socket := socket_value as Dictionary
-		var socket_id := str(socket.get("id", "?"))
-		var local_rect := _rect(socket.get("local_rect", []))
-		var local_rect_px := [
-			roundi(local_rect.position.x / L05_CELL_SIZE.x),
-			roundi(local_rect.position.y / L05_CELL_SIZE.y),
-			roundi(local_rect.size.x / L05_CELL_SIZE.x),
-			roundi(local_rect.size.y / L05_CELL_SIZE.y),
-		]
-		_assert_tower_local_raster_rect(
-			navigation_base,
-			origin_px,
-			local_rect_px,
-			true,
-			"socket %s" % socket_id,
-		)
-	var entry: Dictionary = _record_by_id(sockets_value as Array, "entry_floor_12_broken_window")
-	_assert(not entry.is_empty(), "Wieżowiec musi publikować socket wybitego okna.")
-	if entry.is_empty():
-		return
-	var entry_rect := _rect(entry.get("local_rect", []))
-	var size := _vector(tower.get("size", []))
-	var touches_perimeter := (
-		is_zero_approx(entry_rect.position.x)
-		or is_zero_approx(entry_rect.position.y)
-		or is_equal_approx(entry_rect.end.x, size.x)
-		or is_equal_approx(entry_rect.end.y, size.y)
-	)
-	_assert(touches_perimeter, "Socket wejścia musi dotykać obwodu lokalnej struktury.")
-	var cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
-	var width := int(navigation_base.get("width", 0))
-	var entry_y_px := roundi(entry_rect.position.y / L05_CELL_SIZE.y)
-	var entry_height_px := roundi(entry_rect.size.y / L05_CELL_SIZE.y)
-	var outside_x := origin_px.x - 1
-	for local_y in range(entry_y_px, entry_y_px + entry_height_px):
-		var outside_y := origin_px.y + local_y
-		var outside_index := outside_y * width + outside_x
-		_assert(
-			outside_x >= 0 and outside_index >= 0 and outside_index < cells.size()
-			and int(cells[outside_index]) == 1,
-			"Zewnętrzny pas przy wybitym oknie musi pozostać open_water.",
-		)
-
-
-func _assert_tower_route_rects(manifest: Dictionary, navigation_base: Dictionary) -> void:
-	var tower := _structure_instance(manifest, STRUCTURE_INSTANCE_ID)
-	if tower.is_empty():
-		return
-	var origin := _vector(tower.get("origin", []))
-	var origin_px := Vector2i(
-		roundi(origin.x / L05_CELL_SIZE.x),
-		roundi(origin.y / L05_CELL_SIZE.y),
-	)
-	for route_id in TOWER_ROUTE_OPEN_RECTS_PX:
-		_assert_tower_local_raster_rect(
-			navigation_base,
-			origin_px,
-			TOWER_ROUTE_OPEN_RECTS_PX[route_id] as Array,
-			true,
-			"route rect %s" % route_id,
-		)
-
-
-func _assert_tower_sequence_guard_solids(manifest: Dictionary, navigation_base: Dictionary) -> void:
-	var tower := _structure_instance(manifest, STRUCTURE_INSTANCE_ID)
-	if tower.is_empty():
-		return
-	var origin := _vector(tower.get("origin", []))
-	var origin_px := Vector2i(
-		roundi(origin.x / L05_CELL_SIZE.x),
-		roundi(origin.y / L05_CELL_SIZE.y),
-	)
-	for guard_id in TOWER_SEQUENCE_GUARD_SOLID_RECTS_PX:
-		_assert_tower_local_raster_rect(
-			navigation_base,
-			origin_px,
-			TOWER_SEQUENCE_GUARD_SOLID_RECTS_PX[guard_id] as Array,
-			false,
-			"sequence guard %s" % guard_id,
-		)
-
-
-func _assert_tower_local_raster_rect(
-	navigation_base: Dictionary,
-	origin_px: Vector2i,
-	local_rect_px: Array,
-	expect_open_water: bool,
-	label: String,
-) -> void:
-	_assert(local_rect_px.size() == 4, "%s musi publikować rect_px[x,y,w,h]." % label)
-	if local_rect_px.size() != 4:
-		return
-	var local_x := int(local_rect_px[0])
-	var local_y := int(local_rect_px[1])
-	var rect_width := int(local_rect_px[2])
-	var rect_height := int(local_rect_px[3])
-	_assert(
-		local_x >= 0 and local_y >= 0 and rect_width > 0 and rect_height > 0,
-		"%s musi mieć dodatni lokalny prostokąt." % label,
-	)
-	var width := int(navigation_base.get("width", 0))
-	var height := int(navigation_base.get("height", 0))
-	var cells: PackedByteArray = navigation_base.get("cells", PackedByteArray())
-	var owner_cells: PackedInt32Array = navigation_base.get("solid_owner_cells", PackedInt32Array())
-	var owner_ids: PackedStringArray = navigation_base.get("owner_ids", PackedStringArray())
-	var tower_owner_index := owner_ids.find(STRUCTURE_INSTANCE_ID)
-	_assert(tower_owner_index > OPEN_WATER_OWNER_INDEX, "Raster musi publikować ownera wieżowca.")
-	for y in range(local_y, local_y + rect_height):
-		for x in range(local_x, local_x + rect_width):
-			var world_cell := origin_px + Vector2i(x, y)
-			var inside := (
-				world_cell.x >= 0 and world_cell.y >= 0
-				and world_cell.x < width and world_cell.y < height
-			)
-			_assert(inside, "%s wychodzi poza raster L05." % label)
-			if not inside:
-				continue
-			var cell_index := world_cell.y * width + world_cell.x
-			if expect_open_water:
-				_assert(int(cells[cell_index]) == 1, "%s musi leżeć w open_water." % label)
-				_assert(
-					int(owner_cells[cell_index]) == OPEN_WATER_OWNER_INDEX,
-					"%s open_water nie może mieć właściciela kolizji." % label,
-				)
-			else:
-				_assert(int(cells[cell_index]) == 0, "%s musi pozostać solid." % label)
-				_assert(
-					int(owner_cells[cell_index]) == tower_owner_index,
-					"%s solid musi należeć do tower_prototype_01." % label,
-				)
-
-
 func _rasterize_l05_payload(topology: Dictionary, manifest: Dictionary) -> Dictionary:
 	var collision: Dictionary = topology.get("collision_source", {})
-	var package_path := str(collision.get("path", ""))
-	var resource_path := "res://underwater_map_workbench/%s" % package_path
+	var payload_path := str(collision.get("path", ""))
+	var resource_path := "res://underwater_map_workbench/%s" % payload_path
 	_assert(FileAccess.file_exists(resource_path), "Źródłowy payload L05 musi istnieć.")
 	if not FileAccess.file_exists(resource_path):
 		return {}
@@ -967,17 +1016,14 @@ func _rasterize_l05_payload(topology: Dictionary, manifest: Dictionary) -> Dicti
 		return {}
 	var operation_ids := {}
 	var saw_world_owner := false
-	var saw_structure_owner := false
 	for operation_value in operations_value as Array:
 		_assert(operation_value is Dictionary, "Każda operacja L05 musi być obiektem.")
 		if not operation_value is Dictionary:
 			continue
 		var operation := operation_value as Dictionary
 		var operation_space := str(operation.get("space", ""))
-		var expected_operation_keys := ["id", "op", "space", "rect_px"]
-		if operation_space == "structure_local_px":
-			expected_operation_keys.append("structure_id")
-		_assert_exact_dictionary_keys(operation, expected_operation_keys, "operacja L05 %s" % str(operation.get("id", "?")))
+		_assert_exact_dictionary_keys(operation, ["id", "op", "space", "rect_px"], "globalna operacja L05 %s" % str(operation.get("id", "?")))
+		_assert(operation_space == "world_px", "Globalny payload L05 może publikować wyłącznie operacje world_px.")
 		var operation_id := str(operation.get("id", ""))
 		_assert(not operation_id.is_empty() and not operation_ids.has(operation_id), "Operacje L05 muszą mieć unikalne ID.")
 		operation_ids[operation_id] = true
@@ -992,24 +1038,8 @@ func _rasterize_l05_payload(topology: Dictionary, manifest: Dictionary) -> Dicti
 		var height := int(rect[3])
 		var operation_kind := str(operation.get("op", ""))
 		_assert(operation_kind in ["solid_rect", "open_rect"], "Operacja L05 v2 musi być solid_rect albo open_rect.")
-		_assert(operation_space in ["world_px", "structure_local_px"], "Operacja L05 v2 musi używać world_px albo structure_local_px.")
 		var owner_id := WORLD_COLLISION_OWNER_ID
-		if operation_space == "structure_local_px":
-			owner_id = str(operation.get("structure_id", ""))
-			_assert(owner_index_by_id.has(owner_id), "Operacja L05 v2 musi wskazywać istniejącą strukturę.")
-			if structure_origins_px.has(owner_id):
-				var local_size: Vector2i = structure_sizes_px[owner_id]
-				_assert(
-					x >= 0 and y >= 0 and width > 0 and height > 0
-					and x + width <= local_size.x and y + height <= local_size.y,
-					"Operacja L05 struktury musi mieścić się w jej lokalnym rastrze.",
-				)
-				var structure_origin: Vector2i = structure_origins_px[owner_id]
-				x += structure_origin.x
-				y += structure_origin.y
-		else:
-			saw_world_owner = true
-		saw_structure_owner = saw_structure_owner or owner_id == STRUCTURE_INSTANCE_ID
+		saw_world_owner = true
 		_assert(
 			x >= 0 and y >= 0 and width > 0 and height > 0
 			and x + width <= L05_PIXEL_SIZE.x and y + height <= L05_PIXEL_SIZE.y,
@@ -1022,8 +1052,57 @@ func _rasterize_l05_payload(topology: Dictionary, manifest: Dictionary) -> Dicti
 				var cell_index := row * L05_PIXEL_SIZE.x + column
 				cells[cell_index] = value
 				solid_owner_cells[cell_index] = owner_index if value == 0 else OPEN_WATER_OWNER_INDEX
-	_assert(saw_world_owner, "Payload L05 v2 musi zawierać operacje w world_px należące do world.")
-	_assert(saw_structure_owner, "Payload L05 v2 musi zawierać operacje lokalne tower_prototype_01.")
+	_assert(saw_world_owner, "Globalny payload L05 v2 musi zawierać operacje world_px należące do world.")
+	var saw_package_operation := false
+	for instance_value in structures.get("instances", []):
+		if not instance_value is Dictionary:
+			continue
+		var instance := instance_value as Dictionary
+		var structure_id := str(instance.get("id", ""))
+		var structure_origin: Vector2i = structure_origins_px.get(structure_id, Vector2i.ZERO)
+		var local_size: Vector2i = structure_sizes_px.get(structure_id, Vector2i.ZERO)
+		var package_resource_path := "res://underwater_map_workbench/%s" % str(instance.get("package_path", ""))
+		var package := _load_json_resource(package_resource_path, "pakiet kolizji %s" % structure_id)
+		var package_collision := package.get("collision", {}) as Dictionary
+		var package_operations := package_collision.get("operations", []) as Array
+		for package_operation_value in package_operations:
+			if not package_operation_value is Dictionary:
+				continue
+			var package_operation := package_operation_value as Dictionary
+			_assert_exact_dictionary_keys(
+				package_operation,
+				["id", "op", "rect_px"],
+				"lokalna operacja pakietu %s" % structure_id,
+			)
+			var operation_id := str(package_operation.get("id", ""))
+			_assert(not operation_id.is_empty() and not operation_ids.has(operation_id), "Globalne i package-local operation IDs muszą być unikalne.")
+			operation_ids[operation_id] = true
+			var rect := package_operation.get("rect_px", []) as Array
+			if rect.size() != 4:
+				continue
+			var local_x := int(rect[0])
+			var local_y := int(rect[1])
+			var width := int(rect[2])
+			var height := int(rect[3])
+			_assert(
+				local_x >= 0 and local_y >= 0 and width > 0 and height > 0
+				and local_x + width <= local_size.x and local_y + height <= local_size.y,
+				"Package collision %s musi mieścić się wyłącznie w lokalnym rastrze." % structure_id,
+			)
+			var operation_kind := str(package_operation.get("op", ""))
+			_assert(operation_kind in ["solid_rect", "open_rect"], "Package collision %s ma niepoprawny op." % structure_id)
+			var value := 0 if operation_kind == "solid_rect" else 1
+			var owner_index := int(owner_index_by_id.get(structure_id, OPEN_WATER_OWNER_INDEX))
+			for row in range(structure_origin.y + local_y, structure_origin.y + local_y + height):
+				for column in range(structure_origin.x + local_x, structure_origin.x + local_x + width):
+					var cell_index := row * L05_PIXEL_SIZE.x + column
+					cells[cell_index] = value
+					solid_owner_cells[cell_index] = owner_index if value == 0 else OPEN_WATER_OWNER_INDEX
+			saw_package_operation = true
+	_assert(
+		saw_package_operation,
+		"Co najmniej jeden zarejestrowany pakiet musi dostarczyć lokalne operacje poza globalnym payloadem.",
+	)
 	return {
 		"cells": cells,
 		"owner_ids": owner_ids,
@@ -1245,6 +1324,10 @@ func _active_nonblocking_texture_layer_ids(manifest: Dictionary) -> Array[String
 		if not asset_value is Dictionary:
 			continue
 		var asset := asset_value as Dictionary
+		if str(asset.get("kind", "")) in [
+			"structure_interior_texture", "structure_owner_masked_texture",
+		]:
+			continue
 		var layer_id := str(asset.get("layer_id", ""))
 		if (
 			bool(asset.get("enabled", true))
@@ -1256,13 +1339,41 @@ func _active_nonblocking_texture_layer_ids(manifest: Dictionary) -> Array[String
 	return result
 
 
+func _assert_streamed_backdrops_are_scene_stubs(manifest: Dictionary) -> void:
+	var scene_file := FileAccess.open(CompilerScript.MAP_SCENE_PATH, FileAccess.READ)
+	_assert(scene_file != null, "Scena mapy musi być czytelna do kontroli zależności rezydencji.")
+	if scene_file == null:
+		return
+	var scene_text := scene_file.get_as_text()
+	var visual: Dictionary = manifest.get("visual", {})
+	for asset_value in visual.get("assets", []):
+		if not asset_value is Dictionary:
+			continue
+		var asset := asset_value as Dictionary
+		if (
+			str(asset.get("kind", "")) != "texture_rect"
+			or str(asset.get("layer_id", "")) not in NONBLOCKING_TEXTURE_LAYER_IDS
+		):
+			continue
+		var resource_path := "res://underwater_map_workbench/%s" % str(asset.get("path", ""))
+		_assert(
+			not scene_text.contains('[ext_resource type="Texture2D" path="%s"' % resource_path),
+			"UnderwaterMap.tscn nie może rezydentować %s jako Texture2D ext_resource."
+			% str(asset.get("id", "")),
+		)
+
+
 func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
+	var structure_records: Array = (manifest.get("structures", {}) as Dictionary).get("instances", [])
+	_assert(not structure_records.is_empty(), "Fixture struktur wymaga co najmniej jednego zarejestrowanego pakietu.")
+	if structure_records.is_empty() or not structure_records[0] is Dictionary:
+		return
+	var source_instance := structure_records[0] as Dictionary
+	var structure_id := str(source_instance.get("id", ""))
+	var template_id := str(source_instance.get("template_id", ""))
+
 	var missing_template_fixture := manifest.duplicate(true)
-	var missing_template_instance := _structure_instance(
-		missing_template_fixture,
-		STRUCTURE_INSTANCE_ID,
-	)
-	_assert(not missing_template_instance.is_empty(), "Fixture wymaga tower_prototype_01.")
+	var missing_template_instance := _structure_instance(missing_template_fixture, structure_id)
 	if not missing_template_instance.is_empty():
 		missing_template_instance["template_id"] = "__missing_structure_template__"
 		_assert_manifest_rejected_with_fragment(
@@ -1273,16 +1384,9 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 		)
 
 	var optional_landmark_fixture := manifest.duplicate(true)
-	var optional_landmark_instance := _structure_instance(
-		optional_landmark_fixture,
-		STRUCTURE_INSTANCE_ID,
-	)
-	_assert(
-		not optional_landmark_instance.is_empty()
-		and not optional_landmark_instance.has("landmark_id"),
-		"Neutralny fixture struktury musi legalnie pomijać landmark_id.",
-	)
+	var optional_landmark_instance := _structure_instance(optional_landmark_fixture, structure_id)
 	if not optional_landmark_instance.is_empty():
+		optional_landmark_instance.erase("landmark_id")
 		var optional_landmark_errors: PackedStringArray = compiler.call(
 			"validate_manifest_for_tests",
 			optional_landmark_fixture,
@@ -1292,16 +1396,18 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 			"Brak opcjonalnego landmark_id musi być legalny: %s"
 			% "; ".join(optional_landmark_errors),
 		)
-		optional_landmark_instance["landmark_id"] = "flooded_archive"
-		var valid_landmark_errors: PackedStringArray = compiler.call(
-			"validate_manifest_for_tests",
-			optional_landmark_fixture,
-		)
-		_assert(
-			valid_landmark_errors.is_empty(),
-			"Obecny landmark_id wskazujący istniejący landmark musi być legalny: %s"
-			% "; ".join(valid_landmark_errors),
-		)
+		var landmarks: Array = manifest.get("landmarks", [])
+		if not landmarks.is_empty() and landmarks[0] is Dictionary:
+			optional_landmark_instance["landmark_id"] = str((landmarks[0] as Dictionary).get("id", ""))
+			var valid_landmark_errors: PackedStringArray = compiler.call(
+				"validate_manifest_for_tests",
+				optional_landmark_fixture,
+			)
+			_assert(
+				valid_landmark_errors.is_empty(),
+				"Obecny landmark_id wskazujący istniejący landmark musi być legalny: %s"
+				% "; ".join(valid_landmark_errors),
+			)
 		optional_landmark_instance["landmark_id"] = "__missing_landmark__"
 		_assert_manifest_rejected_with_fragment(
 			compiler,
@@ -1311,7 +1417,7 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 		)
 
 	var off_grid_fixture := manifest.duplicate(true)
-	var off_grid_instance := _structure_instance(off_grid_fixture, STRUCTURE_INSTANCE_ID)
+	var off_grid_instance := _structure_instance(off_grid_fixture, structure_id)
 	if not off_grid_instance.is_empty():
 		var off_grid_origin: Array = (off_grid_instance.get("origin", []) as Array).duplicate()
 		off_grid_origin[0] = int(off_grid_origin[0]) + 1
@@ -1324,50 +1430,51 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 		)
 
 	var outside_socket_fixture := manifest.duplicate(true)
-	var outside_socket_instance := _structure_instance(outside_socket_fixture, STRUCTURE_INSTANCE_ID)
-	var tower_template := _structure_template(outside_socket_fixture, STRUCTURE_TEMPLATE_ID)
-	if not outside_socket_instance.is_empty() and not tower_template.is_empty():
-		var allowed_kinds: Array = tower_template.get("allowed_socket_kinds", [])
-		var socket_kind := str(allowed_kinds[0]) if not allowed_kinds.is_empty() else "entry_opening"
-		var sockets: Array = outside_socket_instance.get("sockets", [])
-		sockets.append({
-			"id": "test_socket",
-			"kind": socket_kind,
-			"local_rect": [0, 0, 80, 160],
-		})
-		var valid_socket_errors: PackedStringArray = compiler.call(
-			"validate_manifest_for_tests",
-			outside_socket_fixture,
-		)
-		_assert(
-			valid_socket_errors.is_empty(),
-			"Typowany socket wewnątrz bounds musi przechodzić walidację: %s"
-			% "; ".join(valid_socket_errors),
-		)
-		(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [1, 0, 80, 160]
-		_assert_manifest_rejected_with_fragment(
-			compiler,
-			outside_socket_fixture,
-			"wyrównany do rastra L05",
-			"Walidator musi odrzucać socket local_rect poza siatką L05.",
-		)
-		(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [0, 0, 80, 160]
-		var structure_size := _vector(outside_socket_instance.get("size", []))
-		(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [
-			int(structure_size.x) - 40,
-			int(structure_size.y) - 40,
-			80,
-			80,
-		]
-		_assert_manifest_rejected_with_fragment(
-			compiler,
-			outside_socket_fixture,
-			"local_rect",
-			"Walidator musi odrzucać socket local_rect wychodzący poza bounds struktury.",
-		)
+	var outside_socket_instance := _structure_instance(outside_socket_fixture, structure_id)
+	var structure_template := _structure_template(outside_socket_fixture, template_id)
+	if not outside_socket_instance.is_empty() and not structure_template.is_empty():
+		var allowed_kinds: Array = structure_template.get("allowed_socket_kinds", [])
+		if not allowed_kinds.is_empty():
+			var sockets: Array = outside_socket_instance.get("sockets", [])
+			sockets.append({
+				"id": "__map_smoke_socket__",
+				"kind": str(allowed_kinds[0]),
+				"local_rect": [0, 0, int(L05_CELL_SIZE.x), int(L05_CELL_SIZE.y)],
+			})
+			var valid_socket_errors: PackedStringArray = compiler.call(
+				"validate_manifest_for_tests",
+				outside_socket_fixture,
+			)
+			_assert(
+				valid_socket_errors.is_empty(),
+				"Typowany socket wewnątrz bounds musi przechodzić walidację: %s"
+				% "; ".join(valid_socket_errors),
+			)
+			(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [
+				1, 0, int(L05_CELL_SIZE.x), int(L05_CELL_SIZE.y),
+			]
+			_assert_manifest_rejected_with_fragment(
+				compiler,
+				outside_socket_fixture,
+				"wyrównany do rastra L05",
+				"Walidator musi odrzucać socket local_rect poza siatką L05.",
+			)
+			var structure_size := _vector(outside_socket_instance.get("size", []))
+			(sockets[sockets.size() - 1] as Dictionary)["local_rect"] = [
+				int(structure_size.x) - 40,
+				int(structure_size.y) - 40,
+				80,
+				80,
+			]
+			_assert_manifest_rejected_with_fragment(
+				compiler,
+				outside_socket_fixture,
+				"local_rect",
+				"Walidator musi odrzucać socket local_rect wychodzący poza bounds struktury.",
+			)
 
 	var duplicate_socket_fixture := manifest.duplicate(true)
-	var duplicate_socket_instance := _structure_instance(duplicate_socket_fixture, STRUCTURE_INSTANCE_ID)
+	var duplicate_socket_instance := _structure_instance(duplicate_socket_fixture, structure_id)
 	if not duplicate_socket_instance.is_empty():
 		var duplicate_sockets: Array = duplicate_socket_instance.get("sockets", [])
 		if not duplicate_sockets.is_empty():
@@ -1380,11 +1487,11 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 			)
 
 	var bad_socket_kind_fixture := manifest.duplicate(true)
-	var bad_socket_kind_instance := _structure_instance(bad_socket_kind_fixture, STRUCTURE_INSTANCE_ID)
+	var bad_socket_kind_instance := _structure_instance(bad_socket_kind_fixture, structure_id)
 	if not bad_socket_kind_instance.is_empty():
 		var bad_kind_sockets: Array = bad_socket_kind_instance.get("sockets", [])
 		if not bad_kind_sockets.is_empty():
-			(bad_kind_sockets[0] as Dictionary)["kind"] = "unsupported_socket_kind"
+			(bad_kind_sockets[0] as Dictionary)["kind"] = "__unsupported_socket_kind__"
 			_assert_manifest_rejected_with_fragment(
 				compiler,
 				bad_socket_kind_fixture,
@@ -1393,7 +1500,7 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 			)
 
 	var stale_partition_fixture := manifest.duplicate(true)
-	var stale_partition_instance := _structure_instance(stale_partition_fixture, STRUCTURE_INSTANCE_ID)
+	var stale_partition_instance := _structure_instance(stale_partition_fixture, structure_id)
 	if not stale_partition_instance.is_empty():
 		stale_partition_instance["partition_digest"] = "partition-v1:stale-fixture"
 		_assert_manifest_rejected_with_fragment(
@@ -1403,6 +1510,31 @@ func _validate_structure_fixtures(compiler, manifest: Dictionary) -> void:
 			"Walidator musi odrzucać strukturę ze starym partition_digest.",
 		)
 
+	var invalid_runtime_fixture := manifest.duplicate(true)
+	var invalid_runtime_instance := _structure_instance(invalid_runtime_fixture, structure_id)
+	if not invalid_runtime_instance.is_empty():
+		invalid_runtime_instance["runtime"] = []
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			invalid_runtime_fixture,
+			"runtime musi być obiektem",
+			"Mapa musi odrzucać runtime pakietu, który nie jest słownikiem.",
+		)
+
+	var opaque_runtime_fixture := manifest.duplicate(true)
+	var opaque_runtime_instance := _structure_instance(opaque_runtime_fixture, structure_id)
+	if not opaque_runtime_instance.is_empty():
+		var opaque_runtime: Dictionary = opaque_runtime_instance.get("runtime", {})
+		opaque_runtime["__package_owned_smoke_probe__"] = {"values": [1, 2, 3]}
+		var opaque_runtime_errors: PackedStringArray = compiler.call(
+			"validate_manifest_for_tests",
+			opaque_runtime_fixture,
+		)
+		_assert(
+			opaque_runtime_errors.is_empty(),
+			"Mapa musi traktować prywatny payload runtime pakietu jako nieprzezroczysty: %s"
+			% "; ".join(opaque_runtime_errors),
+		)
 
 func _validate_visual_element_fixtures(compiler, manifest: Dictionary) -> void:
 	var bad_group_fixture := manifest.duplicate(true)
@@ -1437,6 +1569,44 @@ func _validate_visual_element_fixtures(compiler, manifest: Dictionary) -> void:
 		"1:1 bez skalowania",
 		"Walidator musi odrzucać proxy o pixel_size innym niż world_rect.size.",
 	)
+
+	var outside_structure_asset_fixture := manifest.duplicate(true)
+	var outside_structure_asset := _first_structure_visual_asset(outside_structure_asset_fixture)
+	if not outside_structure_asset.is_empty():
+		var outside_structure_id := str(outside_structure_asset.get("structure_id", ""))
+		var outside_structure := _structure_instance(outside_structure_asset_fixture, outside_structure_id)
+		var outside_structure_size := _vector(outside_structure.get("size", []))
+		outside_structure_asset["local_rect"] = [outside_structure_size.x - 40.0, 0, 80, 80]
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			outside_structure_asset_fixture,
+			"local_rect",
+			"Walidator musi odrzucać structure-local asset poza bounds jego struktury.",
+		)
+
+	var stale_structure_asset_fixture := manifest.duplicate(true)
+	var stale_structure_asset := _first_structure_visual_asset(stale_structure_asset_fixture)
+	if not stale_structure_asset.is_empty():
+		stale_structure_asset["partition_digest"] = "partition-v1:stale-fixture"
+		_assert_manifest_rejected_with_fragment(
+			compiler,
+			stale_structure_asset_fixture,
+			"partition_digest",
+			"Walidator musi odrzucać structure-local asset starego partition_digest.",
+		)
+
+
+func _first_structure_visual_asset(manifest: Dictionary) -> Dictionary:
+	var visual: Dictionary = manifest.get("visual", {})
+	for asset_value in visual.get("assets", []):
+		if (
+			asset_value is Dictionary
+			and str((asset_value as Dictionary).get("kind", "")) in [
+				"structure_interior_texture", "structure_owner_masked_texture",
+			]
+		):
+			return asset_value as Dictionary
+	return {}
 
 
 func _ensure_proxy_fixture_asset(fixture: Dictionary) -> Dictionary:
@@ -1686,7 +1856,7 @@ func _assert_scene_metadata(
 		str(map_root.get_meta("manifest_sha256", "")).to_lower() == raw_manifest_sha,
 		"Scena musi publikować SHA surowych bajtów manifestu.",
 	)
-	_assert(int(map_root.get_meta("schema_version", 0)) == EXPECTED_SCHEMA_VERSION, "Scena musi publikować schema v5.")
+	_assert(int(map_root.get_meta("schema_version", 0)) == EXPECTED_SCHEMA_VERSION, "Scena musi publikować schema v6.")
 	_assert(
 		int(map_root.get_meta("source_version", 0)) == int(map_record.get("source_version", 0)),
 		"Scena musi wyprowadzać source_version z manifestu.",
@@ -1767,6 +1937,7 @@ func _assert_structure_roots(
 			structure_root as Node2D,
 			instance,
 			expected_boundary_sets.get(structure_id, {}) as Dictionary,
+			_structure_visual_assets(manifest, structure_id),
 			owner_label,
 		)
 
@@ -1775,9 +1946,12 @@ func _assert_structure_root_node(
 	structure_root: Node2D,
 	instance: Dictionary,
 	expected_boundary_set: Dictionary,
+	structure_assets: Array[Dictionary],
 	owner_label: String,
 ) -> void:
 	var structure_id := str(instance.get("id", ""))
+	if owner_label == "scena":
+		_assert_structure_root_is_package_scene_instance(structure_root, instance)
 	var expected_children := PackedStringArray([
 		"InteriorVisual", "StructureVisual", "StaticCollision", "DynamicBodies", "Interactives",
 	])
@@ -1797,6 +1971,11 @@ func _assert_structure_root_node(
 		_manifest_value_matches(instance, structure_root.get_meta("source", {})),
 		"%s/%s musi publikować rekord instancji 1:1." % [owner_label, structure_id],
 	)
+	var expected_runtime = instance.get("runtime", {})
+	_assert(
+		_manifest_value_matches(expected_runtime, structure_root.get_meta("runtime", {})),
+		"%s/%s musi publikować opcjonalny rekord runtime 1:1." % [owner_label, structure_id],
+	)
 	var interior := structure_root.get_node_or_null("InteriorVisual") as Node2D
 	var structure_visual := structure_root.get_node_or_null("StructureVisual") as Node2D
 	var static_collision := structure_root.get_node_or_null("StaticCollision") as StaticBody2D
@@ -1806,15 +1985,21 @@ func _assert_structure_root_node(
 	_assert(structure_visual != null and structure_visual.z_index == 0, "%s/%s/StructureVisual musi być L05 z=0." % [owner_label, structure_id])
 	if interior != null:
 		_assert(str(interior.get_meta("logical_layer_id", "")) == "L04", "%s/%s/InteriorVisual musi publikować L04." % [owner_label, structure_id])
+		_assert(
+			interior.get_node_or_null("Backwall") == null,
+			"%s/%s/InteriorVisual nie może zawierać pozamanifestowego Backwall." % [owner_label, structure_id],
+		)
+		_assert(
+			interior.get_node_or_null("Label") == null,
+			"%s/%s/InteriorVisual nie może zawierać bezwarunkowego Label PROXY." % [owner_label, structure_id],
+		)
 	if structure_visual != null:
 		_assert(str(structure_visual.get_meta("logical_layer_id", "")) == "L05", "%s/%s/StructureVisual musi publikować L05." % [owner_label, structure_id])
 	_assert(static_collision != null, "%s/%s musi zawierać StaticCollision:StaticBody2D." % [owner_label, structure_id])
 	_assert(dynamic_bodies != null, "%s/%s musi zawierać DynamicBodies:Node2D." % [owner_label, structure_id])
 	_assert(interactives != null, "%s/%s musi zawierać Interactives:Node2D." % [owner_label, structure_id])
-	if dynamic_bodies != null:
-		_assert(dynamic_bodies.get_child_count() == 0, "%s/%s/DynamicBodies musi pozostać puste w neutralnym prototypie." % [owner_label, structure_id])
-	if interactives != null and structure_id == STRUCTURE_INSTANCE_ID:
-		_assert(interactives.get_child_count() == 0, "%s/%s/Interactives nie może zawierać obiektów kampanii Archiwum." % [owner_label, structure_id])
+	_assert_structure_visual_assets(interior, structure_visual, structure_assets, structure_id, owner_label)
+	_assert_structure_runtime_lifecycle(dynamic_bodies, instance, owner_label)
 	for local_root in [interior, structure_visual, static_collision, dynamic_bodies, interactives]:
 		if local_root is Node2D:
 			var local_root_2d := local_root as Node2D
@@ -1858,6 +2043,273 @@ func _assert_structure_root_node(
 	_assert_structure_root_moves_as_group(structure_root, instance, static_collision, owner_label)
 
 
+func _structure_visual_assets(manifest: Dictionary, structure_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var visual: Dictionary = manifest.get("visual", {})
+	for asset_value in visual.get("assets", []):
+		if not asset_value is Dictionary:
+			continue
+		var asset := asset_value as Dictionary
+		if (
+			str(asset.get("structure_id", "")) == structure_id
+			and str(asset.get("kind", "")) in [
+				"structure_interior_texture", "structure_owner_masked_texture",
+			]
+		):
+			result.append(asset)
+	return result
+
+
+func _assert_structure_visual_assets(
+	interior: Node2D,
+	structure_visual: Node2D,
+	structure_assets: Array[Dictionary],
+	structure_id: String,
+	owner_label: String,
+) -> void:
+	for layer_id in ["L04", "L05"]:
+		var local_root := interior if layer_id == "L04" else structure_visual
+		if local_root == null:
+			continue
+		var expected_groups: Array[Dictionary] = []
+		for asset in structure_assets:
+			if str(asset.get("layer_id", "")) != layer_id:
+				continue
+			var group_id := str(asset.get("group_id", ""))
+			var group_record: Dictionary = {}
+			for candidate in expected_groups:
+				if str(candidate.get("id", "")) == group_id:
+					group_record = candidate
+					break
+			if group_record.is_empty():
+				group_record = {"id": group_id, "assets": []}
+				expected_groups.append(group_record)
+			(group_record["assets"] as Array).append(asset)
+		var actual_groups: Array[Node] = []
+		for child in local_root.get_children():
+			if child.has_meta("group_id"):
+				actual_groups.append(child)
+		if layer_id == "L04":
+			_assert(
+				local_root.get_child_count() == actual_groups.size(),
+				"%s/%s/InteriorVisual może zawierać wyłącznie manifestowe grupy assetów."
+				% [owner_label, structure_id],
+			)
+		_assert(
+			actual_groups.size() == expected_groups.size(),
+			"%s/%s/%s musi wyprowadzać grupy structure-local z visual.assets."
+			% [owner_label, structure_id, str(local_root.name)],
+		)
+		for group_index in range(mini(actual_groups.size(), expected_groups.size())):
+			var group_node := actual_groups[group_index]
+			var expected_group := expected_groups[group_index]
+			var group_id := str(expected_group.get("id", ""))
+			_assert(group_node is Node2D, "%s/%s/%s grupa %s musi być Node2D." % [owner_label, structure_id, layer_id, group_id])
+			_assert(str(group_node.get_meta("group_id", "")) == group_id, "%s/%s grupa assetów ma niepoprawne group_id." % [owner_label, structure_id])
+			_assert(str(group_node.get_meta("layer_id", "")) == layer_id, "%s/%s grupa assetów ma niepoprawne layer_id." % [owner_label, structure_id])
+			_assert(str(group_node.get_meta("structure_id", "")) == structure_id, "%s/%s grupa assetów ma niepoprawne structure_id." % [owner_label, structure_id])
+			if group_node is Node2D:
+				var group_2d := group_node as Node2D
+				_assert(group_2d.position == Vector2.ZERO and group_2d.scale == Vector2.ONE and is_zero_approx(group_2d.rotation), "%s/%s grupa assetów musi zachować identity transform." % [owner_label, structure_id])
+			var expected_assets: Array = expected_group.get("assets", [])
+			_assert(group_node.get_child_count() == expected_assets.size(), "%s/%s grupa %s ma niepoprawną liczbę assetów." % [owner_label, structure_id, group_id])
+			for asset_index in range(mini(group_node.get_child_count(), expected_assets.size())):
+				_assert_structure_local_asset_node(
+					group_node.get_child(asset_index),
+					expected_assets[asset_index] as Dictionary,
+					structure_id,
+					owner_label,
+				)
+
+
+func _assert_structure_local_asset_node(
+	asset_node: Node,
+	asset: Dictionary,
+	structure_id: String,
+	owner_label: String,
+) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var local_rect := _rect(asset.get("local_rect", []))
+	var pixel_size_value := _vector(asset.get("pixel_size", []))
+	var pixel_size := Vector2i(int(pixel_size_value.x), int(pixel_size_value.y))
+	_assert(asset_node is Node2D, "%s/%s asset %s musi być Node2D." % [owner_label, structure_id, asset_id])
+	if asset_node is Node2D:
+		var asset_2d := asset_node as Node2D
+		_assert(asset_2d.position == local_rect.position, "%s/%s asset %s musi używać local_rect.position." % [owner_label, structure_id, asset_id])
+		_assert(asset_2d.scale == Vector2.ONE and is_zero_approx(asset_2d.rotation), "%s/%s asset %s nie może być skalowany ani obracany." % [owner_label, structure_id, asset_id])
+		_assert(asset_2d.visible == bool(asset.get("enabled", true)), "%s/%s asset %s musi zachować enabled." % [owner_label, structure_id, asset_id])
+	for metadata_key in ["asset_id", "structure_id", "layer_id", "group_id", "kind", "topology_digest", "partition_digest"]:
+		var source_key: String = "id" if metadata_key == "asset_id" else str(metadata_key)
+		_assert(
+			asset_node.get_meta(metadata_key, null) == asset.get(source_key, null),
+			"%s/%s asset %s ma nieaktualne metadata %s."
+			% [owner_label, structure_id, asset_id, metadata_key],
+		)
+	_assert(asset_node.get_meta("local_rect", Rect2()) == local_rect, "%s/%s asset %s musi publikować local_rect." % [owner_label, structure_id, asset_id])
+	_assert(asset_node.get_meta("pixel_size", Vector2i.ZERO) == pixel_size, "%s/%s asset %s musi publikować pixel_size." % [owner_label, structure_id, asset_id])
+	_assert(_manifest_value_matches(asset, asset_node.get_meta("source", {})), "%s/%s asset %s musi publikować source 1:1." % [owner_label, structure_id, asset_id])
+	_assert(asset_node.get_child_count() == 1, "%s/%s asset %s musi zawierać tylko Bitmap." % [owner_label, structure_id, asset_id])
+	var bitmap := asset_node.get_node_or_null("Bitmap") as TextureRect
+	_assert(bitmap != null, "%s/%s asset %s wymaga Bitmap:TextureRect." % [owner_label, structure_id, asset_id])
+	if bitmap == null:
+		return
+	_assert(bitmap.scale == Vector2.ONE, "%s/%s Bitmap %s nie może być skalowany." % [owner_label, structure_id, asset_id])
+	_assert(_control_local_rect(bitmap) == Rect2(Vector2.ZERO, local_rect.size), "%s/%s Bitmap %s musi zachować natywny local_rect." % [owner_label, structure_id, asset_id])
+	_assert(bitmap.texture != null and bitmap.texture.get_size() == Vector2(pixel_size), "%s/%s Bitmap %s musi mapować PNG 1:1." % [owner_label, structure_id, asset_id])
+	var material := bitmap.material as ShaderMaterial
+	_assert(material != null and material.shader != null, "%s/%s Bitmap %s musi używać maskującego ShaderMaterial." % [owner_label, structure_id, asset_id])
+	if material == null or material.shader == null:
+		return
+	_assert(
+		material.shader.resource_path == "res://underwater_map_workbench/assets/shaders/structure_clip_masked.gdshader",
+		"%s/%s Bitmap %s musi używać kanonicznego shadera struktury." % [owner_label, structure_id, asset_id],
+	)
+	var expected_mask_name := (
+		"open_water_mask_native.png"
+		if str(asset.get("kind", "")) == "structure_interior_texture"
+		else "solid_mask_native.png"
+	)
+	var clip_mask := material.get_shader_parameter("clip_mask") as Texture2D
+	var surface_detail_mask := material.get_shader_parameter("surface_detail_mask") as Texture2D
+	var expected_mask_path := "res://underwater_map_workbench/structures/%s/generated/%s" % [structure_id, expected_mask_name]
+	var expected_surface_detail_path := (
+		"res://underwater_map_workbench/structures/%s/generated/surface_detail_mask_local.png"
+		% structure_id
+	)
+	_assert(clip_mask != null and clip_mask.resource_path == expected_mask_path, "%s/%s Bitmap %s ma niepoprawną lokalną maskę klipowania." % [owner_label, structure_id, asset_id])
+	_assert(material.get_shader_parameter("local_rect_origin") == local_rect.position, "%s/%s Bitmap %s ma niepoprawny local_rect_origin." % [owner_label, structure_id, asset_id])
+	_assert(material.get_shader_parameter("local_rect_size") == local_rect.size, "%s/%s Bitmap %s ma niepoprawny local_rect_size." % [owner_label, structure_id, asset_id])
+	var structure_root: Node = asset_node.get_parent().get_parent().get_parent()
+	var structure_size: Vector2 = structure_root.get_meta("size", Vector2.ZERO) if structure_root != null else Vector2.ZERO
+	_assert(material.get_shader_parameter("structure_size") == structure_size, "%s/%s Bitmap %s ma niepoprawny structure_size." % [owner_label, structure_id, asset_id])
+	var detail_enabled := str(asset.get("kind", "")) == "structure_owner_masked_texture"
+	_assert(
+		bool(material.get_shader_parameter("detail_enabled")) == detail_enabled,
+		"%s/%s Bitmap %s ma niepoprawny przełącznik detalu L05."
+		% [owner_label, structure_id, asset_id],
+	)
+	_assert(
+		surface_detail_mask != null
+		and surface_detail_mask.resource_path == expected_surface_detail_path
+		and surface_detail_mask.get_size() == structure_size / L05_CELL_SIZE,
+		"%s/%s Bitmap %s musi wskazywać package-local crop detalu L05."
+		% [owner_label, structure_id, asset_id],
+	)
+	_assert(
+		material.get_shader_parameter("world_size") == Vector2(23040.0, 12960.0),
+		"%s/%s Bitmap %s musi mapować detal do pełnego świata."
+		% [owner_label, structure_id, asset_id],
+	)
+	_assert(
+		material.get_shader_parameter("world_rect_origin") == (asset_node as Node2D).global_position,
+		"%s/%s Bitmap %s musi mapować detal world-locked od globalnego początku assetu."
+		% [owner_label, structure_id, asset_id],
+	)
+
+
+func _assert_structure_runtime_lifecycle(
+	dynamic_bodies: Node2D,
+	instance: Dictionary,
+	owner_label: String,
+) -> void:
+	if dynamic_bodies == null:
+		return
+	var structure_id := str(instance.get("id", ""))
+	var runtime_value = instance.get("runtime", null)
+	if owner_label == "scena":
+		_assert(
+			dynamic_bodies.get_child_count() == 0,
+			"%s/%s scena źródłowa nie może wypiekać aktywnego kontrolera pakietu."
+			% [owner_label, structure_id],
+		)
+		return
+	if not runtime_value is Dictionary or (runtime_value as Dictionary).is_empty():
+		_assert(
+			dynamic_bodies.get_child_count() == 0,
+			"%s/%s bez payloadu runtime nie może montować kontrolera."
+			% [owner_label, structure_id],
+		)
+		return
+	_assert(
+		dynamic_bodies.get_child_count() == 1,
+		"%s/%s musi montować dokładnie jeden package-local kontroler runtime."
+		% [owner_label, structure_id],
+	)
+	if dynamic_bodies.get_child_count() != 1:
+		return
+	var controller := dynamic_bodies.get_child(0)
+	_assert(
+		controller.has_method("configure") and controller.has_method("reset_attempt"),
+		"%s/%s kontroler musi publikować publiczny lifecycle configure()/reset_attempt()."
+		% [owner_label, structure_id],
+	)
+	var controller_script = controller.get_script()
+	_assert(
+		controller_script is Script
+		and (controller_script as Script).resource_path == str(instance.get("controller_script", "")),
+		"%s/%s musi montować controller_script wskazany przez rozwinięty pakiet."
+		% [owner_label, structure_id],
+	)
+
+
+func _assert_structure_root_is_package_scene_instance(
+	structure_root: Node2D,
+	instance: Dictionary,
+) -> void:
+	var structure_id := str(instance.get("id", ""))
+	var scene_path := str(instance.get("structure_scene_path", ""))
+	var expected_scene_path := (
+		"res://underwater_map_workbench/structures/%s/generated/structure.tscn"
+		% structure_id
+	)
+	_assert(scene_path == expected_scene_path, "Instancja %s musi wskazywać package PackedScene." % structure_id)
+	_assert(
+		structure_root.scene_file_path == scene_path,
+		"Mapowy StructureRoots/%s musi być instancją package PackedScene, nie kopią węzłów."
+		% structure_id,
+	)
+	var packed_scene := ResourceLoader.load(
+		scene_path,
+		"PackedScene",
+		ResourceLoader.CACHE_MODE_IGNORE,
+	) as PackedScene
+	_assert(packed_scene != null, "Package PackedScene %s musi się ładować." % structure_id)
+	if packed_scene == null:
+		return
+	var package_root := packed_scene.instantiate() as Node2D
+	_assert(package_root != null, "Package PackedScene %s musi mieć root Node2D." % structure_id)
+	if package_root == null:
+		return
+	_assert(
+		package_root.position == Vector2.ZERO
+		and is_zero_approx(package_root.rotation)
+		and package_root.scale == Vector2.ONE,
+		"Package-local scene %s musi zachować identity root." % structure_id,
+	)
+	_assert(
+		package_root.scene_file_path == scene_path,
+		"Bezpośrednia instancja package scene %s musi zachować scene_file_path." % structure_id,
+	)
+	_assert(
+		package_root.get_child_count() == structure_root.get_child_count(),
+		"Mapowa instancja %s musi zachować pełną hierarchię package scene." % structure_id,
+	)
+	for child_index in range(mini(package_root.get_child_count(), structure_root.get_child_count())):
+		var package_child := package_root.get_child(child_index)
+		var map_child := structure_root.get_child(child_index)
+		_assert(
+			package_child.name == map_child.name and package_child.get_class() == map_child.get_class(),
+			"Mapowa instancja %s musi zachować package-local child identity." % structure_id,
+		)
+		if package_child is Node2D and map_child is Node2D:
+			_assert(
+				(package_child as Node2D).transform == (map_child as Node2D).transform,
+				"Mapowa instancja %s nie może nadpisywać lokalnych child transformów package scene."
+				% structure_id,
+			)
+	package_root.free()
+
+
 func _assert_structure_root_moves_as_group(
 	structure_root: Node2D,
 	instance: Dictionary,
@@ -1876,21 +2328,32 @@ func _assert_structure_root_moves_as_group(
 	var first_socket := sockets[0] as Dictionary
 	var socket_center := _rect(first_socket.get("local_rect", [])).get_center()
 	var original_root_position := structure_root.position
-	var original_collision_point := collision_shape.to_global(segments[0])
-	var original_socket_center := structure_root.to_global(socket_center)
+	var original_collision_point := (
+		structure_root.transform
+		* static_collision.transform
+		* collision_shape.transform
+		* segments[0]
+	)
+	var original_socket_center := structure_root.transform * socket_center
 	var child_transforms := {}
 	for child in structure_root.get_children():
 		if child is Node2D:
 			child_transforms[child] = (child as Node2D).transform
 	var delta := Vector2(80.0, -40.0)
 	structure_root.position += delta
+	var moved_collision_point := (
+		structure_root.transform
+		* static_collision.transform
+		* collision_shape.transform
+		* segments[0]
+	)
 	_assert(
-		collision_shape.to_global(segments[0]).is_equal_approx(original_collision_point + delta),
+		moved_collision_point.is_equal_approx(original_collision_point + delta),
 		"%s/%s collider musi przesuwać się dokładnie z rootem struktury."
 		% [owner_label, str(instance.get("id", ""))],
 	)
 	_assert(
-		structure_root.to_global(socket_center).is_equal_approx(original_socket_center + delta),
+		(structure_root.transform * socket_center).is_equal_approx(original_socket_center + delta),
 		"%s/%s sockety muszą przesuwać się dokładnie z rootem struktury."
 		% [owner_label, str(instance.get("id", ""))],
 	)
@@ -2168,6 +2631,7 @@ func _assert_blueprint_matches_manifest(
 		blueprint.structure_spawns,
 		"structures.instances",
 	)
+	_assert_structure_blueprint_envelopes(blueprint.structure_spawns)
 
 	var expected_loot: Array = (gameplay.get("loot_spawns", []) as Array).duplicate(true)
 	for pickup_value in gameplay.get("pickups", []):
@@ -2198,6 +2662,31 @@ func _assert_blueprint_matches_manifest(
 			)
 
 
+func _assert_structure_blueprint_envelopes(structure_spawns: Array[Dictionary]) -> void:
+	for structure in structure_spawns:
+		var structure_id := str(structure.get("id", ""))
+		_assert(not structure_id.is_empty(), "Każda struktura blueprintu musi zachować stable ID registry.")
+		_assert(
+			structure.get("runtime", null) is Dictionary,
+			"Blueprint struktury %s musi zachować nieprzezroczysty słownik runtime pakietu."
+			% structure_id,
+		)
+		_assert(
+			str(structure.get("controller_script", "")).begins_with(
+				"res://underwater_map_workbench/structures/%s/" % structure_id
+			),
+			"Blueprint struktury %s musi zachować package-local controller_script."
+			% structure_id,
+		)
+		for socket_value in structure.get("sockets", []):
+			if socket_value is Dictionary:
+				_assert(
+					(socket_value as Dictionary).get("local_rect", null) is Rect2,
+					"Blueprint struktury %s musi dekodować socket.local_rect do Rect2."
+					% structure_id,
+				)
+
+
 func _assert_archive_campaign_is_global(blueprint, manifest: Dictionary) -> void:
 	var source_archive := _record_by_id(
 		manifest.get("landmarks", []) as Array,
@@ -2205,32 +2694,36 @@ func _assert_archive_campaign_is_global(blueprint, manifest: Dictionary) -> void
 	)
 	_assert(not source_archive.is_empty(), "Manifest musi publikować flooded_archive.")
 	if not source_archive.is_empty():
-		_assert(_vector(source_archive.get("position", [])) == ARCHIVE_WORLD_POSITION, "flooded_archive musi zachować globalne position [6600,4400].")
-		_assert(_vector(source_archive.get("size", [])) == ARCHIVE_LANDMARK_SIZE, "flooded_archive musi zachować size [960,560].")
-		_assert(not source_archive.has("position_space"), "flooded_archive nie może dziedziczyć przestrzeni neutralnego prototypu.")
-		_assert(not source_archive.has("structure_id"), "flooded_archive nie może wskazywać neutralnego prototypu.")
+		_assert(not source_archive.has("position_space"), "flooded_archive nie może dziedziczyć przestrzeni lokalnej struktury.")
+		_assert(not source_archive.has("structure_id"), "flooded_archive nie może wskazywać lokalnej struktury.")
 	var source_terminal := _record_by_id(
 		(manifest.get("gameplay", {}) as Dictionary).get("fixed_device_spawns", []) as Array,
 		"archive_terminal",
 	)
 	_assert(not source_terminal.is_empty(), "Manifest musi publikować archive_terminal.")
 	if not source_terminal.is_empty():
-		_assert(_vector(source_terminal.get("position", [])) == ARCHIVE_WORLD_POSITION, "archive_terminal musi zachować globalne position [6600,4400].")
 		_assert(not source_terminal.has("position_space"), "Globalny archive_terminal nie może publikować position_space override.")
-		_assert(not source_terminal.has("structure_id"), "archive_terminal nie może wskazywać neutralnego prototypu.")
+		_assert(not source_terminal.has("structure_id"), "archive_terminal nie może wskazywać lokalnej struktury.")
 		_assert(not source_terminal.has("local_position"), "Manifest nie może utrzymywać drugiej lokalnej pozycji archive_terminal.")
 	var compiled_archive: Dictionary = blueprint.get_landmark("flooded_archive")
 	_assert(not compiled_archive.is_empty(), "Blueprint musi zawierać flooded_archive.")
-	if not compiled_archive.is_empty():
-		_assert(_vector(compiled_archive.get("position", [])) == ARCHIVE_WORLD_POSITION, "Blueprint musi zachować globalną pozycję flooded_archive.")
+	if not compiled_archive.is_empty() and not source_archive.is_empty():
+		_assert(
+			_vector(compiled_archive.get("position", [])) == _vector(source_archive.get("position", [])),
+			"Blueprint musi wyprowadzać globalną pozycję flooded_archive z manifestu.",
+		)
 	var compiled_terminal := _record_by_id(blueprint.fixed_device_spawns, "archive_terminal")
 	_assert(not compiled_terminal.is_empty(), "Blueprint musi zawierać archive_terminal.")
 	if compiled_terminal.is_empty():
 		return
 	_assert(str(compiled_terminal.get("position_space", "")) == "world", "Blueprint musi jawnie znormalizować archive_terminal do world.")
-	_assert(str(compiled_terminal.get("structure_id", "")).is_empty(), "Blueprint archive_terminal nie może wskazywać neutralnego prototypu.")
+	_assert(str(compiled_terminal.get("structure_id", "")).is_empty(), "Blueprint archive_terminal nie może wskazywać lokalnej struktury.")
 	_assert(not compiled_terminal.has("local_position"), "Blueprint globalnego archive_terminal nie może tworzyć local_position.")
-	_assert(_vector(compiled_terminal.get("position", [])) == ARCHIVE_WORLD_POSITION, "Blueprint musi zachować globalną pozycję archive_terminal [6600,4400].")
+	if not source_terminal.is_empty():
+		_assert(
+			_vector(compiled_terminal.get("position", [])) == _vector(source_terminal.get("position", [])),
+			"Blueprint musi wyprowadzać globalną pozycję archive_terminal z manifestu.",
+		)
 
 
 func _assert_depth_profile(source_value, compiled: PackedVector2Array) -> void:
@@ -2441,6 +2934,10 @@ func _expected_visual_groups_by_layer(visual: Dictionary) -> Dictionary:
 		if not asset_value is Dictionary:
 			continue
 		var asset := asset_value as Dictionary
+		if str(asset.get("kind", "")) in [
+			"structure_interior_texture", "structure_owner_masked_texture",
+		]:
+			continue
 		var layer_id := str(asset.get("layer_id", ""))
 		var group_id := str(asset.get("group_id", ""))
 		if not result.has(layer_id):
@@ -2536,6 +3033,22 @@ func _assert_typed_asset_node(asset_node: Node, source_asset: Dictionary, owner_
 			% [owner_label, asset_id, layer_id],
 		)
 		_assert(asset_node.get_child_count() == 1, "%s asset %s texture_rect musi mieć tylko child Bitmap." % [owner_label, asset_id])
+		var expected_resource_path := "res://underwater_map_workbench/%s" % str(source_asset.get("path", ""))
+		_assert(
+			str(asset_node.get_meta("residency_contract", "")) == STREAMED_BACKDROP_CONTRACT,
+			"%s asset %s musi publikować kontrakt rezydencji okna kamery."
+			% [owner_label, asset_id],
+		)
+		_assert(
+			str(asset_node.get_meta("resource_path", "")) == expected_resource_path,
+			"%s asset %s musi publikować kanoniczną ścieżkę źródła."
+			% [owner_label, asset_id],
+		)
+		_assert(
+			str(asset_node.get_meta("source_sha256", "")) == str(source_asset.get("sha256", "")),
+			"%s asset %s musi publikować SHA źródła."
+			% [owner_label, asset_id],
+		)
 		var bitmap_node := asset_node.get_node_or_null("Bitmap")
 		_assert(bitmap_node is TextureRect, "%s asset %s na %s musi mieć child Bitmap:TextureRect." % [owner_label, asset_id, layer_id])
 		if bitmap_node is TextureRect:
@@ -2545,19 +3058,25 @@ func _assert_typed_asset_node(asset_node: Node, source_asset: Dictionary, owner_
 				_control_local_rect(texture_rect) == Rect2(Vector2.ZERO, expected_rect.size),
 				"%s bitmapa %s musi zajmować natywny rect elementu." % [owner_label, asset_id],
 			)
-			_assert(texture_rect.texture != null, "%s asset %s musi mieć teksturę." % [owner_label, asset_id])
-			if texture_rect.texture != null:
+			_assert(
+				texture_rect.texture == null,
+				"%s asset %s musi pozostać pustym stubem do czasu selekcji okna kamery."
+				% [owner_label, asset_id],
+			)
+			var source_texture := ResourceLoader.load(
+				expected_resource_path,
+				"Texture2D",
+				ResourceLoader.CACHE_MODE_IGNORE,
+			) as Texture2D
+			_assert(source_texture != null, "%s źródło assetu %s musi być poprawną teksturą." % [owner_label, asset_id])
+			if source_texture != null:
 				_assert(
-					expected_rect.size == texture_rect.texture.get_size(),
-					"%s asset %s na %s musi mapować bitmapę natywnie 1 piksel = 1 jednostka świata."
-					% [owner_label, asset_id, layer_id],
+					expected_rect.size == source_texture.get_size()
+					and source_texture.get_size() == _vector(source_asset.get("pixel_size", [])),
+					"%s źródło assetu %s musi zachować natywne mapowanie 1:1."
+					% [owner_label, asset_id],
 				)
-				_assert(
-					texture_rect.texture.get_size() == _vector(source_asset.get("pixel_size", [])),
-					"%s asset %s na %s musi zachować pixel_size źródła."
-					% [owner_label, asset_id, layer_id],
-				)
-				_assert_backdrop_alpha_contract(texture_rect.texture, asset_id, owner_label)
+				_assert_backdrop_alpha_contract(source_texture, asset_id, owner_label)
 	elif kind == COMPOSITION_PROXY_KIND:
 		_assert(layer_id in NONBLOCKING_TEXTURE_LAYER_IDS, "%s proxy %s może należeć tylko do L01 albo L02." % [owner_label, asset_id])
 		_assert(str(source_asset.get("path", "")).is_empty(), "%s proxy %s nie może mieć path." % [owner_label, asset_id])
@@ -2609,9 +3128,17 @@ func _assert_typed_asset_node(asset_node: Node, source_asset: Dictionary, owner_
 			return
 		var topology_mask := material.get_shader_parameter("topology_mask") as Texture2D
 		var ground_texture := material.get_shader_parameter("ground_texture") as Texture2D
+		var surface_detail_mask := material.get_shader_parameter("surface_detail_mask") as Texture2D
 		var texture_tiling_value: Variant = material.get_shader_parameter("texture_tiling")
 		_assert(topology_mask != null, "%s asset %s musi używać wygenerowanej maski L05." % [owner_label, asset_id])
 		_assert(ground_texture != null, "%s asset %s musi używać materiału gruntu." % [owner_label, asset_id])
+		_assert(
+			surface_detail_mask != null
+			and surface_detail_mask.resource_path == L05_SURFACE_DETAIL_MASK_PATH
+			and surface_detail_mask.get_size() == Vector2(L05_PIXEL_SIZE),
+			"%s asset %s musi używać kanonicznej maski detalu L05."
+			% [owner_label, asset_id],
+		)
 		if topology_mask != null:
 			_assert(topology_mask.get_size() == Vector2(L05_PIXEL_SIZE), "%s maska assetu %s musi mieć 576 x 324." % [owner_label, asset_id])
 		if ground_texture != null:
@@ -2819,24 +3346,6 @@ func _all_parallax_nodes(visual_layers: Node2D) -> Array[Parallax2D]:
 	return result
 
 
-func _assert_root_integration_remains_loadable() -> void:
-	var diver_scene := ResourceLoader.load("res://scenes/diving/Diver.tscn") as PackedScene
-	_assert(diver_scene != null, "Rootowa scena nurka musi nadal się ładować.")
-	if diver_scene != null:
-		var diver := diver_scene.instantiate()
-		_assert(diver.get_node_or_null("Camera2D") != null, "Scena nurka musi zachować kamerę.")
-		diver.free()
-	var dive_scene := ResourceLoader.load("res://scenes/diving/DiveScene.tscn") as PackedScene
-	_assert(dive_scene != null, "Rootowy DiveScene musi nadal ładować integrację nurkowania.")
-	if dive_scene != null:
-		var dive_root := dive_scene.instantiate()
-		var world_node := dive_root.get_node_or_null("World")
-		_assert(world_node != null and dive_root.get_node_or_null("Diver") != null, "DiveScene musi zachować World i Diver.")
-		if world_node != null:
-			_assert(world_node.get_script() == LocalRuntimeScript, "DiveScene.World musi używać lokalnego UnderwaterMapRuntime.")
-		dive_root.free()
-
-
 func _valid_visual_group_id(value: String) -> bool:
 	if value.is_empty() or not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".contains(value.left(1)):
 		return false
@@ -2987,6 +3496,19 @@ func _vector_is_grid_aligned(value: Vector2, grid_step: Vector2) -> bool:
 	)
 
 
+func _load_json_resource(resource_path: String, label: String) -> Dictionary:
+	_assert(FileAccess.file_exists(resource_path), "%s nie istnieje: %s." % [label, resource_path])
+	if not FileAccess.file_exists(resource_path):
+		return {}
+	var file := FileAccess.open(resource_path, FileAccess.READ)
+	_assert(file != null, "Nie można otworzyć %s: %s." % [label, resource_path])
+	if file == null:
+		return {}
+	var parsed = JSON.parse_string(file.get_as_text())
+	_assert(parsed is Dictionary, "%s musi być obiektem JSON." % label)
+	return parsed as Dictionary if parsed is Dictionary else {}
+
+
 func _vector(value) -> Vector2:
 	if value is Vector2:
 		return value as Vector2
@@ -3018,5 +3540,5 @@ func _finish() -> void:
 	if _failed:
 		quit(1)
 		return
-	print("Underwater map smoke test passed: schema-v5 structures, partitioned L05 collision, generated scene, blueprint and local runtime parity.")
+	print("Underwater map smoke test passed: schema-v6 package registry, partitioned L05 collision, generated package scenes, blueprint and local runtime parity.")
 	quit(0)

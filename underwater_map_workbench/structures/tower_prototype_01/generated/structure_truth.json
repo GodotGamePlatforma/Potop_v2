@@ -1,0 +1,776 @@
+{
+  "authority": false,
+  "controller_script": "res://underwater_map_workbench/structures/tower_prototype_01/runtime/DiveEnterableTowerController.gd",
+  "generated": true,
+  "local_topology_digest": "structure-topology-v1:35cec4f902213c0e5260db83ced132ae2a9a3a603d8fc1fb836ce09508ee7dc2",
+  "mapping": {
+    "local_origin": [
+      0,
+      0
+    ],
+    "pixel_reference": "pixel_edge",
+    "rounding": "floor",
+    "source_world_units_per_pixel": [
+      40,
+      40
+    ],
+    "world_units_per_pixel": [
+      1,
+      1
+    ],
+    "x_axis": "right",
+    "y_axis": "down"
+  },
+  "native_artifacts": {
+    "boundary_mask_native": {
+      "path": "structures/tower_prototype_01/generated/boundary_mask_native.png",
+      "sha256": "4d244259ef162ee9437b97ac8826c12e99a8d35af05eb6add5925f42d8052353"
+    },
+    "guide_native": {
+      "path": "structures/tower_prototype_01/generated/guide_native.png",
+      "sha256": "e3aeca3d5509a983608a9217f2a5b9d517b4dc412197408c9ff57b7ee08c6811"
+    },
+    "open_water_mask_native": {
+      "path": "structures/tower_prototype_01/generated/open_water_mask_native.png",
+      "sha256": "c1e1f744629c6a27dcc6c305a8bdbda15ed9be5a417796d459d831ea955b06c0"
+    },
+    "solid_mask_native": {
+      "path": "structures/tower_prototype_01/generated/solid_mask_native.png",
+      "sha256": "432f24645362defc1e3c2c01ad4d239628c753c673c20f301503b23ccdb72d84"
+    },
+    "surface_detail_mask_local": {
+      "path": "structures/tower_prototype_01/generated/surface_detail_mask_local.png",
+      "sha256": "2115bbeb0fcea23f3ed21a32a98bd82dee013650564b0c08940e34ddc8a6f88c"
+    }
+  },
+  "package_manifest_path": "structures/tower_prototype_01/structure_manifest.json",
+  "package_manifest_sha256": "f1e37a8f99502e9743ae3e26406fa7e6aab806b5a64f2d6b04317d42cc5cc626",
+  "panels": [
+    {
+      "id": "panel_0_0_2240_3680",
+      "local_rect": [
+        0,
+        0,
+        2240,
+        3680
+      ],
+      "path": "structures/tower_prototype_01/generated/panels/panel_0_0_2240_3680.json",
+      "sha256": "921e54a0cefe1d579ecfb4835d3eb3d2a128ea4ffc6778d3ea4bfb3da9083deb"
+    }
+  ],
+  "runtime": {
+    "barrier_groups": [
+      {
+        "id": "red_route",
+        "members": [
+          {
+            "open_offset": [
+              0,
+              -160
+            ],
+            "socket_id": "gate_red_west"
+          },
+          {
+            "open_offset": [
+              0,
+              -160
+            ],
+            "socket_id": "gate_red_east"
+          }
+        ],
+        "travel_speed": 320
+      },
+      {
+        "id": "blue_route",
+        "members": [
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "gate_blue_upper"
+          },
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "gate_blue_lower"
+          }
+        ],
+        "travel_speed": 320
+      },
+      {
+        "id": "yellow_route",
+        "members": [
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "gate_yellow"
+          }
+        ],
+        "travel_speed": 320
+      },
+      {
+        "id": "shortcut_b",
+        "members": [
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "shortcut_b_upper"
+          },
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "shortcut_b_lower"
+          }
+        ],
+        "travel_speed": 320
+      },
+      {
+        "id": "shortcut_c",
+        "members": [
+          {
+            "open_offset": [
+              160,
+              0
+            ],
+            "socket_id": "shortcut_c_upper"
+          },
+          {
+            "open_offset": [
+              160,
+              0
+            ],
+            "socket_id": "shortcut_c_middle"
+          },
+          {
+            "open_offset": [
+              160,
+              0
+            ],
+            "socket_id": "shortcut_c_lower"
+          }
+        ],
+        "travel_speed": 320
+      },
+      {
+        "id": "hatch_d",
+        "members": [
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "hatch_d"
+          }
+        ],
+        "travel_speed": 320
+      },
+      {
+        "id": "hatch_basement",
+        "members": [
+          {
+            "open_offset": [
+              -160,
+              0
+            ],
+            "socket_id": "hatch_basement"
+          }
+        ],
+        "travel_speed": 320
+      }
+    ],
+    "contract": "enterable_tower_sequence_v3",
+    "elevator": {
+      "cabin_size": [
+        464,
+        200
+      ],
+      "id": "elevator_main",
+      "initial_stop_id": "floor_12",
+      "socket_id": "elevator_upper_travel",
+      "stops": [
+        {
+          "id": "floor_12",
+          "local_center": [
+            1280,
+            180
+          ]
+        },
+        {
+          "id": "floor_7",
+          "local_center": [
+            1280,
+            1580
+          ]
+        }
+      ],
+      "travel_speed": 240
+    },
+    "interactives": [
+      {
+        "display_name": "Rozdzielnia A",
+        "id": "a_distributor",
+        "interaction_action": "activate",
+        "interaction_seconds": 1.0,
+        "kind": "power_distributor",
+        "power_logic": {
+          "circuits": {
+            "blue": {
+              "barrier_group_id": "blue_route",
+              "positions": [
+                "up",
+                "down",
+                "up"
+              ],
+              "symbol": "triangle"
+            },
+            "red": {
+              "barrier_group_id": "red_route",
+              "positions": [
+                "down",
+                "down",
+                "down"
+              ],
+              "symbol": "circle"
+            },
+            "yellow": {
+              "barrier_group_id": "yellow_route",
+              "positions": [
+                "down",
+                "up",
+                "up"
+              ],
+              "symbol": "square"
+            }
+          },
+          "clues": {
+            "blue": "WÓZEK TECHNICZNY: tylko gałąź środkowa domyka tor serwisowy.",
+            "red": "OBWÓD AWARYJNY: pozycja dolna domyka gałąź; wymagane są trzy domknięte gałęzie.",
+            "yellow": "INSTALACJA CIŚNIENIOWA: jedna gałąź pozostaje domknięta; środkowa jest zajęta, prawa odcięta."
+          },
+          "contract": "three_lever_deduction_v2",
+          "diagnostics": {
+            "all_branches_open": {
+              "message": "PRZERWA: żadna gałąź nie domyka obwodu.",
+              "positions": [
+                "up",
+                "up",
+                "up"
+              ]
+            },
+            "left_middle_crossfeed": {
+              "message": "SPRZĘŻENIE: gałęzie lewa i środkowa zwierają tor sterujący.",
+              "positions": [
+                "down",
+                "down",
+                "up"
+              ]
+            },
+            "middle_right_overload": {
+              "message": "PRZECIĄŻENIE: gałęzie środkowa i prawa obciążają wspólną szynę.",
+              "positions": [
+                "up",
+                "down",
+                "down"
+              ]
+            },
+            "right_branch_unterminated": {
+              "message": "PRAWA GAŁĄŹ: brak dostępnego odbiornika.",
+              "positions": [
+                "up",
+                "up",
+                "down"
+              ]
+            },
+            "split_outer_feed": {
+              "message": "ROZDZIAŁ ZASILANIA: dwie skrajne gałęzie tworzą nieciągły tor.",
+              "positions": [
+                "down",
+                "up",
+                "down"
+              ]
+            }
+          },
+          "evaluation": "on_toggle",
+          "levers": [
+            {
+              "display_name": "Dźwignia A1",
+              "id": "a_lever_1",
+              "initial_position": "up",
+              "local_rect": [
+                1776,
+                720,
+                72,
+                72
+              ]
+            },
+            {
+              "display_name": "Dźwignia A2",
+              "id": "a_lever_2",
+              "initial_position": "up",
+              "local_rect": [
+                1884,
+                720,
+                72,
+                72
+              ]
+            },
+            {
+              "display_name": "Dźwignia A3",
+              "id": "a_lever_3",
+              "initial_position": "up",
+              "local_rect": [
+                1992,
+                720,
+                72,
+                72
+              ]
+            }
+          ]
+        },
+        "socket_id": "control_a_distributor"
+      },
+      {
+        "display_name": "Przekaźnik RED B",
+        "id": "b_red_relay",
+        "interaction_action": "latch",
+        "interaction_seconds": 1.0,
+        "kind": "red_relay",
+        "socket_id": "control_b_red_relay",
+        "visual_role": "red_relay_bank"
+      },
+      {
+        "display_name": "Blokada BLUE C",
+        "id": "c_blue_lock",
+        "interaction_action": "lock",
+        "interaction_seconds": 1.0,
+        "kind": "blue_lock",
+        "socket_id": "control_c_blue_lock",
+        "visual_role": "trolley_interlock"
+      },
+      {
+        "display_name": "Wyrównanie ciśnienia",
+        "id": "d_valve_v1",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "kind": "d_valve",
+        "socket_id": "control_d_valve_v1",
+        "step": 1,
+        "visual_role": "pressure_equalization"
+      },
+      {
+        "display_name": "Zasilenie siłownika",
+        "id": "d_valve_v2",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "kind": "d_valve",
+        "socket_id": "control_d_valve_v2",
+        "step": 2,
+        "visual_role": "actuator_power"
+      },
+      {
+        "display_name": "Zwolnienie rygla",
+        "id": "d_valve_v3",
+        "interaction_action": "turn",
+        "interaction_seconds": 0.8,
+        "kind": "d_valve",
+        "socket_id": "control_d_valve_v3",
+        "step": 3,
+        "visual_role": "bolt_release"
+      },
+      {
+        "display_name": "Reset układu D",
+        "id": "d_reset",
+        "interaction_action": "reset",
+        "interaction_seconds": 0.8,
+        "kind": "d_reset",
+        "socket_id": "control_d_reset",
+        "visual_role": "d_reset_guard"
+      },
+      {
+        "display_name": "Sterowanie wejścia do Archiwum",
+        "id": "basement_hatch_control",
+        "interaction_action": "open",
+        "interaction_seconds": 1.0,
+        "kind": "basement_hatch_control",
+        "socket_id": "control_basement_hatch",
+        "visual_role": "archive_access"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "size": [
+    2240,
+    3680
+  ],
+  "socket_cards": [
+    {
+      "id": "entry_floor_12_broken_window",
+      "kind": "entry_opening",
+      "path": "structures/tower_prototype_01/generated/socket_cards/entry_floor_12_broken_window.json",
+      "sha256": "179dc3531dd99ac1167dd99742da0e105b887b6abfef682f31386c3323467fef"
+    },
+    {
+      "id": "elevator_upper_travel",
+      "kind": "moving_elevator",
+      "path": "structures/tower_prototype_01/generated/socket_cards/elevator_upper_travel.json",
+      "sha256": "1be9b7e31e86374619acf11e892a83a9abb42b0cbb3da0b70f3d49144c7445dc"
+    },
+    {
+      "id": "gate_red_west",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_west.json",
+      "sha256": "1b0ccc5953582ffe3f360dfac65ceaebcf66eccb23ed5f8d9d848276b713899c"
+    },
+    {
+      "id": "gate_red_east",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_east.json",
+      "sha256": "8fb82e0c772e63c9bb018f050f50af0740ce0ed995113a112d73a899db90609e"
+    },
+    {
+      "id": "gate_blue_upper",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_upper.json",
+      "sha256": "6ca1c7d6c90a2fd574ac9922053fc589f6d1cbe55b98d4b23f8aef97c93ba861"
+    },
+    {
+      "id": "gate_blue_lower",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_lower.json",
+      "sha256": "1b493a2eea191eb6273f98b693550396dbfbdd28e9f5fa1f61c35a42a90a352c"
+    },
+    {
+      "id": "gate_yellow",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/gate_yellow.json",
+      "sha256": "031ce22df22839bb8798e1e7dd4e36e3da58d579da77e106289a374975d5aa25"
+    },
+    {
+      "id": "hatch_d",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/hatch_d.json",
+      "sha256": "5ad3f0cf4ad27e4db90a74ee42a33288415ed7fb74e2e0d83792fcf52e81653d"
+    },
+    {
+      "id": "shortcut_b_upper",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_upper.json",
+      "sha256": "2af077a6c093abcf32bc0f6267b3d8c7e7d1110415e6862032b77ec2f6abd5fb"
+    },
+    {
+      "id": "shortcut_b_lower",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_lower.json",
+      "sha256": "eba6f4fd6809d725017222ee5a412d8f603668c8b36eb2fcb0d3d53f98199f40"
+    },
+    {
+      "id": "shortcut_c_upper",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_upper.json",
+      "sha256": "553d3bded6302f9cf63bb0a4d05e793fa026352e7f938704fe2473a97afdfac3"
+    },
+    {
+      "id": "shortcut_c_middle",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_middle.json",
+      "sha256": "f9a7c2843685fed7019d8ea9d78cea0bf0de50a77734cd5f5bca86e46222e32e"
+    },
+    {
+      "id": "shortcut_c_lower",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_lower.json",
+      "sha256": "fc95d011274c2dc215a589d1b79001c9786eb932f090670858f31cb3e7555645"
+    },
+    {
+      "id": "hatch_basement",
+      "kind": "dynamic_door",
+      "path": "structures/tower_prototype_01/generated/socket_cards/hatch_basement.json",
+      "sha256": "f23524d23e88b93847665a05e764dc0ba0e0491476b6305faaff99f5a2da0d59"
+    },
+    {
+      "id": "control_a_distributor",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_a_distributor.json",
+      "sha256": "7fe96b335c236999d583d63ae806c85ef616f16731b435d54d233d1314ff7d32"
+    },
+    {
+      "id": "control_b_red_relay",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_b_red_relay.json",
+      "sha256": "1403e47b23102378f0c037c5d1aa7fc82329ae895a731415382b3654c8ba149a"
+    },
+    {
+      "id": "control_c_blue_lock",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_c_blue_lock.json",
+      "sha256": "7134650b94397da165f0e5eaf6a99fa293f764f81a8a6de842730c822df64883"
+    },
+    {
+      "id": "control_d_valve_v1",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v1.json",
+      "sha256": "7b185f97267bd411dfae5a455961759e905ad7be5a88787d688a7121d4ed8048"
+    },
+    {
+      "id": "control_d_valve_v2",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v2.json",
+      "sha256": "b5a4b7d706d160685fdeac913fce1545e263aeb1f90441960c7c26bc3c18e934"
+    },
+    {
+      "id": "control_d_valve_v3",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v3.json",
+      "sha256": "d74cf44baa248aff6f6577d1190aee1a63234d53b4aa5926ef1465731055b09a"
+    },
+    {
+      "id": "control_d_reset",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_d_reset.json",
+      "sha256": "ab35d30d5a68fa1186246db00a340c395de074d11c5eed22abd5870eb5dd348b"
+    },
+    {
+      "id": "control_basement_hatch",
+      "kind": "fixed_interactable",
+      "path": "structures/tower_prototype_01/generated/socket_cards/control_basement_hatch.json",
+      "sha256": "9ec3fd2a14d897e723a5674fe262afc4dfa08aef55ed9971568b36e973b5b079"
+    }
+  ],
+  "sockets": [
+    {
+      "id": "entry_floor_12_broken_window",
+      "kind": "entry_opening",
+      "local_rect": [
+        0,
+        80,
+        80,
+        160
+      ]
+    },
+    {
+      "id": "elevator_upper_travel",
+      "kind": "moving_elevator",
+      "local_rect": [
+        1040,
+        80,
+        480,
+        1600
+      ]
+    },
+    {
+      "id": "gate_red_west",
+      "kind": "dynamic_door",
+      "local_rect": [
+        960,
+        960,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "gate_red_east",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1520,
+        960,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "gate_blue_upper",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1680,
+        840,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "gate_blue_lower",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1680,
+        1120,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "gate_yellow",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        1680,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "hatch_d",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        2240,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_b_upper",
+      "kind": "dynamic_door",
+      "local_rect": [
+        160,
+        840,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_b_lower",
+      "kind": "dynamic_door",
+      "local_rect": [
+        160,
+        1120,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_c_upper",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        840,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_c_middle",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        1120,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "shortcut_c_lower",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1920,
+        1400,
+        160,
+        80
+      ]
+    },
+    {
+      "id": "hatch_basement",
+      "kind": "dynamic_door",
+      "local_rect": [
+        1200,
+        3320,
+        160,
+        120
+      ]
+    },
+    {
+      "id": "control_a_distributor",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1760,
+        680,
+        320,
+        120
+      ]
+    },
+    {
+      "id": "control_b_red_relay",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        160,
+        1240,
+        320,
+        120
+      ]
+    },
+    {
+      "id": "control_c_blue_lock",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1720,
+        1520,
+        320,
+        120
+      ]
+    },
+    {
+      "id": "control_d_valve_v1",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1640,
+        2040,
+        120,
+        120
+      ]
+    },
+    {
+      "id": "control_d_valve_v2",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1800,
+        2040,
+        120,
+        120
+      ]
+    },
+    {
+      "id": "control_d_valve_v3",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1960,
+        2040,
+        120,
+        120
+      ]
+    },
+    {
+      "id": "control_d_reset",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1640,
+        2160,
+        240,
+        80
+      ]
+    },
+    {
+      "id": "control_basement_hatch",
+      "kind": "fixed_interactable",
+      "local_rect": [
+        1360,
+        3200,
+        240,
+        120
+      ]
+    }
+  ],
+  "structure_id": "tower_prototype_01",
+  "template_id": "enterable_tower_v1",
+  "visual_asset_ids": [
+    "tower_prototype_01_interior",
+    "tower_prototype_01_structure"
+  ]
+}

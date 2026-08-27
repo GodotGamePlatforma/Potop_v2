@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="DiverFrameEnvelopeProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://diver_workbench/definitions/DiverFrameEnvelopeProfile.gd" id="1_envelope_profile"]
+
+[resource]
+script = ExtResource("1_envelope_profile")
+target_size = Vector2(70, 40)
+authored_sprite_scale = Vector2(0.16, 0.16)
+authored_sprite_position = Vector2(3.68, -2.16)

@@ -43,7 +43,7 @@ const TUTORIAL_CABLE_BLOCKAGE_SEEN_DISTANCE := 200.0
 @onready var dive_map: ContinuousDiveWorld = $World
 @onready var diver: DiverController = $Diver
 @onready var ambient_darkness: CanvasModulate = $UnderwaterDarkness
-@onready var diver_light: PointLight2D = $Diver/DiveLight
+@onready var diver_light: PointLight2D = diver.light_source()
 
 var game_root: Node
 var game_state
@@ -70,6 +70,7 @@ var _travelled_distance: float = 0.0
 var _tutorial_step_time: float = 0.0
 var _interaction_target
 var _interaction_progress: float = 0.0
+var _interaction_blocked_until_release: bool = false
 var _quiet_repair_progress: float = 0.0
 var _quiet_repair_blocked_until_release: bool = false
 var _scout_signal: Dictionary = {}
@@ -166,9 +167,8 @@ func has_cancelable_overlay_open() -> bool:
 
 func set_graphics_quality(quality_id: String) -> void:
 	_graphics_quality = quality_id if quality_id in ["low", "medium", "high"] else "high"
-	var visual_effects := diver.get_node_or_null("VisualEffects") if diver != null else null
-	if visual_effects != null and visual_effects.has_method("set_graphics_quality"):
-		visual_effects.set_graphics_quality(_graphics_quality)
+	if diver != null:
+		diver.set_graphics_quality(_graphics_quality)
 	if _underwater_environment != null:
 		_underwater_environment.set_graphics_quality(_graphics_quality)
 	if dive_map != null and dive_map.has_method("set_graphics_quality"):
@@ -180,11 +180,8 @@ func set_graphics_quality(quality_id: String) -> void:
 
 func set_reduced_motion(enabled: bool) -> void:
 	_reduced_motion = enabled
-	if diver != null and diver.has_method("set_reduced_motion"):
+	if diver != null:
 		diver.set_reduced_motion(enabled)
-	var visual_effects := diver.get_node_or_null("VisualEffects") if diver != null else null
-	if visual_effects != null and visual_effects.has_method("set_reduced_motion"):
-		visual_effects.set_reduced_motion(enabled)
 	if _underwater_environment != null:
 		_underwater_environment.set_reduced_motion(enabled)
 	if dive_map != null and dive_map.has_method("set_reduced_motion"):
@@ -199,16 +196,10 @@ func seed_user_settings_before_ready(quality_id: String, reduced_motion: bool) -
 	var seeded_diver := get_node_or_null("Diver") as DiverController
 	if seeded_diver == null:
 		return
-	seeded_diver.set_reduced_motion(_reduced_motion)
-	var visual_effects := seeded_diver.get_node_or_null("VisualEffects")
-	if visual_effects != null:
-		if visual_effects.has_method("set_graphics_quality"):
-			visual_effects.set_graphics_quality(_graphics_quality)
-		if visual_effects.has_method("set_reduced_motion"):
-			visual_effects.set_reduced_motion(_reduced_motion)
+	seeded_diver.seed_presentation_settings_before_ready(_graphics_quality, _reduced_motion)
 
 func _ready() -> void:
-	diver.input_enabled = false
+	diver.set_input_enabled(false)
 	diver.distance_travelled.connect(_on_distance_travelled)
 	diver.surface_contacts_reported.connect(_on_diver_surface_contacts_reported)
 	_build_current_visual()
@@ -243,16 +234,15 @@ func _process(delta: float) -> void:
 		elif not _attempt_failed and not _loot_panel.visible and not _rescue_overlay.visible and not _disease_hazard_overlay.visible:
 			_open_inventory()
 	if _attempt_failed or _loot_panel.visible or _inventory_panel.visible or _rescue_overlay.visible or _disease_hazard_overlay.visible:
-		diver.input_enabled = false
-		diver.current_velocity = Vector2.ZERO
-		diver.velocity = Vector2.ZERO
+		diver.set_input_enabled(false)
+		diver.stop_motion()
 		_cancel_talent_actions()
 		_clear_interaction_target_presentation()
 		_sync_diver_visual_context(true)
 		_update_ui()
 		return
 
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	session.elapsed_time += delta
 	_tutorial_step_time += delta
 	if _status_message_time > 0.0:
@@ -266,14 +256,14 @@ func _process(delta: float) -> void:
 	_handle_combat_input()
 
 	var current := _active_current_vector
-	diver.current_velocity = current
+	diver.set_world_current(current)
 	var landmark_id: String = dive_map.landmark_id_at(diver.global_position)
 	if not landmark_id.is_empty() and not _discovered_landmarks_this_dive.has(landmark_id):
 		_discovered_landmarks_this_dive.append(landmark_id)
-	var is_moving := diver.movement_input.length_squared() > 0.01
+	var is_moving := diver.has_movement_input()
 	var rate := _oxygen_system.consumption_rate(
 		is_moving,
-		diver.is_sprinting,
+		diver.is_sprint_active(),
 		session.carry_ratio(),
 		current.length_squared() > 0.01,
 		CompetencySystem.load_oxygen_surcharge_multiplier(setup)
@@ -292,11 +282,11 @@ func _process(delta: float) -> void:
 		dive_map.threats,
 		diver.global_position,
 		dive_map.depth_at(diver.global_position),
-		diver.is_sprinting,
+		diver.is_sprint_active(),
 		delta,
 		_is_diver_light_active()
 	)
-	diver.movement_speed_multiplier = float(risk_update.get("movement_multiplier", 1.0)) * _rescue_system.movement_multiplier(session, rescue_definition) * CompetencySystem.swimming_multiplier(setup)
+	diver.set_movement_speed_multiplier(float(risk_update.get("movement_multiplier", 1.0)) * _rescue_system.movement_multiplier(session, rescue_definition) * CompetencySystem.swimming_multiplier(setup))
 	_risk_warning = str(risk_update.get("warning", ""))
 	for message in risk_update.get("messages", []):
 		_show_status(str(message), 3.2)
@@ -327,6 +317,7 @@ func _start_attempt(is_retry: bool) -> void:
 	_travelled_distance = 0.0
 	_tutorial_step_time = 0.0
 	_set_interaction_target(null)
+	_interaction_blocked_until_release = false
 	_quiet_repair_progress = 0.0
 	_quiet_repair_blocked_until_release = false
 	_scout_runtime.reset()
@@ -347,16 +338,12 @@ func _start_attempt(is_retry: bool) -> void:
 	if not starting_landmark.is_empty():
 		_discovered_landmarks_this_dive.append(starting_landmark)
 	diver.reset_at(dive_map.start_position())
-	var camera := diver.get_node_or_null("Camera2D") as Camera2D
-	if camera != null:
-		camera.limit_right = int(dive_map.world_size().x)
-		camera.limit_bottom = int(dive_map.world_size().y)
-		camera.reset_smoothing()
+	diver.configure_camera_world_bounds(dive_map.world_size())
 	dive_map.update_streaming(dive_map.start_position(), true, _streaming_visible_half_extent())
 	_update_current_presentation(0.0, true)
 	_apply_diver_light_state()
 	_update_environment_lighting(0.0)
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	_pending_finish_result = null
 	_failure_overlay.visible = false
 	if _failure_title != null:
@@ -477,6 +464,11 @@ func _difficulty_modifier(modifier_id: String, fallback: float = 1.0) -> float:
 	return maxf(float(setup.difficulty_modifiers.get(modifier_id, fallback)), 0.0)
 
 func _update_interaction(delta: float) -> void:
+	if _interaction_blocked_until_release:
+		if Input.is_action_pressed("dive_interact"):
+			_set_interaction_target(null)
+			return
+		_interaction_blocked_until_release = false
 	var nearest = dive_map.get_nearest_interactable(diver.global_position, INTERACTION_DISTANCE)
 	if _rescue_system.is_towing(session):
 		nearest = dive_map.exit_line if diver.global_position.distance_to(dive_map.exit_line.global_position) <= INTERACTION_DISTANCE else null
@@ -504,6 +496,7 @@ func _update_interaction(delta: float) -> void:
 		if _interaction_progress >= required:
 			var completed_target = _interaction_target
 			_set_interaction_target(null)
+			_interaction_blocked_until_release = true
 			_complete_interaction(completed_target)
 	else:
 		_interaction_progress = 0.0
@@ -539,6 +532,8 @@ func _complete_interaction(target) -> void:
 		_open_container(target)
 	elif target is DivePersistentInteractable:
 		_complete_persistent_interaction(target)
+	elif _is_attempt_local_interactable(target):
+		_complete_structure_interaction(target)
 	elif target is DiveRescueSurvivor:
 		_complete_rescue_interaction(target)
 	elif target is DiveExitLine:
@@ -555,6 +550,27 @@ func _collect_world_pickup(pickup: DiveWorldPickup) -> void:
 	pickup.mark_collected()
 	diver.play_visual_cue(&"interaction", pickup.global_position, 0.72)
 	_show_status("Zebrano: +1 %s (%.1f kg)." % [pickup.display_name, session.get_unit_weight(pickup.resource_id)], 2.2)
+	_update_ui()
+
+
+func _complete_structure_interaction(target) -> void:
+	if target == null:
+		return
+	var result: Dictionary = target.complete_dive_interaction()
+	var success := bool(result.get("success", false))
+	var message := str(result.get("message", "Sterowanie nie odpowiedziało."))
+	if success:
+		_risk_runtime.emit_action_noise(
+			session,
+			setup,
+			str(result.get("interaction_action", "activate")),
+			diver.global_position
+		)
+		diver.play_visual_cue(&"interaction", target.global_position)
+		_show_status(message, 3.0)
+	else:
+		diver.play_visual_cue(&"interaction", target.global_position, 0.5)
+		_show_status(message, 2.2)
 	_update_ui()
 
 func _complete_rescue_interaction(target: DiveRescueSurvivor) -> void:
@@ -596,7 +612,7 @@ func _begin_pending_rescue(stabilized: bool) -> void:
 	_rescue_system.attach_tow_target(_towed_rescue_node, diver)
 	_pending_rescue = null
 	_rescue_overlay.visible = false
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	_sync_diver_visual_context()
 	diver.play_visual_cue(&"interaction", _towed_rescue_node.global_position if _towed_rescue_node != null else diver.global_position)
 	_show_status(str(result.get("message", "Rozpoczęto holowanie.")), 4.0)
@@ -605,7 +621,7 @@ func _begin_pending_rescue(stabilized: bool) -> void:
 func _leave_pending_rescue() -> void:
 	_pending_rescue = null
 	_rescue_overlay.visible = false
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	_show_status("Ocalały czeka. Możesz wrócić z lekami albo podjąć ryzykowne holowanie.", 3.0)
 	_update_ui()
 
@@ -640,17 +656,32 @@ func _complete_persistent_interaction(target: DivePersistentInteractable) -> voi
 				session.marked_heavy_objects.append(target.persistent_id)
 			_show_status("Obiekt oznaczony. Obsadzony Warsztat III może go wydobyć po powrocie.", 3.2)
 		DivePersistentInteractable.Kind.FIXED_DEVICE:
-			if not session.activated_fixed_devices.has(target.persistent_id):
-				session.activated_fixed_devices.append(target.persistent_id)
-			if setup.tutorial_mode and target.persistent_id == "junction_j7":
+			if not _record_fixed_device_completion(target):
+				_show_status("Urządzenie nie może otworzyć powiązanego skrótu.", 3.0)
+				return
+			if setup != null and setup.tutorial_mode and target.persistent_id == "junction_j7":
 				_tutorial_event(TutorialDirectorScript.JUNCTION_J7_ACTIVATED)
 			if target.persistent_id == "archive_terminal":
-				_show_status("Terminal Archiwum działa. Mapa Wspólnej Linii zostanie przesłana do Przystani po bezpiecznym powrocie.", 4.2)
+				if target.unlocks_shortcut_id.is_empty():
+					_show_status("Terminal Archiwum działa. Mapa Wspólnej Linii zostanie przesłana do Przystani po bezpiecznym powrocie.", 4.2)
+				else:
+					_show_status("Terminal Archiwum działa, a skrót do oceanu jest otwarty. Oba skutki zostaną zapisane po bezpiecznym powrocie.", 4.4)
 			else:
 				_show_status("Urządzenie %s uruchomione. Zmiana zostanie zachowana po nurkowaniu." % target.display_name, 3.2)
 	_risk_runtime.emit_action_noise(session, setup, target.interaction_action, diver.global_position)
 	target.mark_completed()
 	diver.play_visual_cue(&"interaction", target.global_position)
+
+
+func _record_fixed_device_completion(target: DivePersistentInteractable) -> bool:
+	if target == null:
+		return false
+	return _persistence_system.record_fixed_device_completion_for_attempt(
+		session,
+		dive_map,
+		target.persistent_id,
+		target.unlocks_shortcut_id,
+	)
 
 func _open_container(container: DiveLootContainer) -> void:
 	if (
@@ -666,9 +697,8 @@ func _open_container(container: DiveLootContainer) -> void:
 
 func _open_container_loot(container: DiveLootContainer) -> void:
 	_risk_runtime.emit_action_noise(session, setup, container.interaction_action, diver.global_position)
-	diver.input_enabled = false
-	diver.current_velocity = Vector2.ZERO
-	diver.velocity = Vector2.ZERO
+	diver.set_input_enabled(false)
+	diver.stop_motion()
 	container.set_opened(true)
 	diver.play_visual_cue(&"interaction", container.global_position, 0.86)
 	_pending_container = container
@@ -683,9 +713,8 @@ func _present_disease_hazard(container: DiveDiseaseHazardContainer) -> void:
 	if container == null or _disease_hazard_overlay == null:
 		return
 	_pending_disease_hazard = container
-	diver.input_enabled = false
-	diver.current_velocity = Vector2.ZERO
-	diver.velocity = Vector2.ZERO
+	diver.set_input_enabled(false)
+	diver.stop_motion()
 	var disease_definition = GameDatabase.diseases.get(container.disease_id) if GameDatabase != null else null
 	var disease_name := (
 		str(disease_definition.display_name)
@@ -729,7 +758,7 @@ func _decline_pending_disease_hazard() -> void:
 	if _disease_hazard_overlay != null:
 		_disease_hazard_overlay.visible = false
 	if diver != null:
-		diver.input_enabled = true
+		diver.set_input_enabled(true)
 	_show_status("Pozostawiono skażony magazyn bez zmian.", 2.2)
 	_update_ui()
 
@@ -850,7 +879,7 @@ func _finish_pending_loot_interaction() -> void:
 	_pending_container = null
 	_pending_container_changed = false
 	_loot_panel.dismiss()
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	if setup.tutorial_mode and mandatory_order == 1:
 		_maybe_complete_tutorial_loot()
 	elif setup.tutorial_mode and mandatory_order < 0:
@@ -874,18 +903,18 @@ func _leave_pending_loot() -> void:
 	_pending_container = null
 	_pending_container_changed = false
 	_loot_panel.dismiss()
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	_update_ui()
 
 func _open_inventory() -> void:
 	if session == null or _pending_container != null or _pending_disease_hazard != null or _rescue_overlay.visible or _attempt_failed:
 		return
 	_inventory_panel.present(session, Callable(self, "_item_display_name"))
-	diver.input_enabled = false
+	diver.set_input_enabled(false)
 
 func _close_inventory() -> void:
 	_inventory_panel.dismiss()
-	diver.input_enabled = true
+	diver.set_input_enabled(true)
 	_update_ui()
 
 func _drop_inventory_amount(resource_id: String, amount: int) -> void:
@@ -953,7 +982,7 @@ func _maybe_complete_tutorial_loot() -> void:
 	_reconcile_tutorial_dive_progress()
 
 func _on_oxygen_depleted() -> void:
-	diver.input_enabled = false
+	diver.set_input_enabled(false)
 	if setup.tutorial_mode:
 		_attempt_failed = true
 		_pending_finish_result = null
@@ -972,7 +1001,7 @@ func _finish_success() -> void:
 	if game_root == null or setup == null or _ending:
 		return
 	_ending = true
-	diver.input_enabled = false
+	diver.set_input_enabled(false)
 	var result = DiveResultScript.new()
 	result.diver_id = setup.diver_id
 	result.returned_alive = true
@@ -1049,7 +1078,7 @@ func _try_operator_extraction(reason: String) -> bool:
 
 func _finish_operator_extraction(reason: String) -> void:
 	_ending = true
-	diver.input_enabled = false
+	diver.set_input_enabled(false)
 	session.add_injury("emergency_extraction")
 	session.record_risk_event("operator_rescue:%s" % reason)
 	var result = DiveResultScript.new()
@@ -1120,7 +1149,7 @@ func _show_resolution_save_error(result) -> void:
 	_pending_finish_result = result.detached_copy() if result != null and result.has_method("detached_copy") else null
 	_attempt_failed = true
 	_ending = true
-	diver.input_enabled = false
+	diver.set_input_enabled(false)
 	_failure_title.text = "NIE UDAŁO SIĘ ZAPISAĆ"
 	_failure_body.text = "Wyprawa pozostaje zakończona, ale jej skutki nie zostały zastosowane do kampanii. Zwolnij miejsce na dysku i ponów zapis — nurkowania nie trzeba powtarzać."
 	_failure_retry_button.text = "PONÓW ZAPIS I ROZLICZENIE"
@@ -1815,7 +1844,7 @@ func _update_quiet_repair(delta: float) -> void:
 		_quiet_repair_blocked_until_release = true
 		return
 	var interrupted := (
-		diver.movement_input.length_squared() > 0.01
+		diver.has_movement_input()
 		or diver.velocity.length_squared() > STATIONARY_VELOCITY_EPSILON_SQUARED
 		or Input.is_action_pressed(&"dive_interact")
 		or Input.is_action_pressed(&"dive_attack")
@@ -1877,8 +1906,8 @@ func _scout_is_eligible() -> bool:
 		ProfessionTalentSystemScript.has_talent(setup, "nurek_zwiadowca")
 		and not _is_diver_light_active()
 		and not _rescue_system.is_towing(session)
-		and not diver.is_sprinting
-		and diver.movement_input.length_squared() <= 0.01
+		and not diver.is_sprint_active()
+		and not diver.has_movement_input()
 		and diver.velocity.length_squared() <= STATIONARY_VELOCITY_EPSILON_SQUARED
 		and _interaction_progress <= 0.0
 		and _quiet_repair_progress <= 0.0
@@ -2069,10 +2098,7 @@ func _update_current_presentation(delta: float, snap_transition: bool = false) -
 func _visual_camera_anchor() -> Vector2:
 	if diver == null:
 		return Vector2.ZERO
-	var camera := diver.get_node_or_null("Camera2D") as Camera2D
-	if camera != null and camera.is_inside_tree():
-		return camera.get_screen_center_position()
-	return diver.global_position
+	return diver.visual_camera_anchor()
 
 
 func _streaming_visible_half_extent() -> Vector2:
@@ -2097,10 +2123,7 @@ func set_current_visual_sample_for_tests(current_vector: Vector2, time_seconds: 
 	_active_current_vector = current_vector
 	if _current_visual == null or not is_instance_valid(_current_visual):
 		_build_current_visual()
-	var world_anchor := diver.global_position
-	var camera := diver.get_node_or_null("Camera2D") as Camera2D
-	if camera != null and camera.is_inside_tree():
-		world_anchor = camera.get_screen_center_position()
+	var world_anchor := diver.visual_camera_anchor()
 	_current_visual.update_sample(_active_current_vector, world_anchor, 0.0, true)
 	_current_visual.set_visual_time_for_tests(time_seconds, true)
 	_update_ui()
@@ -2171,9 +2194,15 @@ func _required_tool_for(target) -> String:
 		return str(target.required_tool)
 	if target is DivePersistentInteractable:
 		return str(target.required_tool)
+	if _is_attempt_local_interactable(target):
+		return str(target.get("required_tool"))
 	if target is DiveRescueSurvivor:
 		return str(target.required_tool)
 	return ""
+
+
+func _is_attempt_local_interactable(target) -> bool:
+	return target != null and target.has_method("complete_dive_interaction")
 
 func _required_tool_display_name(target, tool_id: String) -> String:
 	if target != null and target.has_method("required_tool_display_name"):
