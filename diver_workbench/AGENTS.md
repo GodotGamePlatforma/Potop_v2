@@ -69,7 +69,7 @@ Ten zapis nie jest grafem wszystkich zależności runtime ani uprawnieniem do ed
 - VFX nie zmieniają ruchu, tlenu, hałasu, czasu, obrażeń, collidera ani zapisu.
 - Profil `low/medium/high` i `reduced_motion` zmienia wyłącznie budżet i wtórny ruch prezentacji.
 
-Obecna scena zachowuje zatwierdzoną bryłę `70 × 40`, root w skali `1` oraz kalibrację grafiki opisaną w `.ai/PROJECT_CONTEXT.md`. Każda przyszła zmiana tej koperty albo collidera pozostaje osobnym zadaniem produktu i integracji.
+Obecna scena zachowuje bryłę zatwierdzoną w aktywnym ARD i walidowanym profilu koperty, root w skali `1` oraz kalibrację grafiki opisaną w `.ai/PROJECT_CONTEXT.md`. Każda przyszła zmiana koperty albo collidera pozostaje osobnym zadaniem produktu i integracji.
 
 ## Authoring aktywnej grafiki 2D
 
