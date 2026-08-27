@@ -17,6 +17,7 @@ var _failed := false
 var _package_manifest: Dictionary = {}
 var _effective_structure: Dictionary = {}
 var _controller_script: Script
+var _moving_body_script: Script
 
 
 func _initialize() -> void:
@@ -29,9 +30,11 @@ func _run() -> void:
 		_finish()
 		return
 	_controller_script = _load_controller_script(_package_manifest)
-	if _controller_script == null:
+	_moving_body_script = _load_script_by_role(_package_manifest, "moving_body")
+	if _controller_script == null or _moving_body_script == null:
 		_finish()
 		return
+	_verify_typed_egress_visual_dispatch()
 	_effective_structure = _effective_structure_record(_package_manifest)
 	if _effective_structure.is_empty():
 		_finish()
@@ -97,6 +100,16 @@ func _verify_s0(controller) -> void:
 	_assert(snapshot.get("attempt_state", {}) == {"persistence": "none", "checkpoint": "none"}, "Snapshot musi jawnie potwierdzać attempt-local stan bez checkpointu.")
 	for barrier_id: String in BARRIER_IDS:
 		_assert(not controller.barrier_is_open(barrier_id), "S0 musi zaczynać z zamkniętą barierą %s." % barrier_id)
+	var facade := _barrier_body(controller, "facade")
+	var egress_rect := _socket_rect(str((_package_manifest.get("runtime", {}) as Dictionary).get("egress_socket_id", "")))
+	_assert(facade != null, "S0 wymaga ruchomej fasady wyjścia.")
+	if facade != null:
+		_assert(str(facade.call(&"visual_style")) == "egress_grille", "Fasada musi wybierać prezentację przez typowany visual_style=egress_grille.")
+		_assert(str(facade.call(&"visual_state")) == "CLOSED", "Fasada w S0 musi publikować wizualny stan CLOSED.")
+		_assert(is_zero_approx(float(facade.call(&"aperture_clear_fraction"))), "CLOSED musi mieć zerową odsłoniętą część apertury.")
+		_assert(not bool(facade.call(&"aperture_is_clear")), "CLOSED nie może raportować pustej apertury.")
+		var closed_body_rect: Rect2 = facade.call(&"body_rect_in_parent")
+		_assert_rect_approx(closed_body_rect, egress_rect, "Collider i wizual CLOSED muszą dokładnie pokrywać building_egress.")
 	_assert(controller.control("panel_a").can_interact(), "S0 musi udostępniać panel A przez zwykłą ścieżkę interakcji gracza.")
 	_assert(controller.control("inlet_b").can_interact(), "S0 musi udostępniać B przez zwykłą ścieżkę interakcji.")
 	_assert(not controller.control("inlet_c").can_interact(), "S0 nie może udostępniać C przed B.")
@@ -323,11 +336,24 @@ func _verify_sequence_and_motion(controller, structure_root: Node2D) -> void:
 	_assert(bool(controller.control("inlet_d").complete_dive_interaction().get("success", false)), "D: zwykła interakcja finalnego wlotu po V1 i V2 musi ukończyć sekwencję.")
 	_assert(str(controller.state_snapshot().get("d_state", "")) == "D_COMPLETE", "D: finalny wlot musi publikować D_COMPLETE.")
 	_assert(controller.barrier_is_commanded_open("facade") and not controller.barrier_is_open("facade"), "Fasada nie może raportować faktycznego otwarcia przed osiągnięciem celu ruchu.")
+	var facade := _barrier_body(controller, "facade")
+	_assert(facade != null, "Sekwencja D wymaga ciała egress_grille.")
+	var closed_clear_fraction := float(facade.call(&"aperture_clear_fraction")) if facade != null else -1.0
+	var mid_clear_fraction := await _await_facade_mid_state(controller, facade)
+	_assert(mid_clear_fraction > closed_clear_fraction and mid_clear_fraction < 1.0, "MID musi monotonicznie odsłonić część apertury bez przedwczesnego OPEN.")
 	await _await_barrier_target(controller, "h3")
 	await _await_barrier_target(controller, "facade")
 	_verify_stage(controller, "S3", true, true, true, 0.0)
 	_assert(controller.barrier_is_open("h3") and controller.barrier_reached_target("h3"), "Po D H3 musi być otwarta.")
 	_assert(controller.barrier_is_open("facade") and controller.barrier_reached_target("facade"), "Po D fasada/wyjście musi być faktycznie otwarta.")
+	if facade != null:
+		var open_clear_fraction := float(facade.call(&"aperture_clear_fraction"))
+		_assert(str(facade.call(&"visual_state")) == "OPEN", "Fasada po osiągnięciu celu musi publikować wizualny stan OPEN.")
+		_assert(open_clear_fraction > mid_clear_fraction and is_equal_approx(open_clear_fraction, 1.0), "OPEN musi monotonicznie osiągnąć w pełni pustą aperturę.")
+		_assert(bool(facade.call(&"aperture_is_clear")), "OPEN musi potwierdzić rozłączność collidera fasady i building_egress.")
+		var open_body_rect: Rect2 = facade.call(&"body_rect_in_parent")
+		var aperture_rect: Rect2 = facade.call(&"aperture_rect_in_parent")
+		_assert(not open_body_rect.intersects(aperture_rect), "AABB ruchomego collidera OPEN nie może przecinać drogi do oceanu.")
 	_assert(not bool(controller.activate_control("d_reset").get("success", true)), "D: reset nie może cofnąć ukończonej próby.")
 	_assert(str(controller.state_snapshot().get("sequence_state", "")) == "S3", "Odrzucony reset po ukończeniu nie może zamknąć wyjścia.")
 
@@ -432,6 +458,9 @@ func _verify_reset_attempt(controller, initial_dynamic_positions: Dictionary) ->
 		_assert(body != null and controller.barrier_reached_target(barrier_id), "reset_attempt musi domknąć fizyczny ruch %s." % barrier_id)
 		if body != null:
 			_assert(body.position.is_equal_approx(initial_dynamic_positions.get(barrier_id, Vector2.INF)), "reset_attempt musi przywrócić pozycję początkową bariery %s." % barrier_id)
+			if barrier_id == "facade":
+				_assert(str(body.call(&"visual_state")) == "CLOSED", "reset_attempt musi przywrócić prezentację fasady CLOSED.")
+				_assert(is_zero_approx(float(body.call(&"aperture_clear_fraction"))) and not bool(body.call(&"aperture_is_clear")), "reset_attempt musi ponownie zamknąć aperturę wyjścia.")
 	var cabinet := _cabinet_body(controller)
 	_assert(controller.cabinet_reached_target(), "reset_attempt musi odstawić cabinet_d do pozycji początkowej bez checkpointu.")
 	if cabinet != null:
@@ -511,6 +540,41 @@ func _load_controller_script(package_manifest: Dictionary) -> Script:
 	return null
 
 
+func _load_script_by_role(package_manifest: Dictionary, role: String) -> Script:
+	for script_value: Variant in package_manifest.get("scripts", []) as Array:
+		var script_record := script_value as Dictionary
+		if str(script_record.get("role", "")) != role:
+			continue
+		var script := load(PACKAGE_ROOT + str(script_record.get("path", ""))) as Script
+		_assert(script != null, "Nie można załadować prywatnego skryptu roli %s W02." % role)
+		return script
+	_assert(false, "Manifest W02 nie deklaruje skryptu roli %s." % role)
+	return null
+
+
+func _verify_typed_egress_visual_dispatch() -> void:
+	if _moving_body_script == null:
+		return
+	var body = _moving_body_script.new()
+	var definition := {
+		"id": "renamed_visual_fixture",
+		"socket_id": "renamed_socket_fixture",
+		"label": "dowolna nazwa bez słowa wyjście",
+		"symbol": "?",
+		"visual_style": "egress_grille",
+		"open_offset": [0, -240],
+		"travel_speed": 280,
+	}
+	var socket_rect := Rect2(120.0, 320.0, 80.0, 160.0)
+	var errors: PackedStringArray = body.configure(definition, socket_rect, STRUCTURE_ID)
+	_assert(errors.is_empty(), "Typowany egress_grille musi konfigurować się niezależnie od ID/socket/label/symbol: %s." % errors)
+	_assert(str(body.call(&"visual_style")) == "egress_grille", "Dispatch prezentacji nie może zależeć od symbol.contains ani nazwy bariery.")
+	_assert(str(body.call(&"visual_state")) == "CLOSED", "Syntetyczny egress_grille musi zaczynać w CLOSED.")
+	body.snap_to_local_position(body.home_local_position() + Vector2(0.0, -240.0))
+	_assert(str(body.call(&"visual_state")) == "OPEN" and bool(body.call(&"aperture_is_clear")), "Syntetyczny egress_grille musi kończyć z pustą aperturą niezależnie od nazw.")
+	body.free()
+
+
 func _effective_structure_record(package_manifest: Dictionary) -> Dictionary:
 	var template := package_manifest.get("template", {}) as Dictionary
 	var size := package_manifest.get("size", []) as Array
@@ -551,6 +615,23 @@ func _await_barrier_target(controller, barrier_id: String) -> void:
 			return
 		await physics_frame
 	_assert(false, "Bariera %s nie osiągnęła celu w limicie physics frames: %s." % [barrier_id, controller.state_snapshot()])
+
+
+func _await_facade_mid_state(controller, facade) -> float:
+	if facade == null:
+		return -1.0
+	for _frame: int in range(MAX_MOTION_FRAMES):
+		var clear_fraction := float(facade.call(&"aperture_clear_fraction"))
+		if clear_fraction >= 0.35 and clear_fraction < 0.95:
+			_assert(str(facade.call(&"visual_state")) == "MID", "Częściowo odsłonięta fasada musi publikować MID.")
+			_assert(controller.barrier_is_commanded_open("facade") and not controller.barrier_is_open("facade") and not controller.barrier_reached_target("facade"), "MID musi zachować rozróżnienie commanded/open/reached.")
+			var mid_body_rect: Rect2 = facade.call(&"body_rect_in_parent")
+			var aperture_rect: Rect2 = facade.call(&"aperture_rect_in_parent")
+			_assert(mid_body_rect.intersects(aperture_rect), "MID ma nadal częściowo przecinać aperturę, zanim osiągnie OPEN.")
+			return clear_fraction
+		await physics_frame
+	_assert(false, "Fasada nie opublikowała odpornego stanu MID przed OPEN: %s." % controller.state_snapshot())
+	return -1.0
 
 
 func _await_cabinet_target(controller) -> void:
@@ -667,6 +748,10 @@ func _basis_xform(transform_value: Transform2D, vector: Vector2) -> Vector2:
 
 func _assert_vector_approx(actual: Vector2, expected: Vector2, message: String) -> void:
 	_assert(actual.is_equal_approx(expected), "%s Oczekiwano %s, otrzymano %s." % [message, expected, actual])
+
+
+func _assert_rect_approx(actual: Rect2, expected: Rect2, message: String) -> void:
+	_assert(actual.position.is_equal_approx(expected.position) and actual.size.is_equal_approx(expected.size), "%s Oczekiwano %s, otrzymano %s." % [message, expected, actual])
 
 
 func _assert(condition: bool, message: String) -> void:

@@ -35,202 +35,402 @@
       {
         "id": "tower_three_inlets_02_shell",
         "op": "solid_rect",
-        "rect_px": [0, 0, 60, 96]
+        "rect_px": [
+          0,
+          0,
+          60,
+          96
+        ]
       },
       {
         "id": "tower_three_inlets_02_central_shaft",
         "op": "open_rect",
-        "rect_px": [27, 2, 6, 90]
+        "rect_px": [
+          27,
+          2,
+          6,
+          90
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_12_left",
         "op": "open_rect",
-        "rect_px": [2, 2, 23, 5]
+        "rect_px": [
+          2,
+          2,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_12_right",
         "op": "open_rect",
-        "rect_px": [35, 2, 23, 5]
+        "rect_px": [
+          35,
+          2,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_11_left",
         "op": "open_rect",
-        "rect_px": [2, 9, 23, 5]
+        "rect_px": [
+          2,
+          9,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_11_right",
         "op": "open_rect",
-        "rect_px": [35, 9, 23, 5]
+        "rect_px": [
+          35,
+          9,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_10_left",
         "op": "open_rect",
-        "rect_px": [2, 16, 23, 5]
+        "rect_px": [
+          2,
+          16,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_10_right",
         "op": "open_rect",
-        "rect_px": [35, 16, 23, 5]
+        "rect_px": [
+          35,
+          16,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_inlet_b_pillar_1",
         "op": "solid_rect",
-        "rect_px": [9, 18, 2, 3]
+        "rect_px": [
+          9,
+          18,
+          2,
+          3
+        ]
       },
       {
         "id": "tower_three_inlets_02_inlet_b_pillar_2",
         "op": "solid_rect",
-        "rect_px": [15, 16, 2, 3]
+        "rect_px": [
+          15,
+          16,
+          2,
+          3
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_09_left",
         "op": "open_rect",
-        "rect_px": [2, 23, 23, 5]
+        "rect_px": [
+          2,
+          23,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_09_right",
         "op": "open_rect",
-        "rect_px": [35, 23, 23, 5]
+        "rect_px": [
+          35,
+          23,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_08_left",
         "op": "open_rect",
-        "rect_px": [2, 30, 23, 5]
+        "rect_px": [
+          2,
+          30,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_08_right",
         "op": "open_rect",
-        "rect_px": [35, 30, 23, 5]
+        "rect_px": [
+          35,
+          30,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_07_left",
         "op": "open_rect",
-        "rect_px": [2, 37, 23, 5]
+        "rect_px": [
+          2,
+          37,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_07_right",
         "op": "open_rect",
-        "rect_px": [35, 37, 23, 5]
+        "rect_px": [
+          35,
+          37,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_06_left",
         "op": "open_rect",
-        "rect_px": [2, 44, 23, 5]
+        "rect_px": [
+          2,
+          44,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_06_right",
         "op": "open_rect",
-        "rect_px": [35, 44, 23, 5]
+        "rect_px": [
+          35,
+          44,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_05_left",
         "op": "open_rect",
-        "rect_px": [2, 51, 23, 5]
+        "rect_px": [
+          2,
+          51,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_05_right",
         "op": "open_rect",
-        "rect_px": [35, 51, 23, 5]
+        "rect_px": [
+          35,
+          51,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_04_left",
         "op": "open_rect",
-        "rect_px": [2, 58, 23, 5]
+        "rect_px": [
+          2,
+          58,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_floor_04_right",
         "op": "open_rect",
-        "rect_px": [35, 58, 23, 5]
+        "rect_px": [
+          35,
+          58,
+          23,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_ground_lobby",
         "op": "open_rect",
-        "rect_px": [35, 86, 23, 6]
+        "rect_px": [
+          35,
+          86,
+          23,
+          6
+        ]
       },
       {
         "id": "tower_three_inlets_02_entry_balcony",
         "op": "open_rect",
-        "rect_px": [0, 2, 2, 4]
+        "rect_px": [
+          0,
+          2,
+          2,
+          4
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_floor_12_to_11",
         "op": "open_rect",
-        "rect_px": [8, 7, 4, 2]
+        "rect_px": [
+          8,
+          7,
+          4,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_floor_11_cross",
         "op": "open_rect",
-        "rect_px": [25, 11, 10, 2]
+        "rect_px": [
+          25,
+          11,
+          10,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_floor_11_to_10",
         "op": "open_rect",
-        "rect_px": [18, 14, 4, 2]
+        "rect_px": [
+          18,
+          14,
+          4,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_shaft_to_floor_09",
         "op": "open_rect",
-        "rect_px": [33, 25, 2, 2]
+        "rect_px": [
+          33,
+          25,
+          2,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_floor_09_to_08",
         "op": "open_rect",
-        "rect_px": [52, 28, 4, 2]
+        "rect_px": [
+          52,
+          28,
+          4,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_c_service_shaft",
         "op": "open_rect",
-        "rect_px": [54, 30, 4, 12]
+        "rect_px": [
+          54,
+          30,
+          4,
+          12
+        ]
       },
       {
         "id": "tower_three_inlets_02_c_front_grate",
         "op": "solid_rect",
-        "rect_px": [45, 37, 2, 5]
+        "rect_px": [
+          45,
+          37,
+          2,
+          5
+        ]
       },
       {
         "id": "tower_three_inlets_02_c_return_shortcut",
         "op": "open_rect",
-        "rect_px": [45, 39, 2, 2]
+        "rect_px": [
+          45,
+          39,
+          2,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_c_to_shaft",
         "op": "open_rect",
-        "rect_px": [33, 39, 2, 2]
+        "rect_px": [
+          33,
+          39,
+          2,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_shaft_to_floor_06",
         "op": "open_rect",
-        "rect_px": [25, 46, 2, 2]
+        "rect_px": [
+          25,
+          46,
+          2,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_floor_06_to_05",
         "op": "open_rect",
-        "rect_px": [8, 49, 4, 2]
+        "rect_px": [
+          8,
+          49,
+          4,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_floor_05_to_04",
         "op": "open_rect",
-        "rect_px": [18, 56, 4, 2]
+        "rect_px": [
+          18,
+          56,
+          4,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_d_cabinet_guide",
         "op": "open_rect",
-        "rect_px": [10, 58, 15, 12]
+        "rect_px": [
+          10,
+          58,
+          15,
+          12
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_d_to_shaft",
         "op": "open_rect",
-        "rect_px": [25, 60, 2, 2]
+        "rect_px": [
+          25,
+          60,
+          2,
+          2
+        ]
       },
       {
         "id": "tower_three_inlets_02_route_shaft_to_lobby",
         "op": "open_rect",
-        "rect_px": [33, 88, 2, 3]
+        "rect_px": [
+          33,
+          88,
+          2,
+          3
+        ]
       },
       {
         "id": "tower_three_inlets_02_facade_opening",
         "op": "open_rect",
-        "rect_px": [58, 87, 2, 4]
+        "rect_px": [
+          58,
+          87,
+          2,
+          4
+        ]
       }
     ]
   },
@@ -238,102 +438,202 @@
     {
       "id": "entry_floor_12_damaged_balcony",
       "kind": "entry_opening",
-      "local_rect": [0, 80, 80, 160]
+      "local_rect": [
+        0,
+        80,
+        80,
+        160
+      ]
     },
     {
       "id": "panel_a_status",
       "kind": "fixed_interactable",
-      "local_rect": [1760, 400, 400, 120]
+      "local_rect": [
+        1760,
+        400,
+        400,
+        120
+      ]
     },
     {
       "id": "inlet_b_lever",
       "kind": "fixed_interactable",
-      "local_rect": [80, 680, 240, 120]
+      "local_rect": [
+        80,
+        680,
+        240,
+        120
+      ]
     },
     {
       "id": "current_b_main",
       "kind": "current_zone",
-      "local_rect": [240, 640, 760, 200]
+      "local_rect": [
+        240,
+        640,
+        760,
+        200
+      ]
     },
     {
       "id": "current_b_cover_1",
       "kind": "current_zone",
-      "local_rect": [360, 640, 160, 200]
+      "local_rect": [
+        360,
+        640,
+        160,
+        200
+      ]
     },
     {
       "id": "current_b_cover_2",
       "kind": "current_zone",
-      "local_rect": [600, 640, 160, 200]
+      "local_rect": [
+        600,
+        640,
+        160,
+        200
+      ]
     },
     {
       "id": "current_b_recovery",
       "kind": "current_zone",
-      "local_rect": [840, 640, 160, 200]
+      "local_rect": [
+        840,
+        640,
+        160,
+        200
+      ]
     },
     {
       "id": "gate_g1",
       "kind": "dynamic_door",
-      "local_rect": [1080, 840, 240, 80]
+      "local_rect": [
+        1080,
+        840,
+        240,
+        80
+      ]
     },
     {
       "id": "inlet_c_lever",
       "kind": "fixed_interactable",
-      "local_rect": [1960, 1520, 240, 120]
+      "local_rect": [
+        1960,
+        1520,
+        240,
+        120
+      ]
     },
     {
       "id": "gate_c_shortcut",
       "kind": "dynamic_door",
-      "local_rect": [1800, 1560, 80, 80]
+      "local_rect": [
+        1800,
+        1560,
+        80,
+        80
+      ]
     },
     {
       "id": "gate_g2",
       "kind": "dynamic_door",
-      "local_rect": [1080, 1680, 240, 80]
+      "local_rect": [
+        1080,
+        1680,
+        240,
+        80
+      ]
     },
     {
       "id": "d_valve_v1",
       "kind": "fixed_interactable",
-      "local_rect": [160, 2360, 120, 80]
+      "local_rect": [
+        160,
+        2360,
+        120,
+        80
+      ]
     },
     {
       "id": "d_valve_v2",
       "kind": "fixed_interactable",
-      "local_rect": [320, 2360, 120, 80]
+      "local_rect": [
+        320,
+        2360,
+        120,
+        80
+      ]
     },
     {
       "id": "d_reset",
       "kind": "fixed_interactable",
-      "local_rect": [160, 2440, 280, 80]
+      "local_rect": [
+        160,
+        2440,
+        280,
+        80
+      ]
     },
     {
       "id": "d_inlet_lever",
       "kind": "fixed_interactable",
-      "local_rect": [640, 2360, 160, 120]
+      "local_rect": [
+        640,
+        2360,
+        160,
+        120
+      ]
     },
     {
       "id": "cabinet_d",
       "kind": "moving_obstacle",
-      "local_rect": [480, 2320, 320, 160]
+      "local_rect": [
+        480,
+        2320,
+        320,
+        160
+      ]
     },
     {
       "id": "gate_h3",
       "kind": "dynamic_door",
-      "local_rect": [1080, 2520, 240, 80]
+      "local_rect": [
+        1080,
+        2520,
+        240,
+        80
+      ]
     },
     {
       "id": "current_central_shaft",
       "kind": "current_zone",
-      "local_rect": [1080, 80, 240, 3600]
+      "local_rect": [
+        1080,
+        80,
+        240,
+        3600
+      ]
     },
     {
       "id": "facade_ground_floor",
       "kind": "dynamic_door",
-      "local_rect": [2320, 3480, 80, 160]
+      "local_rect": [
+        2320,
+        3480,
+        80,
+        160
+      ]
     },
     {
       "id": "egress_ground_floor",
       "kind": "building_egress",
-      "local_rect": [2320, 3480, 80, 160]
+      "local_rect": [
+        2320,
+        3480,
+        80,
+        160
+      ]
     }
   ],
   "runtime": {
@@ -344,7 +644,10 @@
         "socket_id": "gate_g1",
         "label": "G1",
         "symbol": "I",
-        "open_offset": [320, 0],
+        "open_offset": [
+          320,
+          0
+        ],
         "travel_speed": 320
       },
       {
@@ -352,7 +655,10 @@
         "socket_id": "gate_c_shortcut",
         "label": "SKRÓT C",
         "symbol": "▲",
-        "open_offset": [0, -160],
+        "open_offset": [
+          0,
+          -160
+        ],
         "travel_speed": 240
       },
       {
@@ -360,7 +666,10 @@
         "socket_id": "gate_g2",
         "label": "G2",
         "symbol": "II",
-        "open_offset": [320, 0],
+        "open_offset": [
+          320,
+          0
+        ],
         "travel_speed": 320
       },
       {
@@ -368,7 +677,10 @@
         "socket_id": "gate_h3",
         "label": "H3",
         "symbol": "III",
-        "open_offset": [320, 0],
+        "open_offset": [
+          320,
+          0
+        ],
         "travel_speed": 320
       },
       {
@@ -376,7 +688,11 @@
         "socket_id": "facade_ground_floor",
         "label": "FASADA",
         "symbol": "WYJŚCIE",
-        "open_offset": [0, -240],
+        "visual_style": "egress_grille",
+        "open_offset": [
+          0,
+          -240
+        ],
         "travel_speed": 280
       }
     ],
@@ -385,26 +701,46 @@
       "socket_id": "cabinet_d",
       "label": "SZAFA D",
       "symbol": "■",
-      "move_right": [160, 0],
-      "move_down": [0, 320],
+      "move_right": [
+        160,
+        0
+      ],
+      "move_down": [
+        0,
+        320
+      ],
       "travel_speed": 200,
       "safety_margin": 40
     },
     "currents": {
       "central_shaft": {
         "socket_id": "current_central_shaft",
-        "velocity": [0, -240],
-        "stage_multipliers": [1.0, 0.6666667, 0.3333333, 0.0]
+        "velocity": [
+          0,
+          -240
+        ],
+        "stage_multipliers": [
+          1.0,
+          0.6666667,
+          0.3333333,
+          0.0
+        ]
       },
       "inlet_b": {
         "socket_id": "current_b_main",
-        "velocity": [180, 0],
+        "velocity": [
+          180,
+          0
+        ],
         "cover_socket_ids": [
           "current_b_cover_1",
           "current_b_cover_2"
         ],
         "recovery_socket_id": "current_b_recovery",
-        "recovery_velocity": [-260, 0],
+        "recovery_velocity": [
+          -260,
+          0
+        ],
         "active_stage": 0
       }
     },
@@ -486,8 +822,16 @@
       "kind": "structure_interior_texture",
       "path": "assets/visual/tower_interior_production.png",
       "sha256": "74c146ba0418d080e874bb71ac406c3fef0a78c2eea019953d6b01f16a38445b",
-      "pixel_size": [2400, 3840],
-      "local_rect": [0, 0, 2400, 3840],
+      "pixel_size": [
+        2400,
+        3840
+      ],
+      "local_rect": [
+        0,
+        0,
+        2400,
+        3840
+      ],
       "enabled": true,
       "affordance": "open_water_clipped_interior"
     },
@@ -498,8 +842,16 @@
       "kind": "structure_owner_masked_texture",
       "path": "assets/visual/tower_structure_production.png",
       "sha256": "7702006e2ed0d03e5e938323d2b9bfef7e9d5443cf0adf3eacb46ec0c8a7db3c",
-      "pixel_size": [2400, 3840],
-      "local_rect": [0, 0, 2400, 3840],
+      "pixel_size": [
+        2400,
+        3840
+      ],
+      "local_rect": [
+        0,
+        0,
+        2400,
+        3840
+      ],
       "enabled": true,
       "affordance": "exact_owner_solid_surface"
     }
@@ -518,7 +870,7 @@
     {
       "role": "moving_body",
       "path": "scripts/DiveThreeInletsMovingBody.gd",
-      "sha256": "b7fbbcb2fb7b331f4d6cdc192a649602b7a08c2e371305643a6f47cd37ceb5fc"
+      "sha256": "38eda391033ac3809c1e58b3f86fa700ff98afba9a1a688b04f01ff1509bb4a5"
     }
   ],
   "attempt_state": {
@@ -544,49 +896,84 @@
       "sha256": "73e37c82a9c6ef2583e936c63046d93b35bcea7e764d06c0008037ef18570565",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     },
     {
       "path": "references/source/01_Wiezowiec_02_mapa_labiryntu_2D.png",
       "sha256": "405841dde72159c23b8421c95e4883e7365edb6b8e9b50e9b863c56c20f5b095",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     },
     {
       "path": "references/source/02_Logika_przejscia_i_stany.png",
       "sha256": "8a087d1ecb817ac395ec991d56319ddc2d2bed17f5791b37f28cb9aab6d222a3",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     },
     {
       "path": "references/source/03_Zagadki_B_C_D.png",
       "sha256": "f3978525cb01b00d2efa7b6fed73cce40711715e45eee358712abf3ac30c2171",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     },
     {
       "path": "references/source/04_Parter_i_wyjscie_do_oceanu.png",
       "sha256": "49663e83c82f07fa0c9c755450c7e0729f54c44ffc0fac6e90d5a1533aa72743",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     },
     {
       "path": "references/source/walidacja_logiki.json",
       "sha256": "57b2b6132c3f22db1f738d510ea8f2e49da3c679f4b8c873ea0437bbce660266",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     },
     {
       "path": "references/source/MANIFEST_SHA256.txt",
       "sha256": "78a0447e3c3eba26ce72d058836c46253e79940ad57e7d34ec2dd3a5e499dbcb",
       "role": "design_reference_only",
       "authority": false,
-      "excluded_topics": ["checkpoint", "save_load", "point_of_no_return", "collapse_failure"]
+      "excluded_topics": [
+        "checkpoint",
+        "save_load",
+        "point_of_no_return",
+        "collapse_failure"
+      ]
     }
   ]
 }

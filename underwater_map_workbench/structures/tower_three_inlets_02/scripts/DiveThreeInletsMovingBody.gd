@@ -2,6 +2,12 @@ extends AnimatableBody2D
 
 const DIVE_PLAYER_GROUP := &"dive_player"
 const TARGET_EPSILON := 0.5
+const VISUAL_STYLE_INDUSTRIAL_PANEL := "industrial_panel"
+const VISUAL_STYLE_EGRESS_GRILLE := "egress_grille"
+const VISUAL_STATE_CLOSED := "CLOSED"
+const VISUAL_STATE_MID := "MID"
+const VISUAL_STATE_OPEN := "OPEN"
+const APERTURE_EPSILON := 0.001
 
 var body_id: String = ""
 
@@ -12,6 +18,8 @@ var _visual_size := Vector2(80.0, 80.0)
 var _safety_margin := 40.0
 var _symbol := ""
 var _label := ""
+var _visual_style := VISUAL_STYLE_INDUSTRIAL_PANEL
+var _open_offset := Vector2.ZERO
 var _safety_envelope: Area2D
 
 
@@ -32,6 +40,12 @@ func configure(
 	_safety_margin = float(definition.get("safety_margin", 40.0))
 	if _safety_margin < 0.0:
 		errors.append("Ruchome ciało %s ma ujemny safety_margin." % body_id)
+	_visual_style = str(definition.get("visual_style", VISUAL_STYLE_INDUSTRIAL_PANEL))
+	if _visual_style not in [VISUAL_STYLE_INDUSTRIAL_PANEL, VISUAL_STYLE_EGRESS_GRILLE]:
+		errors.append("Ruchome ciało %s ma nieobsługiwany visual_style: %s." % [body_id, _visual_style])
+	_open_offset = _vector_from_value(definition.get("open_offset", []))
+	if _visual_style == VISUAL_STYLE_EGRESS_GRILLE and _open_offset.is_zero_approx():
+		errors.append("Ruchome ciało %s używa egress_grille bez niezerowego open_offset." % body_id)
 	if not errors.is_empty():
 		return errors
 
@@ -52,6 +66,7 @@ func configure(
 	set_meta(&"safety_group_filter", String(DIVE_PLAYER_GROUP))
 	set_meta(&"label", _label)
 	set_meta(&"symbol", _symbol)
+	set_meta(&"visual_style", _visual_style)
 
 	_build_solid_shape()
 	_build_safety_envelope()
@@ -73,6 +88,7 @@ func snap_to_local_position(target: Vector2) -> void:
 		force_update_transform()
 	sync_to_physics = was_synchronized
 	set_meta(&"target_local_position", _target_local_position)
+	queue_redraw()
 
 
 func reset_home() -> void:
@@ -82,6 +98,7 @@ func reset_home() -> void:
 func advance_motion(delta: float) -> bool:
 	if reached_target():
 		position = _target_local_position
+		queue_redraw()
 		return true
 	if not safety_clear():
 		return false
@@ -92,8 +109,10 @@ func advance_motion(delta: float) -> bool:
 	if not can_travel_to_local_position_safely(next_position):
 		return false
 	position = next_position
+	queue_redraw()
 	if reached_target():
 		position = _target_local_position
+		queue_redraw()
 		return true
 	return false
 
@@ -161,6 +180,60 @@ func safety_envelope() -> Area2D:
 	return _safety_envelope
 
 
+func visual_style() -> String:
+	return _visual_style
+
+
+func visual_state() -> String:
+	if _visual_style != VISUAL_STYLE_EGRESS_GRILLE:
+		return VISUAL_STATE_CLOSED
+	if position.distance_to(_home_local_position) <= TARGET_EPSILON:
+		return VISUAL_STATE_CLOSED
+	var open_position := _home_local_position + _open_offset
+	if reached_target() and position.distance_to(open_position) <= TARGET_EPSILON:
+		return VISUAL_STATE_OPEN
+	return VISUAL_STATE_MID
+
+
+func open_progress() -> float:
+	var travel_length_squared := _open_offset.length_squared()
+	if travel_length_squared <= APERTURE_EPSILON:
+		return 0.0
+	return clampf(
+		(position - _home_local_position).dot(_open_offset) / travel_length_squared,
+		0.0,
+		1.0
+	)
+
+
+func aperture_clear_fraction() -> float:
+	if _visual_style != VISUAL_STYLE_EGRESS_GRILLE or _open_offset.is_zero_approx():
+		return 0.0
+	var direction := _open_offset.normalized()
+	var travelled := maxf((position - _home_local_position).dot(direction), 0.0)
+	var aperture_span := (
+		absf(direction.x) * _visual_size.x
+		+ absf(direction.y) * _visual_size.y
+	)
+	return clampf(travelled / maxf(aperture_span, 1.0), 0.0, 1.0)
+
+
+func aperture_is_clear() -> bool:
+	return (
+		_visual_style == VISUAL_STYLE_EGRESS_GRILLE
+		and aperture_clear_fraction() >= 1.0 - APERTURE_EPSILON
+		and not body_rect_in_parent().intersects(aperture_rect_in_parent())
+	)
+
+
+func aperture_rect_in_parent() -> Rect2:
+	return Rect2(_home_local_position - _visual_size * 0.5, _visual_size)
+
+
+func body_rect_in_parent() -> Rect2:
+	return Rect2(position - _visual_size * 0.5, _visual_size)
+
+
 func _build_solid_shape() -> void:
 	var collision := CollisionShape2D.new()
 	collision.name = "CollisionShape2D"
@@ -189,6 +262,14 @@ func _build_safety_envelope() -> void:
 
 
 func _draw() -> void:
+	if _visual_style == VISUAL_STYLE_EGRESS_GRILLE:
+		_draw_egress_portal()
+		_draw_egress_grille()
+		return
+	_draw_industrial_panel()
+
+
+func _draw_industrial_panel() -> void:
 	var half_size := _visual_size * 0.5
 	var body_rect := Rect2(-half_size, _visual_size)
 	draw_rect(body_rect, Color(0.13, 0.25, 0.28, 0.98), true)
@@ -217,8 +298,60 @@ func _draw() -> void:
 		_draw_triangle_symbol()
 	elif _symbol.contains("■"):
 		_draw_square_symbol()
-	elif _symbol.contains("WYJ"):
-		_draw_arrow(Vector2.ZERO, Vector2.RIGHT, minf(_visual_size.x, _visual_size.y) * 0.28)
+
+
+func _draw_egress_portal() -> void:
+	var portal_center := _home_local_position - position
+	var half_size := _visual_size * 0.5
+	var portal_rect := Rect2(portal_center - half_size, _visual_size)
+	var state := visual_state()
+	var frame_color := Color(0.96, 0.66, 0.18, 0.98)
+	if state == VISUAL_STATE_MID:
+		frame_color = Color(0.42, 0.88, 0.90, 0.98)
+	elif state == VISUAL_STATE_OPEN:
+		frame_color = Color(0.45, 0.96, 0.70, 1.0)
+
+	var outer_rect := portal_rect.grow(7.0)
+	draw_rect(outer_rect, Color(0.03, 0.09, 0.11, 0.94), false, 12.0)
+	draw_rect(outer_rect, frame_color, false, 4.0)
+	var corner_length := minf(_visual_size.x, _visual_size.y) * 0.28
+	for corner: Vector2 in [outer_rect.position, Vector2(outer_rect.end.x, outer_rect.position.y), outer_rect.end, Vector2(outer_rect.position.x, outer_rect.end.y)]:
+		var horizontal_direction := 1.0 if is_equal_approx(corner.x, outer_rect.position.x) else -1.0
+		var vertical_direction := 1.0 if is_equal_approx(corner.y, outer_rect.position.y) else -1.0
+		draw_line(corner, corner + Vector2(horizontal_direction * corner_length, 0.0), frame_color, 7.0)
+		draw_line(corner, corner + Vector2(0.0, vertical_direction * corner_length), frame_color, 7.0)
+
+	if state == VISUAL_STATE_OPEN:
+		var guide_start := Vector2(outer_rect.end.x + 10.0, portal_center.y)
+		var guide_end := guide_start + Vector2(48.0, 0.0)
+		draw_line(guide_start, guide_end, frame_color, 5.0)
+		draw_line(guide_end, guide_end + Vector2(-14.0, -12.0), frame_color, 5.0)
+		draw_line(guide_end, guide_end + Vector2(-14.0, 12.0), frame_color, 5.0)
+
+
+func _draw_egress_grille() -> void:
+	var half_size := _visual_size * 0.5
+	var body_rect := Rect2(-half_size, _visual_size)
+	var state := visual_state()
+	var metal_color := Color(0.72, 0.80, 0.78, 1.0)
+	var accent_color := Color(0.96, 0.66, 0.18, 1.0)
+	if state == VISUAL_STATE_MID:
+		accent_color = Color(0.42, 0.88, 0.90, 1.0)
+	elif state == VISUAL_STATE_OPEN:
+		accent_color = Color(0.45, 0.96, 0.70, 1.0)
+
+	draw_rect(body_rect, Color(0.02, 0.08, 0.10, 0.24), true)
+	draw_rect(body_rect, Color(0.02, 0.08, 0.10, 0.98), false, 12.0)
+	draw_rect(body_rect.grow(-5.0), accent_color, false, 4.0)
+	var bar_spacing := 24.0
+	var bar_y := -half_size.y + bar_spacing
+	while bar_y < half_size.y:
+		draw_line(Vector2(-half_size.x + 8.0, bar_y), Vector2(half_size.x - 8.0, bar_y), metal_color, 5.0)
+		bar_y += bar_spacing
+	draw_line(Vector2(-half_size.x + 8.0, half_size.y - 8.0), Vector2(half_size.x - 8.0, -half_size.y + 8.0), metal_color, 4.0)
+	draw_line(Vector2(-half_size.x + 8.0, -half_size.y + 8.0), Vector2(half_size.x - 8.0, half_size.y - 8.0), metal_color, 4.0)
+	if state != VISUAL_STATE_CLOSED:
+		_draw_arrow(Vector2.ZERO, Vector2.UP, minf(_visual_size.x, _visual_size.y) * 0.34)
 
 
 func _draw_arrow(center: Vector2, direction: Vector2, length: float) -> void:
@@ -262,3 +395,9 @@ func _draw_square_symbol() -> void:
 		false,
 		7.0
 	)
+
+
+func _vector_from_value(value: Variant) -> Vector2:
+	if not value is Array or (value as Array).size() != 2:
+		return Vector2.ZERO
+	return Vector2(float((value as Array)[0]), float((value as Array)[1]))
