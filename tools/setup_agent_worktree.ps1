@@ -691,14 +691,6 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             }
 
             $newContract = Join-Path $destinationPath 'tools/workbench_contract.py'
-            $newVerify = Invoke-NativeResult -FilePath 'python' -Arguments @(
-                '-B', $newContract, '--repo', $destinationPath,
-                'lkg', 'resolve', '--candidate-receipt', $receiptPath,
-                '--run-receipt', $runReceiptPath
-            )
-            if ($newVerify.ExitCode -ne 0) {
-                throw "The new worktree no longer resolves to authoritative last-green."
-            }
             $newHead = Invoke-GitText -Arguments @(
                 '-C', $destinationPath, 'rev-parse', 'HEAD'
             )
@@ -728,9 +720,11 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
                 throw "The new worktree failed its ownership doctor check."
             }
 
-            # This is deliberately the final mutating marker. An exit 0 means
-            # the immutable bundle exists in the shared common Git directory;
-            # the task is still WAITING_ACK and must not be treated as RUNNING.
+            # This is deliberately the final mutating marker. Assignment create
+            # performs the post-materialization full candidate/run verification,
+            # so the same expensive receipt verifier is not run redundantly here.
+            # An exit 0 means the immutable bundle exists in the shared common Git
+            # directory; the task remains WAITING_ACK until the exact agent ACKs.
             $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
                 $AckTimeoutSeconds
             ).ToString(
