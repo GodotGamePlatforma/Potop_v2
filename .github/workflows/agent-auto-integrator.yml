@@ -94,6 +94,25 @@ jobs:
             }
           }
 
+          function Assert-ExactComparison {
+            param(
+              [Parameter(Mandatory = $true)][object]$Comparison,
+              [Parameter(Mandatory = $true)][object]$CandidateCommit,
+              [Parameter(Mandatory = $true)][string]$ExpectedBase,
+              [Parameter(Mandatory = $true)][string]$ExpectedHead,
+              [Parameter(Mandatory = $true)][string]$FailureMessage
+            )
+            if (
+              $Comparison.status -cne "ahead" -or
+              [int]$Comparison.behind_by -ne 0 -or
+              [int]$Comparison.ahead_by -le 0 -or
+              [int]$Comparison.total_commits -ne [int]$Comparison.ahead_by -or
+              $Comparison.base_commit.sha -cne $ExpectedBase -or
+              $Comparison.merge_base_commit.sha -cne $ExpectedBase -or
+              $CandidateCommit.sha -cne $ExpectedHead
+            ) { throw $FailureMessage }
+          }
+
           function Test-IsProtectedPath {
             param([AllowEmptyString()][string]$Path)
             if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
@@ -309,11 +328,13 @@ jobs:
           Assert-NoProtectedPathChanges -PullNumber $pullNumber
 
           $comparison = Invoke-GitHubApi -Method GET -Path "/repos/$repository/compare/$($env:BASE_SHA)...$($env:CANDIDATE_SHA)"
-          if (
-            [int]$comparison.behind_by -ne 0 -or
-            $comparison.merge_base_commit.sha -cne $env:BASE_SHA -or
-            $comparison.head_commit.sha -cne $env:CANDIDATE_SHA
-          ) { throw "Candidate is stale, unrelated, or moved." }
+          $candidateCommit = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$($env:CANDIDATE_SHA)"
+          Assert-ExactComparison `
+            -Comparison $comparison `
+            -CandidateCommit $candidateCommit `
+            -ExpectedBase $env:BASE_SHA `
+            -ExpectedHead $env:CANDIDATE_SHA `
+            -FailureMessage "Candidate is stale, unrelated, or moved."
 
           $encoded = [Uri]::EscapeDataString($requiredCheck)
           $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$($env:CANDIDATE_SHA)/check-runs?check_name=$encoded&filter=all&per_page=100"
@@ -412,6 +433,25 @@ jobs:
           function Assert-CommitSha {
             param([string]$Name, [AllowEmptyString()][string]$Value)
             if ($Value -cnotmatch '^[0-9a-f]{40}$') { throw "$Name must be a full lowercase Git SHA." }
+          }
+
+          function Assert-ExactComparison {
+            param(
+              [Parameter(Mandatory = $true)][object]$Comparison,
+              [Parameter(Mandatory = $true)][object]$CandidateCommit,
+              [Parameter(Mandatory = $true)][string]$ExpectedBase,
+              [Parameter(Mandatory = $true)][string]$ExpectedHead,
+              [Parameter(Mandatory = $true)][string]$FailureMessage
+            )
+            if (
+              $Comparison.status -cne "ahead" -or
+              [int]$Comparison.behind_by -ne 0 -or
+              [int]$Comparison.ahead_by -le 0 -or
+              [int]$Comparison.total_commits -ne [int]$Comparison.ahead_by -or
+              $Comparison.base_commit.sha -cne $ExpectedBase -or
+              $Comparison.merge_base_commit.sha -cne $ExpectedBase -or
+              $CandidateCommit.sha -cne $ExpectedHead
+            ) { throw $FailureMessage }
           }
 
           function Test-IsProtectedPath {
@@ -599,11 +639,13 @@ jobs:
           Assert-NoProtectedPathChanges -PullNumber $pullNumber
 
           $comparison = Invoke-GitHubApi -Method GET -Path "/repos/$repository/compare/$($env:BASE_SHA)...$($env:CANDIDATE_SHA)"
-          if (
-            [int]$comparison.behind_by -ne 0 -or
-            $comparison.merge_base_commit.sha -cne $env:BASE_SHA -or
-            $comparison.head_commit.sha -cne $env:CANDIDATE_SHA
-          ) { throw "Candidate ancestry changed before merge." }
+          $candidateCommit = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$($env:CANDIDATE_SHA)"
+          Assert-ExactComparison `
+            -Comparison $comparison `
+            -CandidateCommit $candidateCommit `
+            -ExpectedBase $env:BASE_SHA `
+            -ExpectedHead $env:CANDIDATE_SHA `
+            -FailureMessage "Candidate ancestry changed before merge."
 
           $merge = Invoke-GitHubApi -Method PUT -Path "/repos/$repository/pulls/$pullNumber/merge" -Body @{
             sha = $env:CANDIDATE_SHA
