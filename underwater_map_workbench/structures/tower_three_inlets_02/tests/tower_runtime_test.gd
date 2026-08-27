@@ -50,6 +50,7 @@ func _run() -> void:
 	await physics_frame
 
 	_verify_runtime_shape(controller, interactives)
+	_verify_visual_role_rename_resistance()
 	var initial_dynamic_positions := _dynamic_positions(controller)
 	_verify_s0(controller)
 	_verify_currents_s0(controller, structure_root)
@@ -84,6 +85,41 @@ func _verify_runtime_shape(controller, interactives: Node2D) -> void:
 		_assert(safety != null, "Każde dynamiczne ciało musi mieć SafetyEnvelope.")
 		if safety != null:
 			_assert(safety.collision_layer == 0 and safety.collision_mask == 1, "SafetyEnvelope ma tylko wykrywać ciała fizyki nurka.")
+	var facade := _barrier_body(controller, "facade")
+	var facade_socket_rect := _socket_rect("facade_ground_floor")
+	_assert(facade != null, "Runtime musi utworzyć ciało fasady.")
+	if facade != null:
+		_assert(str(facade.get_meta(&"visual_role", "")) == "egress_grille", "Fasada musi konsumować typowany visual_role=egress_grille.")
+		_assert(str(facade.call(&"visual_role")) == "egress_grille", "Rysowanie fasady musi być wybierane przez visual_role, nie etykietę lub symbol.")
+		_assert(facade.position.is_equal_approx(facade_socket_rect.get_center()), "Zamknięta krata musi zachować dotychczasową pozycję środka socketu.")
+		var collision := facade.get_node_or_null("CollisionShape2D") as CollisionShape2D
+		var shape: RectangleShape2D = collision.shape as RectangleShape2D if collision != null else null
+		_assert(shape != null and shape.size.is_equal_approx(facade_socket_rect.size), "Visual role kraty nie może zmienić prostokąta kolizji fasady.")
+
+
+func _verify_visual_role_rename_resistance() -> void:
+	var renamed_structure := _effective_structure.duplicate(true)
+	var runtime := renamed_structure.get("runtime", {}) as Dictionary
+	var barriers := runtime.get("barriers", []) as Array
+	for barrier_value: Variant in barriers:
+		var barrier := barrier_value as Dictionary
+		if str(barrier.get("id", "")) != "facade":
+			continue
+		barrier["label"] = "Neutralna osłona serwisowa"
+		barrier["symbol"] = "?"
+	var mounted := _mount_runtime("RenamedFacadeTower", Vector2(-1280.0, -420.0), renamed_structure)
+	var structure_root := mounted.get("root") as Node2D
+	var controller = mounted.get("controller")
+	_assert(controller != null, "Fixture rename-resistance musi skonfigurować runtime.")
+	if controller != null:
+		var facade := _barrier_body(controller, "facade")
+		_assert(facade != null, "Fixture rename-resistance musi znaleźć fasadę po stabilnym ID.")
+		if facade != null:
+			_assert(str(facade.get_meta(&"label", "")) == "Neutralna osłona serwisowa", "Fixture musi rzeczywiście zmienić etykietę fasady.")
+			_assert(str(facade.get_meta(&"symbol", "")) == "?", "Fixture musi rzeczywiście usunąć tekst WYJ z symbolu.")
+			_assert(str(facade.get_meta(&"visual_role", "")) == "egress_grille", "Zmiana etykiety i symbolu nie może zmienić roli wizualnej kraty.")
+	if structure_root != null:
+		structure_root.free()
 
 
 func _verify_s0(controller) -> void:
@@ -323,11 +359,15 @@ func _verify_sequence_and_motion(controller, structure_root: Node2D) -> void:
 	_assert(bool(controller.control("inlet_d").complete_dive_interaction().get("success", false)), "D: zwykła interakcja finalnego wlotu po V1 i V2 musi ukończyć sekwencję.")
 	_assert(str(controller.state_snapshot().get("d_state", "")) == "D_COMPLETE", "D: finalny wlot musi publikować D_COMPLETE.")
 	_assert(controller.barrier_is_commanded_open("facade") and not controller.barrier_is_open("facade"), "Fasada nie może raportować faktycznego otwarcia przed osiągnięciem celu ruchu.")
+	_assert(is_zero_approx(controller.barrier_open_progress("facade")), "Fasada musi rozpoczynać otwieranie z postępem 0.")
+	var mid_progress := await _await_barrier_mid_progress(controller, "facade")
+	_assert(mid_progress > 0.0 and mid_progress < 1.0, "Fasada musi przejść przez mierzalny stan MID przed OPEN.")
 	await _await_barrier_target(controller, "h3")
 	await _await_barrier_target(controller, "facade")
 	_verify_stage(controller, "S3", true, true, true, 0.0)
 	_assert(controller.barrier_is_open("h3") and controller.barrier_reached_target("h3"), "Po D H3 musi być otwarta.")
 	_assert(controller.barrier_is_open("facade") and controller.barrier_reached_target("facade"), "Po D fasada/wyjście musi być faktycznie otwarta.")
+	_assert(is_equal_approx(controller.barrier_open_progress("facade"), 1.0), "Otwarta fasada musi raportować postęp 1.")
 	_assert(not bool(controller.activate_control("d_reset").get("success", true)), "D: reset nie może cofnąć ukończonej próby.")
 	_assert(str(controller.state_snapshot().get("sequence_state", "")) == "S3", "Odrzucony reset po ukończeniu nie może zamknąć wyjścia.")
 
@@ -454,7 +494,11 @@ func _verify_fresh_instance() -> void:
 		fresh_root.free()
 
 
-func _mount_runtime(node_name: String, local_position: Vector2) -> Dictionary:
+func _mount_runtime(
+	node_name: String,
+	local_position: Vector2,
+	structure_record: Dictionary = {}
+) -> Dictionary:
 	var structure_root := Node2D.new()
 	structure_root.name = node_name
 	structure_root.position = local_position
@@ -468,7 +512,8 @@ func _mount_runtime(node_name: String, local_position: Vector2) -> Dictionary:
 	var controller = _controller_script.new()
 	controller.name = "TowerThreeInletsController"
 	dynamic_bodies.add_child(controller)
-	var errors = controller.configure(_effective_structure, interactives)
+	var resolved_structure: Dictionary = _effective_structure if structure_record.is_empty() else structure_record
+	var errors = controller.configure(resolved_structure, interactives)
 	_assert(errors is PackedStringArray or errors is Array, "configure musi zwrócić listę błędów.")
 	_assert(errors.is_empty(), "Poprawny pakiet W02 musi skonfigurować runtime bez błędów: %s." % errors)
 	if not errors.is_empty():
@@ -551,6 +596,16 @@ func _await_barrier_target(controller, barrier_id: String) -> void:
 			return
 		await physics_frame
 	_assert(false, "Bariera %s nie osiągnęła celu w limicie physics frames: %s." % [barrier_id, controller.state_snapshot()])
+
+
+func _await_barrier_mid_progress(controller, barrier_id: String) -> float:
+	for _frame: int in range(MAX_MOTION_FRAMES):
+		var progress: float = controller.barrier_open_progress(barrier_id)
+		if progress >= 0.4:
+			return progress
+		await physics_frame
+	_assert(false, "Bariera %s nie osiągnęła stanu MID." % barrier_id)
+	return controller.barrier_open_progress(barrier_id)
 
 
 func _await_cabinet_target(controller) -> void:

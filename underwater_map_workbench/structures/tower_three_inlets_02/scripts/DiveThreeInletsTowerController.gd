@@ -14,6 +14,9 @@ const D_CONTROL_IDS := ["d_v1", "d_v2", "d_reset", "inlet_d"]
 const CABINET_ID := "cabinet_d"
 const CURRENT_CENTRAL_ID := "central_shaft"
 const CURRENT_INLET_B_ID := "inlet_b"
+const VISUAL_ROLE_SOLID_PANEL := "solid_panel"
+const VISUAL_ROLE_EGRESS_GRILLE := "egress_grille"
+const SUPPORTED_VISUAL_ROLES := [VISUAL_ROLE_SOLID_PANEL, VISUAL_ROLE_EGRESS_GRILLE]
 
 const D_START := "D_START"
 const D_MOVING_RIGHT := "D_MOVING_RIGHT"
@@ -138,6 +141,21 @@ func barrier_reached_target(barrier_id: String) -> bool:
 	return body != null and body.reached_target()
 
 
+func barrier_open_progress(barrier_id: String) -> float:
+	if not _barriers.has(barrier_id):
+		return 0.0
+	var barrier := _barriers[barrier_id] as Dictionary
+	var body = barrier.get("body", null)
+	if body == null:
+		return 0.0
+	var closed_position: Vector2 = barrier.get("closed_position", Vector2.ZERO)
+	var open_position: Vector2 = barrier.get("open_position", Vector2.ZERO)
+	var travel_distance := closed_position.distance_to(open_position)
+	if travel_distance <= 0.0:
+		return 0.0
+	return clampf(closed_position.distance_to(body.position) / travel_distance, 0.0, 1.0)
+
+
 func barrier_safety_clear(barrier_id: String) -> bool:
 	if not _barriers.has(barrier_id):
 		return false
@@ -178,6 +196,7 @@ func state_snapshot() -> Dictionary:
 		barrier_states[barrier_id] = {
 			"commanded_open": barrier_is_commanded_open(barrier_id),
 			"open": barrier_is_open(barrier_id),
+			"open_progress": barrier_open_progress(barrier_id),
 			"reached_target": barrier_reached_target(barrier_id),
 			"safety_clear": barrier_safety_clear(barrier_id),
 		}
@@ -566,6 +585,13 @@ func _configuration_errors(
 			errors.append("Bariera %s wymaga niezerowego open_offset." % barrier_id)
 		if float(barrier.get("travel_speed", 0.0)) <= 0.0:
 			errors.append("Bariera %s wymaga dodatniego travel_speed." % barrier_id)
+		var visual_role := str(barrier.get("visual_role", ""))
+		if not visual_role in SUPPORTED_VISUAL_ROLES:
+			errors.append("Bariera %s ma nieobsługiwany visual_role: %s." % [barrier_id, visual_role])
+		elif barrier_id == "facade" and visual_role != VISUAL_ROLE_EGRESS_GRILLE:
+			errors.append("Fasada W02 musi używać visual_role=egress_grille.")
+		elif barrier_id != "facade" and visual_role != VISUAL_ROLE_SOLID_PANEL:
+			errors.append("Bariera %s musi używać visual_role=solid_panel." % barrier_id)
 	if barriers.size() != REQUIRED_BARRIER_IDS.size():
 		errors.append("W02 wymaga dokładnie pięciu barier kontraktu.")
 	for barrier_id: String in REQUIRED_BARRIER_IDS:
@@ -582,6 +608,8 @@ func _configuration_errors(
 		errors.append("Szafa D wymaga dodatniego ruchu move_down na osi Y.")
 	if float(cabinet.get("travel_speed", 0.0)) <= 0.0:
 		errors.append("Szafa D wymaga dodatniego travel_speed.")
+	if str(cabinet.get("visual_role", "")) != VISUAL_ROLE_SOLID_PANEL:
+		errors.append("Szafa D musi używać visual_role=solid_panel.")
 
 	var interactives := runtime.get("interactives", []) as Array
 	var control_ids := {}

@@ -200,15 +200,30 @@ func _verify_runtime_contract(package_manifest: Dictionary) -> void:
 	_assert(_sorted_ids(barriers) == _sorted_copy(EXPECTED_BARRIER_IDS), "W02 musi mieć dokładnie dynamiczne bariery g1/c_shortcut/g2/h3/facade.")
 	for barrier_value: Variant in barriers:
 		var barrier := barrier_value as Dictionary
+		var barrier_id := str(barrier.get("id", "?"))
 		_assert(float(barrier.get("travel_speed", 0.0)) > 0.0, "Bariera %s musi mieć dodatnią prędkość ruchu." % str(barrier.get("id", "?")))
 		_assert(not str(barrier.get("socket_id", "")).is_empty(), "Bariera %s musi wskazywać socket." % str(barrier.get("id", "?")))
 		_assert(_vector2(barrier.get("open_offset", [])).length() > 0.0, "Bariera %s musi mieć rzeczywisty open_offset." % str(barrier.get("id", "?")))
 		_assert(str(_record_by_id(package_manifest.get("sockets", []) as Array, str(barrier.get("socket_id", ""))).get("kind", "")) == "dynamic_door", "Bariera %s musi wiązać się z socketem dynamic_door." % str(barrier.get("id", "?")))
+		var expected_visual_role := "egress_grille" if barrier_id == "facade" else "solid_panel"
+		_assert(
+			str(barrier.get("visual_role", "")) == expected_visual_role,
+			"Bariera %s musi deklarować typowany visual_role=%s niezależny od tekstu etykiety."
+			% [barrier_id, expected_visual_role],
+		)
+	var facade := _record_by_id(barriers, "facade")
+	var facade_socket := _record_by_id(package_manifest.get("sockets", []) as Array, str(facade.get("socket_id", "")))
+	var egress_socket := _record_by_id(package_manifest.get("sockets", []) as Array, str(runtime.get("egress_socket_id", "")))
+	_assert(_rect2i(facade_socket.get("local_rect", [])) == Rect2i(2320, 3480, 80, 160), "Fasada musi zachować dotychczasowy rect kolizji 80x160 przy dolnym wyjściu.")
+	_assert(_rect2i(egress_socket.get("local_rect", [])) == Rect2i(2320, 3480, 80, 160), "Building egress musi pozostać współosiowy z fasadą.")
+	_assert(_vector2(facade.get("open_offset", [])).is_equal_approx(Vector2(0.0, -240.0)), "Fasada musi zachować dotychczasowy open_offset [0,-240].")
+	_assert(is_equal_approx(float(facade.get("travel_speed", 0.0)), 280.0), "Fasada musi zachować dotychczasową prędkość 280.")
 
 	var cabinet := runtime.get("cabinet", {}) as Dictionary
 	_assert(str(cabinet.get("id", "")) == "cabinet_d", "Automat D musi sterować cabinet_d.")
 	_assert(str(_record_by_id(package_manifest.get("sockets", []) as Array, str(cabinet.get("socket_id", ""))).get("kind", "")) == "moving_obstacle", "cabinet_d musi wiązać się z socketem moving_obstacle.")
 	_assert(float(cabinet.get("travel_speed", 0.0)) > 0.0, "cabinet_d musi mieć dodatnią prędkość ruchu.")
+	_assert(str(cabinet.get("visual_role", "")) == "solid_panel", "cabinet_d musi deklarować typowany visual_role=solid_panel.")
 	_assert(_vector2(cabinet.get("move_right", [])).x > 0.0, "Pierwszy krok D musi przesuwać cabinet_d w prawo.")
 	_assert(_vector2(cabinet.get("move_down", [])).y > 0.0, "Drugi krok D musi przesuwać cabinet_d w dół.")
 
