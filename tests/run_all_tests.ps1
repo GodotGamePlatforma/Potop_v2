@@ -3539,6 +3539,45 @@ function New-TestCase {
     }
 }
 
+function Set-NativeShardDummyAudio {
+    param(
+        [object[]]$TestCases,
+        [ValidateSet("headless", "native")]
+        [string]$ShardLane
+    )
+
+    $cases = @($TestCases)
+    if ($cases.Count -lt 1) {
+        throw "Shard lane '$ShardLane' cannot configure an empty test case set."
+    }
+
+    foreach ($testCase in $cases) {
+        $isNativeWindow = [bool]$testCase.NativeWindow
+        if ($ShardLane -eq "headless") {
+            if ($isNativeWindow) {
+                throw "Headless shard lane contains native target '$($testCase.Name)'."
+            }
+            continue
+        }
+
+        if (-not $isNativeWindow) {
+            throw "Native shard lane contains non-native target '$($testCase.Name)'."
+        }
+
+        $arguments = @($testCase.Arguments)
+        $existingAudioDriver = @($arguments | Where-Object {
+            $argumentText = [string]$_
+            $argumentText -ceq "--audio-driver" -or
+                $argumentText.StartsWith("--audio-driver=", [StringComparison]::Ordinal)
+        })
+        if ($existingAudioDriver.Count -gt 0) {
+            throw "Native shard target '$($testCase.Name)' already declares an audio driver."
+        }
+
+        $testCase.Arguments = [string[]](@("--audio-driver", "Dummy") + $arguments)
+    }
+}
+
 function Remove-AnsiEscapes {
     param([string]$Text)
 
@@ -4826,6 +4865,12 @@ try {
                     -Arguments @("--path", $projectRoot, $sceneResourcePath)))
             }
         }
+    }
+
+    if ($shardMode) {
+        Set-NativeShardDummyAudio `
+            -TestCases @($testCases) `
+            -ShardLane ([string]$activePlannedShard.Lane)
     }
 
     $suiteDescription = if ($shardMode) {
