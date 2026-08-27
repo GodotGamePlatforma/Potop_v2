@@ -139,6 +139,16 @@ class NulDiffParserTest(unittest.TestCase):
                     CI_PROTECTED_PATHS.parse_name_only_z(payload)
 
     def test_name_status_parser_preserves_both_rename_paths(self) -> None:
+        records = CI_PROTECTED_PATHS.parse_name_status_records_z(
+            b"M\0src/current.gd\0R100\0.github/old.yml\0docs/new.yml\0"
+        )
+        self.assertEqual(
+            records,
+            (
+                ("M", ("src/current.gd",)),
+                ("R100", (".github/old.yml", "docs/new.yml")),
+            ),
+        )
         paths = CI_PROTECTED_PATHS.parse_name_status_z(
             b"M\0src/current.gd\0R100\0.github/old.yml\0docs/new.yml\0"
         )
@@ -305,7 +315,7 @@ class DiffAdmissionTest(unittest.TestCase):
             runtime_head = self._commit(repository, "forbidden runtime payload")
             with self.assertRaisesRegex(
                 CI_PROTECTED_PATHS.ProtectedPathError,
-                "outside its exact verifier-only lane",
+                "accepts only exact modified files",
             ):
                 CI_PROTECTED_PATHS.validate_map_maintenance_diff(
                     repository, base, runtime_head
@@ -317,7 +327,7 @@ class DiffAdmissionTest(unittest.TestCase):
             forbidden_head = self._commit(repository, "forbidden maintenance")
             with self.assertRaisesRegex(
                 CI_PROTECTED_PATHS.ProtectedPathError,
-                "outside its exact verifier-only lane",
+                "accepts only exact modified files",
             ):
                 CI_PROTECTED_PATHS.validate_map_maintenance_diff(
                     repository, runtime_head, forbidden_head
@@ -327,11 +337,88 @@ class DiffAdmissionTest(unittest.TestCase):
             no_protected_head = self._commit(repository, "unprotected only")
             with self.assertRaisesRegex(
                 CI_PROTECTED_PATHS.ProtectedPathError,
-                "at least one protected",
+                "outside its exact verifier-only lane",
             ):
                 CI_PROTECTED_PATHS.validate_map_maintenance_diff(
                     repository, forbidden_head, no_protected_head
                 )
+
+    def test_map_maintenance_requires_exact_case_sensitive_modified_records(self) -> None:
+        base = "1" * 40
+        head = "2" * 40
+        repository = Path("candidate").resolve()
+        builder = b"underwater_map_workbench/tools/build_underwater_map.py"
+        invalid_payloads = (
+            b"A\0" + builder + b"\0",
+            b"D\0" + builder + b"\0",
+            b"R100\0" + builder + b"\0"
+            + b"underwater_map_workbench/tests/underwater_map_smoke_test.gd\0",
+            b"M\0underwater_map_workbench/Tools/build_underwater_map.py\0",
+        )
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                with (
+                    mock.patch.object(
+                        CI_PROTECTED_PATHS,
+                        "_repository_root",
+                        return_value=repository,
+                    ),
+                    mock.patch.object(
+                        CI_PROTECTED_PATHS,
+                        "_resolve_exact_commit",
+                        side_effect=(base, head),
+                    ),
+                    mock.patch.object(
+                        CI_PROTECTED_PATHS,
+                        "_git_bytes",
+                        return_value=payload,
+                    ),
+                ):
+                    with self.assertRaises(CI_PROTECTED_PATHS.ProtectedPathError):
+                        CI_PROTECTED_PATHS.validate_map_maintenance_diff(
+                            repository, base, head
+                        )
+
+    def test_map_maintenance_uses_name_status_with_rename_detection(self) -> None:
+        base = "1" * 40
+        head = "2" * 40
+        repository = Path("candidate").resolve()
+        payload = (
+            b"M\0underwater_map_workbench/tools/build_underwater_map.py\0"
+        )
+        with (
+            mock.patch.object(
+                CI_PROTECTED_PATHS,
+                "_repository_root",
+                return_value=repository,
+            ),
+            mock.patch.object(
+                CI_PROTECTED_PATHS,
+                "_resolve_exact_commit",
+                side_effect=(base, head),
+            ),
+            mock.patch.object(
+                CI_PROTECTED_PATHS,
+                "_git_bytes",
+                return_value=payload,
+            ) as git_bytes,
+        ):
+            result = CI_PROTECTED_PATHS.validate_map_maintenance_diff(
+                repository, base, head
+            )
+        self.assertEqual(result["protected_path_count"], 1)
+        self.assertEqual(
+            git_bytes.call_args.args[1:],
+            (
+                "diff",
+                "--name-status",
+                "--find-renames",
+                "-z",
+                base,
+                head,
+                "--",
+            ),
+        )
 
 
 class CommandLineTest(unittest.TestCase):

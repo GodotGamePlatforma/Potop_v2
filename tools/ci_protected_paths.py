@@ -158,15 +158,17 @@ def parse_name_only_z(payload: bytes) -> tuple[str, ...]:
     return _bounded_paths(_decode_path(field) for field in fields)
 
 
-def parse_name_status_z(payload: bytes) -> tuple[str, ...]:
-    """Parse `git diff --name-status -z`, preserving both rename paths."""
-
+def parse_name_status_records_z(
+    payload: bytes,
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Parse exact NUL-framed name-status records without losing status."""
     if not payload:
         return ()
     if not payload.endswith(b"\0"):
         raise ProtectedPathError("NUL name-status stream is not terminated.")
     fields = payload[:-1].split(b"\0")
-    paths: list[str] = []
+    records: list[tuple[str, tuple[str, ...]]] = []
+    path_total = 0
     offset = 0
     while offset < len(fields):
         try:
@@ -181,14 +183,31 @@ def parse_name_status_z(payload: bytes) -> tuple[str, ...]:
             raise ProtectedPathError(
                 f"Name-status record {status!r} is missing path fields."
             )
+        record_paths: list[str] = []
         for raw_path in fields[offset:offset + path_count]:
             if raw_path == b"":
                 raise ProtectedPathError(
                     f"Name-status record {status!r} contains an empty path."
                 )
-            paths.append(_decode_path(raw_path))
+            record_paths.append(normalize_repo_path(_decode_path(raw_path)))
+        path_total += len(record_paths)
+        if path_total > MAX_CHANGED_PATHS:
+            raise ProtectedPathError(
+                f"Diff exceeds the {MAX_CHANGED_PATHS}-path admission limit."
+            )
+        records.append((status, tuple(record_paths)))
         offset += path_count
-    return _bounded_paths(paths)
+    return tuple(records)
+
+
+def parse_name_status_z(payload: bytes) -> tuple[str, ...]:
+    """Parse `git diff --name-status -z`, preserving both rename paths."""
+
+    return tuple(
+        path
+        for _status, paths in parse_name_status_records_z(payload)
+        for path in paths
+    )
 
 
 def _git_bytes(repository: Path, *arguments: str) -> bytes:
@@ -304,27 +323,39 @@ def validate_map_maintenance_diff(
     payload = _git_bytes(
         root,
         "diff",
-        "--name-only",
-        "--no-renames",
+        "--name-status",
+        "--find-renames",
         "-z",
         base_commit,
         head_commit,
         "--",
     )
-    paths = parse_name_only_z(payload)
-    protected = tuple(sorted({path for path in paths if is_protected_path(path)}))
-    if not protected:
+    records = parse_name_status_records_z(payload)
+    if not records:
         raise ProtectedPathError(
             "Map maintenance requires at least one protected map verifier path."
         )
-    unauthorized = tuple(
-        path for path in paths if path.lower() not in MAP_MAINTENANCE_ALLOWED_PATHS
-    )
+    paths: list[str] = []
+    unauthorized: list[str] = []
+    for status, record_paths in records:
+        if status != "M" or len(record_paths) != 1:
+            rendered = " -> ".join(record_paths)
+            raise ProtectedPathError(
+                "Map maintenance accepts only exact modified files, not "
+                f"status {status!r}: {rendered}"
+            )
+        path = record_paths[0]
+        paths.append(path)
+        if path not in MAP_MAINTENANCE_ALLOWED_PATHS:
+            unauthorized.append(path)
+    if len(set(paths)) != len(paths):
+        raise ProtectedPathError("Map maintenance diff contains a duplicate path.")
     if unauthorized:
         raise ProtectedPathError(
             "Map maintenance cannot authorize paths outside its exact verifier-only lane: "
             + ", ".join(unauthorized)
         )
+    protected = tuple(sorted(paths))
     return {
         "status": "PASS",
         "path_count": len(paths),

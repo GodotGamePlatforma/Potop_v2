@@ -575,7 +575,7 @@ def audit_check_surface(
         expected_mutations.update(
             {
                 ("maintenance", "inspect"): [],
-                ("maintenance", "authorize"): ["PATCH", "POST", "PATCH", "PATCH"],
+                ("maintenance", "authorize"): ["POST", "PATCH", "PATCH"],
                 ("maintenance", "audit-merged-main"): [],
             }
         )

@@ -30,10 +30,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: map-control-plane-maintenance
-  cancel-in-progress: false
-
 jobs:
   inspect:
     name: Inspect exact map verifier update
@@ -189,6 +185,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: control-plane-maintenance
+    concurrency:
+      group: map-control-plane-authorize-${{ needs.inspect.outputs.pr-number }}-${{ needs.inspect.outputs.candidate-sha }}-${{ needs.inspect.outputs.authorization-sha256 }}
+      cancel-in-progress: false
     permissions:
       actions: read
       checks: read
@@ -273,34 +272,62 @@ jobs:
           $handoffExternalId = "control-plane-handoff-v1:$($env:PR_NUMBER):$($env:BASE_SHA):$($env:CANDIDATE_SHA):$authorizationSha"
           if ($handoffExternalId.Length -gt 255) { throw "Control-plane handoff external_id exceeds 255 characters." }
           $successPattern = "^control-plane-v2:$($env:PR_NUMBER):$($env:BASE_SHA):$($env:CANDIDATE_SHA):$($authorizationSha):[0-9a-f]{64}$"
+          $familyHandoffPattern = "^control-plane-handoff-v1:$($env:PR_NUMBER):$($env:BASE_SHA):$($env:CANDIDATE_SHA):[0-9a-f]{64}$"
+          $familySuccessPattern = "^control-plane-v2:$($env:PR_NUMBER):$($env:BASE_SHA):$($env:CANDIDATE_SHA):[0-9a-f]{64}:[0-9a-f]{64}$"
+          function Get-MaintenanceFamilyDecision {
+            param(
+              [object[]]$CheckRuns,
+              [string]$CandidateSha,
+              [string]$HandoffExternalId,
+              [string]$SuccessPattern,
+              [string]$FamilyHandoffPattern,
+              [string]$FamilySuccessPattern,
+              [long]$ExpectedAppId
+            )
+            $family = @(
+              $CheckRuns |
+                Where-Object {
+                  $_.name -ceq $requiredCheck -and
+                  $_.head_sha -ceq $CandidateSha -and
+                  [long]$_.app.id -eq $ExpectedAppId -and
+                  ($_.external_id -cmatch $FamilyHandoffPattern -or
+                   $_.external_id -cmatch $FamilySuccessPattern)
+                } |
+                Sort-Object -Property @{ Expression = { [long]$_.id } } -Descending
+            )
+            if ($family.Count -eq 0) {
+              return [pscustomobject]@{ action = "queue"; check = $null }
+            }
+            $latest = $family[0]
+            if ($latest.external_id -cmatch $SuccessPattern -and
+                $latest.status -ceq "completed" -and
+                $latest.conclusion -ceq "success") {
+              return [pscustomobject]@{ action = "certified"; check = $latest }
+            }
+            if ($latest.status -ceq "queued" -and
+                $latest.external_id -ceq $HandoffExternalId) {
+              # A host may have died between Check Run creation and dispatch.
+              return [pscustomobject]@{ action = "dispatch"; check = $latest }
+            }
+            # A completed failure or an in-progress lease may belong to a dead
+            # executor. A manual retry creates a newer Check Run; late writers
+            # remain bound to their older check_run_id and cannot win newest-family.
+            return [pscustomobject]@{ action = "queue"; check = $null }
+          }
           $encodedCheck = [Uri]::EscapeDataString($requiredCheck)
           $checkResponse = Invoke-RestMethod -Method GET `
             -Uri "https://api.github.com/repos/$repository/commits/$($env:CANDIDATE_SHA)/check-runs?check_name=$encodedCheck&filter=all&per_page=100" `
             -Headers $attesterHeaders
-          $family = @(
-            $checkResponse.check_runs |
-              Where-Object {
-                $_.name -ceq $requiredCheck -and
-                $_.head_sha -ceq $env:CANDIDATE_SHA -and
-                [long]$_.app.id -eq $appId -and
-                ($_.external_id -ceq $handoffExternalId -or $_.external_id -cmatch $successPattern)
-              } |
-              Sort-Object -Property @{ Expression = { [long]$_.id } } -Descending
-          )
-          $certified = @(
-            $family |
-              Where-Object {
-                $_.external_id -cmatch $successPattern -and
-                $_.status -ceq "completed" -and
-                $_.conclusion -ceq "success"
-              }
-          )
-          if ($certified.Count -gt 0) {
-            Write-Output "Exact map verifier authorization is already certified."
-            exit 0
-          }
-          if ($family.Count -gt 0 -and $family[0].status -ceq "in_progress") {
-            Write-Output "Exact map verifier authorization is already running."
+          $decision = Get-MaintenanceFamilyDecision `
+            -CheckRuns @($checkResponse.check_runs) `
+            -CandidateSha $env:CANDIDATE_SHA `
+            -HandoffExternalId $handoffExternalId `
+            -SuccessPattern $successPattern `
+            -FamilyHandoffPattern $familyHandoffPattern `
+            -FamilySuccessPattern $familySuccessPattern `
+            -ExpectedAppId $appId
+          if ($decision.action -ceq "certified") {
+            Write-Output "Exact map verifier authorization is already certified by the newest family check."
             exit 0
           }
 
@@ -316,19 +343,15 @@ jobs:
             }
           }
           $checkBody = $checkPayload | ConvertTo-Json -Depth 8 -Compress
-          if ($family.Count -gt 0 -and $family[0].status -ceq "queued") {
-            # A previous host may have died after creating the Check Run but
-            # before repository_dispatch. Reuse it and dispatch again.
-            $check = $family[0]
+          if ($decision.action -ceq "dispatch") {
+            $check = $decision.check
           }
-          elseif ($family.Count -gt 0) {
-            $check = Invoke-RestMethod -Method PATCH `
-              -Uri "https://api.github.com/repos/$repository/check-runs/$([long]$family[0].id)" `
+          elseif ($decision.action -ceq "queue") {
+            $check = Invoke-RestMethod -Method POST -Uri "https://api.github.com/repos/$repository/check-runs" `
               -Headers $attesterHeaders -ContentType "application/json" -Body $checkBody
           }
           else {
-            $check = Invoke-RestMethod -Method POST -Uri "https://api.github.com/repos/$repository/check-runs" `
-              -Headers $attesterHeaders -ContentType "application/json" -Body $checkBody
+            throw "Unknown maintenance-family action: $($decision.action)"
           }
           if ($check.name -cne $requiredCheck -or
               $check.head_sha -cne $env:CANDIDATE_SHA -or
@@ -397,6 +420,9 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: map-control-plane-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+      cancel-in-progress: false
     permissions:
       checks: read
       contents: write

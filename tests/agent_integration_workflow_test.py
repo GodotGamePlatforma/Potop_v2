@@ -258,6 +258,15 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("pull_request:", workflow)
         self.assertIn("- closed", workflow)
+        self.assertIn(
+            "group: map-control-plane-authorize-${{ needs.inspect.outputs.pr-number }}-${{ needs.inspect.outputs.candidate-sha }}-${{ needs.inspect.outputs.authorization-sha256 }}",
+            authorize,
+        )
+        self.assertIn(
+            "group: map-control-plane-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}",
+            post_merge,
+        )
+        self.assertNotIn("group: map-control-plane-maintenance\n", workflow)
         self.assertNotIn("authorize-map-control-plane-maintenance", workflow)
         self.assertRegex(workflow, r"(?m)^permissions:\s*\{\}\s*$")
         self.assertNotIn("\n  request:\n", workflow)
@@ -284,7 +293,10 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         self.assertIn("permit an explicit self-review", authorize)
         self.assertIn('event_type = "verify-map-control-plane-candidate"', authorize)
         self.assertIn('name = $requiredCheck', authorize)
-        self.assertIn('$family[0].status -ceq "queued"', authorize)
+        self.assertIn('$decision.action -ceq "dispatch"', authorize)
+        self.assertIn('manual retry creates a newer Check Run', authorize)
+        self.assertNotIn("$certified", authorize)
+        self.assertNotIn('$family[0].status -ceq "in_progress"', authorize)
         self.assertIn('status = "in_progress"', authorize)
         self.assertLess(
             authorize.index('event_type = "verify-map-control-plane-candidate"'),
@@ -438,6 +450,83 @@ $decision = Get-CandidateFamilyDecision -CheckRuns $checks -CandidateSha "{candi
 if ($decision.action -cne "queue" -or [long]$decision.check.id -ne 11L) {{
   throw "Older candidate success was replayed over the newer failed handoff."
 }}
+'''
+        result = subprocess.run(
+            [str(powershell), "-NoProfile", "-NonInteractive", "-Command", "-"],
+            input=script,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_maintenance_retry_uses_only_newest_family_and_recovers_stale_lease(self) -> None:
+        authorize = _job(_workflow("map-control-plane-maintenance.yml"), "authorize")
+        match = re.search(
+            r"(?ms)^          (function Get-MaintenanceFamilyDecision \{.*?"
+            r"^          \})\n^          \$encodedCheck",
+            authorize,
+        )
+        self.assertIsNotNone(match)
+        powershell = shutil.which("pwsh") or shutil.which("powershell")
+        self.assertIsNotNone(powershell, "PowerShell is required for workflow policy tests")
+        candidate_sha = "2" * 40
+        handoff_external = (
+            f"control-plane-handoff-v1:7:{'1' * 40}:{candidate_sha}:{'3' * 64}"
+        )
+        success_pattern = (
+            f"^control-plane-v2:7:{'1' * 40}:{candidate_sha}:{'3' * 64}:"
+            "[0-9a-f]{64}$"
+        )
+        family_handoff_pattern = (
+            f"^control-plane-handoff-v1:7:{'1' * 40}:{candidate_sha}:"
+            "[0-9a-f]{64}$"
+        )
+        family_success_pattern = (
+            f"^control-plane-v2:7:{'1' * 40}:{candidate_sha}:"
+            "[0-9a-f]{64}:[0-9a-f]{64}$"
+        )
+        success_external = (
+            f"control-plane-v2:7:{'1' * 40}:{candidate_sha}:{'3' * 64}:"
+            f"{'4' * 64}"
+        )
+        script = f'''\
+$ErrorActionPreference = "Stop"
+$requiredCheck = "integration-green"
+{match.group(1)}
+$olderSuccessNewerFailure = @(
+  [pscustomobject]@{{ id = 10L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = "{success_external}"; status = "completed"; conclusion = "success"; app = [pscustomobject]@{{ id = 77L }} }},
+  [pscustomobject]@{{ id = 11L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = "{handoff_external}"; status = "completed"; conclusion = "failure"; app = [pscustomobject]@{{ id = 77L }} }}
+)
+$failed = Get-MaintenanceFamilyDecision -CheckRuns $olderSuccessNewerFailure -CandidateSha "{candidate_sha}" -HandoffExternalId "{handoff_external}" -SuccessPattern "{success_pattern}" -FamilyHandoffPattern "{family_handoff_pattern}" -FamilySuccessPattern "{family_success_pattern}" -ExpectedAppId 77
+if ($failed.action -cne "queue" -or $null -ne $failed.check) {{ throw "Older success was replayed over newer maintenance failure." }}
+
+$staleLease = @(
+  [pscustomobject]@{{ id = 12L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = "{handoff_external}"; status = "in_progress"; conclusion = $null; app = [pscustomobject]@{{ id = 77L }} }}
+)
+$stale = Get-MaintenanceFamilyDecision -CheckRuns $staleLease -CandidateSha "{candidate_sha}" -HandoffExternalId "{handoff_external}" -SuccessPattern "{success_pattern}" -FamilyHandoffPattern "{family_handoff_pattern}" -FamilySuccessPattern "{family_success_pattern}" -ExpectedAppId 77
+if ($stale.action -cne "queue" -or $null -ne $stale.check) {{ throw "Stale maintenance lease was not recoverable." }}
+
+$queuedLease = @(
+  [pscustomobject]@{{ id = 13L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = "{handoff_external}"; status = "queued"; conclusion = $null; app = [pscustomobject]@{{ id = 77L }} }}
+)
+$queued = Get-MaintenanceFamilyDecision -CheckRuns $queuedLease -CandidateSha "{candidate_sha}" -HandoffExternalId "{handoff_external}" -SuccessPattern "{success_pattern}" -FamilyHandoffPattern "{family_handoff_pattern}" -FamilySuccessPattern "{family_success_pattern}" -ExpectedAppId 77
+if ($queued.action -cne "dispatch" -or [long]$queued.check.id -ne 13L) {{ throw "Queued crash-window lease was not redispatched." }}
+
+$newestSuccess = @(
+  [pscustomobject]@{{ id = 14L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = "{success_external}"; status = "completed"; conclusion = "success"; app = [pscustomobject]@{{ id = 77L }} }}
+)
+$complete = Get-MaintenanceFamilyDecision -CheckRuns $newestSuccess -CandidateSha "{candidate_sha}" -HandoffExternalId "{handoff_external}" -SuccessPattern "{success_pattern}" -FamilyHandoffPattern "{family_handoff_pattern}" -FamilySuccessPattern "{family_success_pattern}" -ExpectedAppId 77
+if ($complete.action -cne "certified" -or [long]$complete.check.id -ne 14L) {{ throw "Newest successful maintenance family was not accepted." }}
+
+$otherAuthorization = "{'5' * 64}"
+$otherHandoff = "control-plane-handoff-v1:7:{'1' * 40}:{candidate_sha}:$otherAuthorization"
+$newerOtherAuthorization = @(
+  [pscustomobject]@{{ id = 14L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = "{success_external}"; status = "completed"; conclusion = "success"; app = [pscustomobject]@{{ id = 77L }} }},
+  [pscustomobject]@{{ id = 15L; name = "integration-green"; head_sha = "{candidate_sha}"; external_id = $otherHandoff; status = "queued"; conclusion = $null; app = [pscustomobject]@{{ id = 77L }} }}
+)
+$other = Get-MaintenanceFamilyDecision -CheckRuns $newerOtherAuthorization -CandidateSha "{candidate_sha}" -HandoffExternalId "{handoff_external}" -SuccessPattern "{success_pattern}" -FamilyHandoffPattern "{family_handoff_pattern}" -FamilySuccessPattern "{family_success_pattern}" -ExpectedAppId 77
+if ($other.action -cne "queue" -or $null -ne $other.check) {{ throw "A newer different authorization did not fence an older success." }}
 '''
         result = subprocess.run(
             [str(powershell), "-NoProfile", "-NonInteractive", "-Command", "-"],
