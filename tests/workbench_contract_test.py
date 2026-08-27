@@ -222,6 +222,49 @@ class WorkbenchOwnershipTest(unittest.TestCase):
 
 
 class WorkbenchGitStateTest(unittest.TestCase):
+    def test_validate_diff_accepts_clean_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = _new_repository(Path(temporary))
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = contract.main(
+                    [
+                        "--repo",
+                        str(repository),
+                        "validate",
+                        "--owner",
+                        "root",
+                        "--diff",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0, stderr.getvalue())
+            self.assertEqual(stdout.getvalue().strip(), "PASS owner=root paths=0")
+
+    def test_validate_without_selector_still_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = _new_repository(Path(temporary))
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = contract.main(
+                    [
+                        "--repo",
+                        str(repository),
+                        "validate",
+                        "--owner",
+                        "root",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn(
+                "validate requires --path, --write-set, --diff or --base",
+                stderr.getvalue(),
+            )
+
     def test_inventory_includes_tracked_and_nonignored_untracked(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = _new_repository(Path(temporary))
