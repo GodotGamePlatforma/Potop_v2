@@ -33,7 +33,7 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 
 - Status / aktywny zakres: Zastąpiona; brak aktywnego zakresu
 - Zatwierdzenie / zastąpienie: 2026-08-26 / 2026-08-27
-- Relacje: Zastąpiona przez: DIVER-ARD-0006
+- Relacje: Historyczna decyzja koperty | Zastąpiona przez: DIVER-ARD-0006
 - Odwołania historyczne: uszczegóławiała globalne ARD-0103 i ARD-0105/D7; punkt emisji i montaż światła uszczegółowił DIVER-ARD-0003
 - D1. Collider gracza jest jedną prostą, stabilną bryłą obejmującą sztywną część postaci. Płetwy i wtórny ruch animacji nie otrzymują colliderów per klatka.
 - D2. Widoczna alfa całej animacji ma docelową kopertę `70 × 40`, zgodną z obwiednią stabilnego collidera. Nie skaluje się całego korzenia `CharacterBody2D`; aktywne strojenie skali i wycentrowania gałęzi wizualnej należy do walidowanego `assets/profiles/diver_frame_envelope_profile.tres`.
