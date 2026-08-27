@@ -44,7 +44,7 @@ const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap
 const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
-const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v2"
+const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v3"
 const PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID := "L04"
 const PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS := ["L01", "L02"]
 const PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS := ["L03", "L04"]
@@ -2512,25 +2512,29 @@ func _generated_portal_backdrop_clearance_errors(
 		"#%s" % str(expected_visual.get("water_color", "")),
 		Color.TRANSPARENT,
 	)
-	var feather_shadow := Color(
-		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
-		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
-		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
-		1.0,
+	var feather_outer_color := Color(
+		expected_water_color.r * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		expected_water_color.g * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		expected_water_color.b * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		expected_water_color.a,
 	)
 	var expected_vertex_colors := {
 		"Core": PackedColorArray(),
 		"FeatherLeft": PackedColorArray([
-			feather_shadow, Color.WHITE, Color.WHITE, feather_shadow,
+			feather_outer_color, expected_water_color,
+			expected_water_color, feather_outer_color,
 		]),
 		"FeatherRight": PackedColorArray([
-			Color.WHITE, feather_shadow, feather_shadow, Color.WHITE,
+			expected_water_color, feather_outer_color,
+			feather_outer_color, expected_water_color,
 		]),
 		"FeatherTop": PackedColorArray([
-			feather_shadow, feather_shadow, Color.WHITE, Color.WHITE,
+			feather_outer_color, feather_outer_color,
+			expected_water_color, expected_water_color,
 		]),
 		"FeatherBottom": PackedColorArray([
-			Color.WHITE, Color.WHITE, feather_shadow, feather_shadow,
+			expected_water_color, expected_water_color,
+			feather_outer_color, feather_outer_color,
 		]),
 	}
 	for child: Node in clearance_root.get_children():
@@ -2629,8 +2633,16 @@ func _generated_portal_backdrop_clearance_errors(
 					or not polygon.antialiased
 				):
 					errors.append("Portal clearance polygon musi mieć neutralny render state.")
-				if not polygon.color.is_equal_approx(expected_water_color):
-					errors.append("Portal clearance polygon musi używać visual.water_color.")
+				var expected_polygon_color := (
+					expected_water_color
+					if str(visual_child.name) == "Core"
+					else Color.WHITE
+				)
+				if not polygon.color.is_equal_approx(expected_polygon_color):
+					errors.append(
+						"Portal clearance musi rozdzielać kolor Core od pełnych "
+						+ "kolorów wierzchołków Feather."
+					)
 				var expected_colors_value: Variant = expected_vertex_colors.get(
 					str(visual_child.name), null
 				)

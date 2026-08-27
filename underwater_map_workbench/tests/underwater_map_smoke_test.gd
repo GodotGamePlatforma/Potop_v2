@@ -14,7 +14,7 @@ const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
 const STREAMED_BACKDROP_CONTRACT := "camera_windowed_texture_v1"
-const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v2"
+const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v3"
 const PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID := "L04"
 const PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS := ["L01", "L02"]
 const PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS := ["L03", "L04"]
@@ -3185,26 +3185,29 @@ func _assert_portal_backdrop_clearances(
 				Vector2(core_left, outer_bottom),
 			]),
 		}
-		var feather_shadow := Color(
-			PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
-			PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
-			PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
-			1.0,
+		var feather_outer_color := Color(
+			expected_water_color.r * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+			expected_water_color.g * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+			expected_water_color.b * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+			expected_water_color.a,
 		)
-		var opaque_white := Color.WHITE
 		var expected_vertex_colors := {
 			"Core": PackedColorArray(),
 			"FeatherLeft": PackedColorArray([
-				feather_shadow, opaque_white, opaque_white, feather_shadow,
+				feather_outer_color, expected_water_color,
+				expected_water_color, feather_outer_color,
 			]),
 			"FeatherRight": PackedColorArray([
-				opaque_white, feather_shadow, feather_shadow, opaque_white,
+				expected_water_color, feather_outer_color,
+				feather_outer_color, expected_water_color,
 			]),
 			"FeatherTop": PackedColorArray([
-				feather_shadow, feather_shadow, opaque_white, opaque_white,
+				feather_outer_color, feather_outer_color,
+				expected_water_color, expected_water_color,
 			]),
 			"FeatherBottom": PackedColorArray([
-				opaque_white, opaque_white, feather_shadow, feather_shadow,
+				expected_water_color, expected_water_color,
+				feather_outer_color, feather_outer_color,
 			]),
 		}
 		_assert(bool(clearance.get_meta("visual_only", false)), "%s clearance musi być visual-only." % owner_label)
@@ -3246,7 +3249,14 @@ func _assert_portal_backdrop_clearances(
 					"%s %s musi mieć dokładny, nieprzezroczysty układ core/feather."
 					% [owner_label, visual_name],
 				)
-				_assert(polygon.color.is_equal_approx(expected_water_color), "%s clearance musi używać water_color." % owner_label)
+				var expected_polygon_color := (
+					expected_water_color if visual_name == "Core" else Color.WHITE
+				)
+				_assert(
+					polygon.color.is_equal_approx(expected_polygon_color),
+					"%s %s musi rozdzielać kolor Core od pełnych kolorów Feather."
+					% [owner_label, visual_name],
+				)
 				_assert(
 					str(polygon.get_meta("role", ""))
 					== (

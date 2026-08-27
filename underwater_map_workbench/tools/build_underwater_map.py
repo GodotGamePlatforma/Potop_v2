@@ -129,7 +129,7 @@ STRUCTURE_INTERIOR_TEXTURE_KIND = "structure_interior_texture"
 STRUCTURE_OWNER_MASKED_TEXTURE_KIND = "structure_owner_masked_texture"
 STRUCTURE_INTERIOR_AFFORDANCE = "open_water_clipped_interior"
 STRUCTURE_OWNER_AFFORDANCE = "exact_owner_solid_surface"
-PORTAL_BACKDROP_CLEARANCE_CONTRACT = "raster_boundary_opening_clearance_v2"
+PORTAL_BACKDROP_CLEARANCE_CONTRACT = "raster_boundary_opening_clearance_v3"
 PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID = "L04"
 PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS = ("L01", "L02")
 PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS = ("L03", "L04")
@@ -3053,6 +3053,28 @@ def _gd_color(value: Any, label: str, alpha_override: int | None = None) -> str:
     )
 
 
+def _gd_color_components(
+    value: Any,
+    label: str,
+    *,
+    rgb_multiplier: float = 1.0,
+) -> str:
+    normalized = _color(value, label)
+    red = int(normalized[0:2], 16) / 255.0
+    green = int(normalized[2:4], 16) / 255.0
+    blue = int(normalized[4:6], 16) / 255.0
+    alpha = int(normalized[6:8], 16) / 255.0 if len(normalized) == 8 else 1.0
+    return ", ".join(
+        _gd_number(component)
+        for component in (
+            red * rgb_multiplier,
+            green * rgb_multiplier,
+            blue * rgb_multiplier,
+            alpha,
+        )
+    )
+
+
 def _gd_points(points: Iterable[tuple[float, float]]) -> str:
     flattened = ", ".join(
         _gd_number(component)
@@ -5291,15 +5313,15 @@ def _append_portal_backdrop_clearances(
         manifest["visual"]["water_color"],
         "visual.water_color",
     )
-    shadow = ", ".join(
-        (
-            _gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT),
-            _gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT),
-            _gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT),
-            "1",
-        )
+    feather_inner = _gd_color_components(
+        manifest["visual"]["water_color"],
+        "visual.water_color",
     )
-    opaque = "1, 1, 1, 1"
+    feather_outer = _gd_color_components(
+        manifest["visual"]["water_color"],
+        "visual.water_color",
+        rgb_multiplier=PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+    )
     for clearance in clearances:
         geometry_digest = str(clearance["geometry_digest"])
         node_name = f"Clearance_{geometry_digest}"
@@ -5325,7 +5347,7 @@ def _append_portal_backdrop_clearances(
                     (core_x, core_bottom),
                     (outer_x, core_bottom),
                 ),
-                (shadow, opaque, opaque, shadow),
+                (feather_outer, feather_inner, feather_inner, feather_outer),
             ),
             (
                 "FeatherRight",
@@ -5335,7 +5357,7 @@ def _append_portal_backdrop_clearances(
                     (outer_right, core_bottom),
                     (core_right, core_bottom),
                 ),
-                (opaque, shadow, shadow, opaque),
+                (feather_inner, feather_outer, feather_outer, feather_inner),
             ),
             (
                 "FeatherTop",
@@ -5345,7 +5367,7 @@ def _append_portal_backdrop_clearances(
                     (core_right, core_y),
                     (core_x, core_y),
                 ),
-                (shadow, shadow, opaque, opaque),
+                (feather_outer, feather_outer, feather_inner, feather_inner),
             ),
             (
                 "FeatherBottom",
@@ -5355,7 +5377,7 @@ def _append_portal_backdrop_clearances(
                     (core_right, outer_bottom),
                     (core_x, outer_bottom),
                 ),
-                (opaque, opaque, shadow, shadow),
+                (feather_inner, feather_inner, feather_outer, feather_outer),
             ),
         )
         lines.extend(
@@ -5398,7 +5420,7 @@ def _append_portal_backdrop_clearances(
                     "",
                     f'[node name="{feather_name}" type="Polygon2D" parent="{node_path}"]',
                     f"polygon = {_gd_points(feather_points)}",
-                    f"color = {water_color}",
+                    "color = Color(1, 1, 1, 1)",
                     "vertex_colors = PackedColorArray("
                     + ", ".join(vertex_colors)
                     + ")",

@@ -175,8 +175,11 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertNotIn("StaticBody2D", rendered)
         self.assertNotIn("PackedColorArray(Color", rendered)
         self.assertIn(
-            "vertex_colors = PackedColorArray(0.82, 0.82, 0.82, 1, "
-            "1, 1, 1, 1, 1, 1, 1, 1, 0.82, 0.82, 0.82, 1)",
+            "vertex_colors = PackedColorArray("
+            "0.022509804, 0.093254902, 0.13505882, 1, "
+            "0.02745098, 0.11372549, 0.16470588, 1, "
+            "0.02745098, 0.11372549, 0.16470588, 1, "
+            "0.022509804, 0.093254902, 0.13505882, 1)",
             rendered,
         )
         vertex_color_lines = [
@@ -190,6 +193,13 @@ class PortalBackdropClearanceTest(unittest.TestCase):
                 "vertex_colors = PackedColorArray("
             ).removesuffix(")").split(", ")
             self.assertEqual(["1", "1", "1", "1"], components[3::4])
+        self.assertEqual(8, rendered.count("color = Color(1, 1, 1, 1)"))
+        self.assertEqual(
+            2,
+            rendered.count(
+                "color = Color(0.02745098, 0.11372549, 0.16470588, 1)"
+            ),
+        )
         self.assertEqual(2, rendered.count('metadata/role = "portal_backdrop_clearance_core"'))
         self.assertEqual(8, rendered.count('metadata/role = "portal_backdrop_clearance_feather"'))
 
