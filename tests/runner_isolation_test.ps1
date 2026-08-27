@@ -122,6 +122,13 @@ $campaignDefaultTimeoutCase = New-TestCase `
 Assert-RunnerInvariant `
     ($campaignDefaultTimeoutCase.TimeoutSeconds -eq 300) `
     "Campaign format test lost its measured runner-specific timeout."
+$campaignTargetTimeoutCase = New-TestCase `
+    -Name "tests/campaign_format_test.gd" `
+    -Group "headless script" `
+    -Arguments @("--headless")
+Assert-RunnerInvariant `
+    ($campaignTargetTimeoutCase.TimeoutSeconds -eq 300) `
+    "Explicit campaign target alias lost its measured runner-specific timeout."
 $ordinaryDefaultTimeoutCase = New-TestCase `
     -Name "ordinary_test.gd" `
     -Group "headless script" `

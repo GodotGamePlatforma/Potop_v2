@@ -68,6 +68,7 @@ $ErrorActionPreference = "Stop"
 $testTimeoutWasExplicit = $PSBoundParameters.ContainsKey("TestTimeoutSeconds")
 $testSpecificDefaultTimeoutSeconds = @{
     "campaign_format_test.gd" = 300
+    "tests/campaign_format_test.gd" = 300
 }
 
 # PowerShell 7 can otherwise promote native stderr to PowerShell errors. Godot's
