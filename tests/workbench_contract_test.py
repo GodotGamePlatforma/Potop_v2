@@ -177,23 +177,34 @@ def _assignment_candidate(
     write_set_text: str = "tracked.txt\n",
 ) -> dict[str, object]:
     candidate = _publication_candidate(parent)
-    receipt = _create_receipt(candidate)
     repository = candidate["repository"]
-    run_receipt = parent / f"{task_id}-run.json"
+    tests_directory = repository / "tests"
+    tests_directory.mkdir()
+    # Candidate-owned test double: orchestration tests assert delegation here;
+    # the production key=value envelope is verified only by the real runner.
+    (tests_directory / "run_all_tests.ps1").write_bytes(
+        (
+            "param([string]$VerifyRunReceipt, [string]$CandidateReceipt)\n"
+            "if (!(Test-Path -LiteralPath $VerifyRunReceipt) -or "
+            "!(Test-Path -LiteralPath $CandidateReceipt)) { exit 2 }\n"
+            "$content = Get-Content -Raw -LiteralPath $VerifyRunReceipt\n"
+            "if ($content -notmatch '(?m)^overall=PASS\\r?$') { exit 3 }\n"
+            "exit 0\n"
+        ).encode("utf-8")
+    )
+    _commit_all(repository, "add assignment receipt verifier")
+    receipt = _create_receipt(candidate)
+    run_receipt = parent / f"{task_id}-run.receipt"
     run_receipt.write_text(
-        json.dumps(
-            {
-                "head": receipt["head"],
-                "tree": receipt["tree"],
-                "suite_mode": "full",
-                "target_scope": "full",
-                "overall": "PASS",
-                "fail_count": 0,
-                "skip_count": 0,
-                "blocking_failure_count": 0,
-            }
-        )
-        + "\n",
+        "version=assignment-test-run-receipt-v1\n"
+        f"source_head={receipt['head']}\n"
+        f"source_tree={receipt['tree']}\n"
+        "suite_mode=full\n"
+        "pass=1\n"
+        "fail=0\n"
+        "skip=0\n"
+        "blocking=0\n"
+        "overall=PASS\n",
         encoding="utf-8",
     )
     write_set = parent / f"{task_id}-write-set.txt"
@@ -834,23 +845,32 @@ class LastGreenRefTest(unittest.TestCase):
 
 class AgentAssignmentTest(unittest.TestCase):
     def _create(self, fixture: dict[str, object]) -> dict[str, object]:
-        return contract.create_assignment(
-            fixture["repository"],
-            task_id=fixture["task_id"],
-            thread_id=fixture["thread_id"],
-            owner=fixture["owner"],
-            brief=fixture["brief"],
-            destination=fixture["destination"],
-            common_git_dir=fixture["common_git_dir"],
-            branch=fixture["branch"],
-            head=fixture["head"],
-            tree=fixture["tree"],
-            write_set_path=fixture["write_set_path"],
-            candidate_receipt=fixture["candidate_receipt"],
-            run_receipt=fixture["run_receipt"],
-            ack_deadline=fixture["ack_deadline"],
-            now=fixture["now"],
+        with mock.patch.object(
+            contract, "_verify_full_run_receipt", return_value=None
+        ) as verifier:
+            created = contract.create_assignment(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                thread_id=fixture["thread_id"],
+                owner=fixture["owner"],
+                brief=fixture["brief"],
+                destination=fixture["destination"],
+                common_git_dir=fixture["common_git_dir"],
+                branch=fixture["branch"],
+                head=fixture["head"],
+                tree=fixture["tree"],
+                write_set_path=fixture["write_set_path"],
+                candidate_receipt=fixture["candidate_receipt"],
+                run_receipt=fixture["run_receipt"],
+                ack_deadline=fixture["ack_deadline"],
+                now=fixture["now"],
+            )
+        verifier.assert_called_once_with(
+            Path(fixture["repository"]).resolve(),
+            fixture["candidate_receipt"],
+            fixture["run_receipt"],
         )
+        return created
 
     def _ack(
         self,
@@ -1115,18 +1135,39 @@ class AgentAssignmentTest(unittest.TestCase):
                     now=ack_fixture["now"] + timedelta(minutes=1),
                 )
 
-    def test_assignment_rejects_non_integer_run_counts(self) -> None:
+    def test_assignment_rejects_candidate_run_verifier_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = _assignment_candidate(Path(temporary))
-            run_receipt = json.loads(
-                fixture["run_receipt"].read_text(encoding="utf-8")
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=contract.ContractError("candidate verifier rejected receipt"),
+            ) as verifier:
+                with self.assertRaisesRegex(
+                    contract.ContractError, "candidate verifier rejected receipt"
+                ):
+                    contract.create_assignment(
+                        fixture["repository"],
+                        task_id=fixture["task_id"],
+                        thread_id=fixture["thread_id"],
+                        owner=fixture["owner"],
+                        brief=fixture["brief"],
+                        destination=fixture["destination"],
+                        common_git_dir=fixture["common_git_dir"],
+                        branch=fixture["branch"],
+                        head=fixture["head"],
+                        tree=fixture["tree"],
+                        write_set_path=fixture["write_set_path"],
+                        candidate_receipt=fixture["candidate_receipt"],
+                        run_receipt=fixture["run_receipt"],
+                        ack_deadline=fixture["ack_deadline"],
+                        now=fixture["now"],
+                    )
+            verifier.assert_called_once_with(
+                Path(fixture["repository"]).resolve(),
+                fixture["candidate_receipt"],
+                fixture["run_receipt"],
             )
-            run_receipt["fail_count"] = "zero"
-            fixture["run_receipt"].write_text(
-                json.dumps(run_receipt) + "\n", encoding="utf-8"
-            )
-            with self.assertRaisesRegex(contract.ContractError, "run fail_count"):
-                self._create(fixture)
 
     def test_cli_validate_assignment_diff_fails_outside_closed_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

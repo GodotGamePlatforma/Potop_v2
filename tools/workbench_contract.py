@@ -1458,40 +1458,7 @@ def _assert_assignment_evidence(
     candidate = _publication_receipt_header(repository, candidate_receipt)
     if candidate["head"] != head or candidate["tree"] != tree:
         raise ContractError("Assignment candidate receipt does not bind the exact HEAD/tree.")
-    try:
-        run = json.loads(Path(run_receipt).resolve(strict=True).read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ContractError(f"Assignment run receipt is unreadable: {error}") from error
-    if not isinstance(run, dict):
-        raise ContractError("Assignment run receipt must contain an object.")
-    required = {
-        "head",
-        "tree",
-        "suite_mode",
-        "target_scope",
-        "overall",
-        "fail_count",
-        "skip_count",
-        "blocking_failure_count",
-    }
-    if not required.issubset(run):
-        raise ContractError("Assignment run receipt lacks required full-run fields.")
-    fail_count = _assignment_integer(run["fail_count"], "run fail_count")
-    skip_count = _assignment_integer(run["skip_count"], "run skip_count")
-    blocking_failure_count = _assignment_integer(
-        run["blocking_failure_count"], "run blocking_failure_count"
-    )
-    if (
-        run["head"] != head
-        or run["tree"] != tree
-        or run["suite_mode"] not in {"full", "full-with-snapshots"}
-        or run["target_scope"] != "full"
-        or run["overall"] != "PASS"
-        or fail_count != 0
-        or skip_count != 0
-        or blocking_failure_count != 0
-    ):
-        raise ContractError("Assignment run receipt is not the exact full-suite PASS.")
+    _verify_full_run_receipt(repository, candidate_receipt, run_receipt)
 
 
 def create_assignment(
