@@ -3540,7 +3540,6 @@ def _portal_backdrop_clearances(
                 continue
 
             geometry = {
-                "contract": PORTAL_BACKDROP_CLEARANCE_CONTRACT,
                 "axis": "vertical" if vertical_scan else "horizontal",
                 "boundary_cell": boundary_cell,
                 "run_start_cell": run_start,

@@ -99,7 +99,6 @@ class PortalBackdropClearanceTest(unittest.TestCase):
             geometry = clearance["geometry"]
             self.assertEqual(
                 {
-                    "contract",
                     "axis",
                     "boundary_cell",
                     "run_start_cell",

@@ -2509,12 +2509,10 @@ func _generated_portal_backdrop_clearance_errors(
 			continue
 		var geometry := geometry_value as Dictionary
 		if not _dictionary_has_exact_keys(geometry, [
-			"contract", "axis", "boundary_cell", "run_start_cell", "run_end_cell",
+			"axis", "boundary_cell", "run_start_cell", "run_end_cell",
 			"outward_cell", "cell_size",
 		]):
 			errors.append("Portal clearance source_geometry ma nieaktualny typowany schema.")
-		if str(geometry.get("contract", "")) != PORTAL_BACKDROP_CLEARANCE_CONTRACT:
-			errors.append("Portal clearance source_geometry ma nieaktualny kontrakt.")
 		if _canonical_sha256(geometry) != geometry_digest:
 			errors.append("Portal clearance geometry_digest nie odpowiada geometrii.")
 		geometry_records.append(geometry.duplicate(true))

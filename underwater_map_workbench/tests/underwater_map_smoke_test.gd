@@ -3038,15 +3038,14 @@ func _assert_portal_backdrop_clearances(
 		var geometry := geometry_value as Dictionary
 		_assert(
 			_dictionary_has_only_keys(geometry, [
-				"contract", "axis", "boundary_cell", "run_start_cell", "run_end_cell",
+				"axis", "boundary_cell", "run_start_cell", "run_end_cell",
 				"outward_cell", "cell_size",
 			]),
 			"%s clearance source_geometry nie może zawierać ID, ścieżki ani nazwy pakietu."
 			% owner_label,
 		)
 		_assert(
-			str(geometry.get("contract", "")) == PORTAL_BACKDROP_CLEARANCE_CONTRACT
-			and JSON.stringify(geometry, "", true, true).sha256_text().to_lower()
+			JSON.stringify(geometry, "", true, true).sha256_text().to_lower()
 			== geometry_digest,
 			"%s clearance digest musi wynikać wyłącznie z anonimowej geometrii."
 			% owner_label,
@@ -3104,6 +3103,63 @@ func _assert_portal_backdrop_clearances(
 			"%s clearance feather musi mieć dokładnie ograniczony rasterowy margines."
 			% owner_label,
 		)
+		var core_left := core_rect.position.x
+		var core_top := core_rect.position.y
+		var core_right := core_rect.end.x
+		var core_bottom := core_rect.end.y
+		var outer_left := outer_rect.position.x
+		var outer_top := outer_rect.position.y
+		var outer_right := outer_rect.end.x
+		var outer_bottom := outer_rect.end.y
+		var expected_polygons := {
+			"Core": PackedVector2Array([
+				Vector2(core_left, core_top),
+				Vector2(core_right, core_top),
+				Vector2(core_right, core_bottom),
+				Vector2(core_left, core_bottom),
+			]),
+			"FeatherLeft": PackedVector2Array([
+				Vector2(outer_left, core_top),
+				Vector2(core_left, core_top),
+				Vector2(core_left, core_bottom),
+				Vector2(outer_left, core_bottom),
+			]),
+			"FeatherRight": PackedVector2Array([
+				Vector2(core_right, core_top),
+				Vector2(outer_right, core_top),
+				Vector2(outer_right, core_bottom),
+				Vector2(core_right, core_bottom),
+			]),
+			"FeatherTop": PackedVector2Array([
+				Vector2(core_left, outer_top),
+				Vector2(core_right, outer_top),
+				Vector2(core_right, core_top),
+				Vector2(core_left, core_top),
+			]),
+			"FeatherBottom": PackedVector2Array([
+				Vector2(core_left, core_bottom),
+				Vector2(core_right, core_bottom),
+				Vector2(core_right, outer_bottom),
+				Vector2(core_left, outer_bottom),
+			]),
+		}
+		var transparent_white := Color(1.0, 1.0, 1.0, 0.0)
+		var opaque_white := Color.WHITE
+		var expected_vertex_colors := {
+			"Core": PackedColorArray(),
+			"FeatherLeft": PackedColorArray([
+				transparent_white, opaque_white, opaque_white, transparent_white,
+			]),
+			"FeatherRight": PackedColorArray([
+				opaque_white, transparent_white, transparent_white, opaque_white,
+			]),
+			"FeatherTop": PackedColorArray([
+				transparent_white, transparent_white, opaque_white, opaque_white,
+			]),
+			"FeatherBottom": PackedColorArray([
+				opaque_white, opaque_white, transparent_white, transparent_white,
+			]),
+		}
 		_assert(bool(clearance.get_meta("visual_only", false)), "%s clearance musi być visual-only." % owner_label)
 		var actual_visual_children := PackedStringArray()
 		for visual_child: Node in clearance.get_children():
@@ -3111,8 +3167,31 @@ func _assert_portal_backdrop_clearances(
 			_assert(visual_child is Polygon2D, "%s clearance może zawierać wyłącznie Polygon2D." % owner_label)
 			if visual_child is Polygon2D:
 				var polygon := visual_child as Polygon2D
-				_assert(polygon.polygon.size() == 4, "%s clearance polygon musi być quadem." % owner_label)
+				var visual_name := str(polygon.name)
+				_assert(
+					expected_polygons.has(visual_name)
+					and polygon.polygon == (expected_polygons[visual_name] as PackedVector2Array),
+					"%s %s musi mieć dokładne punkty wyprowadzone z core/outer rect."
+					% [owner_label, visual_name],
+				)
+				_assert(
+					expected_vertex_colors.has(visual_name)
+					and polygon.vertex_colors
+					== (expected_vertex_colors[visual_name] as PackedColorArray),
+					"%s %s musi mieć dokładny układ alf core/feather."
+					% [owner_label, visual_name],
+				)
 				_assert(polygon.color.is_equal_approx(expected_water_color), "%s clearance musi używać water_color." % owner_label)
+				_assert(
+					str(polygon.get_meta("role", ""))
+					== (
+						"portal_backdrop_clearance_core"
+						if visual_name == "Core"
+						else "portal_backdrop_clearance_feather"
+					),
+					"%s %s musi mieć typowaną rolę prezentacji."
+					% [owner_label, visual_name],
+				)
 		_assert(
 			actual_visual_children == expected_visual_children,
 			"%s clearance musi zawierać dokładnie Core i cztery Feathery." % owner_label,
