@@ -912,6 +912,16 @@ class AgentAssignmentTest(unittest.TestCase):
         self.assertTrue(lock.released)
         self.assertEqual(sleeper.call_count, 2)
 
+        never_available = mock.Mock()
+        never_available.acquire.side_effect = contract.WorkspaceLockError("busy")
+        with mock.patch.object(
+            contract, "assignment_lock", return_value=never_available
+        ):
+            with self.assertRaisesRegex(contract.ContractError, "Timed out waiting"):
+                with contract.assignment_metadata_lock("ignored", wait_seconds=0):
+                    self.fail("An unavailable metadata lock must fail closed.")
+        never_available.release.assert_not_called()
+
     def test_assignment_rejects_receipt_byte_drift_during_verification(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = _assignment_candidate(Path(temporary), task_id="receipt-drift")
