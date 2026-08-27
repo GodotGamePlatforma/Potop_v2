@@ -5,8 +5,6 @@ const PACKAGE_ROOT := "res://underwater_map_workbench/structures/tower_prototype
 const PACKAGE_SCENE_PATH := PACKAGE_ROOT + "generated/structure.tscn"
 const STRUCTURE_TEXTURE_PATH := PACKAGE_ROOT + "assets/visual/tower_structure.png"
 const INTERIOR_TEXTURE_PATH := PACKAGE_ROOT + "assets/visual/tower_interior.png"
-const STRUCTURE_SOURCE_PATH := PACKAGE_ROOT + "assets/visual/tower_structure_source.svg"
-const INTERIOR_SOURCE_PATH := PACKAGE_ROOT + "assets/visual/tower_interior_source.svg"
 const SOLID_MASK_PATH := PACKAGE_ROOT + "generated/solid_mask_native.png"
 const OPEN_MASK_PATH := PACKAGE_ROOT + "generated/open_water_mask_native.png"
 const STRUCTURE_ID := "tower_prototype_01"
@@ -142,10 +140,23 @@ func _verify_package_contract(package_manifest: Dictionary) -> void:
 			position_parts.append(str(position_value))
 		var position_key := "/".join(position_parts)
 		diagnostic_positions[position_key] = true
-		_assert(not str(diagnostic.get("message", "")).is_empty(), "Diagnostyka %s musi mieć czytelny komunikat." % reason_id)
+		_assert(_is_nonempty_text(diagnostic.get("message", null)), "Diagnostyka %s musi mieć czytelny komunikat String." % reason_id)
+		_assert(_is_nonempty_text(diagnostic.get("summary", null)), "Diagnostyka %s musi mieć krótki tekst prezentacyjny String z authority manifestu." % reason_id)
 	_assert(diagnostic_positions.size() == 5, "Każdy błędny układ A musi mieć unikalną diagnostykę.")
 	var clues := power_logic.get("clues", {}) as Dictionary
-	_assert(clues.size() == 3 and not str(clues.get("red", "")).is_empty() and not str(clues.get("blue", "")).is_empty() and not str(clues.get("yellow", "")).is_empty(), "A/B/C muszą publikować trzy przesłanki dedukcyjne.")
+	_assert(clues.size() == 3 and _is_nonempty_text(clues.get("red", null)) and _is_nonempty_text(clues.get("blue", null)) and _is_nonempty_text(clues.get("yellow", null)), "A/B/C muszą publikować trzy przesłanki dedukcyjne jako niepuste String.")
+	var clue_summaries := power_logic.get("clue_summaries", {}) as Dictionary
+	var yellow_summary_value: Variant = clue_summaries.get("yellow", null)
+	var yellow_summary := str(yellow_summary_value) if yellow_summary_value is String else ""
+	_assert(
+		clue_summaries.size() == 3
+		and _is_nonempty_text(clue_summaries.get("red", null))
+		and _is_nonempty_text(clue_summaries.get("blue", null))
+		and _is_nonempty_text(yellow_summary_value)
+		and yellow_summary.contains("ŚRODEK ZAJ.")
+		and yellow_summary.contains("PRAWA ODC."),
+		"Authority manifestu musi publikować komplet trzech krótkich przesłanek, w tym oba rozstrzygające warunki YELLOW.",
+	)
 
 
 func _verify_native_artwork(package_manifest: Dictionary) -> void:
@@ -169,33 +180,67 @@ func _verify_native_artwork(package_manifest: Dictionary) -> void:
 	var open_bytes := open_mask.get_data()
 	var pixel_count := native_size.x * native_size.y
 	var mismatch_count := 0
+	var non_binary_alpha_count := 0
+	var non_binary_mask_count := 0
 	var overlap_count := 0
 	var gap_count := 0
+	var hidden_rgb_count := 0
 	for pixel_index: int in range(pixel_count):
-		var structure_alpha := int(structure_bytes[pixel_index * 4 + 3])
-		var interior_alpha := int(interior_bytes[pixel_index * 4 + 3])
+		var structure_offset := pixel_index * 4
+		var interior_offset := pixel_index * 4
+		var structure_alpha := int(structure_bytes[structure_offset + 3])
+		var interior_alpha := int(interior_bytes[interior_offset + 3])
 		var solid_value := int(solid_bytes[pixel_index])
 		var open_value := int(open_bytes[pixel_index])
 		if structure_alpha != solid_value or interior_alpha != open_value:
 			mismatch_count += 1
-		if structure_alpha > 0 and interior_alpha > 0:
+		if structure_alpha not in [0, 255] or interior_alpha not in [0, 255]:
+			non_binary_alpha_count += 1
+		if solid_value not in [0, 255] or open_value not in [0, 255]:
+			non_binary_mask_count += 1
+		if solid_value == 255 and open_value == 255:
 			overlap_count += 1
-		if structure_alpha == 0 and interior_alpha == 0:
+		if solid_value == 0 and open_value == 0:
 			gap_count += 1
+		if structure_alpha == 0 and (
+			int(structure_bytes[structure_offset]) != 0
+			or int(structure_bytes[structure_offset + 1]) != 0
+			or int(structure_bytes[structure_offset + 2]) != 0
+		):
+			hidden_rgb_count += 1
+		if interior_alpha == 0 and (
+			int(interior_bytes[interior_offset]) != 0
+			or int(interior_bytes[interior_offset + 1]) != 0
+			or int(interior_bytes[interior_offset + 2]) != 0
+		):
+			hidden_rgb_count += 1
 	_assert(mismatch_count == 0, "Alfa obu grafik musi zgadzać się piksel w piksel z colliderem/open-water: %d różnic." % mismatch_count)
-	_assert(overlap_count == 0 and gap_count == 0, "Złożona grafika budynku musi być pełnym prostokątem 2240x3680 bez nakładek i luk.")
+	_assert(non_binary_alpha_count == 0, "Alfa finalnych PNG musi być binarna (wyłącznie 0/255): %d pikseli narusza kontrakt." % non_binary_alpha_count)
+	_assert(non_binary_mask_count == 0, "Kanoniczne maski muszą być binarne (wyłącznie 0/255): %d pikseli narusza kontrakt." % non_binary_mask_count)
+	_assert(overlap_count == 0, "Kanoniczne maski solid/open-water nie mogą się nakładać: %d pikseli overlap." % overlap_count)
+	_assert(gap_count == 0, "Kanoniczne maski solid/open-water muszą pokrywać pełne płótno bez luk: %d pikseli gap." % gap_count)
+	_assert(hidden_rgb_count == 0, "W pełni przezroczyste piksele finalnych PNG muszą mieć RGB=0: %d naruszeń." % hidden_rgb_count)
 	var asset_hashes := {}
 	for asset_value: Variant in package_manifest.get("visual_assets", []) as Array:
 		var asset := asset_value as Dictionary
 		asset_hashes[str(asset.get("path", ""))] = str(asset.get("sha256", ""))
 	_assert(str(asset_hashes.get("assets/visual/tower_structure.png", "")) == FileAccess.get_sha256(STRUCTURE_TEXTURE_PATH), "Manifest musi przypinać finalną grafikę bryły.")
 	_assert(str(asset_hashes.get("assets/visual/tower_interior.png", "")) == FileAccess.get_sha256(INTERIOR_TEXTURE_PATH), "Manifest musi przypinać finalną grafikę wnętrza.")
-	var structure_source := FileAccess.get_file_as_string(STRUCTURE_SOURCE_PATH)
-	var interior_source := FileAccess.get_file_as_string(INTERIOR_SOURCE_PATH)
-	_assert(structure_source.contains("width=\"2240\"") and structure_source.contains("height=\"3680\""), "Źródło bryły musi powstawać bezpośrednio na płótnie 1:1.")
-	_assert(interior_source.contains("width=\"2240\"") and interior_source.contains("height=\"3680\""), "Źródło wnętrza musi powstawać bezpośrednio na płótnie 1:1.")
-	_assert(not structure_source.contains("tower_art_source") and not interior_source.contains("tower_art_source"), "Finalna grafika nie może skalować obcego konceptu rastrowego.")
-	_assert(not interior_source.contains("radialGradient") and not interior_source.contains("lampAmber") and not interior_source.contains("lampCyan"), "Wnętrze musi pozostać nieemisyjne i bez wypalonych świateł.")
+	_verify_texture_import_contract(STRUCTURE_TEXTURE_PATH)
+	_verify_texture_import_contract(INTERIOR_TEXTURE_PATH)
+
+
+func _verify_texture_import_contract(texture_path: String) -> void:
+	var import_config := ConfigFile.new()
+	var import_path := texture_path + ".import"
+	var load_error := import_config.load(import_path)
+	_assert(load_error == OK, "Godot musi opublikować sidecar importu finalnego PNG: %s (error %d)." % [import_path, load_error])
+	if load_error != OK:
+		return
+	_assert(int(import_config.get_value("params", "compress/mode", -1)) == 0, "Finalny PNG musi być importowany jako Lossless: %s." % texture_path)
+	_assert(not bool(import_config.get_value("params", "mipmaps/generate", true)), "Finalny PNG nie może generować mipmap: %s." % texture_path)
+	_assert(int(import_config.get_value("params", "process/size_limit", -1)) == 0, "Finalny PNG musi zachować size_limit=0: %s." % texture_path)
+	_assert(bool(import_config.get_value("params", "process/fix_alpha_border", false)), "Finalny PNG musi mieć fix_alpha_border=true: %s." % texture_path)
 
 
 func _verify_generated_scene(package_manifest: Dictionary) -> void:
@@ -215,6 +260,14 @@ func _verify_generated_scene(package_manifest: Dictionary) -> void:
 		var asset_node := structure_root.get_node_or_null(node_path)
 		_assert(asset_node != null, "Scena pakietu musi zawierać asset %s." % str(asset.get("id", "")))
 		if asset_node != null:
+			_assert(asset_node is Node2D and (asset_node as Node2D).position.is_zero_approx() and (asset_node as Node2D).scale.is_equal_approx(Vector2.ONE), "Mount assetu %s musi zachować identity transform." % str(asset.get("id", "")))
+			var bitmap := asset_node.get_node_or_null("Bitmap") as TextureRect
+			var package_size := _vector_from_value(package_manifest.get("size", null))
+			_assert(bitmap != null, "Asset %s musi publikować realny child Bitmap TextureRect." % str(asset.get("id", "")))
+			if bitmap != null:
+				_assert(Rect2(bitmap.position, bitmap.size).is_equal_approx(Rect2(Vector2.ZERO, package_size)), "Bitmap %s musi mieć natywny rect 2240x3680 od lokalnego (0,0)." % str(asset.get("id", "")))
+				_assert(bitmap.scale.is_equal_approx(Vector2.ONE), "Bitmap %s nie może kompensować rozmiaru przez skalę." % str(asset.get("id", "")))
+				_assert(bitmap.texture_filter == CanvasItem.TEXTURE_FILTER_PARENT_NODE, "Bitmap %s ma dziedziczyć projektowy filtr tekstury bez przypadkowego override." % str(asset.get("id", "")))
 			var source := asset_node.get_meta(&"source", {}) as Dictionary
 			var expected_source := asset.duplicate(true)
 			expected_source["path"] = "structures/%s/%s" % [STRUCTURE_ID, str(asset.get("path", ""))]
@@ -491,6 +544,10 @@ func _all_groups_have_state(controller, expected_open: bool) -> bool:
 		if controller.barrier_group_is_open(group_id) != expected_open:
 			return false
 	return true
+
+
+func _is_nonempty_text(value: Variant) -> bool:
+	return value is String and not str(value).strip_edges().is_empty()
 
 
 func _assert(condition: bool, message: String) -> void:

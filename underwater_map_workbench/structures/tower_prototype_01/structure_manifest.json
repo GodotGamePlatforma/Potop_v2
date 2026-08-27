@@ -1030,6 +1030,11 @@
             "blue": "WÓZEK TECHNICZNY: tylko gałąź środkowa domyka tor serwisowy.",
             "yellow": "INSTALACJA CIŚNIENIOWA: jedna gałąź pozostaje domknięta; środkowa jest zajęta, prawa odcięta."
           },
+          "clue_summaries": {
+            "red": "RED • TRZY GAŁĘZIE DOMKNIĘTE",
+            "blue": "BLUE • TYLKO ŚRODKOWA GAŁĄŹ",
+            "yellow": "YELLOW • 1 DOMK.; ŚRODEK ZAJ.; PRAWA ODC."
+          },
           "diagnostics": {
             "all_branches_open": {
               "positions": [
@@ -1037,7 +1042,8 @@
                 "up",
                 "up"
               ],
-              "message": "PRZERWA: żadna gałąź nie domyka obwodu."
+              "message": "PRZERWA: żadna gałąź nie domyka obwodu.",
+              "summary": "PRZERWA • ŻADNA GAŁĄŹ"
             },
             "right_branch_unterminated": {
               "positions": [
@@ -1045,7 +1051,8 @@
                 "up",
                 "down"
               ],
-              "message": "PRAWA GAŁĄŹ: brak dostępnego odbiornika."
+              "message": "PRAWA GAŁĄŹ: brak dostępnego odbiornika.",
+              "summary": "PRAWA • BRAK ODBIORNIKA"
             },
             "middle_right_overload": {
               "positions": [
@@ -1053,7 +1060,8 @@
                 "down",
                 "down"
               ],
-              "message": "PRZECIĄŻENIE: gałęzie środkowa i prawa obciążają wspólną szynę."
+              "message": "PRZECIĄŻENIE: gałęzie środkowa i prawa obciążają wspólną szynę.",
+              "summary": "PRZECIĄŻENIE • ŚRODEK + PRAWA"
             },
             "split_outer_feed": {
               "positions": [
@@ -1061,7 +1069,8 @@
                 "up",
                 "down"
               ],
-              "message": "ROZDZIAŁ ZASILANIA: dwie skrajne gałęzie tworzą nieciągły tor."
+              "message": "ROZDZIAŁ ZASILANIA: dwie skrajne gałęzie tworzą nieciągły tor.",
+              "summary": "ROZDZIAŁ • SKRAJNE NIECIĄGŁE"
             },
             "left_middle_crossfeed": {
               "positions": [
@@ -1069,7 +1078,8 @@
                 "down",
                 "up"
               ],
-              "message": "SPRZĘŻENIE: gałęzie lewa i środkowa zwierają tor sterujący."
+              "message": "SPRZĘŻENIE: gałęzie lewa i środkowa zwierają tor sterujący.",
+              "summary": "SPRZĘŻENIE • LEWA + ŚRODEK"
             }
           }
         }
@@ -1149,7 +1159,7 @@
       "group_id": "TowerArtwork",
       "kind": "structure_interior_texture",
       "path": "assets/visual/tower_interior.png",
-      "sha256": "978aac0f3edfe3b65a3afcc92226c0dad25ca7260f6fc14427a7b1645ec9b60c",
+      "sha256": "e76d3cfaa550c20e0c056912050e7e6136a7d4f5ce59ef4967d66e5dcada21e2",
       "pixel_size": [
         2240,
         3680
@@ -1169,7 +1179,7 @@
       "group_id": "TowerArtwork",
       "kind": "structure_owner_masked_texture",
       "path": "assets/visual/tower_structure.png",
-      "sha256": "72b9e46ea7b807d8eb7860987a2a041b3ebad04832b412c1fd6ce439fbe33e51",
+      "sha256": "d1ba7b26afece3ff046c3afcfe2864b0f53fcaca06c64dbe17847142d107298d",
       "pixel_size": [
         2240,
         3680
@@ -1188,22 +1198,22 @@
     {
       "role": "controller",
       "path": "runtime/DiveEnterableTowerController.gd",
-      "sha256": "00e933fbcdb8bf55fbdd7f5974edce57c4f11d4e1ff98d12ee128bd79932a19f"
+      "sha256": "a391fe2b96eb66baa2b362fcba10e7db8ffa5a3b32f6d85b78be4deb703adf0c"
     },
     {
       "role": "power_panel",
       "path": "runtime/DivePowerDistributorPanel.gd",
-      "sha256": "2b91afcf39fe4ffd7daac209f0d88e580413833f86395a3c21ac2ef826a09ae4"
+      "sha256": "d4df93950ccd970ea4b8f40e91cf9669c8c0557c140c09450df756583a205d36"
     },
     {
       "role": "interactable",
       "path": "runtime/DiveStructureInteractable.gd",
-      "sha256": "9f9c3ea53fe1af9a2455414838b2ce39d12f080de8adf4959bab166038a52cb9"
+      "sha256": "526012acb13a43f1cfecdeb5499940afefb3591069bdb1477b86f93036a11bcd"
     },
     {
       "role": "mechanism_visual",
       "path": "runtime/DiveTowerMechanismVisual.gd",
-      "sha256": "1cdfec7488b00b455160e3ab568d0856db9982342ad3ea483c09e58a8ccb4186"
+      "sha256": "1ba9c665cc48a2ed48b8f14c60a8b147de04dc89e96cf6d2ae9a4dcd21a2a498"
     }
   ],
   "attempt_state": {

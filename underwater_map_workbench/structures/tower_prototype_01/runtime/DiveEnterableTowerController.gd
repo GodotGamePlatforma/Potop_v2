@@ -13,6 +13,7 @@ const REQUIRED_POWER_LEVER_IDS := ["a_lever_1", "a_lever_2", "a_lever_3"]
 const DIVE_PLAYER_GROUP := DiverControllerScript.DIVE_PLAYER_GROUP
 const SAFETY_MARGIN := 40.0
 const TARGET_EPSILON := 0.5
+const MECHANISM_Z_INDEX := -10
 const REQUIRED_GROUP_IDS := [
 	"red_route",
 	"blue_route",
@@ -194,7 +195,12 @@ func barrier_group_reached_target(group_id: String) -> bool:
 		var member := member_value as Dictionary
 		var body := member.get("body", null) as AnimatableBody2D
 		var target: Vector2 = member.get("target_position", Vector2.ZERO)
-		if body == null or body.position.distance_to(target) > TARGET_EPSILON:
+		if (
+			body == null
+			or body.position.distance_to(target) > TARGET_EPSILON
+			or not bool(body.get_meta(&"reached_target", false))
+			or bool(body.get_meta(&"target_open", false)) != bool(group.get("open", false))
+		):
 			return false
 	return true
 
@@ -287,9 +293,9 @@ func _advance_motion(delta: float) -> void:
 				continue
 			var target: Vector2 = member.get("target_position", body.position)
 			body.position = body.position.move_toward(target, speed * delta)
-			var visual = member.get("visual", null)
-			if visual != null:
-				visual.set_visual_state("open" if bool(group.get("open", false)) else "closed")
+			if body.position.distance_to(target) <= TARGET_EPSILON:
+				body.position = target
+			_refresh_barrier_member_visual(group, member)
 	if elevator_arrived or contact_changed:
 		_refresh_control_availability()
 	_refresh_trolley_visual()
@@ -477,7 +483,7 @@ func _evaluate_power_logic() -> void:
 			_power_status = "fault"
 			var diagnostic := _matching_power_diagnostic()
 			_power_diagnostic_id = str(diagnostic.get("reason_id", ""))
-			_power_diagnostic_message = str(diagnostic.get("message", "Brak ciągłości obwodu."))
+			_power_diagnostic_message = str(diagnostic.get("message", ""))
 		else:
 			_power_status = "ready"
 	else:
@@ -531,12 +537,16 @@ func _matching_power_diagnostic() -> Dictionary:
 	return {}
 
 
-func _current_clue_text() -> String:
+func _current_clue_id() -> String:
 	if not _red_latched:
-		return str(_power_clues.get("red", "OBWÓD AWARYJNY: domknij wszystkie trzy gałęzie."))
+		return "red"
 	if not _blue_latched:
-		return str(_power_clues.get("blue", "WÓZEK: tylko środkowa gałąź domyka tor."))
-	return str(_power_clues.get("yellow", "INSTALACJA: jedna gałąź; środkowa zajęta, prawa odcięta."))
+		return "blue"
+	return "yellow"
+
+
+func _current_clue_text() -> String:
+	return str(_power_clues.get(_current_clue_id(), ""))
 
 
 func _circuit_states_snapshot() -> Dictionary:
@@ -580,6 +590,7 @@ func _sync_power_panel_state(circuit_states: Dictionary = {}) -> void:
 		_power_status,
 		_power_diagnostic_id,
 		_power_diagnostic_message,
+		_current_clue_id(),
 		_current_clue_text()
 	)
 
@@ -598,11 +609,30 @@ func _set_barrier_group_open(group_id: String, open: bool, force: bool) -> bool:
 			if open
 			else member.get("closed_position", Vector2.ZERO)
 		)
-		var visual = member.get("visual", null)
-		if visual != null:
-			visual.set_visual_state("open" if open else "closed")
+		_refresh_barrier_member_visual(group, member)
 	_barrier_groups[group_id] = group
 	return true
+
+
+func _refresh_barrier_member_visual(group: Dictionary, member: Dictionary) -> void:
+	var body := member.get("body", null) as AnimatableBody2D
+	if body == null:
+		return
+	var target_position: Vector2 = member.get("target_position", body.position)
+	var target_open := bool(group.get("open", false))
+	var reached_target := body.position.is_equal_approx(target_position)
+	var state := ""
+	if reached_target:
+		state = "open" if target_open else "closed"
+	else:
+		state = "opening" if target_open else "closing"
+	var visual = member.get("visual", null)
+	if visual != null:
+		visual.set_visual_state(state)
+	body.set_meta(&"visual_state", state)
+	body.set_meta(&"target_open", target_open)
+	body.set_meta(&"target_position", target_position)
+	body.set_meta(&"reached_target", reached_target)
 
 
 func _snap_barrier_group_to_target(group_id: String) -> void:
@@ -614,6 +644,7 @@ func _snap_barrier_group_to_target(group_id: String) -> void:
 		var body := member.get("body", null) as AnimatableBody2D
 		if body != null:
 			_teleport_animatable(body, member.get("target_position", body.position))
+		_refresh_barrier_member_visual(group, member)
 
 
 func _build_elevator(definition: Dictionary) -> void:
@@ -632,7 +663,7 @@ func _build_elevator(definition: Dictionary) -> void:
 	_elevator_body.collision_mask = 0
 	_elevator_body.sync_to_physics = true
 	_elevator_body.position = _elevator_stops[_elevator_initial_stop_id]
-	_elevator_body.z_index = 5
+	_elevator_body.z_index = MECHANISM_Z_INDEX
 	_elevator_body.set_meta(&"structure_id", structure_id)
 	_elevator_body.set_meta(&"dynamic_kind", "empty_maintenance_trolley")
 	_elevator_body.set_meta(&"socket_id", socket_id)
@@ -670,7 +701,7 @@ func _build_barrier_groups(definitions: Array) -> void:
 			body.collision_mask = 0
 			body.sync_to_physics = true
 			body.position = closed_position
-			body.z_index = 6
+			body.z_index = MECHANISM_Z_INDEX
 			body.set_meta(&"structure_id", structure_id)
 			body.set_meta(&"dynamic_kind", "dynamic_door")
 			body.set_meta(&"barrier_group_id", group_id)
@@ -1167,8 +1198,8 @@ func _power_logic_configuration_errors(definition: Dictionary) -> PackedStringAr
 		errors.append("Rozdzielnia A nie ma słownika power_logic.")
 		return errors
 	var power_logic := power_logic_value as Dictionary
-	if not _dictionary_has_exact_keys(power_logic, ["contract", "evaluation", "levers", "circuits", "diagnostics", "clues"]):
-		errors.append("power_logic musi mieć dokładnie contract, evaluation, levers, circuits, diagnostics i clues.")
+	if not _dictionary_has_exact_keys(power_logic, ["contract", "evaluation", "levers", "circuits", "diagnostics", "clues", "clue_summaries"]):
+		errors.append("power_logic musi mieć dokładnie contract, evaluation, levers, circuits, diagnostics, clues i clue_summaries.")
 	if str(power_logic.get("contract", "")) != POWER_LOGIC_CONTRACT_ID:
 		errors.append("Rozdzielnia A ma nieobsługiwany kontrakt power_logic.")
 	if str(power_logic.get("evaluation", "")) != POWER_EVALUATION_MODE:
@@ -1242,29 +1273,68 @@ func _power_logic_configuration_errors(definition: Dictionary) -> PackedStringAr
 				errors.append("Diagnostyka %s musi być słownikiem." % reason_id)
 				continue
 			var diagnostic := diagnostic_value as Dictionary
-			if not _dictionary_has_exact_keys(diagnostic, ["positions", "message"]):
-				errors.append("Diagnostyka %s wymaga positions i message." % reason_id)
+			if not _dictionary_has_exact_keys(diagnostic, ["positions", "message", "summary"]):
+				errors.append("Diagnostyka %s wymaga positions, message i summary." % reason_id)
 			var positions_value: Variant = diagnostic.get("positions", null)
 			if not positions_value is Array or (positions_value as Array).size() != 3:
 				errors.append("Diagnostyka %s wymaga trzech pozycji." % reason_id)
 			else:
 				var position_parts := PackedStringArray()
 				for position_value: Variant in positions_value as Array:
-					position_parts.append(str(position_value))
+					var position_text := str(position_value)
+					if not position_value is String or position_text not in ["up", "down"]:
+						errors.append("Diagnostyka %s może używać wyłącznie pozycji String up/down." % reason_id)
+					position_parts.append(position_text)
 				var position_key := "/".join(position_parts)
 				if seen_position_keys.has(position_key):
 					errors.append("Diagnostyki A nie mogą powtarzać układu %s." % position_key)
 				seen_position_keys[position_key] = true
-			if str(diagnostic.get("message", "")).is_empty():
+			if not _is_nonempty_text(diagnostic.get("message", null)):
 				errors.append("Diagnostyka %s nie ma komunikatu." % reason_id)
+			if not _is_nonempty_text(diagnostic.get("summary", null)):
+				errors.append("Diagnostyka %s nie ma krótkiego tekstu prezentacyjnego." % reason_id)
+		var valid_position_keys := {}
+		for circuit_id: String in ["red", "blue", "yellow"]:
+			var circuit_definition := REQUIRED_CIRCUIT_DEFINITIONS[circuit_id] as Dictionary
+			var circuit_positions := circuit_definition.get("positions", []) as Array
+			var circuit_position_parts := PackedStringArray()
+			for position_value: Variant in circuit_positions:
+				circuit_position_parts.append(str(position_value))
+			valid_position_keys["/".join(circuit_position_parts)] = true
+		var expected_invalid_position_keys := {}
+		for first_position: String in ["up", "down"]:
+			for second_position: String in ["up", "down"]:
+				for third_position: String in ["up", "down"]:
+					var position_key := "%s/%s/%s" % [first_position, second_position, third_position]
+					if not valid_position_keys.has(position_key):
+						expected_invalid_position_keys[position_key] = true
+		for expected_position_key_value: Variant in expected_invalid_position_keys.keys():
+			var expected_position_key := str(expected_position_key_value)
+			if not seen_position_keys.has(expected_position_key):
+				errors.append("Diagnostyki A nie pokrywają błędnego układu %s." % expected_position_key)
+		for seen_position_key_value: Variant in seen_position_keys.keys():
+			var seen_position_key := str(seen_position_key_value)
+			if not expected_invalid_position_keys.has(seen_position_key):
+				errors.append("Diagnostyka A opisuje układ, który nie jest błędnym dopełnieniem: %s." % seen_position_key)
 	var clues_value: Variant = power_logic.get("clues", null)
 	if not clues_value is Dictionary or not _dictionary_has_exact_keys(clues_value as Dictionary, ["red", "blue", "yellow"]):
 		errors.append("Rozdzielnia A wymaga przesłanek red, blue i yellow.")
 	else:
 		for clue_id: String in ["red", "blue", "yellow"]:
-			if str((clues_value as Dictionary).get(clue_id, "")).is_empty():
+			if not _is_nonempty_text((clues_value as Dictionary).get(clue_id, null)):
 				errors.append("Przesłanka %s nie może być pusta." % clue_id)
+	var clue_summaries_value: Variant = power_logic.get("clue_summaries", null)
+	if not clue_summaries_value is Dictionary or not _dictionary_has_exact_keys(clue_summaries_value as Dictionary, ["red", "blue", "yellow"]):
+		errors.append("Rozdzielnia A wymaga krótkich tekstów prezentacyjnych red, blue i yellow.")
+	else:
+		for clue_id: String in ["red", "blue", "yellow"]:
+			if not _is_nonempty_text((clue_summaries_value as Dictionary).get(clue_id, null)):
+				errors.append("Krótka przesłanka %s nie może być pusta." % clue_id)
 	return errors
+
+
+static func _is_nonempty_text(value: Variant) -> bool:
+	return value is String and not str(value).strip_edges().is_empty()
 
 
 static func _dictionary_has_exact_keys(value: Dictionary, required_keys: Array) -> bool:

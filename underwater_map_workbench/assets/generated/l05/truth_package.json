@@ -28,7 +28,7 @@
     "solid": 0
   },
   "generated": true,
-  "manifest_sha256": "5c1065e5562ab41b883e0cf18386870603971155297f3c682821417f964c6754",
+  "manifest_sha256": "df89e523443e506bb7c20c6deb4f77436aeef026537c41cad99c33a945cbb424",
   "mapping": {
     "pixel_reference": "pixel_edge",
     "rounding": "floor",
@@ -112,7 +112,7 @@
             3680
           ],
           "path": "structures/tower_prototype_01/generated/panels/panel_0_0_2240_3680.json",
-          "sha256": "921e54a0cefe1d579ecfb4835d3eb3d2a128ea4ffc6778d3ea4bfb3da9083deb"
+          "sha256": "1f096ae6d4a962e76b175b81c78a0fb29aff64aa5b49f2190d02291bdd2e5ed7"
         }
       ],
       "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
@@ -315,6 +315,11 @@
                   "symbol": "square"
                 }
               },
+              "clue_summaries": {
+                "blue": "BLUE • TYLKO ŚRODKOWA GAŁĄŹ",
+                "red": "RED • TRZY GAŁĘZIE DOMKNIĘTE",
+                "yellow": "YELLOW • 1 DOMK.; ŚRODEK ZAJ.; PRAWA ODC."
+              },
               "clues": {
                 "blue": "WÓZEK TECHNICZNY: tylko gałąź środkowa domyka tor serwisowy.",
                 "red": "OBWÓD AWARYJNY: pozycja dolna domyka gałąź; wymagane są trzy domknięte gałęzie.",
@@ -328,7 +333,8 @@
                     "up",
                     "up",
                     "up"
-                  ]
+                  ],
+                  "summary": "PRZERWA • ŻADNA GAŁĄŹ"
                 },
                 "left_middle_crossfeed": {
                   "message": "SPRZĘŻENIE: gałęzie lewa i środkowa zwierają tor sterujący.",
@@ -336,7 +342,8 @@
                     "down",
                     "down",
                     "up"
-                  ]
+                  ],
+                  "summary": "SPRZĘŻENIE • LEWA + ŚRODEK"
                 },
                 "middle_right_overload": {
                   "message": "PRZECIĄŻENIE: gałęzie środkowa i prawa obciążają wspólną szynę.",
@@ -344,7 +351,8 @@
                     "up",
                     "down",
                     "down"
-                  ]
+                  ],
+                  "summary": "PRZECIĄŻENIE • ŚRODEK + PRAWA"
                 },
                 "right_branch_unterminated": {
                   "message": "PRAWA GAŁĄŹ: brak dostępnego odbiornika.",
@@ -352,7 +360,8 @@
                     "up",
                     "up",
                     "down"
-                  ]
+                  ],
+                  "summary": "PRAWA • BRAK ODBIORNIKA"
                 },
                 "split_outer_feed": {
                   "message": "ROZDZIAŁ ZASILANIA: dwie skrajne gałęzie tworzą nieciągły tor.",
@@ -360,7 +369,8 @@
                     "down",
                     "up",
                     "down"
-                  ]
+                  ],
+                  "summary": "ROZDZIAŁ • SKRAJNE NIECIĄGŁE"
                 }
               },
               "evaluation": "on_toggle",
@@ -479,133 +489,133 @@
           "id": "entry_floor_12_broken_window",
           "kind": "entry_opening",
           "path": "structures/tower_prototype_01/generated/socket_cards/entry_floor_12_broken_window.json",
-          "sha256": "179dc3531dd99ac1167dd99742da0e105b887b6abfef682f31386c3323467fef"
+          "sha256": "66ae667d16d12e3b4c7e07307a489021d33e35b09642303254f137fe2512e944"
         },
         {
           "id": "elevator_upper_travel",
           "kind": "moving_elevator",
           "path": "structures/tower_prototype_01/generated/socket_cards/elevator_upper_travel.json",
-          "sha256": "1be9b7e31e86374619acf11e892a83a9abb42b0cbb3da0b70f3d49144c7445dc"
+          "sha256": "e74072cc709aba435f1fa703ca7f7e038f36776ee0c8c82e7ce124ac935180cc"
         },
         {
           "id": "gate_red_west",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_west.json",
-          "sha256": "1b0ccc5953582ffe3f360dfac65ceaebcf66eccb23ed5f8d9d848276b713899c"
+          "sha256": "9213d822f0d8d1283386517b975f01eb34b54fb08e87ed868536a5679c8ea6ed"
         },
         {
           "id": "gate_red_east",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_east.json",
-          "sha256": "8fb82e0c772e63c9bb018f050f50af0740ce0ed995113a112d73a899db90609e"
+          "sha256": "9cc831c42d1d2c86a91dccba85c937f0010873e27cd3bbc4a022551e035f194b"
         },
         {
           "id": "gate_blue_upper",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_upper.json",
-          "sha256": "6ca1c7d6c90a2fd574ac9922053fc589f6d1cbe55b98d4b23f8aef97c93ba861"
+          "sha256": "1b0795d93a25f6275b909ed4104cfa37395cf8e57860e0403460a5e03f4238fd"
         },
         {
           "id": "gate_blue_lower",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_lower.json",
-          "sha256": "1b493a2eea191eb6273f98b693550396dbfbdd28e9f5fa1f61c35a42a90a352c"
+          "sha256": "f466aa5afec153d597067e415eb64c96b90a4bab2ec182dbf9eb2db076a8f640"
         },
         {
           "id": "gate_yellow",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_yellow.json",
-          "sha256": "031ce22df22839bb8798e1e7dd4e36e3da58d579da77e106289a374975d5aa25"
+          "sha256": "460e9e9a9f13bdd96bab9bd4d879bf4da6cc24a79bdaa6d86bd5d42b76d6d9b1"
         },
         {
           "id": "hatch_d",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/hatch_d.json",
-          "sha256": "5ad3f0cf4ad27e4db90a74ee42a33288415ed7fb74e2e0d83792fcf52e81653d"
+          "sha256": "6a19d34934572b3a0297fa02985b6012d296a6d1c2235472da542660bedccd9d"
         },
         {
           "id": "shortcut_b_upper",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_upper.json",
-          "sha256": "2af077a6c093abcf32bc0f6267b3d8c7e7d1110415e6862032b77ec2f6abd5fb"
+          "sha256": "b2ad30aa86d21af13c5c01177e023774182fa39acaab326daebedb8c95b83884"
         },
         {
           "id": "shortcut_b_lower",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_lower.json",
-          "sha256": "eba6f4fd6809d725017222ee5a412d8f603668c8b36eb2fcb0d3d53f98199f40"
+          "sha256": "9c87e853f06c862915614a03e6123b0969cf304efc4ba41d9725d466b3140519"
         },
         {
           "id": "shortcut_c_upper",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_upper.json",
-          "sha256": "553d3bded6302f9cf63bb0a4d05e793fa026352e7f938704fe2473a97afdfac3"
+          "sha256": "63449e9ee709177b564f7ec110b7e4e6341c2d4e1a1085d2e1eb81fbc1fdb985"
         },
         {
           "id": "shortcut_c_middle",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_middle.json",
-          "sha256": "f9a7c2843685fed7019d8ea9d78cea0bf0de50a77734cd5f5bca86e46222e32e"
+          "sha256": "3f801fd1c7a3658f0f9501bbacc05a2ae8ea8d774dc8d53c60e41a3a8267b060"
         },
         {
           "id": "shortcut_c_lower",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_lower.json",
-          "sha256": "fc95d011274c2dc215a589d1b79001c9786eb932f090670858f31cb3e7555645"
+          "sha256": "af0e3fe26da7d30affa0eb1166af849439790baf836d5931acdf23d584c248d5"
         },
         {
           "id": "hatch_basement",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/hatch_basement.json",
-          "sha256": "f23524d23e88b93847665a05e764dc0ba0e0491476b6305faaff99f5a2da0d59"
+          "sha256": "a8547c6539a5723f73b65487cc2347709e773ec5fd9b26975824d515ff3ac03d"
         },
         {
           "id": "control_a_distributor",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_a_distributor.json",
-          "sha256": "7fe96b335c236999d583d63ae806c85ef616f16731b435d54d233d1314ff7d32"
+          "sha256": "b37c7bced18dbf55aa02a7f5a9c5ec12f915ac43bc6c1b0a44016431615b3ad3"
         },
         {
           "id": "control_b_red_relay",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_b_red_relay.json",
-          "sha256": "1403e47b23102378f0c037c5d1aa7fc82329ae895a731415382b3654c8ba149a"
+          "sha256": "455f50cbaf92a5b4396eff1e785f84d6b8419f8a8ab0a38999a50bcbdb3da027"
         },
         {
           "id": "control_c_blue_lock",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_c_blue_lock.json",
-          "sha256": "7134650b94397da165f0e5eaf6a99fa293f764f81a8a6de842730c822df64883"
+          "sha256": "3c93c276d02116ed4e0d150b9ed6a6039bb671339c7070bf32ef588f813c0ec7"
         },
         {
           "id": "control_d_valve_v1",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v1.json",
-          "sha256": "7b185f97267bd411dfae5a455961759e905ad7be5a88787d688a7121d4ed8048"
+          "sha256": "ce072d7ac26eeabb8d884c213d2d58e366e668d2d581bea983a3e74ff67b1867"
         },
         {
           "id": "control_d_valve_v2",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v2.json",
-          "sha256": "b5a4b7d706d160685fdeac913fce1545e263aeb1f90441960c7c26bc3c18e934"
+          "sha256": "7dafe9c1e4ef96f7c7726fbb3bd5db2e173e68b57cb1da22894800dea71a6fa6"
         },
         {
           "id": "control_d_valve_v3",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v3.json",
-          "sha256": "d74cf44baa248aff6f6577d1190aee1a63234d53b4aa5926ef1465731055b09a"
+          "sha256": "441dfddea767511774474c2d506e5b48585c57df695e581899f61b438c83238f"
         },
         {
           "id": "control_d_reset",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_reset.json",
-          "sha256": "ab35d30d5a68fa1186246db00a340c395de074d11c5eed22abd5870eb5dd348b"
+          "sha256": "78c4f0291c10fd792be1ae0e9a51c5845a6db2b076e455eb6e4fc663e47af90d"
         },
         {
           "id": "control_basement_hatch",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_basement_hatch.json",
-          "sha256": "9ec3fd2a14d897e723a5674fe262afc4dfa08aef55ed9971568b36e973b5b079"
+          "sha256": "0e52049c57561638b0c046cc5630555bfb58529a841d1c88dde5e7c06dc21267"
         }
       ],
       "sockets": [
@@ -832,7 +842,7 @@
       ],
       "structure_truth": {
         "path": "structures/tower_prototype_01/generated/structure_truth.json",
-        "sha256": "95879211e49cbcca7fecfbeb02ab97962cfd3704e726996fd39dd88b87be6548"
+        "sha256": "d2005335b181b03795bb280ecc8d313a9b56075339d00d4823532bbb2c81eddb"
       },
       "template_id": "enterable_tower_v1",
       "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
@@ -876,7 +886,7 @@
             3840
           ],
           "path": "structures/tower_three_inlets_02/generated/panels/panel_0_0_2400_3840.json",
-          "sha256": "2c2e5dc42f1a1372fb752a8c8e6be59a639e84cd2f75f9f46f1b0762dc44b39c"
+          "sha256": "46509e8dd1a023a6c69dd64c0a231600e3c76267d4f0b68c3c2e3168c8f36e5a"
         }
       ],
       "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
@@ -1072,121 +1082,121 @@
           "id": "entry_floor_12_damaged_balcony",
           "kind": "entry_opening",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/entry_floor_12_damaged_balcony.json",
-          "sha256": "15bc5fe9adc33be10335409d18f4b3c10cdd738a584380e87ec886e4ff0bf085"
+          "sha256": "6f29a0e96c74a86484f5c48a0806ea098c58e4c50bf08d02d21b433ab3e00e58"
         },
         {
           "id": "panel_a_status",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/panel_a_status.json",
-          "sha256": "81ddd27299a17557bbce28cdb30b8cc397702b07ae1a83a8ec06e3857e8db2c3"
+          "sha256": "c784a976788d235e0a574d47719b55d453f91c8b75c3f0ce8e9caa9f498ee2f7"
         },
         {
           "id": "inlet_b_lever",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/inlet_b_lever.json",
-          "sha256": "1fafc4d2a6d512246cf9a1cb6c08f4dbaa778043789e71455714b4a3a59e739f"
+          "sha256": "160cea8c6e54f719092d794993d23c602999fb7591bd59eca3fc40f6a2b3746a"
         },
         {
           "id": "current_b_main",
           "kind": "current_zone",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_main.json",
-          "sha256": "ef8f76371b9876510b292d647ab5dbff728850dc412be34e9ce72467dcc526a7"
+          "sha256": "d67599e9b4585ce00bc6abcd153b044f275cf0f000335976072c221e529c726a"
         },
         {
           "id": "current_b_cover_1",
           "kind": "current_zone",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_cover_1.json",
-          "sha256": "064d6a721c7f53511ad28e9990a84e9089690f7ac23d1432ed2da0f098239480"
+          "sha256": "97e7bb3d023987e0b0aebaf987b59c79115fe2023d74457432fc268a2e26bd05"
         },
         {
           "id": "current_b_cover_2",
           "kind": "current_zone",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_cover_2.json",
-          "sha256": "1bbe594444834f968671e33283172f70b05fac57711991c2d314c1a82643ba64"
+          "sha256": "d69022e41014035cc53e180433e387a976d9d1c9eebad4147af84a0ee96661ac"
         },
         {
           "id": "current_b_recovery",
           "kind": "current_zone",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/current_b_recovery.json",
-          "sha256": "3e7c6dc291b69a2a7873570aef82a402f1a654449d1ba2e3684c7d5de372f01f"
+          "sha256": "1e9e781c7893050e0cfdd504ac49e0e0810c37e790e3286b6eba3df51eaa3ece"
         },
         {
           "id": "gate_g1",
           "kind": "dynamic_door",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_g1.json",
-          "sha256": "7a0e857ffe36cd4d3cf03219975eb40c99f81673fbfe6a8c386bb1bd92d474cf"
+          "sha256": "d5596038249d2404e750040c3744f562012222d6d03aa9e33bbef59dcb5a0953"
         },
         {
           "id": "inlet_c_lever",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/inlet_c_lever.json",
-          "sha256": "d8a700f0925c21934c5d1e8704538fad2c73f9e9ab1eeafd9642a120c792dd0d"
+          "sha256": "d34b1a0e9ebdad04b239a3e0a3f2a107b44a9f3a2b5cbb5a55dc4de494d1d5c6"
         },
         {
           "id": "gate_c_shortcut",
           "kind": "dynamic_door",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_c_shortcut.json",
-          "sha256": "83ab74a3c771400213246640b6ba294333012f06fe01a8953a580e3c49d82396"
+          "sha256": "49e795ae88dd9a3db13cc981aaf26a31aa2abf18240dd4626f9520bdfc694ce7"
         },
         {
           "id": "gate_g2",
           "kind": "dynamic_door",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_g2.json",
-          "sha256": "25549024538453173f9f516522b2256d4594cfb540164c66663575e1d35ad3ab"
+          "sha256": "2cdc48e24947f6f5a20ef099368006639b390da798b08ad8e5fd850edfc2045e"
         },
         {
           "id": "d_valve_v1",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/d_valve_v1.json",
-          "sha256": "d6e4e559387ffe507381dffe6d982813290ca5058f3988df9e5f2c1969b89438"
+          "sha256": "5d05919728c04ea1ee8b3c8306340f783a591ce6cf32ce22941005035d572c2b"
         },
         {
           "id": "d_valve_v2",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/d_valve_v2.json",
-          "sha256": "eac885924fea8f7243993bf9a1243791c24d3d623e2f762424739ce61591c6a0"
+          "sha256": "80771498127a5debae9474b2148133fe89276e70fd5e953304da825645909c14"
         },
         {
           "id": "d_reset",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/d_reset.json",
-          "sha256": "fc8f7e6bcc5cace96bff8971b310f21448210fd2e035b9986905e93f9ea122b6"
+          "sha256": "a86ce6427edc608190a6c74f9c25c511b98c7ddc069bfc7dcae368b4a38a8522"
         },
         {
           "id": "d_inlet_lever",
           "kind": "fixed_interactable",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/d_inlet_lever.json",
-          "sha256": "47bb829b4c63dcd3b5718eb463206c97e1921663148534d87e558dbecea8d830"
+          "sha256": "0cc08d1ae39443e461dae4ed26e5fb5d93f2b5efa04ed24d0e37954045fe5c4e"
         },
         {
           "id": "cabinet_d",
           "kind": "moving_obstacle",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/cabinet_d.json",
-          "sha256": "8cf9f029ad72c085d3c590641e661cdfb01b19c7fca1cf1d6ae7b378d1bce09d"
+          "sha256": "723264cb53d25e86bdde6b16f2bf316e3604d7d75e6b19160ac8d2d081a2ac76"
         },
         {
           "id": "gate_h3",
           "kind": "dynamic_door",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/gate_h3.json",
-          "sha256": "082bb7be0845a115819b64644aee4321d64ef5b2c1e81cdd6a041d2270fbf9b5"
+          "sha256": "b1b8ea4d67c5e24200daf0700d3d7d13e98f510f64267b3cd387f1da244f4ae7"
         },
         {
           "id": "current_central_shaft",
           "kind": "current_zone",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/current_central_shaft.json",
-          "sha256": "63b0a5bce06209857ad0c09f839c32731c0347078d4c39eb430ef7b245b1e17e"
+          "sha256": "bd1a73052fd12d313a2996dc53081f3e658f58cfd2d4d78faf0633e61aa2721a"
         },
         {
           "id": "facade_ground_floor",
           "kind": "dynamic_door",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/facade_ground_floor.json",
-          "sha256": "ca2bea31d8288f865ac74ede779af1f825ab15ae1669aa68076dd882db3dd0fa"
+          "sha256": "dc2be430f03106ca5749ba44c63c3d81df8171ab0e8fb38d8b63628ff4ae0f4f"
         },
         {
           "id": "egress_ground_floor",
           "kind": "building_egress",
           "path": "structures/tower_three_inlets_02/generated/socket_cards/egress_ground_floor.json",
-          "sha256": "604b26a8de528cb6f0828d17f02807b567f8f2152f34f28cc8f1c4e56ee3d0c7"
+          "sha256": "16ae0be9711af5b6042036ee135dbc7f9b26a623ecbe4618046849521dea7569"
         }
       ],
       "sockets": [
@@ -1393,7 +1403,7 @@
       ],
       "structure_truth": {
         "path": "structures/tower_three_inlets_02/generated/structure_truth.json",
-        "sha256": "f596ea7a0f0d6a67272ec46f3dd5737302dc9d8d7e39e5bbfe778f59a99aeae7"
+        "sha256": "03f3e6eabc1f65c63162ce5ee56b0f3e5fc4eeacbe2a292c5f1f4b04a6cfacab"
       },
       "template_id": "enterable_three_inlets_tower_v1",
       "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
