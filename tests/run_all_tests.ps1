@@ -319,8 +319,19 @@ function Assert-ProjectGodotCacheAvailable {
                 break
             }
         }
+        $expandedCandidatePath = [Environment]::ExpandEnvironmentVariables(
+            ([string]$candidatePath).Trim()
+        )
+        # Win32_Process exposes a command line but not the process working
+        # directory. Resolving somebody else's relative `--path .` against
+        # our workspace would fabricate a collision. Official runner-created
+        # Godot processes always receive a canonical absolute --path, so only
+        # absolute paths are comparable here.
+        if (-not [System.IO.Path]::IsPathRooted($expandedCandidatePath)) {
+            continue
+        }
         $normalizedCandidatePath = ConvertTo-NormalizedProjectPath `
-            -Candidate $candidatePath `
+            -Candidate $expandedCandidatePath `
             -RelativeBase $ProjectRoot
         if ($null -eq $normalizedCandidatePath -or
             -not [string]::Equals($normalizedCandidatePath, $normalizedProjectRoot, [StringComparison]::OrdinalIgnoreCase)) {

@@ -34,6 +34,8 @@ $requiredFunctions = @(
     "Get-RunnerTestSelection",
     "Assert-RunnerInvocationMode",
     "Assert-TrackedLfEol",
+    "ConvertTo-NormalizedProjectPath",
+    "Assert-ProjectGodotCacheAvailable",
     "Remove-IsolatedTestWorkspace",
     "ConvertTo-ProcessArgument",
     "Get-GitSnapshotProjectPaths",
@@ -113,6 +115,53 @@ if (-not $fixtureRoot.StartsWith($requiredPrefix, [StringComparison]::OrdinalIgn
 try {
     $sourceRoot = Join-Path $fixtureRoot "source checkout with spaces"
     $workspaceRoot = Join-Path $fixtureRoot "isolated workspaces"
+    $collisionRoot = [System.IO.Path]::GetFullPath((Join-Path $fixtureRoot "collision workspace"))
+    $otherCollisionRoot = [System.IO.Path]::GetFullPath((Join-Path $fixtureRoot "other workspace"))
+    [void](New-Item -ItemType Directory -Path $collisionRoot -Force)
+    [void](New-Item -ItemType Directory -Path $otherCollisionRoot -Force)
+    $script:mockGodotProcesses = @()
+    function Get-CimInstance {
+        param(
+            [string]$ClassName,
+            [System.Management.Automation.ActionPreference]$ErrorAction
+        )
+        return @($script:mockGodotProcesses)
+    }
+    try {
+        $script:mockGodotProcesses = @(
+            [pscustomobject]@{
+                Name = "godot_console.exe"
+                ProcessId = 1001
+                CommandLine = 'godot_console.exe --headless --path . --script res://tests/a.gd'
+            },
+            [pscustomobject]@{
+                Name = "godot.exe"
+                ProcessId = 1002
+                CommandLine = 'godot.exe --headless --path "' + $otherCollisionRoot + '" res://tests/b.tscn'
+            }
+        )
+        Assert-ProjectGodotCacheAvailable -ProjectRoot $collisionRoot
+
+        $script:mockGodotProcesses = @([pscustomobject]@{
+            Name = "godot_console.exe"
+            ProcessId = 1003
+            CommandLine = 'godot_console.exe --headless --path "' + $collisionRoot + '" --script res://tests/c.gd'
+        })
+        $sameWorkspaceBlocked = $false
+        try {
+            Assert-ProjectGodotCacheAvailable -ProjectRoot $collisionRoot
+        }
+        catch {
+            $sameWorkspaceBlocked = $_.Exception.Message.Contains(
+                "PID 1003 [runtime/test]"
+            )
+        }
+        Assert-RunnerInvariant $sameWorkspaceBlocked "Canonical same-workspace Godot path did not block the runner."
+    }
+    finally {
+        Remove-Item -LiteralPath function:Get-CimInstance -ErrorAction SilentlyContinue
+        Remove-Variable -Name mockGodotProcesses -Scope Script -ErrorAction SilentlyContinue
+    }
     [void](New-Item -ItemType Directory -Path $sourceRoot -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tests") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tools") -Force)
