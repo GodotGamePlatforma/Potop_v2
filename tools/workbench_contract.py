@@ -18,7 +18,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Sequence
 
@@ -36,6 +38,15 @@ DEFAULT_PUBLICATION_LOCK = "integration-publish"
 LAST_GREEN_REF = "refs/last-green/integration"
 PUBLICATION_RECEIPT_SCHEMA_VERSION = 1
 PUBLICATION_RECEIPT_STATUS = "PUBLICATION_READY"
+ASSIGNMENT_SCHEMA_VERSION = 1
+ASSIGNMENT_STORE_RELATIVE = Path("codex-agent-assignments") / "v1"
+ASSIGNMENT_LOCK_NAME = "agent-assignments"
+ASSIGNMENT_ID_PATTERN = re.compile(r"[0-9a-f]{32}\Z")
+ASSIGNMENT_DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+ASSIGNMENT_WAITING = "WAITING_ACK"
+ASSIGNMENT_RUNNING = "RUNNING"
+ASSIGNMENT_TIMEOUT = "ACK_TIMEOUT"
+ASSIGNMENT_CLOSED = "CLOSED"
 
 
 class ContractError(RuntimeError):
@@ -581,6 +592,934 @@ def read_write_set(path: str | Path) -> tuple[str, ...]:
             continue
         result.append(normalize_repo_path(candidate))
     return tuple(result)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_text(value: datetime) -> str:
+    if value.tzinfo is None:
+        raise ContractError("Assignment timestamps must be timezone-aware.")
+    normalized = value.astimezone(timezone.utc).replace(microsecond=0)
+    return normalized.isoformat().replace("+00:00", "Z")
+
+
+def _parse_utc_text(value: object, label: str) -> datetime:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise ContractError(f"Assignment {label} must be an ISO-8601 UTC timestamp.")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as error:
+        raise ContractError(
+            f"Assignment {label} must be an ISO-8601 UTC timestamp."
+        ) from error
+    return parsed.astimezone(timezone.utc)
+
+
+def _canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _canonical_digest(value: object) -> str:
+    return hashlib.sha256(_canonical_json_bytes(value)).hexdigest()
+
+
+def _file_sha256(path: str | Path, label: str) -> str:
+    source = Path(path).resolve(strict=False)
+    try:
+        payload = source.read_bytes()
+    except OSError as error:
+        raise ContractError(f"Cannot read {label} {source}: {error}") from error
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _closed_write_set(path: str | Path) -> tuple[str, ...]:
+    values = tuple(sorted(set(read_write_set(path))))
+    if not values:
+        raise ContractError("Assignment write-set must contain at least one path.")
+    return values
+
+
+def _write_set_digest(paths: Iterable[str]) -> str:
+    normalized = tuple(sorted(set(normalize_repo_path(path) for path in paths)))
+    return hashlib.sha256(("\n".join(normalized) + "\n").encode("utf-8")).hexdigest()
+
+
+def _assignment_text(value: str, label: str, maximum: int) -> str:
+    normalized = value.strip()
+    if (
+        not normalized
+        or len(normalized) > maximum
+        or any(ord(character) < 32 for character in normalized)
+    ):
+        raise ContractError(
+            f"Assignment {label} must be nonempty, contain no control characters "
+            f"and be at most {maximum} characters."
+        )
+    return normalized
+
+
+def _assignment_integer(value: object, label: str, minimum: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ContractError(
+            f"Assignment {label} must be an integer greater than or equal to {minimum}."
+        )
+    return value
+
+
+def _canonical_path(path: str | Path, *, must_exist: bool) -> str:
+    resolved = Path(path).resolve(strict=must_exist)
+    return str(resolved)
+
+
+def _same_path(left: str | Path, right: str | Path) -> bool:
+    return os.path.normcase(_canonical_path(left, must_exist=False)) == os.path.normcase(
+        _canonical_path(right, must_exist=False)
+    )
+
+
+def assignment_store(repository: str | Path = ".") -> Path:
+    return git_common_dir(repository) / ASSIGNMENT_STORE_RELATIVE
+
+
+def assignment_lock(repository: str | Path = ".") -> InterprocessWorkspaceLock:
+    return publication_lock(repository, ASSIGNMENT_LOCK_NAME)
+
+
+def _assignment_task_hash(task_id: str) -> str:
+    return hashlib.sha256(task_id.encode("utf-8")).hexdigest()
+
+
+def _assignment_bundle_path(
+    repository: str | Path,
+    task_id: str,
+    assignment_id: str,
+) -> Path:
+    if ASSIGNMENT_ID_PATTERN.fullmatch(assignment_id) is None:
+        raise ContractError("Assignment ID must contain exactly 32 lowercase hex digits.")
+    normalized_task = _assignment_text(task_id, "task_id", 512)
+    return assignment_store(repository) / _assignment_task_hash(normalized_task) / assignment_id
+
+
+def _read_json_object(path: Path, label: str) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContractError(f"Assignment {label} is unreadable: {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise ContractError(f"Assignment {label} must contain a JSON object: {path}")
+    return value
+
+
+def _write_json_file(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8", newline="\n") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _assignment_record(bundle: Path) -> dict[str, object]:
+    record = _read_json_object(bundle / "assignment.json", "record")
+    required = {
+        "schema_version",
+        "assignment_id",
+        "assignment_digest",
+        "task_id",
+        "task_id_sha256",
+        "thread_id",
+        "owner",
+        "brief",
+        "destination",
+        "common_git_dir",
+        "branch",
+        "head",
+        "tree",
+        "write_set",
+        "write_set_digest",
+        "candidate_receipt_sha256",
+        "run_receipt_sha256",
+        "created_at",
+        "ack_deadline",
+    }
+    if set(record) != required or record.get("schema_version") != ASSIGNMENT_SCHEMA_VERSION:
+        raise ContractError("Assignment record has an invalid exact schema.")
+    assignment_id = str(record["assignment_id"])
+    assignment_digest = str(record["assignment_digest"])
+    if (
+        ASSIGNMENT_ID_PATTERN.fullmatch(assignment_id) is None
+        or ASSIGNMENT_DIGEST_PATTERN.fullmatch(assignment_digest) is None
+        or bundle.name != assignment_id
+    ):
+        raise ContractError("Assignment record has an invalid ID or digest.")
+    payload = dict(record)
+    del payload["assignment_digest"]
+    if _canonical_digest(payload) != assignment_digest:
+        raise ContractError("Assignment record digest does not match its content.")
+    identity_payload = dict(payload)
+    del identity_payload["assignment_id"]
+    if _canonical_digest(identity_payload)[:32] != assignment_id:
+        raise ContractError("Assignment ID does not match the immutable identity payload.")
+    task_id = _assignment_text(str(record["task_id"]), "task_id", 512)
+    if (
+        record["task_id"] != task_id
+        or record["task_id_sha256"] != _assignment_task_hash(task_id)
+        or bundle.parent.name != record["task_id_sha256"]
+    ):
+        raise ContractError("Assignment record task identity is not canonical.")
+    normalized_owner = normalize_owner(str(record["owner"]))
+    if record["owner"] != normalized_owner:
+        raise ContractError("Assignment record owner is not canonical.")
+    write_set_value = record["write_set"]
+    if not isinstance(write_set_value, list) or not write_set_value:
+        raise ContractError("Assignment record write_set must be a nonempty list.")
+    write_set = tuple(normalize_repo_path(str(path)) for path in write_set_value)
+    if write_set != tuple(sorted(set(write_set))):
+        raise ContractError("Assignment record write_set is not closed and sorted.")
+    if record["write_set_digest"] != _write_set_digest(write_set):
+        raise ContractError("Assignment record write_set digest is invalid.")
+    if validate_paths(normalized_owner, write_set):
+        raise ContractError("Assignment record write_set crosses its owner boundary.")
+    for field in (
+        "candidate_receipt_sha256",
+        "run_receipt_sha256",
+        "task_id_sha256",
+    ):
+        if ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(record[field])) is None:
+            raise ContractError(f"Assignment record {field} is invalid.")
+    for field in ("head", "tree"):
+        if re.fullmatch(r"[0-9a-f]{40,64}", str(record[field])) is None:
+            raise ContractError(f"Assignment record {field} is invalid.")
+    _assignment_text(str(record["thread_id"]), "thread_id", 512)
+    _assignment_text(str(record["brief"]), "brief", 10000)
+    _assignment_text(str(record["branch"]), "branch", 512)
+    _parse_utc_text(record["created_at"], "created_at")
+    _parse_utc_text(record["ack_deadline"], "ack_deadline")
+    return record
+
+
+def _event_record(
+    path: Path,
+    *,
+    event_type: str,
+    digest_field: str,
+    required_fields: set[str],
+    assignment: dict[str, object],
+) -> dict[str, object]:
+    event = _read_json_object(path, event_type.lower())
+    if set(event) != required_fields or event.get("event") != event_type:
+        raise ContractError(f"Assignment {event_type} event has an invalid exact schema.")
+    if (
+        event.get("schema_version") != ASSIGNMENT_SCHEMA_VERSION
+        or event.get("assignment_id") != assignment["assignment_id"]
+        or event.get("assignment_digest") != assignment["assignment_digest"]
+        or ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(event.get(digest_field, ""))) is None
+    ):
+        raise ContractError(f"Assignment {event_type} event identity is invalid.")
+    payload = dict(event)
+    del payload[digest_field]
+    if _canonical_digest(payload) != event[digest_field]:
+        raise ContractError(f"Assignment {event_type} event digest is invalid.")
+    return event
+
+
+def _assignment_ack(bundle: Path, assignment: dict[str, object]) -> dict[str, object] | None:
+    path = bundle / "ack.json"
+    if not path.exists():
+        return None
+    event = _event_record(
+        path,
+        event_type="ACK",
+        digest_field="ack_digest",
+        required_fields={
+            "schema_version",
+            "event",
+            "assignment_id",
+            "assignment_digest",
+            "thread_id",
+            "owner",
+            "destination",
+            "common_git_dir",
+            "branch",
+            "head",
+            "tree",
+            "write_set_digest",
+            "acknowledged_at",
+            "ack_digest",
+        },
+        assignment=assignment,
+    )
+    for field in (
+        "thread_id",
+        "owner",
+        "destination",
+        "common_git_dir",
+        "branch",
+        "head",
+        "tree",
+        "write_set_digest",
+    ):
+        if event[field] != assignment[field]:
+            raise ContractError(f"Assignment ACK {field} differs from its assignment.")
+    _parse_utc_text(event["acknowledged_at"], "acknowledged_at")
+    return event
+
+
+def _assignment_close(bundle: Path, assignment: dict[str, object]) -> dict[str, object] | None:
+    path = bundle / "close.json"
+    if not path.exists():
+        return None
+    event = _event_record(
+        path,
+        event_type="CLOSE",
+        digest_field="close_digest",
+        required_fields={
+            "schema_version",
+            "event",
+            "assignment_id",
+            "assignment_digest",
+            "thread_id",
+            "reason",
+            "closed_at",
+            "close_digest",
+        },
+        assignment=assignment,
+    )
+    if event["thread_id"] != assignment["thread_id"]:
+        raise ContractError("Assignment CLOSE thread_id differs from its assignment.")
+    _assignment_text(str(event["reason"]), "close reason", 2000)
+    _parse_utc_text(event["closed_at"], "closed_at")
+    return event
+
+
+def _assignment_redispatches(
+    bundle: Path,
+    assignment: dict[str, object],
+) -> tuple[dict[str, object], ...]:
+    directory = bundle / "redispatch"
+    if not directory.exists():
+        return ()
+    events: list[dict[str, object]] = []
+    previous_deadline = str(assignment["ack_deadline"])
+    for path in sorted(directory.glob("*.json")):
+        event = _event_record(
+            path,
+            event_type="REDISPATCH",
+            digest_field="redispatch_digest",
+            required_fields={
+                "schema_version",
+                "event",
+                "assignment_id",
+                "assignment_digest",
+                "thread_id",
+                "sequence",
+                "reason",
+                "previous_deadline",
+                "ack_deadline",
+                "redispatched_at",
+                "redispatch_digest",
+            },
+            assignment=assignment,
+        )
+        sequence = _assignment_integer(event["sequence"], "redispatch sequence", 1)
+        if path.name != f"{sequence:06d}.json" or sequence != len(events) + 1:
+            raise ContractError("Assignment redispatch sequence is not contiguous.")
+        if event["thread_id"] != assignment["thread_id"]:
+            raise ContractError(
+                "Assignment REDISPATCH thread_id differs from its assignment."
+            )
+        if event["previous_deadline"] != previous_deadline:
+            raise ContractError("Assignment REDISPATCH deadline chain is invalid.")
+        _assignment_text(str(event["reason"]), "redispatch reason", 2000)
+        _parse_utc_text(event["redispatched_at"], "redispatched_at")
+        _parse_utc_text(event["ack_deadline"], "redispatch ack_deadline")
+        previous_deadline = str(event["ack_deadline"])
+        events.append(event)
+    return tuple(events)
+
+
+def _all_assignment_bundles(repository: str | Path) -> tuple[Path, ...]:
+    store = assignment_store(repository)
+    if not store.exists():
+        return ()
+    bundles: list[Path] = []
+    for task_directory in sorted(store.iterdir()):
+        if not task_directory.is_dir() or task_directory.name.startswith("."):
+            continue
+        if ASSIGNMENT_DIGEST_PATTERN.fullmatch(task_directory.name) is None:
+            raise ContractError(f"Unexpected assignment task directory: {task_directory}")
+        for bundle in sorted(task_directory.iterdir()):
+            if not bundle.is_dir() or bundle.name.startswith("."):
+                continue
+            if ASSIGNMENT_ID_PATTERN.fullmatch(bundle.name) is None:
+                raise ContractError(f"Unexpected assignment bundle: {bundle}")
+            bundles.append(bundle)
+    return tuple(bundles)
+
+
+def _find_assignment_bundle(
+    repository: str | Path,
+    assignment_id: str | None,
+    task_id: str | None = None,
+) -> Path:
+    if task_id is not None:
+        normalized_task = _assignment_text(task_id, "task_id", 512)
+        task_directory = (
+            assignment_store(repository) / _assignment_task_hash(normalized_task)
+        )
+        if assignment_id is not None:
+            bundle = _assignment_bundle_path(repository, normalized_task, assignment_id)
+            if not bundle.is_dir():
+                raise ContractError(f"Assignment bundle does not exist: {bundle}")
+            return bundle
+        matches = [
+            bundle
+            for bundle in sorted(task_directory.iterdir())
+            if bundle.is_dir() and not bundle.name.startswith(".")
+        ] if task_directory.is_dir() else []
+        if len(matches) != 1:
+            raise ContractError(
+                f"Task ID must resolve to exactly one assignment; found {len(matches)}."
+            )
+        record = _assignment_record(matches[0])
+        if record["task_id"] != normalized_task:
+            raise ContractError("Assignment task hash collision detected.")
+        return matches[0]
+    if assignment_id is None:
+        raise ContractError("Assignment lookup requires task_id or assignment_id.")
+    matches = [
+        bundle for bundle in _all_assignment_bundles(repository) if bundle.name == assignment_id
+    ]
+    if len(matches) != 1:
+        raise ContractError(
+            f"Assignment ID must resolve to exactly one bundle; found {len(matches)}."
+        )
+    return matches[0]
+
+
+def _assignment_status_unlocked(
+    bundle: Path,
+    *,
+    now: datetime,
+) -> dict[str, object]:
+    assignment = _assignment_record(bundle)
+    redispatches = _assignment_redispatches(bundle, assignment)
+    ack = _assignment_ack(bundle, assignment)
+    close = _assignment_close(bundle, assignment)
+    deadline_text = str(
+        redispatches[-1]["ack_deadline"] if redispatches else assignment["ack_deadline"]
+    )
+    deadline = _parse_utc_text(deadline_text, "effective ack_deadline")
+    if close is not None:
+        state = ASSIGNMENT_CLOSED
+    elif ack is not None:
+        state = ASSIGNMENT_RUNNING
+    elif now.astimezone(timezone.utc) > deadline:
+        state = ASSIGNMENT_TIMEOUT
+    else:
+        state = ASSIGNMENT_WAITING
+    return {
+        "state": state,
+        "assignment": assignment,
+        "ack": ack,
+        "redispatches": list(redispatches),
+        "close": close,
+        "effective_ack_deadline": deadline_text,
+        "bundle": str(bundle),
+    }
+
+
+def assignment_status(
+    repository: str | Path,
+    *,
+    assignment_id: str | None = None,
+    task_id: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    root = repository_root(repository)
+    with assignment_lock(root):
+        bundle = _find_assignment_bundle(root, assignment_id, task_id)
+        return _assignment_status_unlocked(bundle, now=now or _utc_now())
+
+
+def _write_sets_overlap(left: Iterable[str], right: Iterable[str]) -> tuple[str, str] | None:
+    for left_path in left:
+        left_key = normalize_repo_path(left_path).casefold()
+        for right_path in right:
+            right_key = normalize_repo_path(right_path).casefold()
+            if (
+                left_key == right_key
+                or left_key.startswith(right_key + "/")
+                or right_key.startswith(left_key + "/")
+            ):
+                return left_path, right_path
+    return None
+
+
+def _assert_assignment_evidence(
+    repository: Path,
+    *,
+    candidate_receipt: str | Path,
+    run_receipt: str | Path,
+    head: str,
+    tree: str,
+) -> None:
+    candidate = _publication_receipt_header(repository, candidate_receipt)
+    if candidate["head"] != head or candidate["tree"] != tree:
+        raise ContractError("Assignment candidate receipt does not bind the exact HEAD/tree.")
+    try:
+        run = json.loads(Path(run_receipt).resolve(strict=True).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContractError(f"Assignment run receipt is unreadable: {error}") from error
+    if not isinstance(run, dict):
+        raise ContractError("Assignment run receipt must contain an object.")
+    required = {
+        "head",
+        "tree",
+        "suite_mode",
+        "target_scope",
+        "overall",
+        "fail_count",
+        "skip_count",
+        "blocking_failure_count",
+    }
+    if not required.issubset(run):
+        raise ContractError("Assignment run receipt lacks required full-run fields.")
+    fail_count = _assignment_integer(run["fail_count"], "run fail_count")
+    skip_count = _assignment_integer(run["skip_count"], "run skip_count")
+    blocking_failure_count = _assignment_integer(
+        run["blocking_failure_count"], "run blocking_failure_count"
+    )
+    if (
+        run["head"] != head
+        or run["tree"] != tree
+        or run["suite_mode"] not in {"full", "full-with-snapshots"}
+        or run["target_scope"] != "full"
+        or run["overall"] != "PASS"
+        or fail_count != 0
+        or skip_count != 0
+        or blocking_failure_count != 0
+    ):
+        raise ContractError("Assignment run receipt is not the exact full-suite PASS.")
+
+
+def create_assignment(
+    repository: str | Path,
+    *,
+    task_id: str,
+    thread_id: str,
+    owner: str,
+    brief: str,
+    destination: str | Path,
+    common_git_dir: str | Path,
+    branch: str,
+    head: str,
+    tree: str,
+    write_set_path: str | Path,
+    candidate_receipt: str | Path,
+    run_receipt: str | Path,
+    ack_deadline: datetime,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    root = repository_root(repository)
+    created_at = (now or _utc_now()).astimezone(timezone.utc)
+    deadline = ack_deadline.astimezone(timezone.utc)
+    if deadline <= created_at:
+        raise ContractError("Assignment ACK deadline must be in the future.")
+    normalized_task = _assignment_text(task_id, "task_id", 512)
+    normalized_thread = _assignment_text(thread_id, "thread_id", 512)
+    normalized_owner = normalize_owner(owner)
+    normalized_brief = _assignment_text(brief, "brief", 10000)
+    normalized_branch = _assignment_text(branch, "branch", 512)
+    normalized_destination = _canonical_path(destination, must_exist=True)
+    normalized_common = _canonical_path(common_git_dir, must_exist=True)
+    actual_common = _canonical_path(git_common_dir(root), must_exist=True)
+    if not _same_path(root, normalized_destination):
+        raise ContractError("Assignment destination must be the exact current worktree root.")
+    if not _same_path(actual_common, normalized_common):
+        raise ContractError("Assignment common Git directory does not match the worktree.")
+    actual_branch = _branch_name(root)
+    actual_head = _git_text(root, "rev-parse", "HEAD")
+    actual_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    if (
+        actual_branch != normalized_branch
+        or actual_head != head
+        or actual_tree != tree
+    ):
+        raise ContractError(
+            "Assignment branch/HEAD/tree does not match the destination worktree."
+        )
+    if changed_paths(root):
+        raise ContractError("Assignment creation requires a clean destination worktree.")
+    if last_green_head(root) != head:
+        raise ContractError("Assignment HEAD must equal the authoritative last-green ref.")
+    write_set = _closed_write_set(write_set_path)
+    violations = validate_paths(normalized_owner, write_set)
+    if violations:
+        raise ContractError(
+            "Assignment write-set crosses its owner boundary: "
+            + ", ".join(item.path for item in violations)
+        )
+    _assert_assignment_evidence(
+        root,
+        candidate_receipt=candidate_receipt,
+        run_receipt=run_receipt,
+        head=head,
+        tree=tree,
+    )
+    payload: dict[str, object] = {
+        "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+        "task_id": normalized_task,
+        "task_id_sha256": _assignment_task_hash(normalized_task),
+        "thread_id": normalized_thread,
+        "owner": normalized_owner,
+        "brief": normalized_brief,
+        "destination": normalized_destination,
+        "common_git_dir": normalized_common,
+        "branch": normalized_branch,
+        "head": head,
+        "tree": tree,
+        "write_set": list(write_set),
+        "write_set_digest": _write_set_digest(write_set),
+        "candidate_receipt_sha256": _file_sha256(
+            candidate_receipt, "candidate receipt"
+        ),
+        "run_receipt_sha256": _file_sha256(run_receipt, "run receipt"),
+        "created_at": _utc_text(created_at),
+        "ack_deadline": _utc_text(deadline),
+    }
+    identity_digest = _canonical_digest(payload)
+    assignment_id = identity_digest[:32]
+    payload["assignment_id"] = assignment_id
+    record = dict(payload)
+    record["assignment_digest"] = _canonical_digest(payload)
+
+    with assignment_lock(root):
+        task_directory = assignment_store(root) / str(record["task_id_sha256"])
+        task_directory.mkdir(parents=True, exist_ok=True)
+        existing_bundles = [
+            bundle
+            for bundle in sorted(task_directory.iterdir())
+            if bundle.is_dir() and not bundle.name.startswith(".")
+        ]
+        if existing_bundles:
+            if len(existing_bundles) != 1:
+                raise ContractError("Duplicate task has more than one assignment bundle.")
+            existing = _assignment_record(existing_bundles[0])
+            if existing.get("task_id") != normalized_task:
+                raise ContractError("Assignment task hash collision detected.")
+            if existing == record:
+                status = _assignment_status_unlocked(
+                    existing_bundles[0], now=created_at
+                )
+                status["created"] = False
+                return status
+            raise ContractError(
+                "Task already has an immutable assignment; redispatch the same "
+                "assignment instead of creating a second author."
+            )
+
+        for bundle in _all_assignment_bundles(root):
+            status = _assignment_status_unlocked(bundle, now=created_at)
+            if status["state"] == ASSIGNMENT_CLOSED:
+                continue
+            other = status["assignment"]
+            overlap = _write_sets_overlap(write_set, other["write_set"])
+            if overlap is not None:
+                raise ContractError(
+                    "Active assignment write-set overlaps another assignment: "
+                    f"{overlap[0]} <-> {overlap[1]} "
+                    f"(task={other['task_id']}, assignment={other['assignment_id']})."
+                )
+
+        final_bundle = task_directory / assignment_id
+        staging = task_directory / f".{assignment_id}.{uuid.uuid4().hex}.staging"
+        staging.mkdir()
+        try:
+            _write_json_file(staging / "assignment.json", record)
+            staging.rename(final_bundle)
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
+        status = _assignment_status_unlocked(final_bundle, now=created_at)
+        status["created"] = True
+        return status
+
+
+def acknowledge_assignment(
+    repository: str | Path,
+    *,
+    task_id: str,
+    assignment_id: str,
+    thread_id: str,
+    owner: str,
+    write_set_path: str | Path,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    root = repository_root(repository)
+    acknowledged_at = (now or _utc_now()).astimezone(timezone.utc)
+    normalized_thread = _assignment_text(thread_id, "thread_id", 512)
+    normalized_owner = normalize_owner(owner)
+    write_set = _closed_write_set(write_set_path)
+    with assignment_lock(root):
+        bundle = _find_assignment_bundle(root, assignment_id, task_id)
+        status = _assignment_status_unlocked(bundle, now=acknowledged_at)
+        assignment = status["assignment"]
+        if status["state"] == ASSIGNMENT_CLOSED:
+            raise ContractError("Closed assignment cannot be acknowledged.")
+        if status["state"] == ASSIGNMENT_TIMEOUT:
+            raise ContractError(
+                "Assignment ACK deadline expired; coordinator must redispatch the "
+                "same assignment before ACK."
+            )
+        checks = {
+            "task_id": (assignment["task_id"], _assignment_text(task_id, "task_id", 512)),
+            "thread_id": (assignment["thread_id"], normalized_thread),
+            "owner": (assignment["owner"], normalized_owner),
+            "destination": (assignment["destination"], str(root)),
+            "common_git_dir": (assignment["common_git_dir"], str(git_common_dir(root))),
+            "branch": (assignment["branch"], _branch_name(root)),
+            "head": (assignment["head"], _git_text(root, "rev-parse", "HEAD")),
+            "tree": (assignment["tree"], _git_text(root, "rev-parse", "HEAD^{tree}")),
+            "write_set_digest": (
+                assignment["write_set_digest"],
+                _write_set_digest(write_set),
+            ),
+        }
+        mismatches = [
+            label
+            for label, (expected, actual) in checks.items()
+            if (
+                not _same_path(str(expected), str(actual))
+                if label in {"destination", "common_git_dir"}
+                else expected != actual
+            )
+        ]
+        if tuple(assignment["write_set"]) != write_set:
+            mismatches.append("write_set")
+        if mismatches:
+            raise ContractError(
+                "Assignment ACK identity mismatch: " + ", ".join(sorted(set(mismatches)))
+            )
+        dirty = changed_paths(root)
+        if dirty:
+            raise ContractError(
+                "Assignment ACK requires a clean destination worktree; dirty paths: "
+                + ", ".join(dirty)
+            )
+        existing_ack = status["ack"]
+        if existing_ack is not None:
+            status["created"] = False
+            return status
+        event: dict[str, object] = {
+            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "event": "ACK",
+            "assignment_id": assignment_id,
+            "assignment_digest": assignment["assignment_digest"],
+            "thread_id": normalized_thread,
+            "owner": normalized_owner,
+            "destination": str(root),
+            "common_git_dir": str(git_common_dir(root)),
+            "branch": _branch_name(root),
+            "head": _git_text(root, "rev-parse", "HEAD"),
+            "tree": _git_text(root, "rev-parse", "HEAD^{tree}"),
+            "write_set_digest": _write_set_digest(write_set),
+            "acknowledged_at": _utc_text(acknowledged_at),
+        }
+        event["ack_digest"] = _canonical_digest(event)
+        _write_json_file(bundle / "ack.json", event)
+        result = _assignment_status_unlocked(bundle, now=acknowledged_at)
+        result["created"] = True
+        return result
+
+
+def redispatch_assignment(
+    repository: str | Path,
+    *,
+    task_id: str,
+    assignment_id: str,
+    thread_id: str,
+    reason: str,
+    ack_deadline: datetime,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    root = repository_root(repository)
+    redispatched_at = (now or _utc_now()).astimezone(timezone.utc)
+    deadline = ack_deadline.astimezone(timezone.utc)
+    if deadline <= redispatched_at:
+        raise ContractError("Redispatch ACK deadline must be in the future.")
+    normalized_thread = _assignment_text(thread_id, "thread_id", 512)
+    normalized_reason = _assignment_text(reason, "redispatch reason", 2000)
+    with assignment_lock(root):
+        bundle = _find_assignment_bundle(root, assignment_id, task_id)
+        status = _assignment_status_unlocked(bundle, now=redispatched_at)
+        assignment = status["assignment"]
+        if assignment["thread_id"] != normalized_thread:
+            raise ContractError("Redispatch must keep the exact original thread_id.")
+        if status["state"] != ASSIGNMENT_TIMEOUT:
+            raise ContractError(
+                "Redispatch is allowed only after ACK timeout and never creates a second author."
+            )
+        sequence = len(status["redispatches"]) + 1
+        event: dict[str, object] = {
+            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "event": "REDISPATCH",
+            "assignment_id": assignment_id,
+            "assignment_digest": assignment["assignment_digest"],
+            "thread_id": normalized_thread,
+            "sequence": sequence,
+            "reason": normalized_reason,
+            "previous_deadline": status["effective_ack_deadline"],
+            "ack_deadline": _utc_text(deadline),
+            "redispatched_at": _utc_text(redispatched_at),
+        }
+        event["redispatch_digest"] = _canonical_digest(event)
+        _write_json_file(bundle / "redispatch" / f"{sequence:06d}.json", event)
+        return _assignment_status_unlocked(bundle, now=redispatched_at)
+
+
+def close_assignment(
+    repository: str | Path,
+    *,
+    task_id: str,
+    assignment_id: str,
+    thread_id: str,
+    reason: str,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    root = repository_root(repository)
+    closed_at = (now or _utc_now()).astimezone(timezone.utc)
+    normalized_thread = _assignment_text(thread_id, "thread_id", 512)
+    normalized_reason = _assignment_text(reason, "close reason", 2000)
+    with assignment_lock(root):
+        bundle = _find_assignment_bundle(root, assignment_id, task_id)
+        status = _assignment_status_unlocked(bundle, now=closed_at)
+        assignment = status["assignment"]
+        if assignment["thread_id"] != normalized_thread:
+            raise ContractError("Close must use the exact assigned thread_id.")
+        if status["close"] is not None:
+            return status
+        event: dict[str, object] = {
+            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "event": "CLOSE",
+            "assignment_id": assignment_id,
+            "assignment_digest": assignment["assignment_digest"],
+            "thread_id": normalized_thread,
+            "reason": normalized_reason,
+            "closed_at": _utc_text(closed_at),
+        }
+        event["close_digest"] = _canonical_digest(event)
+        _write_json_file(bundle / "close.json", event)
+        return _assignment_status_unlocked(bundle, now=closed_at)
+
+
+def assignment_gc_plan(
+    repository: str | Path,
+    *,
+    retention_days: int,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    if retention_days < 1:
+        raise ContractError("Assignment retention must be at least one day.")
+    root = repository_root(repository)
+    current = (now or _utc_now()).astimezone(timezone.utc)
+    cutoff = current - timedelta(days=retention_days)
+    eligible: list[dict[str, object]] = []
+    with assignment_lock(root):
+        for bundle in _all_assignment_bundles(root):
+            status = _assignment_status_unlocked(bundle, now=current)
+            if status["state"] != ASSIGNMENT_CLOSED:
+                continue
+            closed_at = _parse_utc_text(status["close"]["closed_at"], "closed_at")
+            if closed_at <= cutoff:
+                eligible.append(
+                    {
+                        "task_id": status["assignment"]["task_id"],
+                        "assignment_id": status["assignment"]["assignment_id"],
+                        "closed_at": status["close"]["closed_at"],
+                        "bundle": str(bundle),
+                    }
+                )
+    return {
+        "mode": "PLAN_ONLY",
+        "retention_days": retention_days,
+        "cutoff": _utc_text(cutoff),
+        "eligible_count": len(eligible),
+        "eligible": eligible,
+    }
+
+
+def assignment_allows_path(assignment: dict[str, object], path: str) -> bool:
+    normalized = normalize_repo_path(path).casefold()
+    for root in assignment["write_set"]:
+        root_key = normalize_repo_path(str(root)).casefold()
+        if normalized == root_key or normalized.startswith(root_key + "/"):
+            return True
+    return False
+
+
+def validate_assignment_context(
+    repository: str | Path,
+    *,
+    assignment_id: str,
+    task_id: str | None,
+    thread_id: str,
+    owner: str,
+    paths: Iterable[str],
+    now: datetime | None = None,
+) -> tuple[dict[str, object], tuple[str, ...]]:
+    root = repository_root(repository)
+    normalized_thread = _assignment_text(thread_id, "thread_id", 512)
+    normalized_owner = normalize_owner(owner)
+    with assignment_lock(root):
+        bundle = _find_assignment_bundle(root, assignment_id, task_id)
+        status = _assignment_status_unlocked(bundle, now=now or _utc_now())
+        assignment = status["assignment"]
+        if status["state"] != ASSIGNMENT_RUNNING:
+            raise ContractError(
+                f"Assignment must be RUNNING before validation; state={status['state']}."
+            )
+        mismatches: list[str] = []
+        if assignment["thread_id"] != normalized_thread:
+            mismatches.append("thread_id")
+        if assignment["owner"] != normalized_owner:
+            mismatches.append("owner")
+        if not _same_path(assignment["destination"], root):
+            mismatches.append("destination")
+        if not _same_path(assignment["common_git_dir"], git_common_dir(root)):
+            mismatches.append("common_git_dir")
+        if assignment["branch"] != _branch_name(root):
+            mismatches.append("branch")
+        ancestor = _run_git(
+            root,
+            "merge-base",
+            "--is-ancestor",
+            str(assignment["head"]),
+            "HEAD",
+            check=False,
+        )
+        if ancestor.returncode != 0:
+            mismatches.append("head_lineage")
+        if mismatches:
+            raise ContractError(
+                "Assignment validation context mismatch: "
+                + ", ".join(sorted(mismatches))
+            )
+        outside = tuple(
+            sorted(
+                normalize_repo_path(path)
+                for path in paths
+                if not assignment_allows_path(assignment, path)
+            )
+        )
+        return status, outside
 
 
 def _structure_package_status(
@@ -1363,6 +2302,12 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--write-set", action="append", default=[])
     validate.add_argument("--diff", action="store_true")
     validate.add_argument("--base")
+    validate.add_argument(
+        "--assignment",
+        help="require one acknowledged assignment ID and its closed write-set",
+    )
+    validate.add_argument("--task-id")
+    validate.add_argument("--thread-id")
     validate.add_argument("--json", action="store_true")
 
     doctor = commands.add_parser(
@@ -1445,6 +2390,80 @@ def _parser() -> argparse.ArgumentParser:
         required=True,
         help="current last-green commit, or 'missing' for the first promotion",
     )
+
+    assignment = commands.add_parser(
+        "assignment",
+        help="create and verify durable per-task assignment/ACK bundles",
+    )
+    assignment_commands = assignment.add_subparsers(
+        dest="assignment_command",
+        required=True,
+    )
+    assignment_create = assignment_commands.add_parser(
+        "create",
+        help="atomically create the only assignment for one task",
+    )
+    assignment_create.add_argument("--task-id", required=True)
+    assignment_create.add_argument("--thread-id", required=True)
+    assignment_create.add_argument("--owner", required=True)
+    assignment_create.add_argument("--brief", required=True)
+    assignment_create.add_argument("--destination", required=True)
+    assignment_create.add_argument("--common-dir", required=True)
+    assignment_create.add_argument("--branch", required=True)
+    assignment_create.add_argument("--head", required=True)
+    assignment_create.add_argument("--tree", required=True)
+    assignment_create.add_argument("--write-set", required=True)
+    assignment_create.add_argument("--candidate-receipt", required=True)
+    assignment_create.add_argument("--run-receipt", required=True)
+    assignment_create.add_argument("--ack-deadline", required=True)
+    assignment_create.add_argument("--json", action="store_true")
+
+    assignment_ack = assignment_commands.add_parser(
+        "ack",
+        help="acknowledge from the exact clean assigned worktree",
+    )
+    assignment_ack.add_argument("--task-id", required=True)
+    assignment_ack.add_argument("--assignment-id", required=True)
+    assignment_ack.add_argument("--thread-id", required=True)
+    assignment_ack.add_argument("--owner", required=True)
+    assignment_ack.add_argument("--write-set", required=True)
+    assignment_ack.add_argument("--json", action="store_true")
+
+    assignment_status_parser = assignment_commands.add_parser(
+        "status",
+        help="verify and report one assignment lifecycle",
+    )
+    assignment_status_parser.add_argument("--assignment-id")
+    assignment_status_parser.add_argument("--task-id")
+    assignment_status_parser.add_argument("--json", action="store_true")
+
+    assignment_redispatch = assignment_commands.add_parser(
+        "redispatch",
+        help="extend an expired ACK deadline for the same task/thread/worktree",
+    )
+    assignment_redispatch.add_argument("--task-id", required=True)
+    assignment_redispatch.add_argument("--assignment-id", required=True)
+    assignment_redispatch.add_argument("--thread-id", required=True)
+    assignment_redispatch.add_argument("--reason", required=True)
+    assignment_redispatch.add_argument("--ack-deadline", required=True)
+    assignment_redispatch.add_argument("--json", action="store_true")
+
+    assignment_close = assignment_commands.add_parser(
+        "close",
+        help="immutably close an assignment and release its write-set",
+    )
+    assignment_close.add_argument("--task-id", required=True)
+    assignment_close.add_argument("--assignment-id", required=True)
+    assignment_close.add_argument("--thread-id", required=True)
+    assignment_close.add_argument("--reason", required=True)
+    assignment_close.add_argument("--json", action="store_true")
+
+    assignment_gc = assignment_commands.add_parser(
+        "gc",
+        help="print a retention plan for old closed bundles; never delete",
+    )
+    assignment_gc.add_argument("--retention-days", required=True, type=int)
+    assignment_gc.add_argument("--json", action="store_true")
     return parser
 
 
@@ -1487,15 +2506,41 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             owner = normalize_owner(args.owner)
             violations = validate_paths(owner, paths)
+            assignment_status_value: dict[str, object] | None = None
+            outside_assignment: tuple[str, ...] = ()
+            if args.assignment:
+                thread_id = args.thread_id or os.environ.get("CODEX_THREAD_ID", "")
+                if not thread_id:
+                    raise ContractError(
+                        "validate --assignment requires --thread-id or CODEX_THREAD_ID."
+                    )
+                assignment_status_value, outside_assignment = (
+                    validate_assignment_context(
+                        root,
+                        assignment_id=args.assignment,
+                        task_id=args.task_id,
+                        thread_id=thread_id,
+                        owner=owner,
+                        paths=paths,
+                    )
+                )
+            elif args.task_id or args.thread_id:
+                raise ContractError(
+                    "validate --task-id/--thread-id require --assignment."
+                )
             payload = {
                 "owner": owner,
                 "path_count": len(paths),
-                "ready": not violations,
+                "ready": not violations and not outside_assignment,
                 "violations": [asdict(item) for item in violations],
+                "outside_assignment": outside_assignment,
             }
+            if assignment_status_value is not None:
+                payload["assignment_id"] = args.assignment
+                payload["assignment_state"] = assignment_status_value["state"]
             if args.json:
                 _write_json(payload)
-            elif violations:
+            elif violations or outside_assignment:
                 for item in violations:
                     print(
                         "CROSS_OWNER\t"
@@ -1503,9 +2548,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                         f"actual={item.actual_owner}\t{item.path}",
                         file=sys.stderr,
                     )
+                for path in outside_assignment:
+                    print(f"OUTSIDE_ASSIGNMENT\t{path}", file=sys.stderr)
             else:
-                print(f"PASS owner={owner} paths={len(paths)}")
-            return 0 if not violations else 2
+                assignment_suffix = (
+                    f" assignment={args.assignment}" if args.assignment else ""
+                )
+                print(
+                    f"PASS owner={owner} paths={len(paths)}{assignment_suffix}"
+                )
+            return 0 if not violations and not outside_assignment else 2
 
         if args.command == "doctor":
             report = doctor_report(
@@ -1597,6 +2649,91 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise ContractError(
                 f"Unsupported last-green command: {args.last_green_command}"
             )
+
+        if args.command == "assignment":
+            if args.assignment_command == "create":
+                status = create_assignment(
+                    root,
+                    task_id=args.task_id,
+                    thread_id=args.thread_id,
+                    owner=args.owner,
+                    brief=args.brief,
+                    destination=args.destination,
+                    common_git_dir=args.common_dir,
+                    branch=args.branch,
+                    head=args.head,
+                    tree=args.tree,
+                    write_set_path=args.write_set,
+                    candidate_receipt=args.candidate_receipt,
+                    run_receipt=args.run_receipt,
+                    ack_deadline=_parse_utc_text(
+                        args.ack_deadline, "ack_deadline"
+                    ),
+                )
+            elif args.assignment_command == "ack":
+                status = acknowledge_assignment(
+                    root,
+                    task_id=args.task_id,
+                    assignment_id=args.assignment_id,
+                    thread_id=args.thread_id,
+                    owner=args.owner,
+                    write_set_path=args.write_set,
+                )
+            elif args.assignment_command == "status":
+                if not args.assignment_id and not args.task_id:
+                    raise ContractError(
+                        "assignment status requires --task-id or --assignment-id."
+                    )
+                status = assignment_status(
+                    root,
+                    task_id=args.task_id,
+                    assignment_id=args.assignment_id,
+                )
+            elif args.assignment_command == "redispatch":
+                status = redispatch_assignment(
+                    root,
+                    task_id=args.task_id,
+                    assignment_id=args.assignment_id,
+                    thread_id=args.thread_id,
+                    reason=args.reason,
+                    ack_deadline=_parse_utc_text(
+                        args.ack_deadline, "ack_deadline"
+                    ),
+                )
+            elif args.assignment_command == "close":
+                status = close_assignment(
+                    root,
+                    task_id=args.task_id,
+                    assignment_id=args.assignment_id,
+                    thread_id=args.thread_id,
+                    reason=args.reason,
+                )
+            elif args.assignment_command == "gc":
+                status = assignment_gc_plan(
+                    root,
+                    retention_days=args.retention_days,
+                )
+            else:
+                raise ContractError(
+                    f"Unsupported assignment command: {args.assignment_command}"
+                )
+            if args.json:
+                _write_json(status)
+            elif args.assignment_command == "gc":
+                print(
+                    "ASSIGNMENT_GC_PLAN "
+                    f"eligible={status['eligible_count']} "
+                    f"retention_days={status['retention_days']}"
+                )
+            else:
+                assignment = status["assignment"]
+                print(
+                    f"ASSIGNMENT_{status['state']} "
+                    f"task={assignment['task_id']} "
+                    f"assignment={assignment['assignment_id']} "
+                    f"bundle={status['bundle']}"
+                )
+            return 0
 
         if args.command == "lock-path":
             print(publication_lock_path(root, args.name))
