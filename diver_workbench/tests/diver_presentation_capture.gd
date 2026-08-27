@@ -66,7 +66,7 @@ func _ready() -> void:
 		return
 	report_file.store_string(JSON.stringify(performance_report, "  "))
 	report_file.close()
-	print("Diver presentation capture saved: motion, quality/reduced matrix, sockets, 70 x 40 envelope/contact matrix, radial lantern matrix and performance.")
+	print("Diver presentation capture saved: motion, quality/reduced matrix, sockets, %s envelope/contact matrix, radial lantern matrix and performance." % _physical_envelope_label())
 	print("DIVER_PRESENTATION_PERFORMANCE %s" % JSON.stringify(performance_report))
 	get_tree().quit(0)
 
@@ -110,20 +110,24 @@ func _draw_envelope_qa_overlay() -> void:
 		draw_rect(_contact_wall_rect, Color(0.70, 0.84, 0.84, 0.86), false, 2.0)
 	var center := _diver.global_position
 	var root_rotation := _diver.global_rotation
+	var body_shape := (_diver.get_node("CollisionShape2D") as CollisionShape2D).shape as CapsuleShape2D
+	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
+	var half_target := target_size * 0.5
+	var half_segment := body_shape.height * 0.5 - body_shape.radius
 	var target_corners := PackedVector2Array([
-		center + Vector2(-35.0, -20.0).rotated(root_rotation),
-		center + Vector2(35.0, -20.0).rotated(root_rotation),
-		center + Vector2(35.0, 20.0).rotated(root_rotation),
-		center + Vector2(-35.0, 20.0).rotated(root_rotation),
-		center + Vector2(-35.0, -20.0).rotated(root_rotation),
+		center + Vector2(-half_target.x, -half_target.y).rotated(root_rotation),
+		center + Vector2(half_target.x, -half_target.y).rotated(root_rotation),
+		center + Vector2(half_target.x, half_target.y).rotated(root_rotation),
+		center + Vector2(-half_target.x, half_target.y).rotated(root_rotation),
+		center + Vector2(-half_target.x, -half_target.y).rotated(root_rotation),
 	])
 	draw_polyline(target_corners, Color(0.98, 0.73, 0.25, 0.88), 1.6)
 	var axis := Vector2.RIGHT.rotated(root_rotation)
 	var normal := axis.rotated(PI * 0.5)
-	draw_line(center - axis * 15.0 - normal * 20.0, center + axis * 15.0 - normal * 20.0, Color(0.38, 0.94, 0.88, 0.95), 2.0)
-	draw_line(center - axis * 15.0 + normal * 20.0, center + axis * 15.0 + normal * 20.0, Color(0.38, 0.94, 0.88, 0.95), 2.0)
-	draw_arc(center - axis * 15.0, 20.0, root_rotation + PI * 0.5, root_rotation + PI * 1.5, 28, Color(0.38, 0.94, 0.88, 0.95), 2.0)
-	draw_arc(center + axis * 15.0, 20.0, root_rotation - PI * 0.5, root_rotation + PI * 0.5, 28, Color(0.38, 0.94, 0.88, 0.95), 2.0)
+	draw_line(center - axis * half_segment - normal * body_shape.radius, center + axis * half_segment - normal * body_shape.radius, Color(0.38, 0.94, 0.88, 0.95), 2.0)
+	draw_line(center - axis * half_segment + normal * body_shape.radius, center + axis * half_segment + normal * body_shape.radius, Color(0.38, 0.94, 0.88, 0.95), 2.0)
+	draw_arc(center - axis * half_segment, body_shape.radius, root_rotation + PI * 0.5, root_rotation + PI * 1.5, 28, Color(0.38, 0.94, 0.88, 0.95), 2.0)
+	draw_arc(center + axis * half_segment, body_shape.radius, root_rotation - PI * 0.5, root_rotation + PI * 0.5, 28, Color(0.38, 0.94, 0.88, 0.95), 2.0)
 	if _diver.has_method("_current_visual_alpha_bounds"):
 		var alpha_bounds: Rect2 = _diver._current_visual_alpha_bounds()
 		var alpha_corners := PackedVector2Array([
@@ -384,7 +388,7 @@ func _capture_envelope_matrix() -> bool:
 				_diver._update_presentation_pose(0.0)
 				_diver._update_socket_markers()
 				queue_redraw()
-				_status.text = "KOPERTA 70 × 40 — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA  •  ZŁOTO: AABB" % [animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
+				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL AABB" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
 				await get_tree().process_frame
 				await RenderingServer.frame_post_draw
 				var side := "left" if flip_h else "right"
@@ -453,7 +457,7 @@ func _capture_contact_case(
 		return false
 	_diver._update_presentation_pose(0.0)
 	_diver._update_socket_markers()
-	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA  •  ZŁOTO: 70 × 40" % label
+	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL %s" % [label, _physical_envelope_label()]
 	queue_redraw()
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
@@ -462,6 +466,13 @@ func _capture_contact_case(
 	await get_tree().physics_frame
 	_contact_wall_rect = Rect2()
 	return saved
+
+
+func _physical_envelope_label() -> String:
+	if _diver == null or _diver.frame_envelope_profile == null:
+		return "? × ?"
+	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
+	return "%d × %d" % [roundi(target_size.x), roundi(target_size.y)]
 
 
 func _capture_lantern_matrix() -> bool:

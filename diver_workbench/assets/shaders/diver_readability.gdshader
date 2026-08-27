@@ -14,7 +14,7 @@ uniform vec4 damage_color : source_color = vec4(1.0, 0.24, 0.16, 1.0);
 
 void fragment() {
 	vec4 base = texture(TEXTURE, UV) * COLOR;
-	vec2 pixel = TEXTURE_PIXEL_SIZE * 4.2;
+	vec2 pixel = TEXTURE_PIXEL_SIZE * 3.5;
 	float nearby_alpha = 0.0;
 	float inner_alpha = 1.0;
 	nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV + vec2(pixel.x, 0.0)).a);

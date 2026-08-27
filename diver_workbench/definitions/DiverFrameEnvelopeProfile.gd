@@ -2,11 +2,11 @@ class_name DiverFrameEnvelopeProfile
 extends Resource
 
 const DiverFrameEnvelopeScript := preload("res://diver_workbench/definitions/DiverFrameEnvelope.gd")
-const PHYSICAL_ENVELOPE := Vector2(70.0, 40.0)
+const PHYSICAL_ENVELOPE := Vector2(105.0, 60.0)
 
-@export var target_size := Vector2(70.0, 40.0)
-@export var authored_sprite_scale := Vector2(0.16, 0.16)
-@export var authored_sprite_position := Vector2(3.68, -2.16)
+@export var target_size := PHYSICAL_ENVELOPE
+@export var authored_sprite_scale := Vector2(0.239, 0.239)
+@export var authored_sprite_position := Vector2(5.497, -3.2265)
 
 
 func validation_errors() -> PackedStringArray:
@@ -14,7 +14,7 @@ func validation_errors() -> PackedStringArray:
 	if target_size.x <= 0.0 or target_size.y <= 0.0:
 		errors.append("target_size must be positive.")
 	if not target_size.is_equal_approx(PHYSICAL_ENVELOPE):
-		errors.append("target_size must match the approved 70 x 40 physical collider envelope.")
+		errors.append("target_size must match the approved 105 x 60 physical collider envelope.")
 	if authored_sprite_scale.x <= 0.0 or authored_sprite_scale.y <= 0.0:
 		errors.append("authored_sprite_scale must be positive.")
 	if not is_equal_approx(authored_sprite_scale.x, authored_sprite_scale.y):
