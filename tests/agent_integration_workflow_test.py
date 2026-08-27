@@ -163,6 +163,89 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         for forbidden in forbidden_processes:
             self.assertNotIn(forbidden, workflow)
 
+    def test_auto_integrator_accepts_real_compare_shape_and_binds_exact_head(self) -> None:
+        controller = _workflow("agent-auto-integrator.yml")
+        admit = _job(controller, "admit-handoff")
+        merge = _job(controller, "merge-handoff")
+        functions = re.findall(
+            r"(?ms)^          (function Assert-ExactComparison \{.*?"
+            r"^          \})\n\n^          function Test-IsProtectedPath",
+            controller,
+        )
+        self.assertEqual(2, len(functions))
+        self.assertNotIn("head_commit.sha", controller)
+        exact_commit_lookup = (
+            'Invoke-GitHubApi -Method GET -Path '
+            '"/repos/$repository/commits/$($env:CANDIDATE_SHA)"'
+        )
+        for job in (admit, merge):
+            self.assertEqual(1, job.count(exact_commit_lookup))
+            self.assertEqual(1, job.count("Assert-ExactComparison `"))
+
+        powershell = shutil.which("pwsh") or shutil.which("powershell")
+        self.assertIsNotNone(powershell, "PowerShell is required for workflow policy tests")
+        base_sha = "1" * 40
+        candidate_sha = "2" * 40
+        other_sha = "3" * 40
+        for function in functions:
+            script = f'''\
+$ErrorActionPreference = "Stop"
+{function}
+$baseSha = "{base_sha}"
+$candidateSha = "{candidate_sha}"
+$comparison = [pscustomobject]@{{
+  status = "ahead"
+  ahead_by = 2
+  behind_by = 0
+  total_commits = 2
+  base_commit = [pscustomobject]@{{ sha = $baseSha }}
+  merge_base_commit = [pscustomobject]@{{ sha = $baseSha }}
+  head_commit = $null
+  commits = @(
+    [pscustomobject]@{{ sha = "{other_sha}" }},
+    [pscustomobject]@{{ sha = $candidateSha }}
+  )
+}}
+$candidateCommit = [pscustomobject]@{{ sha = $candidateSha }}
+Assert-ExactComparison -Comparison $comparison -CandidateCommit $candidateCommit -ExpectedBase $baseSha -ExpectedHead $candidateSha -FailureMessage "valid comparison rejected"
+
+$rejected = $false
+try {{
+  Assert-ExactComparison -Comparison $comparison -CandidateCommit ([pscustomobject]@{{ sha = "{other_sha}" }}) -ExpectedBase $baseSha -ExpectedHead $candidateSha -FailureMessage "reject"
+}}
+catch {{
+  if ($_.Exception.Message -ceq "reject") {{ $rejected = $true }} else {{ throw }}
+}}
+if (-not $rejected) {{ throw "A different candidate commit was accepted." }}
+
+$inconsistent = [pscustomobject]@{{
+  status = "ahead"
+  ahead_by = 2
+  behind_by = 0
+  total_commits = 1
+  base_commit = [pscustomobject]@{{ sha = $baseSha }}
+  merge_base_commit = [pscustomobject]@{{ sha = $baseSha }}
+  head_commit = $null
+  commits = @([pscustomobject]@{{ sha = $candidateSha }})
+}}
+$rejected = $false
+try {{
+  Assert-ExactComparison -Comparison $inconsistent -CandidateCommit $candidateCommit -ExpectedBase $baseSha -ExpectedHead $candidateSha -FailureMessage "reject"
+}}
+catch {{
+  if ($_.Exception.Message -ceq "reject") {{ $rejected = $true }} else {{ throw }}
+}}
+if (-not $rejected) {{ throw "An inconsistent comparison count was accepted." }}
+'''
+            result = subprocess.run(
+                [str(powershell), "-NoProfile", "-NonInteractive", "-Command", "-"],
+                input=script,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
     def test_trusted_preflight_binds_exact_base_head_and_trusted_helpers(self) -> None:
         workflow = _workflow("agent-integration.yml")
         preflight = _job(workflow, "trust-preflight")
