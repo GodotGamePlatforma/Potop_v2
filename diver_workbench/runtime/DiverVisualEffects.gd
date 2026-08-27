@@ -353,6 +353,10 @@ func _update_wake() -> void:
 	if _wake_upper_emitter == null or _wake_lower_emitter == null:
 		return
 	var diver := get_parent() as DiverController
+	var kick_wave := sin(diver._animation_phase(diver_sprite) * TAU)
+	var kick_depth := 0.18 if _reduced_motion else 0.38
+	_wake_upper_emitter.amount_ratio = lerpf(1.0 - kick_depth, 1.0, (kick_wave + 1.0) * 0.5)
+	_wake_lower_emitter.amount_ratio = lerpf(1.0 - kick_depth, 1.0, (1.0 - kick_wave) * 0.5)
 	var water_relative_velocity := diver.velocity - diver._current_velocity
 	var speed := water_relative_velocity.length()
 	_wake_upper_emitter.global_position = _socket_global(&"fin_upper")

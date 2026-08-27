@@ -1057,7 +1057,9 @@ function New-IsolatedTrackedEolProof {
     if (Test-Path -LiteralPath (Join-Path $isolatedRoot ".git")) {
         throw "Isolated EOL proof must not rely on copied Git metadata."
     }
-    $contractTool = Join-Path $isolatedRoot "tools/workbench_contract.py"
+    # The source Git checkout, not the untrusted non-Git copy, issues the
+    # attestation after rehashing both sides of the snapshot boundary.
+    $contractTool = Join-Path $sourceRoot "tools/workbench_contract.py"
     if (-not (Test-Path -LiteralPath $contractTool -PathType Leaf)) {
         throw "Isolated workbench contract tool is missing: '$contractTool'."
     }

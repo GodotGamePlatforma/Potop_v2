@@ -1,11 +1,31 @@
 #!/bin/sh
 
-# Local policy guard from ARD-0108. Remote branch protection remains the
-# authoritative enforcement layer; this hook intentionally fails closed.
+# Local policy guard from ARD-0108. Remote branch protection is the target
+# enforcement layer once configured; until then this hook is the fail-closed
+# local and procedural guard.
 
 remote_name=${1:-unknown}
 remote_url=${2:-unknown}
 rejected=0
+updates_file=
+
+cleanup_updates() {
+    if [ -n "$updates_file" ]; then
+        rm -f -- "$updates_file"
+    fi
+}
+
+trap cleanup_updates EXIT
+trap 'exit 1' HUP INT TERM
+umask 077
+updates_file=$(mktemp "${TMPDIR:-/tmp}/codex-pre-push.XXXXXX") || {
+    printf '%s\n' "PRE-PUSH REJECTED: nie mozna utworzyc prywatnego pliku rekordow push." >&2
+    exit 1
+}
+if ! cat > "$updates_file"; then
+    printf '%s\n' "PRE-PUSH REJECTED: nie mozna zachowac rekordow push do pelnej walidacji." >&2
+    exit 1
+fi
 
 is_zero_oid() {
     case "$1" in
@@ -65,10 +85,21 @@ do
             reject_update "'$remote_ref' jest poza dozwolonym refs/heads/codex/* (inne galezie i tagi sa zabronione)."
             ;;
     esac
-done
+done < "$updates_file"
 
 if [ "$rejected" -ne 0 ]; then
     printf '%s\n' "Push zatrzymany lokalnie. Popraw ref/historie albo wykonaj zweryfikowana procedure integratora." >&2
+    exit 1
+fi
+
+if ! command -v git-lfs >/dev/null 2>&1; then
+    reject_update "repozytorium wymaga Git LFS, ale polecenie 'git-lfs' nie jest dostepne."
+elif ! git lfs pre-push "$@" < "$updates_file"; then
+    reject_update "git lfs pre-push nie przeslal wszystkich wymaganych obiektow."
+fi
+
+if [ "$rejected" -ne 0 ]; then
+    printf '%s\n' "Push zatrzymany lokalnie. Napraw Git LFS i ponow zwykly push bez --force." >&2
     exit 1
 fi
 

@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_envelope_profile")
-target_size = Vector2(70, 40)
-authored_sprite_scale = Vector2(0.16, 0.16)
-authored_sprite_position = Vector2(3.68, -2.16)
+target_size = Vector2(105, 60)
+authored_sprite_scale = Vector2(0.239, 0.239)
+authored_sprite_position = Vector2(5.497, -3.2265)

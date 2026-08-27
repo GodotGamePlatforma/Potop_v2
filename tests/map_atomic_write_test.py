@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from contextlib import nullcontext
 from pathlib import Path
@@ -851,7 +852,10 @@ class MapAtomicWriteTest(unittest.TestCase):
 
     def test_build_captures_output_baseline_before_render(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            workbench = Path(temporary) / "underwater_map_workbench"
+            # TemporaryDirectory may expose an 8.3 alias on Windows runners.
+            # Production paths are rooted below a resolved WORKBENCH_DIR, so
+            # keep the fixture under the same canonical identity as well.
+            workbench = (Path(temporary) / "underwater_map_workbench").resolve()
             manifest_path = workbench / "map_manifest.json"
             scene_path = workbench / "UnderwaterMap.tscn"
             manifest_path.parent.mkdir(parents=True)
@@ -923,6 +927,78 @@ class MapAtomicWriteTest(unittest.TestCase):
                 events,
                 ["lock", "baseline", "render", "lock", "publish"],
             )
+
+    def test_build_cas_rejects_edit_during_render_with_event_barrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workbench = (Path(temporary) / "underwater_map_workbench").resolve()
+            manifest_path = workbench / "map_manifest.json"
+            scene_path = workbench / "UnderwaterMap.tscn"
+            l05_generated_dir = workbench / "assets" / "generated" / "l05"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_bytes(b"manifest")
+            scene_path.write_bytes(b"old")
+            render_started = threading.Event()
+            external_edit_done = threading.Event()
+
+            class RecordingContext:
+                def __enter__(self) -> "RecordingContext":
+                    return self
+
+                def __exit__(self, *_args: object) -> None:
+                    return None
+
+            def render(
+                _raw: bytes,
+            ) -> tuple[dict[Path, bytes], dict[str, object], str, str, str]:
+                render_started.set()
+                if not external_edit_done.wait(timeout=10):
+                    raise AssertionError("external edit did not reach render barrier")
+                return {scene_path: b"new"}, {}, "sha", "gameplay", "presentation"
+
+            def edit_after_baseline() -> None:
+                if not render_started.wait(timeout=10):
+                    return
+                scene_path.write_bytes(b"external-edit")
+                external_edit_done.set()
+
+            editor = threading.Thread(target=edit_after_baseline, daemon=True)
+            args = argparse.Namespace(
+                build=True,
+                check=False,
+                build_structure=None,
+                check_structure=None,
+            )
+            with (
+                mock.patch.object(builder, "WORKBENCH_DIR", workbench),
+                mock.patch.object(builder, "MANIFEST_PATH", manifest_path),
+                mock.patch.object(builder, "SCENE_PATH", scene_path),
+                mock.patch.object(builder, "L05_GENERATED_DIR", l05_generated_dir),
+                mock.patch.object(
+                    builder,
+                    "_capture_manifest_input_fingerprint",
+                    return_value={},
+                ),
+                mock.patch.object(
+                    builder,
+                    "_render_build_candidate",
+                    side_effect=render,
+                ),
+                mock.patch.object(
+                    builder,
+                    "_map_promotion_lock",
+                    side_effect=lambda: RecordingContext(),
+                ),
+            ):
+                editor.start()
+                with self.assertRaisesRegex(
+                    builder.ManifestError,
+                    "concurrent edit detected before CAS publication",
+                ):
+                    builder._run_render_mode(args)
+                editor.join(timeout=10)
+
+            self.assertFalse(editor.is_alive())
+            self.assertEqual(scene_path.read_bytes(), b"external-edit")
 
     def test_git_common_directory_resolves_relative_git_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -11,8 +11,8 @@
 shader = ExtResource("4_readability_shader")
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_diver"]
-radius = 20.0
-height = 70.0
+radius = 30.0
+height = 105.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_interaction"]
 radius = 112.0
@@ -29,8 +29,8 @@ script = ExtResource("3_visual_effects")
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=511580381]
 material = SubResource("ShaderMaterial_diver_readability")
 texture_filter = 4
-position = Vector2(3.68, -2.16)
-scale = Vector2(0.16, 0.16)
+position = Vector2(5.497, -3.2265)
+scale = Vector2(0.239, 0.239)
 sprite_frames = ExtResource("2_diver_frames")
 animation = &"idle"
 autoplay = "idle"

@@ -17,6 +17,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -35,6 +36,7 @@ STRUCTURE_OWNER_PATTERN = re.compile(r"structure:([a-z][a-z0-9_]*)\Z")
 STRUCTURE_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*\Z")
 LOCK_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,95}\Z")
 DEFAULT_PUBLICATION_LOCK = "integration-publish"
+LAST_GREEN_REF = "refs/last-green/integration"
 PUBLICATION_RECEIPT_SCHEMA_VERSION = 1
 PUBLICATION_RECEIPT_STATUS = "PUBLICATION_READY"
 ISOLATED_EOL_PROOF_SCHEMA_VERSION = 1
@@ -603,6 +605,50 @@ def _isolated_snapshot_file_records(
     return tuple(records), digest, file_count, missing_count
 
 
+def _isolated_snapshot_actual_file_paths(snapshot_root: Path) -> tuple[str, ...]:
+    """Return every regular file in a non-Git snapshot, rejecting links."""
+
+    root = snapshot_root.resolve(strict=True)
+    paths: list[str] = []
+    for candidate in root.rglob("*"):
+        relative = candidate.relative_to(root).as_posix()
+        if candidate.is_symlink():
+            raise ContractError(
+                f"Isolated snapshot cannot contain a symlink: {relative}"
+            )
+        if candidate.is_dir():
+            continue
+        if not candidate.is_file():
+            raise ContractError(
+                f"Isolated snapshot entry must be a regular file: {relative}"
+            )
+        paths.append(normalize_repo_path(relative))
+    return tuple(sorted(paths))
+
+
+def _assert_isolated_snapshot_closed(
+    snapshot_root: Path,
+    records: Iterable[dict[str, object]],
+    *,
+    permitted_extra: str | None = None,
+) -> None:
+    expected = {
+        str(record["path"])
+        for record in records
+        if record["exists"] is True
+    }
+    if permitted_extra is not None:
+        expected.add(normalize_repo_path(permitted_extra))
+    actual = set(_isolated_snapshot_actual_file_paths(snapshot_root))
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise ContractError(
+            "Isolated EOL proof snapshot inventory changed: "
+            f"missing={missing}, extra={extra}."
+        )
+
+
 def _isolated_eol_secret(secret_hex: str | None = None) -> bytes:
     value = secret_hex or os.environ.get(ISOLATED_EOL_PROOF_KEY_ENV, "")
     if re.fullmatch(r"[0-9a-fA-F]{64}", value) is None:
@@ -698,6 +744,7 @@ def create_isolated_eol_proof(
         raise ContractError("Isolated EOL proof source and snapshot byte records differ.")
     if (source_files, source_missing) != (isolated_files, isolated_missing):
         raise ContractError("Isolated EOL proof source and snapshot counts differ.")
+    _assert_isolated_snapshot_closed(isolated_root, isolated_records)
 
     head = os.fsdecode(_run_git(source_root, "rev-parse", "--verify", "HEAD").stdout).strip().lower()
     tree = os.fsdecode(
@@ -861,6 +908,11 @@ def verify_isolated_eol_proof(
     )
     if tuple(records) != current_records:
         raise ContractError("Isolated EOL proof snapshot bytes changed after attestation.")
+    _assert_isolated_snapshot_closed(
+        isolated_root,
+        records,
+        permitted_extra=source.relative_to(isolated_root).as_posix(),
+    )
     if payload["source_snapshot_sha256"] != current_digest:
         raise ContractError("Isolated EOL proof snapshot digest does not match current bytes.")
     if payload["path_count"] != len(paths) or payload["file_count"] != file_count or payload["missing_count"] != missing_count:
@@ -1310,6 +1362,263 @@ def verify_publication_receipt(
         return receipt
 
 
+def _publication_receipt_header(
+    repository: Path,
+    receipt_path: str | Path,
+) -> dict[str, object]:
+    target = _receipt_target(repository, receipt_path)
+    try:
+        receipt = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContractError(f"Publication receipt is unreadable: {error}") from error
+    if not isinstance(receipt, dict):
+        raise ContractError("Publication receipt must contain an object.")
+    if (
+        receipt.get("schema_version") != PUBLICATION_RECEIPT_SCHEMA_VERSION
+        or receipt.get("status") != PUBLICATION_RECEIPT_STATUS
+        or re.fullmatch(r"[0-9a-f]{40,64}", str(receipt.get("head", ""))) is None
+        or re.fullmatch(r"[0-9a-f]{40,64}", str(receipt.get("tree", ""))) is None
+    ):
+        raise ContractError("Publication receipt has no valid candidate HEAD/tree.")
+    return receipt
+
+
+def last_green_head(repository: str | Path = ".") -> str | None:
+    """Return the direct commit stored in the shared authoritative LKG ref."""
+
+    root = repository_root(repository)
+    symbolic = _run_git(
+        root,
+        "symbolic-ref",
+        "--quiet",
+        LAST_GREEN_REF,
+        check=False,
+    )
+    if symbolic.returncode == 0:
+        target = os.fsdecode(symbolic.stdout).strip()
+        raise ContractError(
+            f"{LAST_GREEN_REF} must be a direct ref, not a symbolic ref to {target}."
+        )
+    if symbolic.returncode not in {1, 128}:
+        detail = symbolic.stderr.decode("utf-8", errors="replace").strip()
+        raise ContractError(f"Cannot inspect {LAST_GREEN_REF}: {detail}")
+    result = _run_git(
+        root,
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        LAST_GREEN_REF,
+        check=False,
+    )
+    if result.returncode == 1:
+        return None
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ContractError(f"Cannot read {LAST_GREEN_REF}: {detail}")
+    object_id = os.fsdecode(result.stdout).strip()
+    if re.fullmatch(r"[0-9a-f]{40,64}", object_id) is None:
+        raise ContractError(f"{LAST_GREEN_REF} contains an invalid object ID.")
+    object_type = _git_text(root, "cat-file", "-t", object_id)
+    if object_type != "commit":
+        raise ContractError(
+            f"{LAST_GREEN_REF} must point directly to a commit, not {object_type}."
+        )
+    return object_id
+
+
+def _verify_full_run_receipt(
+    repository: Path,
+    candidate_receipt: str | Path,
+    run_receipt: str | Path,
+) -> None:
+    runner = repository / "tests" / "run_all_tests.ps1"
+    if not runner.is_file():
+        raise ContractError(f"Candidate has no run receipt verifier: {runner}")
+    powershell = next(
+        (
+            executable
+            for name in ("pwsh", "powershell.exe", "powershell")
+            if (executable := shutil.which(name)) is not None
+        ),
+        None,
+    )
+    if powershell is None:
+        raise ContractError("PowerShell is required to verify the full run receipt.")
+    command = [
+        powershell,
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(runner),
+        "-VerifyRunReceipt",
+        str(Path(run_receipt).resolve(strict=False)),
+        "-CandidateReceipt",
+        str(Path(candidate_receipt).resolve(strict=False)),
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=repository,
+            check=False,
+            capture_output=True,
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ContractError(
+            "Full run receipt verification timed out after 180 seconds."
+        ) from error
+    if result.returncode != 0:
+        detail = (
+            result.stdout.decode("utf-8", errors="replace")
+            + "\n"
+            + result.stderr.decode("utf-8", errors="replace")
+        ).strip()
+        raise ContractError(
+            f"Full run receipt verification failed ({result.returncode}): {detail}"
+        )
+
+
+def resolve_last_green(
+    repository: str | Path,
+    *,
+    candidate_receipt: str | Path,
+    run_receipt: str | Path,
+) -> dict[str, str]:
+    """Resolve one verified immutable baseline from the shared LKG ref."""
+
+    root = repository_root(repository)
+    header = _publication_receipt_header(root, candidate_receipt)
+    expected_head = str(header["head"])
+    before = last_green_head(root)
+    if before is None:
+        raise ContractError(
+            f"Authoritative last-green ref is missing: {LAST_GREEN_REF}"
+        )
+    if before != expected_head:
+        raise ContractError(
+            f"Candidate HEAD {expected_head} differs from {LAST_GREEN_REF} {before}."
+        )
+
+    _verify_full_run_receipt(root, candidate_receipt, run_receipt)
+    receipt = verify_publication_receipt(root, candidate_receipt)
+    current_head = _git_text(root, "rev-parse", "HEAD")
+    current_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    after = last_green_head(root)
+    if (
+        receipt["head"] != current_head
+        or receipt["tree"] != current_tree
+        or before != after
+        or after != current_head
+    ):
+        raise ContractError(
+            "Candidate HEAD, run receipt and authoritative last-green ref did "
+            "not remain identical during resolution."
+        )
+    return {"ref": LAST_GREEN_REF, "head": current_head, "tree": current_tree}
+
+
+def _zero_object_id(repository: Path) -> str:
+    object_format = _git_text(repository, "rev-parse", "--show-object-format")
+    if object_format == "sha1":
+        return "0" * 40
+    if object_format == "sha256":
+        return "0" * 64
+    raise ContractError(f"Unsupported Git object format: {object_format}")
+
+
+def promote_last_green(
+    repository: str | Path,
+    *,
+    candidate_receipt: str | Path,
+    run_receipt: str | Path,
+    expected_old: str | None,
+) -> dict[str, str]:
+    """Promote a full-suite PASS candidate through Git's atomic ref CAS."""
+
+    root = repository_root(repository)
+    header = _publication_receipt_header(root, candidate_receipt)
+    candidate_head = str(header["head"])
+    candidate_tree = str(header["tree"])
+    current_head = _git_text(root, "rev-parse", "HEAD")
+    current_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    if candidate_head != current_head or candidate_tree != current_tree:
+        raise ContractError("LKG promotion must run from the exact candidate HEAD/tree.")
+
+    before = last_green_head(root)
+    if expected_old is None:
+        if before is not None:
+            raise ContractError(
+                f"Expected {LAST_GREEN_REF} to be missing, but it is {before}."
+            )
+    else:
+        if re.fullmatch(r"[0-9a-f]{40,64}", expected_old) is None:
+            raise ContractError("--expected-old must be a lowercase Git object ID or 'missing'.")
+        expected_commit = _git_text(root, "rev-parse", f"{expected_old}^{{commit}}")
+        if expected_commit != expected_old:
+            raise ContractError("--expected-old must identify a commit directly.")
+        if before != expected_old:
+            raise ContractError(
+                f"LKG compare-and-swap mismatch: expected {expected_old}, actual {before}."
+            )
+        ancestor = _run_git(
+            root,
+            "merge-base",
+            "--is-ancestor",
+            expected_old,
+            candidate_head,
+            check=False,
+        )
+        if ancestor.returncode != 0:
+            raise ContractError(
+                "LKG promotion must be a fast-forward descendant of the expected ref."
+            )
+
+    _verify_full_run_receipt(root, candidate_receipt, run_receipt)
+    verified = verify_publication_receipt(root, candidate_receipt)
+    if verified["head"] != candidate_head or verified["tree"] != candidate_tree:
+        raise ContractError("Candidate receipt moved during LKG promotion.")
+    if last_green_head(root) != before:
+        raise ContractError("LKG ref moved while evidence was being verified; retry.")
+
+    if before == candidate_head:
+        return {
+            "status": "UNCHANGED",
+            "ref": LAST_GREEN_REF,
+            "head": candidate_head,
+            "tree": candidate_tree,
+        }
+    old_value = before if before is not None else _zero_object_id(root)
+    update = _run_git(
+        root,
+        "update-ref",
+        "--no-deref",
+        "--create-reflog",
+        "-m",
+        "promote verified full-suite PASS",
+        LAST_GREEN_REF,
+        candidate_head,
+        old_value,
+        check=False,
+    )
+    if update.returncode != 0:
+        detail = update.stderr.decode("utf-8", errors="replace").strip()
+        raise ContractError(f"LKG compare-and-swap failed: {detail}")
+    after = last_green_head(root)
+    if after != candidate_head:
+        raise ContractError(
+            f"LKG postcondition failed: expected {candidate_head}, actual {after}."
+        )
+    return {
+        "status": "PROMOTED",
+        "ref": LAST_GREEN_REF,
+        "head": candidate_head,
+        "tree": candidate_tree,
+    }
+
+
 def _git_text(repository: Path, *arguments: str) -> str:
     return os.fsdecode(_run_git(repository, *arguments).stdout).strip()
 
@@ -1511,6 +1820,32 @@ def _parser() -> argparse.ArgumentParser:
         help="verify a receipt, clean candidate, HEAD/tree and closed file sets",
     )
     publication_verify.add_argument("--receipt", required=True)
+
+    last_green = commands.add_parser(
+        "lkg",
+        help="resolve or atomically promote the authoritative last-green ref",
+    )
+    last_green_commands = last_green.add_subparsers(
+        dest="last_green_command",
+        required=True,
+    )
+    last_green_resolve = last_green_commands.add_parser(
+        "resolve",
+        help="require candidate, full PASS evidence and last-green to identify one commit",
+    )
+    last_green_resolve.add_argument("--candidate-receipt", required=True)
+    last_green_resolve.add_argument("--run-receipt", required=True)
+    last_green_promote = last_green_commands.add_parser(
+        "promote",
+        help="move last-green by Git compare-and-swap after full PASS verification",
+    )
+    last_green_promote.add_argument("--candidate-receipt", required=True)
+    last_green_promote.add_argument("--run-receipt", required=True)
+    last_green_promote.add_argument(
+        "--expected-old",
+        required=True,
+        help="current last-green commit, or 'missing' for the first promotion",
+    )
     return parser
 
 
@@ -1539,12 +1874,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         if args.command == "validate":
+            selector_supplied = bool(
+                args.path or args.write_set or args.diff or args.base
+            )
             paths: set[str] = {normalize_repo_path(path) for path in args.path}
             for write_set_path in args.write_set:
                 paths.update(read_write_set(write_set_path))
             if args.diff or args.base:
                 paths.update(changed_paths(root, args.base))
-            if not paths:
+            if not selector_supplied:
                 raise ContractError(
                     "validate requires --path, --write-set, --diff or --base"
                 )
@@ -1629,6 +1967,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
             raise ContractError(
                 f"Unsupported publication command: {args.publication_command}"
+            )
+
+        if args.command == "lkg":
+            if args.last_green_command == "resolve":
+                resolved = resolve_last_green(
+                    root,
+                    candidate_receipt=args.candidate_receipt,
+                    run_receipt=args.run_receipt,
+                )
+                print(
+                    f"LKG_RESOLVED ref={resolved['ref']} "
+                    f"head={resolved['head']} tree={resolved['tree']}"
+                )
+                return 0
+            if args.last_green_command == "promote":
+                promoted = promote_last_green(
+                    root,
+                    candidate_receipt=args.candidate_receipt,
+                    run_receipt=args.run_receipt,
+                    expected_old=(
+                        None if args.expected_old == "missing" else args.expected_old
+                    ),
+                )
+                print(
+                    f"LKG_{promoted['status']} ref={promoted['ref']} "
+                    f"head={promoted['head']} tree={promoted['tree']}"
+                )
+                return 0
+            raise ContractError(
+                f"Unsupported last-green command: {args.last_green_command}"
             )
 
         if args.command == "lock-path":
