@@ -5,6 +5,12 @@ const DiverSocketProfileScript := preload("res://diver_workbench/definitions/Div
 const DiverFrameEnvelopeScript := preload("res://diver_workbench/definitions/DiverFrameEnvelope.gd")
 const SocketProfile := preload("res://diver_workbench/assets/profiles/diver_socket_profile.tres")
 const EnvelopeProfile := preload("res://diver_workbench/assets/profiles/diver_frame_envelope_profile.tres")
+const ActiveSpriteFrames := preload("res://diver_workbench/assets/animation/diver_sprite_frames.tres")
+const APPROVED_ENVELOPE := Vector2(105.0, 60.0)
+const APPROVED_SPRITE_SCALE := Vector2(0.239, 0.239)
+const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
+const GAMEPLAY_CAMERA_ZOOM := 1.2
+const MINIMUM_READABLE_SCREEN_SIZE := Vector2(100.0, 35.0)
 const ANIMATION_SOURCES := {
 	&"idle": "res://diver_workbench/assets/animation/diver_idle_16f.png",
 	&"swim": "res://diver_workbench/assets/animation/diver_swim_16f.png",
@@ -17,6 +23,7 @@ var _failures: Array[String] = []
 func _ready() -> void:
 	_test_socket_resource_contract()
 	_test_frame_envelope_contract()
+	_test_animation_timing_contract()
 	_test_pre_ready_quality_bridge()
 	await _test_runtime_presentation_contract()
 	if _failures.is_empty():
@@ -55,6 +62,7 @@ func _test_frame_envelope_contract() -> void:
 	var measured_union := Rect2()
 	var has_union := false
 	var measured_count := 0
+	var minimum_screen_size := Vector2(INF, INF)
 	for animation_name: StringName in ANIMATION_SOURCES:
 		var image := Image.new()
 		var image_error := image.load(ProjectSettings.globalize_path(ANIMATION_SOURCES[animation_name]))
@@ -75,21 +83,55 @@ func _test_frame_envelope_contract() -> void:
 			)
 			var expected: Rect2 = DiverFrameEnvelopeScript.bounds_for(animation_name, frame)
 			_check(measured == expected, "%s frame %d alpha bounds should match the validated runtime profile: %s != %s." % [animation_name, frame, measured, expected])
+			var screen_size := measured.size * EnvelopeProfile.authored_sprite_scale * GAMEPLAY_CAMERA_ZOOM
+			minimum_screen_size = minimum_screen_size.min(screen_size)
 			measured_union = measured if not has_union else measured_union.merge(measured)
 			has_union = true
 			measured_count += 1
 	_check(measured_count == 48, "The alpha-envelope gate should inspect all 48 authored frames.")
 	_check(measured_union == DiverFrameEnvelopeScript.SOURCE_UNION, "The measured 48-frame source union should remain explicit and stable.")
 	var base_world_size: Vector2 = measured_union.size * EnvelopeProfile.authored_sprite_scale
-	_check(base_world_size.is_equal_approx(Vector2(68.8, 31.2)), "The authored alpha union should retarget to 68.8 x 31.2 world units.")
-	_check(base_world_size.x <= EnvelopeProfile.target_size.x and base_world_size.y <= EnvelopeProfile.target_size.y, "Every authored frame must fit the 70 x 40 visual target before presentation motion.")
+	_check(EnvelopeProfile.target_size.is_equal_approx(APPROVED_ENVELOPE), "The active presentation profile should publish the approved 105 x 60 envelope.")
+	_check(EnvelopeProfile.authored_sprite_scale.is_equal_approx(APPROVED_SPRITE_SCALE), "The active presentation profile should publish the reviewed 0.239 visual scale.")
+	_check(base_world_size.is_equal_approx(Vector2(102.77, 46.605)), "The authored alpha union should retarget to 102.77 x 46.605 world units.")
+	_check(base_world_size.x <= EnvelopeProfile.target_size.x and base_world_size.y <= EnvelopeProfile.target_size.y, "Every authored frame must fit the 105 x 60 visual target before presentation motion.")
+	_check(minimum_screen_size.x >= MINIMUM_READABLE_SCREEN_SIZE.x, "Every locomotion frame should remain at least 100 screen pixels wide at the gameplay camera zoom: %.2f." % minimum_screen_size.x)
+	_check(minimum_screen_size.y >= MINIMUM_READABLE_SCREEN_SIZE.y, "Every locomotion frame should remain at least 35 screen pixels tall at the gameplay camera zoom: %.2f." % minimum_screen_size.y)
+
+
+func _test_animation_timing_contract() -> void:
+	var expected_durations := {
+		&"idle": 2.0,
+		&"swim": 1.0,
+		&"sprint": 0.8,
+	}
+	for animation_name: StringName in expected_durations:
+		var frame_count := ActiveSpriteFrames.get_frame_count(animation_name)
+		_check(frame_count == 16, "%s should retain the reviewed 16-frame cycle." % animation_name)
+		_check(ActiveSpriteFrames.get_animation_loop(animation_name), "%s should remain a seamless looping clip." % animation_name)
+		var duration_weight := 0.0
+		for frame in range(frame_count):
+			duration_weight += ActiveSpriteFrames.get_frame_duration(animation_name, frame)
+		var duration_seconds := duration_weight / ActiveSpriteFrames.get_animation_speed(animation_name)
+		_check(is_equal_approx(duration_seconds, float(expected_durations[animation_name])), "%s should last %.2f seconds, got %.4f." % [animation_name, expected_durations[animation_name], duration_seconds])
+	for animation_name: StringName in [&"swim", &"sprint"]:
+		var upper := SocketProfile.points_for(animation_name, &"fin_upper")
+		var lower := SocketProfile.points_for(animation_name, &"fin_lower")
+		var minimum_separation := INF
+		var maximum_separation := 0.0
+		for frame in range(SocketProfile.frame_count):
+			var separation := absf(lower[frame].y - upper[frame].y)
+			minimum_separation = minf(minimum_separation, separation)
+			maximum_separation = maxf(maximum_separation, separation)
+		_check(minimum_separation >= 10.0, "%s must keep both fins visually distinct in every frame." % animation_name)
+		_check(maximum_separation - minimum_separation >= 20.0, "%s must visibly open and close its scissor-kick silhouette." % animation_name)
 
 
 func _test_pre_ready_quality_bridge() -> void:
 	var diver := DiverScene.instantiate()
 	var sprite := diver.get_node("AnimatedSprite2D") as AnimatedSprite2D
 	_check(diver.scale.is_equal_approx(Vector2.ONE), "The CharacterBody2D root must remain unscaled.")
-	_check(sprite.scale.is_equal_approx(EnvelopeProfile.authored_sprite_scale), "Only the visual branch should use the 0.16 authored retarget scale.")
+	_check(sprite.scale.is_equal_approx(EnvelopeProfile.authored_sprite_scale), "Only the visual branch should use the 0.239 authored retarget scale.")
 	_check(sprite.position.is_equal_approx(EnvelopeProfile.authored_sprite_position), "The right-facing alpha union should be centered on the physical root.")
 	_check(diver.frame_envelope_profile == EnvelopeProfile, "The scene should bind the single active frame-envelope profile.")
 	diver.seed_presentation_settings_before_ready("low", true)
@@ -123,7 +165,10 @@ func _test_runtime_presentation_contract() -> void:
 	_check(high.get("wake_count") == 16, "High profile should split the authored wake budget across both fins.")
 	_check(high.get("leak_count") == 6 and high.get("tool_count") == 6 and high.get("cue_count") == 10, "High profile should expose all contextual VFX budgets.")
 	_check(float(high.get("bubble_lifetime", 99.0)) < 1.05, "A sprint breath pulse should finish before the next authored breath interval instead of restarting live particles.")
-	_check(is_equal_approx(float(high.get("visual_retarget_scale", 0.0)), 0.16 / 0.34), "Diver VFX dimensions should follow the same visual retarget ratio as the sprite.")
+	_check(is_equal_approx(
+		float(high.get("visual_retarget_scale", 0.0)),
+		APPROVED_SPRITE_SCALE.x / PREVIOUS_AUTHORED_SPRITE_SCALE
+	), "Diver VFX dimensions should follow the same visual retarget ratio as the sprite.")
 
 	var sprite := diver.get_node("AnimatedSprite2D") as AnimatedSprite2D
 	var breath := diver.get_node("AnimatedSprite2D/BreathSocket") as Marker2D
@@ -183,8 +228,17 @@ func _test_runtime_presentation_contract() -> void:
 	_check(not wake_upper.emitting and not wake_lower.emitting, "Passive current drift should not create fin propulsion wakes.")
 	diver.velocity = Vector2(120.0, 0.0)
 	diver._current_velocity = Vector2(20.0, 0.0)
+	sprite.play(&"swim")
+	sprite.pause()
+	diver._set_animation_phase(sprite, 0.25)
 	visual_effects._update_wake()
 	_check(wake_upper.emitting and wake_lower.emitting, "Water-relative propulsion should create wakes at both fin sockets.")
+	var upper_push_ratio := wake_upper.amount_ratio
+	var lower_recovery_ratio := wake_lower.amount_ratio
+	diver._set_animation_phase(sprite, 0.75)
+	visual_effects._update_wake()
+	_check(upper_push_ratio > lower_recovery_ratio, "The first half-cycle should emphasize the upper-fin propulsion wake.")
+	_check(wake_lower.amount_ratio > wake_upper.amount_ratio, "The opposite half-cycle should transfer propulsion emphasis to the lower fin.")
 
 	diver.set_visual_context(0.8, &"repair", 0.5, true)
 	visual_effects._update_leak()
@@ -199,7 +253,7 @@ func _test_runtime_presentation_contract() -> void:
 	var body_shape := (diver.get_node("CollisionShape2D") as CollisionShape2D).shape
 	var interaction_shape := (diver.get_node("InteractionRange/CollisionShape2D") as CollisionShape2D).shape
 	var capsule := body_shape as CapsuleShape2D
-	_check(EnvelopeProfile.target_size.is_equal_approx(Vector2(capsule.height, capsule.radius * 2.0)), "The visual target must independently match the unchanged 70 x 40 capsule AABB.")
+	_check(EnvelopeProfile.target_size.is_equal_approx(Vector2(capsule.height, capsule.radius * 2.0)), "The visual target must independently match the approved 105 x 60 capsule AABB.")
 	diver.play_visual_cue(&"repair", diver.global_position + Vector2(80.0, -20.0), 1.0)
 	diver._update_presentation_pose(0.08)
 	_check(diver.position.is_equal_approx(root_position), "Presentation cues must never move the CharacterBody2D root.")
@@ -214,8 +268,44 @@ func _test_runtime_presentation_contract() -> void:
 	_check(cleared.get("interaction_action") == &"" and cleared.get("is_towing") == false, "Clearing presentation context should not leave stale action state.")
 	for emitter_name: String in ["BreathEmitter", "WakeEmitterUpper", "WakeEmitterLower", "LeakEmitter", "ToolEmitter", "CueEmitter"]:
 		_check(not (visual_effects.get_node(emitter_name) as GPUParticles2D).emitting, "Presentation reset should stop and clear %s." % emitter_name)
+	_test_directional_motion_contract(diver, sprite)
 	await _test_physical_contact_contract(diver)
 	diver.queue_free()
+
+
+func _test_directional_motion_contract(diver: DiverController, sprite: AnimatedSprite2D) -> void:
+	var directions := PackedVector2Array([
+		Vector2.RIGHT,
+		Vector2(1.0, 1.0).normalized(),
+		Vector2.DOWN,
+		Vector2(-1.0, 1.0).normalized(),
+		Vector2.LEFT,
+		Vector2(-1.0, -1.0).normalized(),
+		Vector2.UP,
+		Vector2(1.0, -1.0).normalized(),
+	])
+	for direction in directions:
+		diver.reset_at(Vector2.ZERO)
+		for _step in range(24):
+			diver.simulate_motion_tick(direction, false, Vector2.ZERO, 1.0, 1.0 / 60.0, true)
+		var visual_forward := (Vector2.LEFT if sprite.flip_h else Vector2.RIGHT).rotated(diver.rotation)
+		_check(visual_forward.dot(direction) >= 0.985, "The diver visual should face its commanded eight-way direction: %s versus %s." % [visual_forward, direction])
+		_check(sprite.animation == &"swim", "Eight-way movement should select the swim clip.")
+		if absf(direction.x) > 0.05:
+			_check(sprite.flip_h == (direction.x < 0.0), "Horizontal facing should mirror the sprite without mirroring the physical root scale.")
+		_check(diver.scale.is_equal_approx(Vector2.ONE), "Eight-way steering must keep the CharacterBody2D root unscaled.")
+	diver.reset_at(Vector2.ZERO)
+	sprite.play(&"swim")
+	sprite.pause()
+	diver._set_animation_phase(sprite, 0.375)
+	var swim_phase := diver._animation_phase(sprite)
+	diver._switch_animation_preserving_phase(&"sprint", false)
+	var sprint_phase := diver._animation_phase(sprite)
+	_check(absf(swim_phase - sprint_phase) <= 0.001, "Swim-to-sprint transition should preserve normalized kick phase.")
+	diver._switch_animation_preserving_phase(&"idle", false)
+	var idle_phase := diver._animation_phase(sprite)
+	_check(absf(sprint_phase - idle_phase) <= 0.001, "Sprint-to-idle transition should preserve normalized kick phase.")
+	diver.reset_at(Vector2.ZERO)
 
 
 func _test_runtime_visual_envelope(diver: DiverController, sprite: AnimatedSprite2D) -> void:
@@ -270,7 +360,7 @@ func _test_physical_contact_contract(diver: DiverController) -> void:
 	var body_collision := diver.get_node("CollisionShape2D") as CollisionShape2D
 	var body_shape := body_collision.shape as CapsuleShape2D
 	var interaction_shape := (diver.get_node("InteractionRange/CollisionShape2D") as CollisionShape2D).shape as CircleShape2D
-	_check(is_equal_approx(body_shape.radius, 20.0) and is_equal_approx(body_shape.height, 70.0), "Wall-contact QA must use the unchanged 70 x 40 capsule.")
+	_check(is_equal_approx(body_shape.radius, 30.0) and is_equal_approx(body_shape.height, 105.0), "Wall-contact QA must use the approved 105 x 60 capsule.")
 	_check(is_equal_approx(interaction_shape.radius, 112.0), "Wall-contact QA must not alter InteractionRange.")
 
 	var vertical_wall := _create_test_wall("VerticalWall", Vector2(100.0, 0.0), Vector2(10.0, 240.0))
@@ -284,7 +374,7 @@ func _test_physical_contact_contract(diver: DiverController) -> void:
 		if vertical_collision:
 			break
 	_check(vertical_collision, "The real CharacterBody2D should collide with a vertical StaticBody2D wall.")
-	_check(diver.global_position.x + 35.0 <= 95.1, "The 70-unit horizontal capsule must stop before the vertical wall plane.")
+	_check(diver.global_position.x + body_shape.height * 0.5 <= 95.1, "The 105-unit horizontal capsule must stop before the vertical wall plane.")
 	_check((diver.get_node("DiveLight") as PointLight2D).position.is_zero_approx(), "Wall contact must not move the central radial light.")
 	vertical_wall.queue_free()
 	await get_tree().physics_frame

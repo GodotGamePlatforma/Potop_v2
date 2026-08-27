@@ -2,8 +2,8 @@ extends RefCounted
 
 ## Measured alpha bounds in the 512 x 256 source-frame coordinate space.
 ## The runtime consumes the same data that the local test validates against every
-## PNG frame, so presentation poses cannot silently drift outside the 70 x 40
-## physical envelope.
+## PNG frame, so presentation poses cannot silently drift outside the approved
+## physical envelope stored in DiverFrameEnvelopeProfile.
 
 const FRAME_SIZE := Vector2i(512, 256)
 const SOURCE_UNION := Rect2(-238, -84, 430, 195)
