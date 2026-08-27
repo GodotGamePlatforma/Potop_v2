@@ -1638,7 +1638,22 @@ def create_assignment(
             existing = _assignment_record(existing_bundles[0])
             if existing.get("task_id") != normalized_task:
                 raise ContractError("Assignment task hash collision detected.")
-            if existing == record:
+            retry_variant_fields = {
+                "created_at",
+                "assignment_id",
+                "assignment_digest",
+            }
+            existing_identity = {
+                key: value
+                for key, value in existing.items()
+                if key not in retry_variant_fields
+            }
+            requested_identity = {
+                key: value
+                for key, value in record.items()
+                if key not in retry_variant_fields
+            }
+            if existing_identity == requested_identity:
                 status = _assignment_status_unlocked(
                     existing_bundles[0], now=created_at
                 )

@@ -957,7 +957,12 @@ class AgentAssignmentTest(unittest.TestCase):
                         now=fixture["now"],
                     )
 
-    def _create(self, fixture: dict[str, object]) -> dict[str, object]:
+    def _create(
+        self,
+        fixture: dict[str, object],
+        *,
+        now: datetime | None = None,
+    ) -> dict[str, object]:
         with mock.patch.object(
             contract, "_verify_full_run_receipt", return_value=None
         ) as verifier:
@@ -976,7 +981,7 @@ class AgentAssignmentTest(unittest.TestCase):
                 candidate_receipt=fixture["candidate_receipt"],
                 run_receipt=fixture["run_receipt"],
                 ack_deadline=fixture["ack_deadline"],
-                now=fixture["now"],
+                now=fixture["now"] if now is None else now,
             )
         verifier.assert_called_once_with(
             Path(fixture["repository"]).resolve(),
@@ -1167,6 +1172,54 @@ class AgentAssignmentTest(unittest.TestCase):
                 now=timed_out_at + timedelta(minutes=1),
             )
             self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+
+    def test_retry_across_created_at_boundary_keeps_first_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            first = _assignment_candidate(parent, task_id="first")
+            created = self._create(first)
+            assignment_bytes = (
+                Path(created["bundle"]) / "assignment.json"
+            ).read_bytes()
+            duplicate = self._create(
+                first,
+                now=first["now"] + timedelta(seconds=1),
+            )
+            self.assertFalse(duplicate["created"])
+            self.assertEqual(duplicate["bundle"], created["bundle"])
+            self.assertEqual(
+                duplicate["assignment"]["assignment_id"],
+                created["assignment"]["assignment_id"],
+            )
+            self.assertEqual(
+                (Path(created["bundle"]) / "assignment.json").read_bytes(),
+                assignment_bytes,
+            )
+
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "already has an immutable assignment",
+                ):
+                    contract.create_assignment(
+                        first["repository"],
+                        task_id=first["task_id"],
+                        thread_id=first["thread_id"],
+                        owner=first["owner"],
+                        brief=str(first["brief"]) + " changed",
+                        destination=first["destination"],
+                        common_git_dir=first["common_git_dir"],
+                        branch=first["branch"],
+                        head=first["head"],
+                        tree=first["tree"],
+                        write_set_path=first["write_set_path"],
+                        candidate_receipt=first["candidate_receipt"],
+                        run_receipt=first["run_receipt"],
+                        ack_deadline=first["ack_deadline"],
+                        now=first["now"] + timedelta(seconds=2),
+                    )
 
     def test_duplicate_and_overlapping_assignments_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
