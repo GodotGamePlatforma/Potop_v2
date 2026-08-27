@@ -14,10 +14,11 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import zlib
 from collections import deque
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -52,6 +53,9 @@ L05_GENERATED_PATHS = {
     "surface_detail_mask": L05_GENERATED_DIR / "surface_detail_mask.png",
     "truth_package": L05_GENERATED_DIR / "truth_package.json",
 }
+FINAL_MAP_PROMOTION_LOCK_ATTEMPTS = 6
+FINAL_MAP_PROMOTION_INITIAL_BACKOFF_SECONDS = 0.05
+FINAL_MAP_PROMOTION_MAX_BACKOFF_SECONDS = 0.4
 L05_SHADER_PATH = "assets/shaders/l05_ground_masked.gdshader"
 L05_SOLID_MASK_RESOURCE_PATH = (
     "res://underwater_map_workbench/assets/generated/l05/solid_mask.png"
@@ -363,6 +367,40 @@ def _map_promotion_lock() -> Iterable[None]:
             return
         with InterprocessWorkspaceLock(common_directory, "map-promotion"):
             yield
+
+
+@contextmanager
+def _map_build_admission_lock() -> Iterable[None]:
+    """Admit only one expensive full Map build across linked worktrees."""
+    project_root = WORKBENCH_DIR.parent.resolve()
+    common_directory = _git_common_directory(project_root)
+    with InterprocessWorkspaceLock(common_directory, "map-build-admission"):
+        yield
+
+
+@contextmanager
+def _final_map_promotion_lock() -> Iterable[None]:
+    """Retry only final lock acquisition while preserving the rendered candidate."""
+    delay_seconds = FINAL_MAP_PROMOTION_INITIAL_BACKOFF_SECONDS
+    with ExitStack() as stack:
+        for attempt in range(1, FINAL_MAP_PROMOTION_LOCK_ATTEMPTS + 1):
+            try:
+                stack.enter_context(_map_promotion_lock())
+            except WorkspaceLockError as error:
+                if attempt == FINAL_MAP_PROMOTION_LOCK_ATTEMPTS:
+                    raise WorkspaceLockError(
+                        "Map promotion remained busy after "
+                        f"{FINAL_MAP_PROMOTION_LOCK_ATTEMPTS} bounded attempts. "
+                        f"Last acquisition error: {error}"
+                    ) from error
+                time.sleep(delay_seconds)
+                delay_seconds = min(
+                    delay_seconds * 2.0,
+                    FINAL_MAP_PROMOTION_MAX_BACKOFF_SECONDS,
+                )
+            else:
+                break
+        yield
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:
@@ -6797,6 +6835,13 @@ def _check_expected_outputs(
     return 0
 
 
+def _run_selected_render_mode(args: argparse.Namespace) -> int:
+    if getattr(args, "build", False):
+        with _map_build_admission_lock():
+            return _run_render_mode(args)
+    return _run_render_mode(args)
+
+
 def _run_render_mode(args: argparse.Namespace) -> int:
     structure_mode_id = args.build_structure or args.check_structure
     manifest_raw = MANIFEST_PATH.read_bytes()
@@ -6889,7 +6934,7 @@ def _run_render_mode(args: argparse.Namespace) -> int:
         expected_outputs,
         captured_baseline,
     )
-    with _map_promotion_lock():
+    with _final_map_promotion_lock():
         _assert_input_fingerprint(inputs)
         _publish_outputs_with_cas(
             expected_outputs,
@@ -6981,7 +7026,7 @@ def main() -> int:
                 "--sealed-package-sha256 is valid only with "
                 "--refresh-structure-package"
             )
-        return _run_render_mode(args)
+        return _run_selected_render_mode(args)
     except WorkspaceLockError as error:
         print(f"underwater map publication is busy: {error}", file=sys.stderr)
         return 2
