@@ -240,10 +240,15 @@ def _is_runner_temp_path(value: str) -> bool:
     return ".." not in re.split(r"[/\\]+", suffix)
 
 
-def _audit_actions(lines: list[ActiveLine]) -> list[str]:
+def _audit_actions(
+    lines: list[ActiveLine], *, allow_pull_request_target: bool = False
+) -> list[str]:
     violations: list[str] = []
     for index, line in enumerate(lines):
-        if re.search(r"\bpull_request_target\b", line.stripped, re.I):
+        if (
+            not allow_pull_request_target
+            and re.search(r"\bpull_request_target\b", line.stripped, re.I)
+        ):
             violations.append(f"line {line.number}: pull_request_target is forbidden")
         if re.search(r"\bself-hosted\b", line.stripped, re.I):
             violations.append(f"line {line.number}: self-hosted runners are forbidden")
@@ -460,6 +465,138 @@ def _audit_controller(lines: list[ActiveLine], workflow_text: str) -> list[str]:
         )
     if "actions/checkout" in workflow_text:
         violations.append("default-branch controller cannot check out repository content")
+
+    expected_jobs = {
+        "auto-admit-standard-pr",
+        "admit-handoff",
+        "merge-handoff",
+    }
+    actual_jobs = {job.job_id for job in _jobs(lines)}
+    if actual_jobs != expected_jobs:
+        violations.append(
+            "default-branch controller must contain exactly auto admission, "
+            "trusted admission and merge jobs"
+        )
+
+    for required_trigger in (
+        "  pull_request_target:\n"
+        "    types:\n"
+        "      - opened\n"
+        "      - reopened\n"
+        "      - synchronize\n"
+        "      - ready_for_review",
+        "  workflow_run:\n"
+        "    workflows:\n"
+        "      - Agent branch validation\n"
+        "    types:\n"
+        "      - completed",
+    ):
+        if required_trigger not in workflow_text:
+            violations.append("controller is missing the exact safe auto-admission trigger")
+    if re.search(r"(?m)^  (?:push|schedule):", workflow_text):
+        violations.append("controller has an unapproved automatic trigger")
+
+    intake = _find_job(lines, "auto-admit-standard-pr")
+    if intake is None:
+        violations.append("controller job is missing: auto-admit-standard-pr")
+    else:
+        permissions, permission_error = _job_permissions(lines, intake)
+        expected_permissions = {
+            "actions": "read",
+            "checks": "read",
+            "contents": "write",
+            "pull-requests": "write",
+        }
+        if permission_error:
+            violations.append(permission_error)
+        elif permissions != expected_permissions:
+            violations.append(
+                f"line {intake.header.number}: auto admission permissions must be "
+                "exactly actions/checks read plus contents/pull-requests write"
+            )
+
+        forbidden_intake = (
+            "actions/checkout",
+            "actions/download-artifact",
+            "actions/cache",
+            "git fetch",
+            "git checkout",
+            "git switch",
+            "gh pr checkout",
+            "Invoke-Expression",
+            "Start-Process",
+            "Invoke-WebRequest",
+            "INTEGRATION_ATTESTER_PRIVATE_KEY",
+            "secrets.",
+            "/contents/",
+            "/git/blobs/",
+            "/tarball/",
+            "/zipball/",
+        )
+        for forbidden in forbidden_intake:
+            if forbidden.lower() in intake.text.lower():
+                violations.append(
+                    f"line {intake.header.number}: auto admission contains "
+                    f"candidate execution/download surface {forbidden!r}"
+                )
+        if re.search(r"(?mi)^\s*(?:-\s*)?uses\s*:", intake.text):
+            violations.append(
+                f"line {intake.header.number}: auto admission must be REST-only"
+            )
+        if intake.text.count("        run: |") != 1 or "        shell: pwsh" not in intake.text:
+            violations.append(
+                f"line {intake.header.number}: auto admission needs one explicit pwsh REST step"
+            )
+
+        required_intake = (
+            "vars.AUTO_INTEGRATOR_ENABLED == 'true'",
+            "github.event_name == 'workflow_run'",
+            "github.event.workflow_run.conclusion == 'success'",
+            "github.event_name == 'pull_request_target'",
+            "github.event.pull_request.draft == false",
+            "EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}",
+            "EVENT_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}",
+            "EXPECTED_ATTESTER_APP_ID: ${{ vars.INTEGRATION_ATTESTER_APP_ID }}",
+            '$workflowRun.name -cne $fastWorkflowName',
+            '$workflowRun.event -cne "push"',
+            '$workflowRun.conclusion -cne "success"',
+            '$workflowRun.repository.full_name -cne $repository',
+            '$workflowRun.head_repository.full_name -cne $repository',
+            '$pullRequest.state -cne "open" -or $pullRequest.draft',
+            '$pullRequest.base.ref -cne "main"',
+            '$pullRequest.head.repo.full_name -cne $repository',
+            '$pullRequest.head.sha -cne $candidateSha',
+            "^codex/(root|map|diver|integration|structure-",
+            '$pullRequest.base.sha -cne $baseSha',
+            '$comparison.status -cne "ahead"',
+            '[int]$comparison.behind_by -ne 0',
+            '$comparison.base_commit.sha -cne $baseSha',
+            '$comparison.merge_base_commit.sha -cne $baseSha',
+            '$_.head_sha -ceq $CandidateSha',
+            '$latestFastRun.conclusion -cne "success"',
+            "Test-PullHasProtectedPath -PullNumber $pullNumber",
+            "previous_filename",
+            "$inspected -gt 3000",
+            "$page -ge 30",
+            "$inspected -eq 0",
+            "Get-LatestCandidateClaim",
+            "Get-CandidateClaimState",
+            '$claimState -ceq "active"',
+            'return "complete"',
+            'event_type = "integrate-agent-handoff"',
+            "pr_number = $pullNumber",
+            "base_sha = $baseSha",
+            "candidate_sha = $candidateSha",
+            "if ($labelAdded)",
+            "-Method DELETE",
+            "$attempt -lt 12",
+            "if (-not $claimObserved)",
+        )
+        for required in required_intake:
+            if required not in intake.text:
+                violations.append(
+                    f"line {intake.header.number}: auto admission is missing {required!r}"
+                )
 
     for job_id, action in (
         ("admit-handoff", "integrate-agent-handoff"),
@@ -687,7 +824,9 @@ def audit_workflow(path: Path, text: str, *, role: str = "generic") -> list[str]
     violations: list[str] = []
     if any(line.indent == -1 for line in lines):
         violations.append("YAML indentation must not contain tabs")
-    violations.extend(_audit_actions(lines))
+    violations.extend(
+        _audit_actions(lines, allow_pull_request_target=role == "controller")
+    )
     violations.extend(_audit_permissions(lines))
     violations.extend(_audit_ordinary_check_jobs(lines))
     if role == "integration":
@@ -830,6 +969,94 @@ class WorkflowAuditorNegativeFixtureTest(unittest.TestCase):
             Path("old-receipt-claim.yml"), fixture, role="controller"
         )
         self.assertTrue(any("incoming receipt claims" in item for item in violations))
+
+    def test_pull_request_target_is_allowed_only_for_hardened_controller(self) -> None:
+        generic = """\
+name: unsafe target
+on:
+  pull_request_target:
+permissions: {}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: echo unsafe
+"""
+        generic_violations = audit_workflow(Path("unsafe-target.yml"), generic)
+        self.assertTrue(
+            any("pull_request_target is forbidden" in item for item in generic_violations)
+        )
+
+        injected = self.controller.replace(
+            '          $ErrorActionPreference = "Stop"',
+            '          $ErrorActionPreference = "Stop"\n          git fetch origin candidate',
+            1,
+        )
+        self.assertNotEqual(self.controller, injected)
+        injected_violations = audit_workflow(
+            Path("candidate-fetch.yml"), injected, role="controller"
+        )
+        self.assertTrue(
+            any("candidate execution/download surface" in item for item in injected_violations)
+        )
+
+        checkout = self.controller.replace(
+            "      - name: Validate latest fast run and dispatch ordinary PR",
+            "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
+            "      - name: Validate latest fast run and dispatch ordinary PR",
+            1,
+        )
+        self.assertNotEqual(self.controller, checkout)
+        checkout_violations = audit_workflow(
+            Path("candidate-checkout.yml"), checkout, role="controller"
+        )
+        self.assertTrue(
+            any("auto admission must be REST-only" in item for item in checkout_violations)
+        )
+
+    def test_auto_admission_guards_and_retry_are_fail_closed(self) -> None:
+        required_guards = (
+            '$pullRequest.state -cne "open" -or $pullRequest.draft',
+            '$pullRequest.head.repo.full_name -cne $repository',
+            "^codex/(root|map|diver|integration|structure-",
+            '$pullRequest.base.sha -cne $baseSha',
+            '[int]$comparison.behind_by -ne 0',
+            '$pullRequest.head.sha -cne $candidateSha',
+            "Test-PullHasProtectedPath -PullNumber $pullNumber",
+            "previous_filename",
+            "$inspected -gt 3000",
+            '$claimState -ceq "active"',
+            'return "complete"',
+            "if ($labelAdded)",
+            "if (-not $claimObserved)",
+        )
+        for guard in required_guards:
+            with self.subTest(guard=guard):
+                self.assertIn(guard, self.controller)
+                fixture = self.controller.replace(guard, "REMOVED_GUARD", 1)
+                violations = audit_workflow(
+                    Path("missing-auto-guard.yml"), fixture, role="controller"
+                )
+                self.assertTrue(
+                    any("auto admission is missing" in item for item in violations),
+                    "\n" + "\n".join(violations),
+                )
+
+    def test_auto_admission_permissions_are_exact(self) -> None:
+        fixture = self.controller.replace(
+            "      actions: read\n      checks: read\n      contents: write\n      pull-requests: write",
+            "      actions: write\n      checks: read\n      contents: write\n      pull-requests: write",
+            1,
+        )
+        self.assertNotEqual(self.controller, fixture)
+        violations = audit_workflow(
+            Path("overprivileged-intake.yml"), fixture, role="controller"
+        )
+        self.assertTrue(
+            any("auto admission permissions must be exactly" in item for item in violations)
+        )
 
     def test_child_cli_aggregate_array_binding_is_rejected(self) -> None:
         needle = "            -AggregateShardReceipt $shardReceipts `"

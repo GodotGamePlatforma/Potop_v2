@@ -102,13 +102,18 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         self.assertNotRegex(workflow, r"(?m)^\s+(?:checks|contents|pull-requests): write\s*$")
         self.assertNotIn("run_all_tests.ps1", workflow)
 
-    def test_default_branch_controller_is_checkout_free_auto_off_and_minimal(self) -> None:
+    def test_default_branch_controller_auto_admits_only_exact_ordinary_prs(self) -> None:
         workflow = _workflow("agent-auto-integrator.yml")
 
+        self.assertIn("pull_request_target:", workflow)
+        for event_type in ("opened", "reopened", "synchronize", "ready_for_review"):
+            self.assertIn(f"      - {event_type}", workflow)
+        self.assertIn("workflow_run:", workflow)
+        self.assertIn("      - Agent branch validation", workflow)
+        self.assertIn("      - completed", workflow)
         self.assertIn("repository_dispatch:", workflow)
         self.assertIn("- integrate-agent-handoff", workflow)
         self.assertIn("- complete-agent-handoff", workflow)
-        self.assertNotIn("workflow_run:", workflow)
         self.assertNotIn("schedule:", workflow)
         self.assertNotRegex(workflow, r"(?m)^  push:")
         self.assertRegex(workflow, r"(?m)^permissions:\s*\{\}\s*$")
@@ -116,11 +121,61 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         uses = re.findall(r"(?mi)^\s*(?:-\s*)?uses\s*:\s*(\S+)", workflow)
         self.assertEqual([self.ATTESTER_ACTION], uses)
 
+        auto_admit = _job(workflow, "auto-admit-standard-pr")
         admit = _job(workflow, "admit-handoff")
         merge = _job(workflow, "merge-handoff")
+        self.assertIn("github.event_name == 'workflow_run'", auto_admit)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", auto_admit)
+        self.assertIn("github.event_name == 'pull_request_target'", auto_admit)
+        self.assertIn("github.event.pull_request.draft == false", auto_admit)
+        self.assertRegex(
+            auto_admit,
+            r"(?ms)^    permissions:\n"
+            r"      actions: read\n"
+            r"      checks: read\n"
+            r"      contents: write\n"
+            r"      pull-requests: write\s*$",
+        )
+        self.assertNotRegex(auto_admit, r"(?mi)^\s*(?:-\s*)?uses\s*:")
+        for forbidden in (
+            "actions/checkout",
+            "actions/download-artifact",
+            "git fetch",
+            "git checkout",
+            "gh pr checkout",
+            "Invoke-Expression",
+            "Start-Process",
+            "INTEGRATION_ATTESTER_PRIVATE_KEY",
+        ):
+            self.assertNotIn(forbidden, auto_admit)
+        for required in (
+            '$pullRequest.state -cne "open" -or $pullRequest.draft',
+            '$pullRequest.base.ref -cne "main"',
+            '$pullRequest.head.repo.full_name -cne $repository',
+            '$pullRequest.head.sha -cne $candidateSha',
+            "^codex/(root|map|diver|integration|structure-",
+            '$pullRequest.base.sha -cne $baseSha',
+            '$comparison.status -cne "ahead"',
+            '[int]$comparison.behind_by -ne 0',
+            '$comparison.merge_base_commit.sha -cne $baseSha',
+            '$latestFastRun.conclusion -cne "success"',
+            "Test-PullHasProtectedPath -PullNumber $pullNumber",
+            "previous_filename",
+            "$inspected -gt 3000",
+            "$page -ge 30",
+            "Get-LatestCandidateClaim",
+            "Get-CandidateClaimState",
+            '$claimState -ceq "active"',
+            'return "complete"',
+            'event_type = "integrate-agent-handoff"',
+            "if ($labelAdded)",
+            "-Method DELETE",
+        ):
+            self.assertIn(required, auto_admit)
+
         self.assertIn("github.event.action == 'integrate-agent-handoff'", admit)
         self.assertIn("github.event.action == 'complete-agent-handoff'", merge)
-        for job in (admit, merge):
+        for job in (auto_admit, admit, merge):
             self.assertIn("vars.AUTO_INTEGRATOR_ENABLED == 'true'", job)
 
         self.assertRegex(
