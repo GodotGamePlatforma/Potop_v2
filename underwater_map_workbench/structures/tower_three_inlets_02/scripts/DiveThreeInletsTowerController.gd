@@ -14,6 +14,10 @@ const D_CONTROL_IDS := ["d_v1", "d_v2", "d_reset", "inlet_d"]
 const CABINET_ID := "cabinet_d"
 const CURRENT_CENTRAL_ID := "central_shaft"
 const CURRENT_INLET_B_ID := "inlet_b"
+const SOCKET_KIND_BUILDING_EGRESS := "building_egress"
+const SOCKET_KIND_DYNAMIC_DOOR := "dynamic_door"
+const VISUAL_STYLE_INDUSTRIAL_PANEL := "industrial_panel"
+const VISUAL_STYLE_EGRESS_GRILLE := "egress_grille"
 
 const D_START := "D_START"
 const D_MOVING_RIGHT := "D_MOVING_RIGHT"
@@ -28,6 +32,7 @@ var structure_id: String = ""
 var _configured := false
 var _runtime_config: Dictionary = {}
 var _socket_rects: Dictionary = {}
+var _socket_kinds: Dictionary = {}
 var _barriers: Dictionary = {}
 var _control_definitions: Dictionary = {}
 var _controls: Dictionary = {}
@@ -446,7 +451,12 @@ func _build_barriers(definitions: Array) -> PackedStringArray:
 		var socket_rect := _socket_rect(socket_id)
 		var body = ThreeInletsMovingBodyScript.new()
 		body.name = barrier_id.to_pascal_case()
-		var body_errors: PackedStringArray = body.configure(definition, socket_rect, structure_id)
+		var body_errors: PackedStringArray = body.configure(
+			definition,
+			socket_rect,
+			structure_id,
+			_barrier_visual_style(definition)
+		)
 		if not body_errors.is_empty():
 			errors.append_array(body_errors)
 			body.free()
@@ -508,13 +518,28 @@ func _on_interactive_activated(control_id: String) -> Dictionary:
 
 func _index_sockets(socket_values: Array) -> void:
 	_socket_rects.clear()
+	_socket_kinds.clear()
 	for socket_value: Variant in socket_values:
 		var socket := socket_value as Dictionary
-		_socket_rects[str(socket.get("id", ""))] = _rect_from_value(socket.get("local_rect", []))
+		var socket_id := str(socket.get("id", ""))
+		_socket_rects[socket_id] = _rect_from_value(socket.get("local_rect", []))
+		_socket_kinds[socket_id] = str(socket.get("kind", ""))
 
 
 func _socket_rect(socket_id: String) -> Rect2:
 	return _socket_rects.get(socket_id, Rect2()) as Rect2
+
+
+func _barrier_visual_style(definition: Dictionary) -> String:
+	var egress_socket_id := str(_runtime_config.get("egress_socket_id", ""))
+	var barrier_socket_id := str(definition.get("socket_id", ""))
+	if str(_socket_kinds.get(egress_socket_id, "")) != SOCKET_KIND_BUILDING_EGRESS:
+		return VISUAL_STYLE_INDUSTRIAL_PANEL
+	if str(_socket_kinds.get(barrier_socket_id, "")) != SOCKET_KIND_DYNAMIC_DOOR:
+		return VISUAL_STYLE_INDUSTRIAL_PANEL
+	if _socket_rect(barrier_socket_id) == _socket_rect(egress_socket_id):
+		return VISUAL_STYLE_EGRESS_GRILLE
+	return VISUAL_STYLE_INDUSTRIAL_PANEL
 
 
 func _configuration_errors(
@@ -544,6 +569,7 @@ func _configuration_errors(
 		errors.append("W02 nie może deklarować persistent_id.")
 
 	var socket_ids := {}
+	var socket_records := {}
 	for socket_value: Variant in structure_record.get("sockets", []) as Array:
 		var socket := socket_value as Dictionary
 		var socket_id := str(socket.get("id", ""))
@@ -554,6 +580,7 @@ func _configuration_errors(
 		if socket_rect.size.x <= 0.0 or socket_rect.size.y <= 0.0:
 			errors.append("Socket %s ma nieprawidłowy local_rect." % socket_id)
 		socket_ids[socket_id] = true
+		socket_records[socket_id] = socket
 
 	var barriers := runtime.get("barriers", []) as Array
 	var barrier_ids := {}
@@ -612,6 +639,22 @@ func _configuration_errors(
 	var egress_socket_id := str(runtime.get("egress_socket_id", ""))
 	if egress_socket_id.is_empty() or not socket_ids.has(egress_socket_id):
 		errors.append("W02 wymaga poprawnego egress_socket_id.")
+	else:
+		var egress_socket := socket_records.get(egress_socket_id, {}) as Dictionary
+		var egress_rect := _rect_from_value(egress_socket.get("local_rect", []))
+		if str(egress_socket.get("kind", "")) != SOCKET_KIND_BUILDING_EGRESS:
+			errors.append("egress_socket_id W02 musi wskazywać socket building_egress.")
+		var egress_barrier_count := 0
+		for barrier_value: Variant in barriers:
+			var barrier := barrier_value as Dictionary
+			var barrier_socket := socket_records.get(str(barrier.get("socket_id", "")), {}) as Dictionary
+			if (
+				str(barrier_socket.get("kind", "")) == SOCKET_KIND_DYNAMIC_DOOR
+				and _rect_from_value(barrier_socket.get("local_rect", [])) == egress_rect
+			):
+				egress_barrier_count += 1
+		if egress_barrier_count != 1:
+			errors.append("W02 wymaga dokładnie jednej bariery dynamic_door pokrywającej building_egress.")
 	return errors
 
 

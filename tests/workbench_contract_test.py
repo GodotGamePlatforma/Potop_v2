@@ -10,6 +10,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 from pathlib import Path
 
 
@@ -167,6 +169,67 @@ def _create_receipt(candidate: dict[str, object]) -> dict[str, object]:
     )
 
 
+def _assignment_candidate(
+    parent: Path,
+    *,
+    task_id: str = "task-root-a",
+    thread_id: str = "thread-root-a",
+    write_set_text: str = "tracked.txt\n",
+) -> dict[str, object]:
+    candidate = _publication_candidate(parent)
+    repository = candidate["repository"]
+    tests_directory = repository / "tests"
+    tests_directory.mkdir()
+    # Candidate-owned test double: orchestration tests assert delegation here;
+    # the production key=value envelope is verified only by the real runner.
+    (tests_directory / "run_all_tests.ps1").write_bytes(
+        (
+            "param([string]$VerifyRunReceipt, [string]$CandidateReceipt)\n"
+            "if (!(Test-Path -LiteralPath $VerifyRunReceipt) -or "
+            "!(Test-Path -LiteralPath $CandidateReceipt)) { exit 2 }\n"
+            "$content = Get-Content -Raw -LiteralPath $VerifyRunReceipt\n"
+            "if ($content -notmatch '(?m)^overall=PASS\\r?$') { exit 3 }\n"
+            "exit 0\n"
+        ).encode("utf-8")
+    )
+    _commit_all(repository, "add assignment receipt verifier")
+    receipt = _create_receipt(candidate)
+    run_receipt = parent / f"{task_id}-run.receipt"
+    run_receipt.write_text(
+        "version=assignment-test-run-receipt-v1\n"
+        f"source_head={receipt['head']}\n"
+        f"source_tree={receipt['tree']}\n"
+        "suite_mode=full\n"
+        "pass=1\n"
+        "fail=0\n"
+        "skip=0\n"
+        "blocking=0\n"
+        "overall=PASS\n",
+        encoding="utf-8",
+    )
+    write_set = parent / f"{task_id}-write-set.txt"
+    write_set.write_text(write_set_text, encoding="utf-8")
+    _git(repository, "update-ref", contract.LAST_GREEN_REF, str(receipt["head"]))
+    now = datetime(2026, 8, 27, 8, 0, tzinfo=timezone.utc)
+    return {
+        **candidate,
+        "task_id": task_id,
+        "thread_id": thread_id,
+        "owner": "root",
+        "brief": f"Implement {task_id}",
+        "destination": repository,
+        "common_git_dir": contract.git_common_dir(repository),
+        "branch": _git(repository, "branch", "--show-current"),
+        "head": receipt["head"],
+        "tree": receipt["tree"],
+        "write_set_path": write_set,
+        "candidate_receipt": candidate["receipt"],
+        "run_receipt": run_receipt,
+        "ack_deadline": now + timedelta(minutes=5),
+        "now": now,
+    }
+
+
 class WorkbenchOwnershipTest(unittest.TestCase):
     def test_owner_classification_and_generated_boundary(self) -> None:
         cases = {
@@ -183,6 +246,10 @@ class WorkbenchOwnershipTest(unittest.TestCase):
         for path, expected_owner in cases.items():
             with self.subTest(path=path):
                 self.assertEqual(contract.owner_for_path(path), expected_owner)
+
+    def test_play_alias_is_not_an_owner(self) -> None:
+        with self.assertRaisesRegex(contract.ContractError, "Owner must be"):
+            contract.normalize_owner("play")
 
     def test_structure_cannot_write_another_structure_or_generated(self) -> None:
         violations = contract.validate_paths(
@@ -606,6 +673,625 @@ class PublicationReceiptTest(unittest.TestCase):
                 _create_receipt(candidate)
 
 
+class LastGreenRefTest(unittest.TestCase):
+    def test_last_green_ref_is_shared_by_linked_worktrees(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            candidate = _publication_candidate(parent)
+            repository = candidate["repository"]
+            head = _git(repository, "rev-parse", "HEAD")
+            linked = parent / "linked"
+            _git(repository, "worktree", "add", "--detach", str(linked), head)
+
+            _git(repository, "update-ref", contract.LAST_GREEN_REF, head)
+
+            self.assertEqual(contract.last_green_head(repository), head)
+            self.assertEqual(contract.last_green_head(linked), head)
+
+    def test_resolve_requires_existing_matching_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+
+            with self.assertRaisesRegex(contract.ContractError, "ref is missing"):
+                contract.resolve_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=Path(temporary) / "unused-run.json",
+                )
+
+            parent = _git(repository, "rev-parse", "HEAD^")
+            _git(repository, "update-ref", contract.LAST_GREEN_REF, parent)
+            with self.assertRaisesRegex(contract.ContractError, "differs from"):
+                contract.resolve_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=Path(temporary) / "unused-run.json",
+                )
+            self.assertNotEqual(receipt["head"], parent)
+
+    def test_symbolic_last_green_ref_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            branch = _git(repository, "branch", "--show-current")
+            _git(
+                repository,
+                "symbolic-ref",
+                contract.LAST_GREEN_REF,
+                f"refs/heads/{branch}",
+            )
+
+            with self.assertRaisesRegex(contract.ContractError, "symbolic ref"):
+                contract.last_green_head(repository)
+
+    def test_promote_and_resolve_verified_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+            run_receipt = Path(temporary) / "run.json"
+
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ) as verifier:
+                promoted = contract.promote_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=run_receipt,
+                    expected_old=None,
+                )
+                resolved = contract.resolve_last_green(
+                    repository,
+                    candidate_receipt=candidate["receipt"],
+                    run_receipt=run_receipt,
+                )
+
+            self.assertEqual(promoted["status"], "PROMOTED")
+            self.assertEqual(promoted["head"], receipt["head"])
+            self.assertEqual(resolved["head"], receipt["head"])
+            self.assertEqual(contract.last_green_head(repository), receipt["head"])
+            self.assertEqual(verifier.call_count, 2)
+
+    def test_failed_run_evidence_cannot_move_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            candidate = _publication_candidate(parent)
+            first_receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+            _git(
+                repository,
+                "update-ref",
+                contract.LAST_GREEN_REF,
+                str(first_receipt["head"]),
+            )
+
+            (repository / "source" / "input.txt").write_bytes(b"next\n")
+            _commit_all(repository, "next candidate")
+            candidate["receipt"] = parent / "publication_receipt_next.json"
+            next_receipt = _create_receipt(candidate)
+
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=contract.ContractError("full run is not PASS"),
+            ):
+                with self.assertRaisesRegex(contract.ContractError, "not PASS"):
+                    contract.promote_last_green(
+                        repository,
+                        candidate_receipt=candidate["receipt"],
+                        run_receipt=parent / "failed-run.json",
+                        expected_old=str(first_receipt["head"]),
+                    )
+
+            self.assertNotEqual(first_receipt["head"], next_receipt["head"])
+            self.assertEqual(
+                contract.last_green_head(repository), first_receipt["head"]
+            )
+
+    def test_stale_compare_and_swap_does_not_verify_or_move(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            receipt = _create_receipt(candidate)
+            repository = candidate["repository"]
+            _git(
+                repository,
+                "update-ref",
+                contract.LAST_GREEN_REF,
+                str(receipt["head"]),
+            )
+
+            stale = _git(repository, "rev-parse", "HEAD^")
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ) as verifier:
+                with self.assertRaisesRegex(
+                    contract.ContractError, "compare-and-swap mismatch"
+                ):
+                    contract.promote_last_green(
+                        repository,
+                        candidate_receipt=candidate["receipt"],
+                        run_receipt=Path(temporary) / "run.json",
+                        expected_old=stale,
+                    )
+
+            verifier.assert_not_called()
+            self.assertEqual(contract.last_green_head(repository), receipt["head"])
+
+    def test_non_fast_forward_candidate_cannot_move_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            _create_receipt(candidate)
+            repository = candidate["repository"]
+            tree = _git(repository, "rev-parse", "HEAD^{tree}")
+            unrelated = _git(repository, "commit-tree", tree, "-m", "unrelated")
+            _git(repository, "update-ref", contract.LAST_GREEN_REF, unrelated)
+
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ) as verifier:
+                with self.assertRaisesRegex(contract.ContractError, "fast-forward"):
+                    contract.promote_last_green(
+                        repository,
+                        candidate_receipt=candidate["receipt"],
+                        run_receipt=Path(temporary) / "run.json",
+                        expected_old=unrelated,
+                    )
+
+            verifier.assert_not_called()
+            self.assertEqual(contract.last_green_head(repository), unrelated)
+
+
+class AgentAssignmentTest(unittest.TestCase):
+    def _create(self, fixture: dict[str, object]) -> dict[str, object]:
+        with mock.patch.object(
+            contract, "_verify_full_run_receipt", return_value=None
+        ) as verifier:
+            created = contract.create_assignment(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                thread_id=fixture["thread_id"],
+                owner=fixture["owner"],
+                brief=fixture["brief"],
+                destination=fixture["destination"],
+                common_git_dir=fixture["common_git_dir"],
+                branch=fixture["branch"],
+                head=fixture["head"],
+                tree=fixture["tree"],
+                write_set_path=fixture["write_set_path"],
+                candidate_receipt=fixture["candidate_receipt"],
+                run_receipt=fixture["run_receipt"],
+                ack_deadline=fixture["ack_deadline"],
+                now=fixture["now"],
+            )
+        verifier.assert_called_once_with(
+            Path(fixture["repository"]).resolve(),
+            fixture["candidate_receipt"],
+            fixture["run_receipt"],
+        )
+        return created
+
+    def _ack(
+        self,
+        fixture: dict[str, object],
+        status: dict[str, object],
+        **overrides: object,
+    ) -> dict[str, object]:
+        assignment = status["assignment"]
+        arguments = {
+            "task_id": fixture["task_id"],
+            "assignment_id": assignment["assignment_id"],
+            "thread_id": fixture["thread_id"],
+            "owner": fixture["owner"],
+            "write_set_path": fixture["write_set_path"],
+            "now": fixture["now"] + timedelta(seconds=30),
+        }
+        arguments.update(overrides)
+        return contract.acknowledge_assignment(fixture["repository"], **arguments)
+
+    def test_lifecycle_ack_validate_close_and_retention_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            assignment = created["assignment"]
+
+            self.assertTrue(created["created"])
+            self.assertEqual(created["state"], contract.ASSIGNMENT_WAITING)
+            bundle = Path(created["bundle"])
+            self.assertTrue(bundle.is_relative_to(contract.assignment_store(fixture["repository"])))
+            self.assertEqual(bundle.parent.name, assignment["task_id_sha256"])
+            self.assertEqual(bundle.name, assignment["assignment_id"])
+            self.assertEqual(
+                tuple(assignment["write_set"]),
+                ("tracked.txt",),
+            )
+            by_task = contract.assignment_status(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                now=fixture["now"],
+            )
+            self.assertEqual(by_task["bundle"], created["bundle"])
+
+            acknowledged = self._ack(fixture, created)
+            self.assertTrue(acknowledged["created"])
+            self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+            verified, outside = contract.validate_assignment_context(
+                fixture["repository"],
+                assignment_id=assignment["assignment_id"],
+                task_id=fixture["task_id"],
+                thread_id=fixture["thread_id"],
+                owner="root",
+                paths=("tracked.txt",),
+                now=fixture["now"] + timedelta(minutes=1),
+            )
+            self.assertEqual(verified["state"], contract.ASSIGNMENT_RUNNING)
+            self.assertEqual(outside, ())
+
+            closed = contract.close_assignment(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                assignment_id=assignment["assignment_id"],
+                thread_id=fixture["thread_id"],
+                reason="handoff complete",
+                now=fixture["now"] + timedelta(days=2),
+            )
+            self.assertEqual(closed["state"], contract.ASSIGNMENT_CLOSED)
+            plan = contract.assignment_gc_plan(
+                fixture["repository"],
+                retention_days=7,
+                now=fixture["now"] + timedelta(days=10),
+            )
+            self.assertEqual(plan["mode"], "PLAN_ONLY")
+            self.assertEqual(plan["eligible_count"], 1)
+            self.assertTrue(bundle.exists(), "retention planning must never delete")
+
+    def test_ack_rejects_wrong_context_dirty_and_outside_write_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            fixture = _assignment_candidate(parent)
+            created = self._create(fixture)
+            assignment_id = created["assignment"]["assignment_id"]
+
+            with self.assertRaisesRegex(contract.ContractError, "thread_id"):
+                self._ack(fixture, created, thread_id="wrong-thread")
+            with self.assertRaisesRegex(contract.ContractError, "does not exist"):
+                self._ack(fixture, created, task_id="wrong-task")
+            with self.assertRaisesRegex(contract.ContractError, "owner"):
+                self._ack(fixture, created, owner="integration")
+            wrong_write_set = parent / "wrong-write-set.txt"
+            wrong_write_set.write_text("outside.txt\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "write_set"):
+                self._ack(fixture, created, write_set_path=wrong_write_set)
+
+            repository = fixture["repository"]
+            (repository / "tracked.txt").write_text("dirty\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "clean destination"):
+                self._ack(fixture, created)
+            (repository / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+
+            original_branch = fixture["branch"]
+            _git(repository, "checkout", "-q", "-b", "wrong-assignment-branch")
+            with self.assertRaisesRegex(contract.ContractError, "branch"):
+                self._ack(fixture, created)
+            _git(repository, "checkout", "-q", str(original_branch))
+
+            _git(repository, "commit", "--allow-empty", "-q", "-m", "wrong head")
+            with self.assertRaisesRegex(contract.ContractError, "head"):
+                self._ack(fixture, created)
+            _git(repository, "reset", "--hard", str(fixture["head"]))
+
+            linked = parent / "wrong-cwd"
+            _git(repository, "worktree", "add", "--detach", "-q", str(linked), str(fixture["head"]))
+            try:
+                with self.assertRaisesRegex(contract.ContractError, "destination"):
+                    contract.acknowledge_assignment(
+                        linked,
+                        task_id=fixture["task_id"],
+                        assignment_id=assignment_id,
+                        thread_id=fixture["thread_id"],
+                        owner="root",
+                        write_set_path=fixture["write_set_path"],
+                        now=fixture["now"] + timedelta(seconds=30),
+                    )
+            finally:
+                _git(repository, "worktree", "remove", "--force", str(linked))
+
+            acknowledged = self._ack(fixture, created)
+            _, outside = contract.validate_assignment_context(
+                repository,
+                assignment_id=assignment_id,
+                task_id=fixture["task_id"],
+                thread_id=fixture["thread_id"],
+                owner="root",
+                paths=("tracked.txt", "outside.txt"),
+                now=fixture["now"] + timedelta(minutes=1),
+            )
+            self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+            self.assertEqual(outside, ("outside.txt",))
+
+    def test_timeout_redispatch_keeps_same_task_thread_and_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            assignment = created["assignment"]
+            timed_out_at = fixture["ack_deadline"] + timedelta(seconds=1)
+            status = contract.assignment_status(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                assignment_id=assignment["assignment_id"],
+                now=timed_out_at,
+            )
+            self.assertEqual(status["state"], contract.ASSIGNMENT_TIMEOUT)
+            with self.assertRaisesRegex(contract.ContractError, "redispatch"):
+                self._ack(fixture, created, now=timed_out_at)
+            with self.assertRaisesRegex(contract.ContractError, "original thread_id"):
+                contract.redispatch_assignment(
+                    fixture["repository"],
+                    task_id=fixture["task_id"],
+                    assignment_id=assignment["assignment_id"],
+                    thread_id="second-author",
+                    reason="timeout",
+                    ack_deadline=timed_out_at + timedelta(minutes=5),
+                    now=timed_out_at,
+                )
+
+            redispatched = contract.redispatch_assignment(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                assignment_id=assignment["assignment_id"],
+                thread_id=fixture["thread_id"],
+                reason="retry same task",
+                ack_deadline=timed_out_at + timedelta(minutes=5),
+                now=timed_out_at,
+            )
+            self.assertEqual(redispatched["state"], contract.ASSIGNMENT_WAITING)
+            self.assertEqual(redispatched["bundle"], created["bundle"])
+            self.assertEqual(redispatched["assignment"]["thread_id"], fixture["thread_id"])
+            acknowledged = self._ack(
+                fixture,
+                created,
+                now=timed_out_at + timedelta(minutes=1),
+            )
+            self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+
+    def test_duplicate_and_overlapping_assignments_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            first = _assignment_candidate(parent, task_id="first")
+            created = self._create(first)
+            duplicate = self._create(first)
+            self.assertFalse(duplicate["created"])
+            self.assertEqual(duplicate["bundle"], created["bundle"])
+
+            second_write_set = parent / "second-write-set.txt"
+            second_write_set.write_text("tracked.txt\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "overlaps"):
+                contract.create_assignment(
+                    first["repository"],
+                    task_id="second",
+                    thread_id="thread-second",
+                    owner="root",
+                    brief="overlap",
+                    destination=first["destination"],
+                    common_git_dir=first["common_git_dir"],
+                    branch=first["branch"],
+                    head=first["head"],
+                    tree=first["tree"],
+                    write_set_path=second_write_set,
+                    candidate_receipt=first["candidate_receipt"],
+                    run_receipt=first["run_receipt"],
+                    ack_deadline=first["ack_deadline"],
+                    now=first["now"] + timedelta(seconds=1),
+                )
+            self.assertEqual(created["state"], contract.ASSIGNMENT_WAITING)
+
+    def test_cross_owner_write_set_and_tamper_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            fixture = _assignment_candidate(
+                parent,
+                write_set_text="diver_workbench/runtime/Diver.tscn\n",
+            )
+            with self.assertRaisesRegex(contract.ContractError, "owner boundary"):
+                self._create(fixture)
+
+            valid_parent = parent / "valid"
+            valid_parent.mkdir()
+            valid = _assignment_candidate(
+                valid_parent,
+                task_id="valid-task",
+            )
+            created = self._create(valid)
+            assignment_path = Path(created["bundle"]) / "assignment.json"
+            record = json.loads(assignment_path.read_text(encoding="utf-8"))
+            record["brief"] = "tampered"
+            assignment_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "digest"):
+                contract.assignment_status(
+                    valid["repository"],
+                    task_id=valid["task_id"],
+                    assignment_id=created["assignment"]["assignment_id"],
+                    now=valid["now"],
+                )
+
+            ack_parent = parent / "ack-tamper"
+            ack_parent.mkdir()
+            ack_fixture = _assignment_candidate(
+                ack_parent,
+                task_id="ack-tamper-task",
+            )
+            ack_created = self._create(ack_fixture)
+            self._ack(ack_fixture, ack_created)
+            ack_path = Path(ack_created["bundle"]) / "ack.json"
+            ack_record = json.loads(ack_path.read_text(encoding="utf-8"))
+            ack_record["owner"] = "integration"
+            ack_path.write_text(json.dumps(ack_record) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "digest"):
+                contract.assignment_status(
+                    ack_fixture["repository"],
+                    task_id=ack_fixture["task_id"],
+                    assignment_id=ack_created["assignment"]["assignment_id"],
+                    now=ack_fixture["now"] + timedelta(minutes=1),
+                )
+
+    def test_assignment_rejects_candidate_run_verifier_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=contract.ContractError("candidate verifier rejected receipt"),
+            ) as verifier:
+                with self.assertRaisesRegex(
+                    contract.ContractError, "candidate verifier rejected receipt"
+                ):
+                    contract.create_assignment(
+                        fixture["repository"],
+                        task_id=fixture["task_id"],
+                        thread_id=fixture["thread_id"],
+                        owner=fixture["owner"],
+                        brief=fixture["brief"],
+                        destination=fixture["destination"],
+                        common_git_dir=fixture["common_git_dir"],
+                        branch=fixture["branch"],
+                        head=fixture["head"],
+                        tree=fixture["tree"],
+                        write_set_path=fixture["write_set_path"],
+                        candidate_receipt=fixture["candidate_receipt"],
+                        run_receipt=fixture["run_receipt"],
+                        ack_deadline=fixture["ack_deadline"],
+                        now=fixture["now"],
+                    )
+            verifier.assert_called_once_with(
+                Path(fixture["repository"]).resolve(),
+                fixture["candidate_receipt"],
+                fixture["run_receipt"],
+            )
+
+    def test_cli_validate_assignment_diff_fails_outside_closed_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            self._ack(fixture, created)
+            repository = fixture["repository"]
+            (repository / "outside.txt").write_text("outside\n", encoding="utf-8")
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = contract.main(
+                    [
+                        "--repo",
+                        str(repository),
+                        "validate",
+                        "--owner",
+                        "root",
+                        "--assignment",
+                        str(created["assignment"]["assignment_id"]),
+                        "--task-id",
+                        str(fixture["task_id"]),
+                        "--thread-id",
+                        str(fixture["thread_id"]),
+                        "--diff",
+                    ]
+                )
+            self.assertEqual(exit_code, 2)
+            self.assertIn("OUTSIDE_ASSIGNMENT\toutside.txt", stderr.getvalue())
+
+    def test_process_races_create_one_bundle_and_one_ack_event(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary), task_id="race-task")
+            deadline = (
+                datetime.now(timezone.utc) + timedelta(minutes=10)
+            ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            tool = PROJECT_ROOT / "tools" / "workbench_contract.py"
+            create_command = [
+                sys.executable,
+                "-B",
+                str(tool),
+                "--repo",
+                str(fixture["repository"]),
+                "assignment",
+                "create",
+                "--task-id",
+                str(fixture["task_id"]),
+                "--thread-id",
+                str(fixture["thread_id"]),
+                "--owner",
+                "root",
+                "--brief",
+                str(fixture["brief"]),
+                "--destination",
+                str(fixture["destination"]),
+                "--common-dir",
+                str(fixture["common_git_dir"]),
+                "--branch",
+                str(fixture["branch"]),
+                "--head",
+                str(fixture["head"]),
+                "--tree",
+                str(fixture["tree"]),
+                "--write-set",
+                str(fixture["write_set_path"]),
+                "--candidate-receipt",
+                str(fixture["candidate_receipt"]),
+                "--run-receipt",
+                str(fixture["run_receipt"]),
+                "--ack-deadline",
+                deadline,
+                "--json",
+            ]
+            creators = [
+                subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                for _ in range(2)
+            ]
+            create_results = [process.communicate(timeout=30) for process in creators]
+            task_directory = (
+                contract.assignment_store(fixture["repository"])
+                / contract._assignment_task_hash(str(fixture["task_id"]))
+            )
+            bundles = [path for path in task_directory.iterdir() if not path.name.startswith(".")]
+            self.assertEqual(len(bundles), 1, create_results)
+            assignment = json.loads(
+                (bundles[0] / "assignment.json").read_text(encoding="utf-8")
+            )
+            created_true = sum(
+                b'"created": true' in stdout for stdout, _stderr in create_results
+            )
+            self.assertEqual(created_true, 1, create_results)
+
+            ack_command = [
+                sys.executable,
+                "-B",
+                str(tool),
+                "--repo",
+                str(fixture["repository"]),
+                "assignment",
+                "ack",
+                "--task-id",
+                str(fixture["task_id"]),
+                "--assignment-id",
+                str(assignment["assignment_id"]),
+                "--thread-id",
+                str(fixture["thread_id"]),
+                "--owner",
+                "root",
+                "--write-set",
+                str(fixture["write_set_path"]),
+                "--json",
+            ]
+            acknowledgers = [
+                subprocess.Popen(ack_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                for _ in range(2)
+            ]
+            ack_results = [process.communicate(timeout=30) for process in acknowledgers]
+            self.assertTrue((bundles[0] / "ack.json").is_file(), ack_results)
+            ack_created_true = sum(
+                b'"created": true' in stdout for stdout, _stderr in ack_results
+            )
+            self.assertEqual(ack_created_true, 1, ack_results)
+
+
 class TrackedEolCheckTest(unittest.TestCase):
     def test_eol_check_accepts_dirty_lf_and_hydrated_lfs_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -678,6 +1364,105 @@ class TrackedEolCheckTest(unittest.TestCase):
                 r"source/input\.txt \(w/mixed\)",
             ):
                 contract.assert_tracked_lf_eol(repository)
+
+
+class IsolatedEolProofTest(unittest.TestCase):
+    def _fixture(self, parent: Path) -> tuple[Path, Path, str]:
+        repository = _new_repository(parent)
+        (repository / ".gitattributes").write_bytes(b"* text=auto eol=lf\n")
+        (repository / "nested").mkdir()
+        (repository / "nested" / "input.txt").write_bytes(b"one\ntwo\n")
+        _commit_all(repository, "isolated EOL proof fixture")
+
+        snapshot = parent / "snapshot"
+        snapshot.mkdir()
+        paths = contract.inventory_paths(repository)
+        for relative_path in paths:
+            source = repository.joinpath(*Path(relative_path).parts)
+            destination = snapshot.joinpath(*Path(relative_path).parts)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
+        _records, digest, _files, _missing = contract._isolated_snapshot_file_records(
+            snapshot,
+            paths,
+        )
+        return repository, snapshot, digest
+
+    def test_valid_proof_verifies_and_missing_proof_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, snapshot, digest = self._fixture(Path(temporary))
+            proof = snapshot / ".godot" / "isolated_eol_proofs" / "tower.json"
+            secret = "ab" * 32
+
+            created = contract.create_isolated_eol_proof(
+                repository,
+                snapshot_root=snapshot,
+                expected_snapshot_sha256=digest,
+                structure_id="tower_local",
+                proof_path=proof,
+                secret_hex=secret,
+            )
+            verified = contract.verify_isolated_eol_proof(
+                snapshot,
+                proof_path=proof,
+                structure_id="tower_local",
+                secret_hex=secret,
+            )
+
+            self.assertEqual(created["hmac_sha256"], verified["hmac_sha256"])
+            self.assertEqual(digest, verified["source_snapshot_sha256"])
+            with self.assertRaisesRegex(contract.ContractError, "does not exist"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof.with_name("missing.json"),
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+    def test_proof_tamper_and_snapshot_drift_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, snapshot, digest = self._fixture(Path(temporary))
+            proof = snapshot / ".godot" / "isolated_eol_proofs" / "tower.json"
+            secret = "cd" * 32
+            contract.create_isolated_eol_proof(
+                repository,
+                snapshot_root=snapshot,
+                expected_snapshot_sha256=digest,
+                structure_id="tower_local",
+                proof_path=proof,
+                secret_hex=secret,
+            )
+            original_proof = proof.read_bytes()
+            tampered = json.loads(original_proof.decode("utf-8"))
+            tampered["file_count"] += 1
+            proof.write_text(json.dumps(tampered), encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "HMAC verification failed"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof,
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+            proof.write_bytes(original_proof)
+            (snapshot / "nested" / "input.txt").write_bytes(b"drift\n")
+            with self.assertRaisesRegex(contract.ContractError, "bytes changed"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof,
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
+
+            (snapshot / "nested" / "input.txt").write_bytes(b"one\ntwo\n")
+            (snapshot / "unexpected.txt").write_bytes(b"added after proof\n")
+            with self.assertRaisesRegex(contract.ContractError, "inventory changed"):
+                contract.verify_isolated_eol_proof(
+                    snapshot,
+                    proof_path=proof,
+                    structure_id="tower_local",
+                    secret_hex=secret,
+                )
 
 
 if __name__ == "__main__":

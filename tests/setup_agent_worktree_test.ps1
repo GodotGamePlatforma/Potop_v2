@@ -10,27 +10,69 @@ $repository = Join-Path $testRoot 'repository'
 $worktreeA = Join-Path $testRoot 'worktree-a'
 $worktreeB = Join-Path $testRoot 'worktree-b'
 $parallelWorktree = Join-Path $testRoot 'parallel-worktree'
+$crossDestinationWorktree = Join-Path $testRoot 'cross-destination-worktree'
+$crossBranchWorktreeA = Join-Path $testRoot 'cross-branch-worktree-a'
+$crossBranchWorktreeB = Join-Path $testRoot 'cross-branch-worktree-b'
 $faultWorktree = Join-Path $testRoot 'fault-worktree'
+$overlapWorktree = Join-Path $testRoot 'overlap-worktree'
+$lkgRaceWorktree = Join-Path $testRoot 'lkg-race-worktree'
 $unavailableWorktree = Join-Path $testRoot 'unavailable-worktree'
 $mismatchRunWorktree = Join-Path $testRoot 'mismatch-run-worktree'
 $failedRunWorktree = Join-Path $testRoot 'failed-run-worktree'
+$missingLkgWorktree = Join-Path $testRoot 'missing-lkg-worktree'
+$legacyWorktree = Join-Path $testRoot 'legacy-worktree'
 $candidateReceipt = Join-Path $testRoot 'candidate-receipt.json'
+$legacyReceipt = Join-Path $testRoot 'legacy-receipt.json'
 $unavailableReceipt = Join-Path $testRoot 'unavailable-receipt.json'
 $runReceipt = Join-Path $testRoot 'run-receipt.json'
 $mismatchRunReceipt = Join-Path $testRoot 'mismatch-run-receipt.json'
 $failedRunReceipt = Join-Path $testRoot 'failed-run-receipt.json'
+$legacyRunReceipt = Join-Path $testRoot 'legacy-run-receipt.json'
 $inputList = Join-Path $testRoot 'inputs.txt'
 $outputList = Join-Path $testRoot 'outputs.txt'
 $parallelReadyA = Join-Path $testRoot 'parallel-a.ready'
 $parallelReadyB = Join-Path $testRoot 'parallel-b.ready'
 $parallelStartGate = Join-Path $testRoot 'parallel.start'
 $parallelJobs = @()
+$lkgRaceJob = $null
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Write-Utf8NoBom {
     param([string]$Path, [string]$Value)
 
     [System.IO.File]::WriteAllText($Path, $Value, $utf8NoBom)
+}
+
+function New-TestWriteSet {
+    param([string]$TaskSlug)
+
+    $path = Join-Path $testRoot "write-set-$TaskSlug.txt"
+    Write-Utf8NoBom -Path $path -Value "src/assignment-$TaskSlug.txt`n"
+    return $path
+}
+
+function Get-TestAssignmentRecord {
+    param([string]$Repo, [string]$TaskId)
+
+    $commonDirectory = Invoke-Git $Repo rev-parse --path-format=absolute --git-common-dir
+    $store = Join-Path $commonDirectory 'codex-agent-assignments/v1'
+    $matches = @()
+    if (Test-Path -LiteralPath $store -PathType Container) {
+        foreach ($path in @(Get-ChildItem -LiteralPath $store -Recurse `
+            -Filter assignment.json -File)) {
+            $record = Get-Content -LiteralPath $path.FullName -Raw | ConvertFrom-Json
+            if ([string]$record.task_id -eq $TaskId) {
+                $matches += [pscustomobject]@{
+                    Bundle = $path.Directory.FullName
+                    Record = $record
+                }
+            }
+        }
+    }
+    if ($matches.Count -ne 1) {
+        throw "Expected one assignment for $TaskId, found $($matches.Count)."
+    }
+    return $matches[0]
 }
 
 function Invoke-Git {
@@ -169,10 +211,38 @@ if ([string]$run.head -ne $head -or [string]$run.tree -ne $tree -or
 Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
 '@
     Invoke-Git $repository add src/input.txt build/output.txt tests/run_all_tests.ps1 | Out-Null
-    Invoke-Git $repository commit -q -m candidate | Out-Null
+    Invoke-Git $repository commit -q -m 'legacy candidate without LKG resolver' | Out-Null
 
     Write-Utf8NoBom -Path $inputList -Value "src/input.txt`n"
     Write-Utf8NoBom -Path $outputList -Value "build/output.txt`n"
+    & python -B $contract --repo $repository publication create `
+        --input-list $inputList --output-list $outputList `
+        --input-root src --output-root build --receipt $legacyReceipt
+    if ($LASTEXITCODE -ne 0) { throw 'legacy publication receipt create failed' }
+    $legacyReceiptData = Get-Content -LiteralPath $legacyReceipt -Raw | ConvertFrom-Json
+    $legacyRunData = [ordered]@{
+        head = [string]$legacyReceiptData.head
+        tree = [string]$legacyReceiptData.tree
+        suite_mode = 'full'
+        target_scope = 'full'
+        overall = 'PASS'
+        fail_count = 0
+        skip_count = 0
+        blocking_failure_count = 0
+    }
+    Write-Utf8NoBom -Path $legacyRunReceipt -Value (
+        ($legacyRunData | ConvertTo-Json -Depth 10) + "`n"
+    )
+
+    New-Item -ItemType Directory -Path (Join-Path $repository 'tools') -Force | Out-Null
+    Copy-Item -LiteralPath $contract `
+        -Destination (Join-Path $repository 'tools/workbench_contract.py')
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'tools/workbench_lock.py') `
+        -Destination (Join-Path $repository 'tools/workbench_lock.py')
+    Invoke-Git $repository add `
+        tools/workbench_contract.py tools/workbench_lock.py | Out-Null
+    Invoke-Git $repository commit -q -m 'candidate with LKG resolver' | Out-Null
+
     & python -B $contract --repo $repository publication create `
         --input-list $inputList --output-list $outputList `
         --input-root src --output-root build --receipt $candidateReceipt
@@ -204,20 +274,81 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         ($failedRunData | ConvertTo-Json -Depth 10) + "`n"
     )
 
+    $missingLkgRejected = $false
+    Push-Location $repository
+    try {
+        try {
+            & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
+                -Owner root -TaskSlug missing-lkg `
+                -TaskId 'task/missing-lkg' -ThreadId 'thread/missing-lkg' `
+                -TaskBrief 'missing LKG rejection' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'missing-lkg') `
+                -Destination $missingLkgWorktree 2>&1 | Out-Null
+        }
+        catch {
+            $missingLkgRejected = $_.Exception.Message -match 'last-green ref is missing'
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    if (-not $missingLkgRejected -or (Test-Path -LiteralPath $missingLkgWorktree)) {
+        throw 'Setup accepted a candidate while authoritative local LKG was missing.'
+    }
+
+    Invoke-Git $repository update-ref refs/last-green/integration `
+        ([string]$legacyReceiptData.head) | Out-Null
+    $legacyRejected = $false
+    $legacyFailure = ''
+    Push-Location $repository
+    try {
+        try {
+            & $helper -CandidateReceipt $legacyReceipt `
+                -RunReceipt $legacyRunReceipt -Owner root `
+                -TaskSlug legacy-candidate -TaskId 'task/legacy-candidate' `
+                -ThreadId 'thread/legacy-candidate' `
+                -TaskBrief 'legacy candidate rejection' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'legacy-candidate') `
+                -Destination $legacyWorktree 2>&1 | Out-Null
+        }
+        catch {
+            $legacyRejected = $true
+            $legacyFailure = $_.Exception.Message
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    if (-not $legacyRejected -or $legacyFailure -notmatch 'no workbench contract' -or
+        (Test-Path -LiteralPath $legacyWorktree)) {
+        throw 'Historical candidate without the LKG resolver did not fail closed.'
+    }
+
+    & python -B $contract --repo $repository lkg promote `
+        --candidate-receipt $candidateReceipt --run-receipt $runReceipt `
+        --expected-old ([string]$legacyReceiptData.head)
+    if ($LASTEXITCODE -ne 0) { throw 'LKG CAS promotion failed' }
+
     Push-Location $repository
     try {
         $plan = & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
             -Owner root `
-            -TaskSlug plan-a -Destination $worktreeA 2>&1 | Out-String
+            -TaskSlug plan-a -TaskId 'task/plan-a' -ThreadId 'thread/plan-a' `
+            -TaskBrief 'plan assignment' `
+            -WriteSet (New-TestWriteSet -TaskSlug 'plan-a') `
+            -Destination $worktreeA 2>&1 | Out-String
         if ($plan -notmatch 'PLAN ONLY' -or
             $plan -notmatch 'codex/root/plan-a' -or
+            $plan -notmatch 'task/plan-a' -or
+            $plan -notmatch 'thread/plan-a' -or
+            $plan -notmatch 'prospective WAITING_ACK' -or
             $plan -notmatch 'candidate-receipt' -or
-            $plan -notmatch 'run-receipt') {
+            $plan -notmatch 'run-receipt' -or
+            $plan -notmatch 'refs/last-green/integration') {
             throw "Plan output is incomplete: $plan"
         }
-        $legacyReceiptAdjective = 'gr' + 'een'
-        if ($plan -match "(?i)$legacyReceiptAdjective") {
-            throw "Plan uses the forbidden legacy receipt adjective: $plan"
+        if ($plan -match '(?i)green[- ]?(baseline|receipt)') {
+            throw "Plan uses a forbidden legacy receipt label: $plan"
         }
         if (Test-Path -LiteralPath $worktreeA) {
             throw "Plan-only mode created a worktree unexpectedly: $worktreeA"
@@ -227,7 +358,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         try {
             & $helper -CandidateReceipt $candidateReceipt `
                 -RunReceipt $mismatchRunReceipt -Owner root `
-                -TaskSlug mismatch-run -Destination $mismatchRunWorktree `
+                -TaskSlug mismatch-run -TaskId 'task/mismatch-run' `
+                -ThreadId 'thread/mismatch-run' -TaskBrief 'mismatch run' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'mismatch-run') `
+                -Destination $mismatchRunWorktree `
                 2>&1 | Out-Null
         }
         catch {
@@ -244,7 +378,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         try {
             & $helper -CandidateReceipt $candidateReceipt `
                 -RunReceipt $failedRunReceipt -Owner root `
-                -TaskSlug failed-run -Destination $failedRunWorktree `
+                -TaskSlug failed-run -TaskId 'task/failed-run' `
+                -ThreadId 'thread/failed-run' -TaskBrief 'failed run' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'failed-run') `
+                -Destination $failedRunWorktree `
                 2>&1 | Out-Null
         }
         catch {
@@ -261,7 +398,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         try {
             & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
                 -Owner root `
-                -TaskSlug invalid-ref -Destination $worktreeA `
+                -TaskSlug invalid-ref -TaskId 'task/invalid-ref' `
+                -ThreadId 'thread/invalid-ref' -TaskBrief 'invalid ref' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'invalid-ref') `
+                -Destination $worktreeA `
                 -Branch 'codex/root/bad..ref' 2>&1 | Out-Null
         }
         catch {
@@ -273,10 +413,67 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
 
         & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
             -Owner root `
-            -TaskSlug actual-a -Destination $worktreeA -Create | Out-Null
+            -TaskSlug actual-a -TaskId 'task/actual-a' -ThreadId 'thread/actual-a' `
+            -TaskBrief 'actual assignment A' `
+            -WriteSet (New-TestWriteSet -TaskSlug 'actual-a') `
+            -Destination $worktreeA -Create | Out-Null
     }
     finally {
         Pop-Location
+    }
+
+    # A created worktree is only WAITING_ACK. The exact task must acknowledge
+    # from that clean destination before any authoring is considered RUNNING.
+    $assignmentA = Get-TestAssignmentRecord -Repo $repository -TaskId 'task/actual-a'
+    if (-not (Test-Path -LiteralPath (Join-Path $assignmentA.Bundle 'assignment.json') `
+        -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $assignmentA.Bundle 'ack.json'))) {
+        throw 'Setup did not leave one immutable WAITING_ACK assignment bundle.'
+    }
+    $actualAWriteSet = New-TestWriteSet -TaskSlug 'actual-a'
+    $worktreeAContract = Join-Path $worktreeA 'tools/workbench_contract.py'
+    $ackOutput = & python -B $worktreeAContract --repo $worktreeA `
+        assignment ack --task-id 'task/actual-a' `
+        --assignment-id ([string]$assignmentA.Record.assignment_id) `
+        --thread-id 'thread/actual-a' --owner root `
+        --write-set $actualAWriteSet --json 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0 -or $ackOutput -notmatch '"state": "RUNNING"' -or
+        -not (Test-Path -LiteralPath (Join-Path $assignmentA.Bundle 'ack.json') `
+            -PathType Leaf)) {
+        throw "Exact assignment ACK failed: $ackOutput"
+    }
+    $assignmentValidate = & python -B $worktreeAContract --repo $worktreeA `
+        validate --owner root --assignment ([string]$assignmentA.Record.assignment_id) `
+        --task-id 'task/actual-a' --thread-id 'thread/actual-a' --diff 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0 -or $assignmentValidate -notmatch 'PASS owner=root paths=0') {
+        throw "Acknowledged assignment did not validate its clean diff: $assignmentValidate"
+    }
+
+    # An overlapping active write-set is detected only after the second exact
+    # worktree exists; setup must roll back only that invocation and preserve
+    # the running winner and its immutable bundle.
+    $overlapRejected = $false
+    Push-Location $repository
+    try {
+        try {
+            & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
+                -Owner root -TaskSlug overlap-a -TaskId 'task/overlap-a' `
+                -ThreadId 'thread/overlap-a' -TaskBrief 'overlap rollback' `
+                -WriteSet $actualAWriteSet -Destination $overlapWorktree `
+                -Create 2>&1 | Out-Null
+        }
+        catch {
+            $overlapRejected = $_.Exception.Message -match 'overlaps'
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    if (-not $overlapRejected -or (Test-Path -LiteralPath $overlapWorktree) -or
+        (Test-WorktreeRegistered -Repo $repository -Path $overlapWorktree) -or
+        (Test-BranchExists -Repo $repository -Branch 'codex/root/overlap-a') -or
+        -not (Test-WorktreeRegistered -Repo $repository -Path $worktreeA) -or
+        -not (Test-Path -LiteralPath (Join-Path $assignmentA.Bundle 'ack.json'))) {
+        throw 'Assignment overlap rollback damaged the running winning worktree.'
     }
 
     Write-Utf8NoBom -Path (Join-Path $repository 'src/input.txt') -Value "dirty-caller`n"
@@ -288,7 +485,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         try {
             & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
                 -Owner root `
-                -TaskSlug fault-a -Destination $faultWorktree -Create `
+                -TaskSlug fault-a -TaskId 'task/fault-a' -ThreadId 'thread/fault-a' `
+                -TaskBrief 'fault rollback' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'fault-a') `
+                -Destination $faultWorktree -Create `
                 -FaultInjection AfterGitWorktreeAdd 2>&1 | Out-Null
         }
         catch {
@@ -307,6 +507,71 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         throw 'Partial git worktree add was not fully rolled back.'
     }
 
+    $lkgRaceWorker = {
+        param(
+            [string]$Helper,
+            [string]$Repository,
+            [string]$CandidateReceipt,
+            [string]$RunReceipt,
+            [string]$Destination,
+            [string]$WriteSetPath
+        )
+
+        $ErrorActionPreference = 'Stop'
+        Push-Location $Repository
+        try {
+            try {
+                $output = & $Helper -CandidateReceipt $CandidateReceipt `
+                    -RunReceipt $RunReceipt -Owner root -TaskSlug lkg-race `
+                    -TaskId 'task/lkg-race' -ThreadId 'thread/lkg-race' `
+                    -TaskBrief 'LKG race rollback' -WriteSet $WriteSetPath `
+                    -Destination $Destination -Create 2>&1 | Out-String
+                return [pscustomobject]@{ Succeeded = $true; Output = $output }
+            }
+            catch {
+                return [pscustomobject]@{
+                    Succeeded = $false
+                    Output = (($_ | Out-String) + $_.Exception.Message)
+                }
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    $lkgRaceJob = Start-Job -ScriptBlock $lkgRaceWorker -ArgumentList @(
+        $helper, $repository, $candidateReceipt, $runReceipt, $lkgRaceWorktree,
+        (New-TestWriteSet -TaskSlug 'lkg-race')
+    )
+    $lkgRaceDeadline = [System.DateTime]::UtcNow.AddSeconds(30)
+    while (-not (Test-BranchExists -Repo $repository -Branch 'codex/root/lkg-race')) {
+        if ($lkgRaceJob.State -in @('Completed', 'Failed', 'Stopped')) {
+            break
+        }
+        if ([System.DateTime]::UtcNow -ge $lkgRaceDeadline) {
+            throw 'Timed out waiting for post-materialization LKG race window.'
+        }
+        Start-Sleep -Milliseconds 10
+    }
+    Invoke-Git $repository update-ref refs/last-green/integration `
+        ([string]$legacyReceiptData.head) ([string]$receiptData.head) | Out-Null
+    Wait-Job -Job $lkgRaceJob -Timeout 30 | Out-Null
+    if ($lkgRaceJob.State -notin @('Completed', 'Failed')) {
+        throw 'LKG race setup process did not finish within 30 seconds.'
+    }
+    $lkgRaceResult = Receive-Job -Job $lkgRaceJob
+    if ($null -eq $lkgRaceResult -or $lkgRaceResult.Succeeded -eq $true -or
+        [string]$lkgRaceResult.Output -notmatch 'last-green|Last-green' -or
+        (Test-Path -LiteralPath $lkgRaceWorktree) -or
+        (Test-WorktreeRegistered -Repo $repository -Path $lkgRaceWorktree) -or
+        (Test-BranchExists -Repo $repository -Branch 'codex/root/lkg-race')) {
+        throw 'Post-materialization LKG race did not fail closed and roll back.'
+    }
+    Remove-Job -Job $lkgRaceJob -Force -ErrorAction SilentlyContinue
+    $lkgRaceJob = $null
+    Invoke-Git $repository update-ref refs/last-green/integration `
+        ([string]$receiptData.head) ([string]$legacyReceiptData.head) | Out-Null
+
     $parallelWorker = {
         param(
             [string]$Helper,
@@ -315,7 +580,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
             [string]$RunReceipt,
             [string]$Destination,
             [string]$ReadyPath,
-            [string]$StartGate
+            [string]$StartGate,
+            [string]$WorkerTaskSlug,
+            [string]$WorkerBranch,
+            [string]$WriteSetPath
         )
 
         $ErrorActionPreference = 'Stop'
@@ -332,14 +600,29 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         Push-Location $Repository
         try {
             try {
-                $output = & $Helper -CandidateReceipt $CandidateReceipt `
-                    -RunReceipt $RunReceipt -Owner root `
-                    -TaskSlug parallel-race -Destination $Destination -Create `
-                    2>&1 | Out-String
+                $helperArguments = @{
+                    CandidateReceipt = $CandidateReceipt
+                    RunReceipt = $RunReceipt
+                    Owner = 'root'
+                    TaskSlug = $WorkerTaskSlug
+                    TaskId = "task/$WorkerTaskSlug"
+                    ThreadId = "thread/$WorkerTaskSlug"
+                    TaskBrief = "parallel setup $WorkerTaskSlug"
+                    WriteSet = $WriteSetPath
+                    Destination = $Destination
+                    Create = $true
+                }
+                if (-not [string]::IsNullOrWhiteSpace($WorkerBranch)) {
+                    $helperArguments.Branch = $WorkerBranch
+                }
+                $output = & $Helper @helperArguments 2>&1 | Out-String
                 return [pscustomobject]@{
                     Succeeded = $true
                     ProcessId = $PID
                     Output = $output
+                    Destination = $Destination
+                    TaskSlug = $WorkerTaskSlug
+                    Branch = $WorkerBranch
                 }
             }
             catch {
@@ -347,6 +630,9 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
                     Succeeded = $false
                     ProcessId = $PID
                     Output = (($_ | Out-String) + $_.Exception.Message)
+                    Destination = $Destination
+                    TaskSlug = $WorkerTaskSlug
+                    Branch = $WorkerBranch
                 }
             }
         }
@@ -355,13 +641,95 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         }
     }
 
+    function Invoke-CrossAxisSetupRace {
+        param(
+            [string]$CaseName,
+            [string]$DestinationA,
+            [string]$DestinationB,
+            [string]$TaskSlugA,
+            [string]$TaskSlugB,
+            [string]$BranchA = '',
+            [string]$BranchB = ''
+        )
+
+        $readyA = Join-Path $testRoot "$CaseName-a.ready"
+        $readyB = Join-Path $testRoot "$CaseName-b.ready"
+        $startGate = Join-Path $testRoot "$CaseName.start"
+        $jobs = @()
+        try {
+            $jobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
+                $helper, $repository, $candidateReceipt, $runReceipt,
+                $DestinationA, $readyA, $startGate, $TaskSlugA, $BranchA,
+                (New-TestWriteSet -TaskSlug $TaskSlugA)
+            )
+            $jobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
+                $helper, $repository, $candidateReceipt, $runReceipt,
+                $DestinationB, $readyB, $startGate, $TaskSlugB, $BranchB,
+                (New-TestWriteSet -TaskSlug $TaskSlugB)
+            )
+            $readyDeadline = [System.DateTime]::UtcNow.AddSeconds(15)
+            while (-not (
+                (Test-Path -LiteralPath $readyA -PathType Leaf) -and
+                (Test-Path -LiteralPath $readyB -PathType Leaf)
+            )) {
+                if ([System.DateTime]::UtcNow -ge $readyDeadline) {
+                    throw "$CaseName workers did not reach their shared start gate."
+                }
+                Start-Sleep -Milliseconds 20
+            }
+            Write-Utf8NoBom -Path $startGate -Value "start`n"
+            Wait-Job -Job $jobs -Timeout 60 | Out-Null
+            if (@($jobs | Where-Object {
+                $_.State -notin @('Completed', 'Failed')
+            }).Count -gt 0) {
+                throw "$CaseName workers did not finish within 60 seconds."
+            }
+            $results = @(Receive-Job -Job $jobs -ErrorAction SilentlyContinue)
+            $successes = @($results | Where-Object { $_.Succeeded -eq $true })
+            $failures = @($results | Where-Object { $_.Succeeded -ne $true })
+            if ($successes.Count -ne 1 -or $failures.Count -ne 1) {
+                throw (
+                    "$CaseName must produce one winner and one loser. " +
+                    (($results | ForEach-Object { $_.Output }) -join "`n")
+                )
+            }
+            $winner = $successes[0]
+            $loser = $failures[0]
+            $winnerBranch = if ([string]::IsNullOrWhiteSpace($winner.Branch)) {
+                "codex/root/$($winner.TaskSlug)"
+            }
+            else {
+                [string]$winner.Branch
+            }
+            if ([string]$loser.Output -notmatch 'Shared worktree reservation' -or
+                -not (Test-Path -LiteralPath $winner.Destination -PathType Container) -or
+                -not (Test-WorktreeRegistered -Repo $repository `
+                    -Path $winner.Destination) -or
+                -not (Test-BranchExists -Repo $repository -Branch $winnerBranch) -or
+                ((Test-Path -LiteralPath $loser.Destination -PathType Container) -and
+                    [string]$loser.Destination -ne [string]$winner.Destination)) {
+                throw "$CaseName loser damaged or bypassed the winning resource."
+            }
+        }
+        finally {
+            foreach ($job in @($jobs)) {
+                if ($job.State -notin @('Completed', 'Failed', 'Stopped')) {
+                    Stop-Job -Job $job -ErrorAction SilentlyContinue
+                }
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     $parallelJobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
         $helper, $repository, $candidateReceipt, $runReceipt,
-        $parallelWorktree, $parallelReadyA, $parallelStartGate
+        $parallelWorktree, $parallelReadyA, $parallelStartGate,
+        'parallel-race', '', (New-TestWriteSet -TaskSlug 'parallel-race')
     )
     $parallelJobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
         $helper, $repository, $candidateReceipt, $runReceipt,
-        $parallelWorktree, $parallelReadyB, $parallelStartGate
+        $parallelWorktree, $parallelReadyB, $parallelStartGate,
+        'parallel-race', '', (New-TestWriteSet -TaskSlug 'parallel-race')
     )
 
     $readyDeadline = [System.DateTime]::UtcNow.AddSeconds(15)
@@ -430,11 +798,25 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
     }
     Assert-NoCallerLeakage -Worktree $parallelWorktree
 
+    Invoke-CrossAxisSetupRace -CaseName 'cross-destination' `
+        -DestinationA $crossDestinationWorktree `
+        -DestinationB $crossDestinationWorktree `
+        -TaskSlugA 'cross-dest-a' -TaskSlugB 'cross-dest-b'
+    Invoke-CrossAxisSetupRace -CaseName 'cross-branch' `
+        -DestinationA $crossBranchWorktreeA `
+        -DestinationB $crossBranchWorktreeB `
+        -TaskSlugA 'cross-branch-a' -TaskSlugB 'cross-branch-b' `
+        -BranchA 'codex/root/shared-cross-branch' `
+        -BranchB 'codex/root/shared-cross-branch'
+
     Push-Location $repository
     try {
         & $helper -CandidateReceipt $candidateReceipt -RunReceipt $runReceipt `
             -Owner root `
-            -TaskSlug actual-b -Destination $worktreeB -Create | Out-Null
+            -TaskSlug actual-b -TaskId 'task/actual-b' -ThreadId 'thread/actual-b' `
+            -TaskBrief 'actual assignment B' `
+            -WriteSet (New-TestWriteSet -TaskSlug 'actual-b') `
+            -Destination $worktreeB -Create | Out-Null
     }
     finally {
         Pop-Location
@@ -484,7 +866,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         try {
             & $helper -CandidateReceipt $unavailableReceipt -RunReceipt $runReceipt `
                 -Owner root `
-                -TaskSlug unavailable -Destination $unavailableWorktree 2>&1 | Out-Null
+                -TaskSlug unavailable -TaskId 'task/unavailable' `
+                -ThreadId 'thread/unavailable' -TaskBrief 'unavailable commit' `
+                -WriteSet (New-TestWriteSet -TaskSlug 'unavailable') `
+                -Destination $unavailableWorktree 2>&1 | Out-Null
         }
         catch {
             $unavailableRejected = $true
@@ -502,6 +887,12 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
     Write-Host 'PASS setup_agent_worktree candidate/full-run receipts/parallel reservation/dirty isolation/rollback contract'
 }
 finally {
+    if ($null -ne $lkgRaceJob) {
+        if ($lkgRaceJob.State -notin @('Completed', 'Failed', 'Stopped')) {
+            Stop-Job -Job $lkgRaceJob -ErrorAction SilentlyContinue
+        }
+        Remove-Job -Job $lkgRaceJob -Force -ErrorAction SilentlyContinue
+    }
     foreach ($parallelJob in @($parallelJobs)) {
         if ($parallelJob.State -notin @('Completed', 'Failed', 'Stopped')) {
             Stop-Job -Job $parallelJob -ErrorAction SilentlyContinue
@@ -510,8 +901,12 @@ finally {
     }
     if (Test-Path -LiteralPath (Join-Path $repository '.git')) {
         foreach ($candidateWorktree in @(
-            $worktreeA, $worktreeB, $parallelWorktree, $faultWorktree, $unavailableWorktree,
-            $mismatchRunWorktree, $failedRunWorktree
+            $worktreeA, $worktreeB, $parallelWorktree,
+            $crossDestinationWorktree, $crossBranchWorktreeA,
+            $crossBranchWorktreeB, $faultWorktree, $overlapWorktree,
+            $lkgRaceWorktree, $unavailableWorktree,
+            $mismatchRunWorktree, $failedRunWorktree, $missingLkgWorktree,
+            $legacyWorktree
         )) {
             if (Test-Path -LiteralPath $candidateWorktree) {
                 $removeResult = & git -C $repository worktree remove --force $candidateWorktree 2>&1

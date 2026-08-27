@@ -1,0 +1,22 @@
+# The repository owner is the default reviewer for every path. More specific
+# entries below make the integration control plane explicit in GitHub reviews.
+* @Siwy55p
+
+# CI, workflow security and ownership policy.
+/.github/** @Siwy55p
+**/AGENTS.md @Siwy55p
+**/.ai/DECISIONS.md @Siwy55p
+**/.ai/PROJECT_CONTEXT.md @Siwy55p
+/docs/Ostatni_Pomost_architektura_Godot.txt @Siwy55p
+/README.md @Siwy55p
+
+# Candidate identity, receipts, isolated-worktree setup and the shared runner.
+/tests/run_all_tests.ps1 @Siwy55p
+/tools/workbench_contract.py @Siwy55p
+/tests/workbench_contract_test.py @Siwy55p
+/tools/setup_agent_worktree.ps1 @Siwy55p
+/tests/setup_agent_worktree_test.ps1 @Siwy55p
+
+# Asynchronous CI plans, verifiers and their contract tests.
+/tools/ci_* @Siwy55p
+/tests/ci_* @Siwy55p

@@ -39,7 +39,7 @@ position = Vector2(0, 0)
 scale = Vector2(1, 1)
 visible = true
 metadata/package_manifest_path = "res://underwater_map_workbench/structures/tower_three_inlets_02/structure_manifest.json"
-metadata/package_manifest_sha256 = "c20e87fbda90f92e193cf613d72f36174c576bd746848800f9d9a02a2adf28cf"
+metadata/package_manifest_sha256 = "770fee3b89615fd7ccd5a12d3593bcbb197fa87aea86422a88cb1ec0b446a9bd"
 metadata/local_topology_digest = "structure-topology-v1:21d7a04d9fb176e9c3d6f95e8ba8a7564029caccbf06a4379711e71e5c99e1e1"
 metadata/controller_script = "res://underwater_map_workbench/structures/tower_three_inlets_02/scripts/DiveThreeInletsTowerController.gd"
 metadata/structure_id = "tower_three_inlets_02"
@@ -864,7 +864,7 @@ metadata/local_rect = Rect2(0, 0, 2400, 3840)
 metadata/pixel_size = Vector2i(2400, 3840)
 metadata/topology_digest = "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
 metadata/partition_digest = "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded"
-metadata/source = {"affordance": "exact_owner_solid_surface", "enabled": true, "group_id": "TowerThreeInletsArtwork", "id": "tower_three_inlets_02_structure_production", "kind": "structure_owner_masked_texture", "layer_id": "L05", "local_rect": [0, 0, 2400, 3840], "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded", "path": "structures/tower_three_inlets_02/assets/visual/tower_structure_production.png", "pixel_size": [2400, 3840], "sha256": "7e65d8442e3512f1788085b71524415b9d5dc23c637ac74870ce62dd1a02242e", "structure_id": "tower_three_inlets_02", "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"}
+metadata/source = {"affordance": "exact_owner_solid_surface", "enabled": true, "group_id": "TowerThreeInletsArtwork", "id": "tower_three_inlets_02_structure_production", "kind": "structure_owner_masked_texture", "layer_id": "L05", "local_rect": [0, 0, 2400, 3840], "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded", "path": "structures/tower_three_inlets_02/assets/visual/tower_structure_production.png", "pixel_size": [2400, 3840], "sha256": "7702006e2ed0d03e5e938323d2b9bfef7e9d5443cf0adf3eacb46ec0c8a7db3c", "structure_id": "tower_three_inlets_02", "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"}
 
 [node name="Bitmap" type="TextureRect" parent="StructureVisual/TowerThreeInletsArtwork/tower_three_inlets_02_structure_production"]
 position = Vector2(0, 0)

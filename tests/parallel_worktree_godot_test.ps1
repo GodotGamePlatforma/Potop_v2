@@ -407,38 +407,73 @@ function Get-ClosureFingerprint {
     }
 }
 
-function Get-GitRepositoryAudit {
+function Get-GitHeadIdentity {
     param([string]$RepositoryRoot)
 
     $normalizedRoot = [System.IO.Path]::GetFullPath($RepositoryRoot).TrimEnd([char[]]"\/")
-    $head = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--verify", "HEAD")).Output.Trim().ToLowerInvariant()
-    $tree = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--verify", "HEAD^{tree}")).Output.Trim().ToLowerInvariant()
-    $status = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("status", "--porcelain=v1", "--untracked-files=all", "-z")).Output
     $headRef = (Invoke-GitCapture `
         -RepositoryRoot $normalizedRoot `
         -Arguments @("symbolic-ref", "-q", "HEAD") `
         -AllowedExitCodes @(0, 1)).Output.Trim()
-    $refs = (Invoke-GitCapture `
-        -RepositoryRoot $normalizedRoot `
-        -Arguments @("for-each-ref", "--sort=refname", "--format=%(refname)%09%(objectname)%09%(objecttype)%09%(symref)", "refs")).Output
-    $commonDirText = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--git-common-dir")).Output
-    $topLevel = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--show-toplevel")).Output.Trim()
-    $paths = @(Get-GitClosurePaths -RepositoryRoot $normalizedRoot)
-    $closure = Get-ClosureFingerprint -RootPath $normalizedRoot -Paths $paths
+    $headRefTarget = ""
+    if (-not [string]::IsNullOrWhiteSpace($headRef)) {
+        Assert-AcceptanceInvariant `
+            -Condition ($headRef.StartsWith("refs/", [StringComparison]::Ordinal)) `
+            -Message "Git audit returned an invalid symbolic HEAD ref '$headRef'."
+        $headRefTarget = (Invoke-GitCapture `
+            -RepositoryRoot $normalizedRoot `
+            -Arguments @("show-ref", "--verify", "--hash", $headRef)).Output.Trim().ToLowerInvariant()
+    }
+    $head = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--verify", "HEAD")).Output.Trim().ToLowerInvariant()
+    $tree = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--verify", "HEAD^{tree}")).Output.Trim().ToLowerInvariant()
 
     Assert-AcceptanceInvariant `
         -Condition ($head -match '^[0-9a-f]{40,64}$' -and $tree -match '^[0-9a-f]{40,64}$') `
         -Message "Git audit did not return valid HEAD/tree IDs."
+    Assert-AcceptanceInvariant `
+        -Condition ([string]::IsNullOrWhiteSpace($headRef) -or
+            ($headRefTarget -match '^[0-9a-f]{40,64}$' -and $headRefTarget -ceq $head)) `
+        -Message "Git audit observed symbolic HEAD '$headRef' at '$headRefTarget' but resolved HEAD as '$head'."
+
+    return [pscustomobject]@{
+        Head = $head
+        Tree = $tree
+        HeadRef = $headRef
+        HeadRefTarget = $headRefTarget
+    }
+}
+
+function Get-GitRepositoryAudit {
+    param([string]$RepositoryRoot)
+
+    $normalizedRoot = [System.IO.Path]::GetFullPath($RepositoryRoot).TrimEnd([char[]]"\/")
+    # Linked worktrees legitimately share every unrelated ref in the common
+    # Git dir. Bind this worktree's symbolic HEAD and its exact target instead
+    # of freezing the global ref namespace while other authors push/update it.
+    $headIdentityBefore = Get-GitHeadIdentity -RepositoryRoot $normalizedRoot
+    $status = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("status", "--porcelain=v1", "--untracked-files=all", "-z")).Output
+    $commonDirText = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--git-common-dir")).Output
+    $topLevel = (Invoke-GitCapture -RepositoryRoot $normalizedRoot -Arguments @("rev-parse", "--show-toplevel")).Output.Trim()
+    $paths = @(Get-GitClosurePaths -RepositoryRoot $normalizedRoot)
+    $closure = Get-ClosureFingerprint -RootPath $normalizedRoot -Paths $paths
+    $headIdentityAfter = Get-GitHeadIdentity -RepositoryRoot $normalizedRoot
+
+    foreach ($propertyName in @("Head", "Tree", "HeadRef", "HeadRefTarget")) {
+        Assert-AcceptanceInvariant `
+            -Condition ([string]$headIdentityBefore.$propertyName -ceq [string]$headIdentityAfter.$propertyName) `
+            -Message "Git audit observed '$propertyName' changing while materializing the source closure."
+    }
 
     return [pscustomobject]@{
         Root = [System.IO.Path]::GetFullPath($topLevel).TrimEnd([char[]]"\/")
         CommonDir = Resolve-GitReportedPath -RepositoryRoot $normalizedRoot -ReportedPath $commonDirText
-        Head = $head
-        Tree = $tree
-        HeadRef = $headRef
+        Head = $headIdentityAfter.Head
+        Tree = $headIdentityAfter.Tree
+        HeadRef = $headIdentityAfter.HeadRef
+        HeadRefTarget = $headIdentityAfter.HeadRefTarget
         StatusDigest = Get-Sha256Text -Text $status
+        StatusDisplay = [regex]::Replace($status, '\x00', ' | ').Trim()
         WorktreeClean = [string]::IsNullOrEmpty($status)
-        RefsDigest = Get-Sha256Text -Text ($headRef + "`n" + $refs)
         Closure = $closure
     }
 }
@@ -506,7 +541,7 @@ function Assert-RepositoryAuditUnchanged {
     )
 
     foreach ($propertyName in @(
-        "Root", "CommonDir", "Head", "Tree", "HeadRef", "StatusDigest", "WorktreeClean", "RefsDigest"
+        "Root", "CommonDir", "HeadRef", "HeadRefTarget", "Head", "Tree", "StatusDigest", "WorktreeClean"
     )) {
         if ([string]$Before.$propertyName -cne [string]$After.$propertyName) {
             throw "$Label changed '$propertyName': before='$($Before.$propertyName)' after='$($After.$propertyName)'."
@@ -517,6 +552,158 @@ function Assert-RepositoryAuditUnchanged {
             $differenceSummary = Get-ClosureDifferenceSummary -BeforeClosure $Before.Closure -AfterClosure $After.Closure
             throw "$Label changed closure '$propertyName': before='$($Before.Closure.$propertyName)' after='$($After.Closure.$propertyName)'; paths: $differenceSummary."
         }
+    }
+}
+
+function Assert-RepositoryAuditChangeRejected {
+    param(
+        [pscustomobject]$Before,
+        [pscustomobject]$After,
+        [string]$Label,
+        [string]$ExpectedProperty
+    )
+
+    $rejection = $null
+    try {
+        Assert-RepositoryAuditUnchanged -Before $Before -After $After -Label $Label
+    }
+    catch {
+        $rejection = $_.Exception
+    }
+    if ($null -eq $rejection) {
+        throw "$Label was accepted even though '$ExpectedProperty' changed."
+    }
+    $expectedFragment = "changed '$ExpectedProperty'"
+    if (-not $rejection.Message.Contains($expectedFragment)) {
+        throw "$Label was rejected for an unexpected reason: $($rejection.Message)"
+    }
+}
+
+function Invoke-GitRepositoryAuditRegressions {
+    param([string]$RepositoryRoot)
+
+    $baseline = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+    Assert-AcceptanceInvariant -Condition $baseline.WorktreeClean -Message "Audit regression repository must start clean."
+    Assert-AcceptanceInvariant `
+        -Condition (-not [string]::IsNullOrWhiteSpace($baseline.HeadRef) -and
+            $baseline.HeadRefTarget -ceq $baseline.Head) `
+        -Message "Audit regression repository must start on an exact attached HEAD ref."
+
+    $alternateCommit = (Invoke-GitCapture `
+        -RepositoryRoot $RepositoryRoot `
+        -Arguments @(
+            "-c", "user.name=ParallelWorktreeAcceptance",
+            "-c", "user.email=parallel.worktree.acceptance@example.invalid",
+            "commit-tree", $baseline.Tree, "-p", $baseline.Head,
+            "-m", "audit regression alternate commit"
+        )).Output.Trim().ToLowerInvariant()
+    Assert-AcceptanceInvariant `
+        -Condition ($alternateCommit -match '^[0-9a-f]{40,64}$' -and $alternateCommit -cne $baseline.Head) `
+        -Message "Audit regression could not create a distinct same-tree commit."
+
+    $unrelatedRef = "refs/heads/acceptance-unrelated-ref"
+    [void](Invoke-GitCapture -RepositoryRoot $RepositoryRoot -Arguments @("update-ref", $unrelatedRef, $baseline.Head))
+    $unrelatedBefore = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+    Assert-RepositoryAuditUnchanged `
+        -Before $baseline `
+        -After $unrelatedBefore `
+        -Label "Unrelated ref creation regression"
+
+    [void](Invoke-GitCapture `
+        -RepositoryRoot $RepositoryRoot `
+        -Arguments @("update-ref", $unrelatedRef, $alternateCommit, $baseline.Head))
+    $unrelatedRefTarget = (Invoke-GitCapture `
+        -RepositoryRoot $RepositoryRoot `
+        -Arguments @("show-ref", "--verify", "--hash", $unrelatedRef)).Output.Trim().ToLowerInvariant()
+    Assert-AcceptanceInvariant `
+        -Condition ($unrelatedRefTarget -ceq $alternateCommit) `
+        -Message "Unrelated ref regression did not perform the requested exact update."
+    $unrelatedAfter = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+    Assert-RepositoryAuditUnchanged `
+        -Before $unrelatedBefore `
+        -After $unrelatedAfter `
+        -Label "Unrelated ref update regression"
+    Assert-AcceptanceInvariant `
+        -Condition ($unrelatedAfter.HeadRefTarget -ceq $baseline.HeadRefTarget -and
+            $unrelatedAfter.Head -ceq $baseline.Head -and
+            $unrelatedAfter.Tree -ceq $baseline.Tree) `
+        -Message "Unrelated ref update changed the source worktree identity."
+    [void](Invoke-GitCapture `
+        -RepositoryRoot $RepositoryRoot `
+        -Arguments @("update-ref", $unrelatedRef, $baseline.Head, $alternateCommit))
+
+    [void](Invoke-GitCapture -RepositoryRoot $RepositoryRoot -Arguments @("symbolic-ref", "HEAD", $unrelatedRef))
+    try {
+        $changedHeadRef = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+        Assert-AcceptanceInvariant `
+            -Condition ($changedHeadRef.Head -ceq $baseline.Head -and $changedHeadRef.Tree -ceq $baseline.Tree) `
+            -Message "Head-ref regression unexpectedly changed HEAD/tree."
+        Assert-RepositoryAuditChangeRejected `
+            -Before $baseline `
+            -After $changedHeadRef `
+            -Label "Source head-ref regression" `
+            -ExpectedProperty "HeadRef"
+    }
+    finally {
+        [void](Invoke-GitCapture -RepositoryRoot $RepositoryRoot -Arguments @("symbolic-ref", "HEAD", $baseline.HeadRef))
+    }
+
+    [void](Invoke-GitCapture `
+        -RepositoryRoot $RepositoryRoot `
+        -Arguments @("update-ref", $baseline.HeadRef, $alternateCommit, $baseline.HeadRefTarget))
+    try {
+        $changedOwnRef = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+        Assert-AcceptanceInvariant `
+            -Condition ($changedOwnRef.HeadRefTarget -ceq $alternateCommit -and
+                $changedOwnRef.Head -ceq $alternateCommit -and
+                $changedOwnRef.Tree -ceq $baseline.Tree -and
+                $changedOwnRef.WorktreeClean) `
+            -Message "Own-ref regression did not isolate an exact ref/HEAD change over the same tree."
+        Assert-RepositoryAuditChangeRejected `
+            -Before $baseline `
+            -After $changedOwnRef `
+            -Label "Source exact-ref regression" `
+            -ExpectedProperty "HeadRefTarget"
+    }
+    finally {
+        [void](Invoke-GitCapture `
+            -RepositoryRoot $RepositoryRoot `
+            -Arguments @("update-ref", $baseline.HeadRef, $baseline.HeadRefTarget, $alternateCommit))
+    }
+
+    $contentPath = Join-Path $RepositoryRoot "project.godot"
+    $originalBytes = [System.IO.File]::ReadAllBytes($contentPath)
+    $changedBytes = New-Object byte[] ($originalBytes.Length + 1)
+    [Array]::Copy($originalBytes, $changedBytes, $originalBytes.Length)
+    $changedBytes[$changedBytes.Length - 1] = [byte]10
+    [System.IO.File]::WriteAllBytes($contentPath, $changedBytes)
+    try {
+        $changedContent = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+        Assert-AcceptanceInvariant `
+            -Condition ($changedContent.StatusDigest -cne $baseline.StatusDigest -and
+                $changedContent.Closure.MaterializedDigest -cne $baseline.Closure.MaterializedDigest) `
+            -Message "Content regression did not change both status and materialized closure."
+        Assert-RepositoryAuditChangeRejected `
+            -Before $baseline `
+            -After $changedContent `
+            -Label "Source content regression" `
+            -ExpectedProperty "StatusDigest"
+    }
+    finally {
+        [System.IO.File]::WriteAllBytes($contentPath, $originalBytes)
+    }
+
+    [void](Invoke-GitCapture `
+        -RepositoryRoot $RepositoryRoot `
+        -Arguments @("update-ref", "-d", $unrelatedRef, $baseline.Head))
+    $restored = Get-GitRepositoryAudit -RepositoryRoot $RepositoryRoot
+    Assert-RepositoryAuditUnchanged -Before $baseline -After $restored -Label "Audit regression cleanup"
+
+    return [ordered]@{
+        unrelated_ref_update_allowed = $true
+        source_head_ref_change_rejected = $true
+        source_exact_ref_and_head_change_rejected = $true
+        source_status_and_content_change_rejected = $true
     }
 }
 
@@ -655,19 +842,17 @@ function Normalize-TargetPath {
 function Get-WorktreeState {
     param([string]$WorktreeRoot)
 
-    $head = (Invoke-GitCapture -RepositoryRoot $WorktreeRoot -Arguments @("rev-parse", "--verify", "HEAD")).Output.Trim().ToLowerInvariant()
-    $tree = (Invoke-GitCapture -RepositoryRoot $WorktreeRoot -Arguments @("rev-parse", "--verify", "HEAD^{tree}")).Output.Trim().ToLowerInvariant()
-    $status = (Invoke-GitCapture -RepositoryRoot $WorktreeRoot -Arguments @("status", "--porcelain=v1", "--untracked-files=all", "-z")).Output
-    $commonDirText = (Invoke-GitCapture -RepositoryRoot $WorktreeRoot -Arguments @("rev-parse", "--git-common-dir")).Output
-    $paths = @(Get-GitClosurePaths -RepositoryRoot $WorktreeRoot)
+    $audit = Get-GitRepositoryAudit -RepositoryRoot $WorktreeRoot
     return [pscustomobject]@{
-        Head = $head
-        Tree = $tree
-        Clean = [string]::IsNullOrEmpty($status)
-        StatusDigest = Get-Sha256Text -Text $status
-        StatusDisplay = [regex]::Replace($status, '\x00', ' | ').Trim()
-        CommonDir = Resolve-GitReportedPath -RepositoryRoot $WorktreeRoot -ReportedPath $commonDirText
-        Closure = Get-ClosureFingerprint -RootPath $WorktreeRoot -Paths $paths
+        Head = $audit.Head
+        Tree = $audit.Tree
+        HeadRef = $audit.HeadRef
+        HeadRefTarget = $audit.HeadRefTarget
+        Clean = $audit.WorktreeClean
+        StatusDigest = $audit.StatusDigest
+        StatusDisplay = $audit.StatusDisplay
+        CommonDir = $audit.CommonDir
+        Closure = $audit.Closure
     }
 }
 
@@ -679,7 +864,7 @@ function Assert-WorktreeStateUnchanged {
     )
 
     Assert-AcceptanceInvariant -Condition ($Before.Clean -and $After.Clean) -Message "$Label was not clean before and after the runner."
-    foreach ($propertyName in @("Head", "Tree", "StatusDigest", "CommonDir")) {
+    foreach ($propertyName in @("HeadRef", "HeadRefTarget", "Head", "Tree", "StatusDigest", "CommonDir")) {
         if ([string]$Before.$propertyName -cne [string]$After.$propertyName) {
             throw "$Label changed '$propertyName'."
         }
@@ -1121,6 +1306,7 @@ $auditException = $null
 $cleanupException = $null
 $activeLanes = @()
 $acceptanceData = $null
+$auditRegressions = $null
 
 try {
     $sourceAuditBefore = Get-GitRepositoryAudit -RepositoryRoot $sourceProjectRoot
@@ -1189,6 +1375,7 @@ try {
     $temporaryRemotes = (Invoke-GitCapture -RepositoryRoot $temporaryRepositoryRoot -Arguments @("remote")).Output
     Assert-AcceptanceInvariant -Condition ([string]::IsNullOrEmpty($temporaryStatus)) -Message "Temporary snapshot repository is not clean after its isolated commit."
     Assert-AcceptanceInvariant -Condition ([string]::IsNullOrWhiteSpace($temporaryRemotes)) -Message "Temporary snapshot repository unexpectedly has a remote."
+    $auditRegressions = Invoke-GitRepositoryAuditRegressions -RepositoryRoot $temporaryRepositoryRoot
     $expectedCommittedPaths = @($sourceAuditBefore.Closure.Entries | Where-Object Exists | ForEach-Object RelativePath)
     $temporaryCommittedPaths = @(Get-GitClosurePaths -RepositoryRoot $temporaryRepositoryRoot)
     Assert-AcceptanceInvariant `
@@ -1330,18 +1517,21 @@ try {
     Assert-AcceptanceInvariant -Condition ([string]::Equals($worktreeAAfter.CommonDir, $worktreeBAfter.CommonDir, [StringComparison]::OrdinalIgnoreCase)) -Message "Linked worktrees stopped sharing their temporary common-dir."
 
     $acceptanceData = [ordered]@{
-        schema_version = 1
+        schema_version = 2
         status = "PASS"
         acceptance_id = $acceptanceId
         source_kind = "temporary_commit_from_git_closed_working_snapshot"
         real_source_head_observed = $sourceAuditBefore.Head
         real_source_tree_observed = $sourceAuditBefore.Tree
+        real_source_head_ref_observed = $sourceAuditBefore.HeadRef
+        real_source_head_ref_target_observed = $sourceAuditBefore.HeadRefTarget
         real_source_snapshot = $sourceAuditBefore.Closure.Digest
         temporary_commit = $temporaryCommit
         temporary_tree = $temporaryTree
         linked_common_dir = $worktreeAAfter.CommonDir
         shared_runner_source_snapshot = $receiptA.Scalars["source_snapshot"]
         concurrent_overlap_ms = [Math]::Round($overlapMilliseconds, 3)
+        audit_regressions = $auditRegressions
         evidence_root = $evidenceRunRoot
         retained_runner_workspaces = @($workspaceEvidenceA.WorkspacePath, $workspaceEvidenceB.WorkspacePath)
         retained_user_directories = @($workspaceEvidenceA.UserPath, $workspaceEvidenceB.UserPath)
@@ -1425,8 +1615,9 @@ if ($failureMessages.Count -gt 0) {
     throw ("parallel_worktree_godot_test FAIL: " + ($failureMessages -join " | ") + ". Evidence: '$evidenceRunRoot'.")
 }
 
-$acceptanceData["real_repository_unchanged"] = $true
-$acceptanceData["real_refs_unchanged"] = $true
+$acceptanceData["real_source_worktree_unchanged"] = $true
+$acceptanceData["real_source_exact_ref_unchanged"] = $true
+$acceptanceData["foreign_refs_outside_invariant"] = $true
 $acceptanceData["temporary_fixture_removed"] = $true
 $summaryPath = Join-Path $evidenceRunRoot "parallel_worktree_acceptance.json"
 $summaryJson = $acceptanceData | ConvertTo-Json -Depth 8

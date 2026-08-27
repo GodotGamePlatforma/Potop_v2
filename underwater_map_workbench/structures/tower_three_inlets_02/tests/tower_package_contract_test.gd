@@ -198,12 +198,34 @@ func _verify_runtime_contract(package_manifest: Dictionary) -> void:
 
 	var barriers := runtime.get("barriers", []) as Array
 	_assert(_sorted_ids(barriers) == _sorted_copy(EXPECTED_BARRIER_IDS), "W02 musi mieć dokładnie dynamiczne bariery g1/c_shortcut/g2/h3/facade.")
+	var egress_socket_id := str(runtime.get("egress_socket_id", ""))
+	var egress_socket := _record_by_id(package_manifest.get("sockets", []) as Array, egress_socket_id)
+	var egress_rect := _rect2i(egress_socket.get("local_rect", []))
+	var egress_visual_barriers: Array[Dictionary] = []
 	for barrier_value: Variant in barriers:
 		var barrier := barrier_value as Dictionary
 		_assert(float(barrier.get("travel_speed", 0.0)) > 0.0, "Bariera %s musi mieć dodatnią prędkość ruchu." % str(barrier.get("id", "?")))
 		_assert(not str(barrier.get("socket_id", "")).is_empty(), "Bariera %s musi wskazywać socket." % str(barrier.get("id", "?")))
 		_assert(_vector2(barrier.get("open_offset", [])).length() > 0.0, "Bariera %s musi mieć rzeczywisty open_offset." % str(barrier.get("id", "?")))
 		_assert(str(_record_by_id(package_manifest.get("sockets", []) as Array, str(barrier.get("socket_id", ""))).get("kind", "")) == "dynamic_door", "Bariera %s musi wiązać się z socketem dynamic_door." % str(barrier.get("id", "?")))
+		_assert(not barrier.has("visual_style"), "Czysto prezentacyjny styl bariery nie może zmieniać runtime ani gameplay signature.")
+		var barrier_socket := _record_by_id(package_manifest.get("sockets", []) as Array, str(barrier.get("socket_id", "")))
+		if (
+			str(barrier_socket.get("kind", "")) == "dynamic_door"
+			and _rect2i(barrier_socket.get("local_rect", [])) == egress_rect
+		):
+			egress_visual_barriers.append(barrier)
+
+	_assert(egress_visual_barriers.size() == 1, "Dokładnie jedna bariera dynamic_door musi pokrywać typowany building_egress i otrzymać prezentację egress_grille.")
+	if egress_visual_barriers.size() == 1:
+		var egress_barrier := egress_visual_barriers[0]
+		var barrier_socket := _record_by_id(package_manifest.get("sockets", []) as Array, str(egress_barrier.get("socket_id", "")))
+		var closed_rect := _rect2i(barrier_socket.get("local_rect", []))
+		var open_offset := _vector2i(egress_barrier.get("open_offset", []))
+		var open_rect := Rect2i(closed_rect.position + open_offset, closed_rect.size)
+		_assert(closed_rect == egress_rect, "Relacja dynamic_door→building_egress musi typować egress_grille bez zależności od ID, socketu, label ani symbolu.")
+		_assert((open_offset.x == 0) != (open_offset.y == 0), "egress_grille musi otwierać się wzdłuż dokładnie jednej osi.")
+		_assert(not open_rect.intersects(egress_rect), "Pozycja OPEN egress_grille musi całkowicie opuścić prostokąt przejścia.")
 
 	var cabinet := runtime.get("cabinet", {}) as Dictionary
 	_assert(str(cabinet.get("id", "")) == "cabinet_d", "Automat D musi sterować cabinet_d.")
@@ -243,7 +265,7 @@ func _verify_runtime_contract(package_manifest: Dictionary) -> void:
 		_assert(_rect_contains_collision_value(cover_rect, collision_cells, 0), "Osłona B %s musi zawierać fizyczny filar." % cover_socket_id)
 		_assert(_rect_contains_collision_value(cover_rect, collision_cells, 255), "Osłona B %s musi pozostawiać osiągalną kieszeń bez prądu." % cover_socket_id)
 	_assert(int(b_current.get("active_stage", -1)) == 0, "Prąd B może działać wyłącznie w S0.")
-	_assert(str(_record_by_id(package_manifest.get("sockets", []) as Array, str(runtime.get("egress_socket_id", ""))).get("kind", "")) == "building_egress", "egress_socket_id musi wskazywać jedyne building_egress.")
+	_assert(str(egress_socket.get("kind", "")) == "building_egress", "egress_socket_id musi wskazywać jedyne building_egress.")
 
 
 func _verify_visual_assets(package_manifest: Dictionary) -> void:
