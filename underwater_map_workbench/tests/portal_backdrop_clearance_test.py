@@ -172,6 +172,12 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertNotIn("CollisionShape2D", rendered)
         self.assertNotIn("CollisionPolygon2D", rendered)
         self.assertNotIn("StaticBody2D", rendered)
+        self.assertNotIn("PackedColorArray(Color", rendered)
+        self.assertIn(
+            "vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, "
+            "1, 1, 1, 1, 1, 1, 1, 0)",
+            rendered,
+        )
         self.assertEqual(2, rendered.count('metadata/role = "portal_backdrop_clearance_core"'))
         self.assertEqual(8, rendered.count('metadata/role = "portal_backdrop_clearance_feather"'))
 

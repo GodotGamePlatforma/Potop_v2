@@ -5285,8 +5285,8 @@ def _append_portal_backdrop_clearances(
         manifest["visual"]["water_color"],
         "visual.water_color",
     )
-    transparent = "Color(1, 1, 1, 0)"
-    opaque = "Color(1, 1, 1, 1)"
+    transparent = "1, 1, 1, 0"
+    opaque = "1, 1, 1, 1"
     for clearance in clearances:
         geometry_digest = str(clearance["geometry_digest"])
         node_name = f"Clearance_{geometry_digest}"
