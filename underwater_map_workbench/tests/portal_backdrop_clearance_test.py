@@ -114,12 +114,12 @@ class PortalBackdropClearanceTest(unittest.TestCase):
             )
             core_x, core_y, core_width, core_height = clearance["core_rect"]
             outer_x, outer_y, outer_width, outer_height = clearance["outer_rect"]
-            self.assertEqual(400, core_width)
+            self.assertEqual(240, core_width)
             self.assertEqual(int(clearance["span"]) + 80, core_height)
-            self.assertEqual(core_x - 80, outer_x)
-            self.assertEqual(core_y - 80, outer_y)
-            self.assertEqual(core_width + 160, outer_width)
-            self.assertEqual(core_height + 160, outer_height)
+            self.assertEqual(core_x - 40, outer_x)
+            self.assertEqual(core_y - 40, outer_y)
+            self.assertEqual(core_width + 80, outer_width)
+            self.assertEqual(core_height + 80, outer_height)
 
     def test_identity_and_package_names_cannot_change_digest_or_presentation(self) -> None:
         first_topology = _fixture("structure_alpha")
@@ -157,6 +157,7 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertIn("z_as_relative = false", first_render)
         self.assertIn("z_index = -79", first_render)
         self.assertIn("metadata/clearance_count = 2", first_render)
+        self.assertIn("metadata/feather_outer_tint = 0.82", first_render)
 
     def test_generated_fragment_is_visual_only_and_deterministic(self) -> None:
         topology = _fixture()
@@ -174,9 +175,30 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertNotIn("StaticBody2D", rendered)
         self.assertNotIn("PackedColorArray(Color", rendered)
         self.assertIn(
-            "vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, "
-            "1, 1, 1, 1, 1, 1, 1, 0)",
+            "vertex_colors = PackedColorArray("
+            "0.022509804, 0.093254902, 0.13505882, 1, "
+            "0.02745098, 0.11372549, 0.16470588, 1, "
+            "0.02745098, 0.11372549, 0.16470588, 1, "
+            "0.022509804, 0.093254902, 0.13505882, 1)",
             rendered,
+        )
+        vertex_color_lines = [
+            line
+            for line in lines_a
+            if line.startswith("vertex_colors = PackedColorArray(")
+        ]
+        self.assertEqual(8, len(vertex_color_lines))
+        for line in vertex_color_lines:
+            components = line.removeprefix(
+                "vertex_colors = PackedColorArray("
+            ).removesuffix(")").split(", ")
+            self.assertEqual(["1", "1", "1", "1"], components[3::4])
+        self.assertEqual(8, rendered.count("color = Color(1, 1, 1, 1)"))
+        self.assertEqual(
+            2,
+            rendered.count(
+                "color = Color(0.02745098, 0.11372549, 0.16470588, 1)"
+            ),
         )
         self.assertEqual(2, rendered.count('metadata/role = "portal_backdrop_clearance_core"'))
         self.assertEqual(8, rendered.count('metadata/role = "portal_backdrop_clearance_feather"'))

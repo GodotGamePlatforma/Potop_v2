@@ -28,7 +28,7 @@
     "solid": 0
   },
   "generated": true,
-  "manifest_sha256": "df89e523443e506bb7c20c6deb4f77436aeef026537c41cad99c33a945cbb424",
+  "manifest_sha256": "0fbd7412b50086bb4963cd95f305a0912f6d2bc4b0d4603bd2c6d907f7561b51",
   "mapping": {
     "pixel_reference": "pixel_edge",
     "rounding": "floor",

@@ -14,13 +14,14 @@ const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
 const STREAMED_BACKDROP_CONTRACT := "camera_windowed_texture_v1"
-const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v1"
+const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v3"
 const PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID := "L04"
 const PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS := ["L01", "L02"]
 const PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS := ["L03", "L04"]
-const PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS := 5
+const PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS := 3
 const PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS := 1
-const PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS := 2
+const PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS := 1
+const PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT := 0.82
 const NO_BLOCKING_AFFORDANCE_POLICY := "no_visual_blockage_in_protected_water"
 const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap_open_water"
 const COMPOSITION_PROXY_KIND := "composition_proxy"
@@ -2981,7 +2982,11 @@ func _assert_portal_backdrop_clearances(
 		and int(clearance_root.get_meta("tangent_padding_cells", 0))
 		== PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS
 		and int(clearance_root.get_meta("feather_cells", 0))
-		== PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS,
+		== PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS
+		and is_equal_approx(
+			float(clearance_root.get_meta("feather_outer_tint", -1.0)),
+			PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		),
 		"%s PortalBackdropClearances musi mieć ograniczony padding i feather." % owner_label,
 	)
 
@@ -3180,21 +3185,29 @@ func _assert_portal_backdrop_clearances(
 				Vector2(core_left, outer_bottom),
 			]),
 		}
-		var transparent_white := Color(1.0, 1.0, 1.0, 0.0)
-		var opaque_white := Color.WHITE
+		var feather_outer_color := Color(
+			expected_water_color.r * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+			expected_water_color.g * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+			expected_water_color.b * PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+			expected_water_color.a,
+		)
 		var expected_vertex_colors := {
 			"Core": PackedColorArray(),
 			"FeatherLeft": PackedColorArray([
-				transparent_white, opaque_white, opaque_white, transparent_white,
+				feather_outer_color, expected_water_color,
+				expected_water_color, feather_outer_color,
 			]),
 			"FeatherRight": PackedColorArray([
-				opaque_white, transparent_white, transparent_white, opaque_white,
+				expected_water_color, feather_outer_color,
+				feather_outer_color, expected_water_color,
 			]),
 			"FeatherTop": PackedColorArray([
-				transparent_white, transparent_white, opaque_white, opaque_white,
+				feather_outer_color, feather_outer_color,
+				expected_water_color, expected_water_color,
 			]),
 			"FeatherBottom": PackedColorArray([
-				opaque_white, opaque_white, transparent_white, transparent_white,
+				expected_water_color, expected_water_color,
+				feather_outer_color, feather_outer_color,
 			]),
 		}
 		_assert(bool(clearance.get_meta("visual_only", false)), "%s clearance musi być visual-only." % owner_label)
@@ -3233,10 +3246,17 @@ func _assert_portal_backdrop_clearances(
 					expected_vertex_colors.has(visual_name)
 					and polygon.vertex_colors
 					== (expected_vertex_colors[visual_name] as PackedColorArray),
-					"%s %s musi mieć dokładny układ alf core/feather."
+					"%s %s musi mieć dokładny, nieprzezroczysty układ core/feather."
 					% [owner_label, visual_name],
 				)
-				_assert(polygon.color.is_equal_approx(expected_water_color), "%s clearance musi używać water_color." % owner_label)
+				var expected_polygon_color := (
+					expected_water_color if visual_name == "Core" else Color.WHITE
+				)
+				_assert(
+					polygon.color.is_equal_approx(expected_polygon_color),
+					"%s %s musi rozdzielać kolor Core od pełnych kolorów Feather."
+					% [owner_label, visual_name],
+				)
 				_assert(
 					str(polygon.get_meta("role", ""))
 					== (
