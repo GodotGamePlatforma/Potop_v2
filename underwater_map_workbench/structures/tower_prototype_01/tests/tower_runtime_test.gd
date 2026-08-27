@@ -26,6 +26,7 @@ func _run() -> void:
 	if _effective_structure.is_empty():
 		_finish()
 		return
+	_verify_power_presentation_contract_validation()
 
 	var structure_root := Node2D.new()
 	structure_root.name = "TowerPrototype01"
@@ -86,6 +87,8 @@ func _run() -> void:
 	_assert(str(power_panel.get_meta(&"power_logic_contract", "")) == "three_lever_deduction_v2", "Panel A musi publikować dedukcyjny kontrakt feedbacku.")
 	_assert(power_panel.circuit_visual_state("red") == "ready" and power_panel.circuit_visual_state("blue") == "locked", "Lampy panelu muszą odwzorować ready/locked ze snapshotu.")
 	_assert(str(power_panel.get_meta(&"diagnostic_id", "x")).is_empty(), "Neutralny start A nie może udawać błędu.")
+	_verify_power_panel_geometry(controller, power_panel)
+	_verify_runtime_visual_order(controller, power_panel, dynamic_body_nodes)
 	for label_value: Variant in power_panel.find_children("*", "Label", true, false):
 		var label_text := (label_value as Label).text
 		_assert(not label_text.contains("↑") and not label_text.contains("↓"), "Panel A nie może wyświetlać gotowego kodu strzałkami.")
@@ -100,26 +103,52 @@ func _run() -> void:
 	_assert(bool(controller.activate_power_lever("a_lever_1").get("success", false)), "Publiczne API capture musi przełączać stabilny lever ID.")
 	_assert(str((controller.state_snapshot().get("lever_positions", {}) as Dictionary).get("a_lever_1", "")) == "down", "Publiczne API levera musi natychmiast publikować nową pozycję.")
 	controller.reset_attempt()
-	_verify_all_power_patterns(controller)
+	_verify_all_power_patterns(controller, power_panel)
 	controller.reset_attempt()
 
 	_set_power_pattern(controller, ["down", "down", "down"])
 	_assert(str(controller.state_snapshot().get("active_circuit_id", "")) == "red", "Wzorzec down/down/down ma aktywować RED.")
 	_assert(power_panel.circuit_visual_state("red") == "active", "Lampa RED musi pokazać active.")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateRed") as Label, "red", "active")
 	_assert(controller.barrier_group_is_open("red_route"), "Aktywny RED musi otworzyć red_route.")
+	_assert(_barrier_group_has_visual_state(controller, "red_route", "opening"), "RED musi natychmiast opublikować stan opening podczas ruchu drzwi.")
+	await _await_barrier_group_target(controller, "red_route")
+	_assert(
+		_barrier_group_has_visual_state(controller, "red_route", "open"),
+		"RED musi zakończyć ruch jednoznacznym stanem open: %s."
+		% [_barrier_group_debug_snapshot(controller, "red_route")],
+	)
 	_assert(bool(controller.activate_control("b_red_relay").get("success", false)), "B ma zatrzasnąć RED.")
 	_assert(controller.barrier_group_is_open("red_route") and controller.barrier_group_is_open("shortcut_b"), "B musi zachować RED i otworzyć shortcut_b.")
 	_assert(controller.power_circuit_state("red") == "latched" and controller.power_circuit_state("blue") == "ready", "Po B RED ma być latched, a BLUE ready.")
 	_assert(str(controller.state_snapshot().get("power_status", "")) == "latched", "Wzorzec RED po B musi publikować status latched.")
 	_assert(power_panel.circuit_visual_state("red") == "latched" and power_panel.circuit_visual_state("blue") == "ready", "Lampy panelu muszą pokazać latch RED i ready BLUE.")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateRed") as Label, "red", "latched")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateBlue") as Label, "blue", "ready")
 	_verify_power_patterns_after_latch(controller, false)
 	_set_power_pattern(controller, ["up", "down", "up"])
 	_assert(controller.power_circuit_state("blue") == "active", "Wzorzec up/down/up po B ma aktywować BLUE.")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateBlue") as Label, "blue", "active")
 	_assert(controller.barrier_group_is_open("blue_route"), "Aktywny BLUE musi otworzyć blue_route.")
 	_assert(controller.elevator_target_stop_id() == "floor_7", "Aktywny BLUE musi wysłać pusty wózek na floor_7.")
 	for _frame_index: int in range(30):
 		await physics_frame
 	_assert(not controller.elevator_reached_stop("floor_12") and not controller.elevator_reached_stop("floor_7"), "Niezatrzaśnięty pusty wózek musi rozpocząć przejazd z floor_12 do floor_7.")
+	var trolley_visual := _mechanism_visual_by_kind(controller, "empty_maintenance_trolley")
+	_assert(trolley_visual != null and str(trolley_visual.call("visual_state")) == "moving_down", "Ruch wózka musi mieć stan moving_down.")
+	if trolley_visual != null:
+		var aperture_value: Variant = trolley_visual.get_meta(&"open_aperture_local_rect", null)
+		_assert(
+			aperture_value is Rect2
+			and (aperture_value as Rect2).size.x > 0.0
+			and (aperture_value as Rect2).size.y > 0.0
+			and bool(trolley_visual.get_meta(&"open_aperture_expected_transparent", false)),
+			"Pusty wózek musi publikować dodatnią, przezroczystą aperturę ładunkową do kontroli capture.",
+		)
+		var moving_wheel_phase := float(trolley_visual.get("_wheel_phase"))
+		for _frame_index: int in range(3):
+			await process_frame
+		_assert(not is_equal_approx(float(trolley_visual.get("_wheel_phase")), moving_wheel_phase), "Koła pustego wózka muszą obracać się wyłącznie podczas jazdy.")
 	_assert(not bool(controller.state_snapshot().get("trolley_contact_closed", true)), "Styk C musi pozostać otwarty podczas ruchu wózka.")
 	_assert(not bool(controller.activate_control("c_blue_lock").get("success", true)), "C nie może zatrzasnąć wózka przed fizycznym stykiem na floor_7.")
 	_set_power_pattern(controller, ["up", "up", "up"])
@@ -133,17 +162,45 @@ func _run() -> void:
 	_assert(controller.elevator_reached_stop("floor_12"), "Po wyłączeniu niezatrzaśniętego BLUE winda musi faktycznie wrócić na floor_12.")
 	_set_power_pattern(controller, ["up", "down", "up"])
 	await _await_elevator_stop(controller, "floor_7")
-	_assert(controller.elevator_reached_stop("floor_7"), "Pusty wózek musi deterministycznie dojechać do floor_7: %s" % controller.state_snapshot())
 	var trolley_arrived := controller.state_snapshot()
-	_assert(bool(trolley_arrived.get("trolley_contact_closed", false)), "Dojście pustego wózka ma automatycznie domknąć fizyczny styk C.")
+	_assert(
+		str(trolley_arrived.get("elevator_current_stop_id", "")) == "floor_7"
+		and bool(trolley_arrived.get("trolley_contact_closed", false)),
+		"floor_7 i fizycznie domknięty styk C muszą wystąpić w tej samej obserwacji snapshotu: %s" % trolley_arrived,
+	)
 	_assert(str(trolley_arrived.get("trolley_visual_state", "")) == "contact_closed", "Grafika wózka musi pokazać domknięty styk przed C.")
 	_assert(str(trolley_arrived.get("last_feedback_kind", "")) == "trolley_contact_closed", "Dojście wózka musi mieć jednoznaczny feedback audio.")
 	_assert(str(controller.control("c_blue_lock").visual_state()) == "contact_closed", "Grafika C musi pokazać domknięcie styku.")
+	if trolley_visual != null:
+		var contact_wheel_phase := float(trolley_visual.get("_wheel_phase"))
+		for _frame_index: int in range(4):
+			await process_frame
+		_assert(is_equal_approx(float(trolley_visual.get("_wheel_phase")), contact_wheel_phase), "Koła wózka muszą zatrzymać się dokładnie po domknięciu styku floor_7.")
 	_assert(bool(controller.activate_control("c_blue_lock").get("success", false)), "C ma zatrzasnąć pusty wózek i BLUE.")
 	_assert(controller.barrier_group_is_open("blue_route") and controller.barrier_group_is_open("shortcut_c"), "C musi zachować BLUE i otworzyć shortcut_c.")
 	_assert(controller.power_circuit_state("blue") == "latched" and controller.power_circuit_state("yellow") == "ready", "Po C BLUE ma być latched, a YELLOW ready.")
 	_assert(str(controller.state_snapshot().get("power_status", "")) == "latched", "Wzorzec BLUE po C musi publikować status latched.")
 	_assert(power_panel.circuit_visual_state("blue") == "latched" and power_panel.circuit_visual_state("yellow") == "ready", "Lampy panelu muszą pokazać latch BLUE i ready YELLOW.")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateBlue") as Label, "blue", "latched")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateYellow") as Label, "yellow", "ready")
+	var yellow_clue := power_panel.get_node_or_null("DeductionClue") as Label
+	var expected_yellow_summary := str(
+		(_manifest_power_logic().get("clue_summaries", {}) as Dictionary).get("yellow", "")
+	)
+	var expected_yellow_clue := str(
+		(_manifest_power_logic().get("clues", {}) as Dictionary).get("yellow", "")
+	)
+	_assert(
+		yellow_clue != null
+		and yellow_clue.visible
+		and str(yellow_clue.get_meta(&"clue_circuit_id", "")) == "yellow"
+		and yellow_clue.text == expected_yellow_summary
+		and yellow_clue.tooltip_text == expected_yellow_clue
+		and yellow_clue.text.contains("ŚRODEK ZAJ.")
+		and yellow_clue.text.contains("PRAWA ODC.")
+		and _label_multiline_content_fits(yellow_clue),
+		"Widoczna przesłanka YELLOW musi in-world podać zajęty środek i odciętą prawą gałąź, bez polegania na kolorze lub tooltipie.",
+	)
 	_assert(str(controller.state_snapshot().get("trolley_visual_state", "")) == "latched_floor_7", "Po C pusty wózek musi być wizualnie nieruchomym interlockiem.")
 	_verify_power_patterns_after_latch(controller, true)
 	_set_power_pattern(controller, ["up", "up", "up"])
@@ -151,6 +208,7 @@ func _run() -> void:
 	_set_power_pattern(controller, ["down", "up", "up"])
 	_assert(controller.power_circuit_state("yellow") == "active", "Wzorzec down/up/up po C ma aktywować YELLOW.")
 	_assert(power_panel.circuit_visual_state("yellow") == "active", "Lampa YELLOW musi pokazać active.")
+	_verify_circuit_badge_content(power_panel.get_node_or_null("CircuitStateYellow") as Label, "yellow", "active")
 	_assert(controller.barrier_group_is_open("yellow_route"), "Aktywny YELLOW musi otworzyć yellow_route.")
 
 	_verify_d_reset_and_fault_matrix(controller)
@@ -192,7 +250,7 @@ func _run() -> void:
 	_finish()
 
 
-func _verify_all_power_patterns(controller) -> void:
+func _verify_all_power_patterns(controller, power_panel: Node2D) -> void:
 	var pattern_cases := [
 		{"positions": ["up", "up", "up"], "matched": ""},
 		{"positions": ["up", "up", "down"], "matched": ""},
@@ -211,6 +269,7 @@ func _verify_all_power_patterns(controller) -> void:
 	_assert(bool(controller.activate_power_lever("a_lever_1").get("success", false)), "Fixture UUU diagnostic wymaga powrotu do układu startowego.")
 	var returned_to_start: Dictionary = controller.state_snapshot()
 	_assert(str(returned_to_start.get("power_diagnostic_id", "")) == "all_branches_open", "Układ UUU osiągnięty po przełączeniu musi zgłosić przerwę, nie neutralny start.")
+	_verify_power_feedback_labels(power_panel, returned_to_start, true)
 	diagnostic_ids[str(returned_to_start.get("power_diagnostic_id", ""))] = true
 	for pattern_case_value: Variant in pattern_cases:
 		var pattern_case := pattern_case_value as Dictionary
@@ -230,13 +289,17 @@ func _verify_all_power_patterns(controller) -> void:
 			if expected_invalid_status == "fault":
 				var reason_id := str(snapshot.get("power_diagnostic_id", ""))
 				_assert(not reason_id.is_empty() and not str(snapshot.get("power_diagnostic_message", "")).is_empty(), "Każdy błędny układ musi mieć reason_id i komunikat: %s." % [positions])
+				_verify_power_feedback_labels(power_panel, snapshot, true)
 				diagnostic_ids[reason_id] = true
+			else:
+				_verify_power_feedback_labels(power_panel, snapshot, false)
 		else:
 			valid_count += 1
 			var expected_state := "active" if expected_match == "red" else "locked"
 			_assert(controller.power_circuit_state(expected_match) == expected_state, "Wzorzec %s ma respektować aktualne active/locked: %s." % [expected_match, snapshot])
 			_assert(str(snapshot.get("power_status", "")) == expected_state, "Feedback panelu ma zgadzać się ze stanem matched circuit.")
 			_assert(str(snapshot.get("active_circuit_id", "")) == ("red" if expected_match == "red" else ""), "Przed B tylko wzorzec RED może napędzać mechanizm.")
+			_verify_power_feedback_labels(power_panel, snapshot, false)
 		for lever_id: String in POWER_LEVER_IDS:
 			_assert(controller.power_lever(lever_id).can_interact(), "Levery A muszą pozostać interaktywne także w locked/fault: %s." % [positions])
 	_assert(valid_count == 3 and invalid_count == 5, "Rozdzielnia A musi rozróżniać dokładnie 3 prawidłowe i 5 niewłaściwych kombinacji.")
@@ -326,6 +389,295 @@ func _verify_fresh_runtime_has_no_checkpoint() -> void:
 		_assert(fresh_state.get("circuit_states", {}) == {"red": "ready", "blue": "locked", "yellow": "locked"}, "Nowa instancja wieżowca nie może odtworzyć latchy z poprzedniej próby.")
 		_assert(not bool(fresh_state.get("d_complete", true)) and _all_groups_have_state(fresh_controller, false), "Nowa instancja wieżowca nie może odtworzyć drzwi ani ukończenia z poprzedniej próby.")
 	detached_root.free()
+
+
+func _verify_power_presentation_contract_validation() -> void:
+	var invalid_cases: Array[Dictionary] = [
+		{
+			"id": "diagnostic_summary_null",
+			"field": "diagnostic_summary",
+			"value": null,
+		},
+		{
+			"id": "clue_summary_whitespace",
+			"field": "clue_summary",
+			"value": "   ",
+		},
+		{
+			"id": "diagnostics_not_exact_invalid_complement",
+			"field": "diagnostic_positions",
+			"value": ["down", "down", "down"],
+		},
+	]
+	for invalid_case: Dictionary in invalid_cases:
+		var invalid_record := _effective_structure.duplicate(true)
+		var power_logic := _power_logic_from_runtime(invalid_record.get("runtime", null))
+		var invalid_field := str(invalid_case.get("field", ""))
+		if invalid_field in ["diagnostic_summary", "diagnostic_positions"]:
+			var diagnostics := power_logic.get("diagnostics", {}) as Dictionary
+			var diagnostic := diagnostics.get("all_branches_open", {}) as Dictionary
+			if invalid_field == "diagnostic_summary":
+				diagnostic["summary"] = invalid_case.get("value", null)
+			else:
+				diagnostic["positions"] = invalid_case.get("value", null)
+		else:
+			var clue_summaries := power_logic.get("clue_summaries", {}) as Dictionary
+			clue_summaries["red"] = invalid_case.get("value", null)
+		var invalid_controller = TowerControllerScript.new()
+		var invalid_interactives := Node2D.new()
+		var errors := invalid_controller.configure(invalid_record, invalid_interactives)
+		_assert(
+			not errors.is_empty(),
+			"Konfiguracja A musi fail-closed odrzucić nie-String lub whitespace presentation text: %s."
+			% str(invalid_case.get("id", "")),
+		)
+		invalid_controller.free()
+		invalid_interactives.free()
+
+
+func _verify_power_panel_geometry(controller, power_panel: Node2D) -> void:
+	var panel_rect: Variant = power_panel.get_meta(&"socket_rect", null)
+	_assert(panel_rect is Rect2 and (panel_rect as Rect2).is_equal_approx(Rect2(1760.0, 680.0, 320.0, 120.0)), "Panel A musi zachować manifestową geometrię 320x120.")
+	if not panel_rect is Rect2:
+		return
+	var socket_rect := panel_rect as Rect2
+	var indicator_nodes := power_panel.find_children("CircuitState*", "Label", true, false)
+	_assert(indicator_nodes.size() == 3, "Panel A musi mieć trzy realne węzły Label-indicator, nie wyłącznie symbole w _draw().")
+	var indicators_by_circuit := {}
+	var presentation_labels: Array[Label] = []
+	for indicator_value: Variant in indicator_nodes:
+		var indicator := indicator_value as Label
+		var circuit_id := str(indicator.get_meta(&"circuit_id", ""))
+		_assert(circuit_id in ["red", "blue", "yellow"] and not indicators_by_circuit.has(circuit_id), "Indicator A musi mieć unikalne circuit_id red/blue/yellow.")
+		indicators_by_circuit[circuit_id] = indicator
+		presentation_labels.append(indicator)
+		_assert(indicator.get_parent() == power_panel and indicator.z_as_relative and indicator.z_index == 1, "Indicator A musi pozostać realnym dzieckiem panelu na lokalnym z=1 (effective z=-8).")
+		_assert(power_panel.z_index + indicator.z_index == -8, "Indicator A musi mieć effective z=-8: nad tłem panelu, pod bryłą L05.")
+		_assert(socket_rect.encloses(Rect2(indicator.position, indicator.size)), "Indicator A nie może wyjść poza socket 320x120.")
+	var title_label := power_panel.get_node_or_null("PowerStatus") as Label
+	var clue_label := power_panel.get_node_or_null("DeductionClue") as Label
+	var diagnostic_label := power_panel.get_node_or_null("DiagnosticReason") as Label
+	_assert(title_label != null and clue_label != null and diagnostic_label != null, "Panel A musi mieć realne labelki statusu, clue i diagnostyki.")
+	if title_label != null:
+		presentation_labels.append(title_label)
+		_assert(title_label.text == "A", "Tytuł panelu ma pozostać krótkim identyfikatorem A; pełny status należy do tooltip/meta.")
+		_assert(not title_label.tooltip_text.is_empty() and not str(title_label.get_meta(&"visual_state", "")).is_empty(), "Tytuł A musi przenosić czytelny status przez tooltip i meta.")
+	for message_label: Label in [clue_label, diagnostic_label]:
+		if message_label == null:
+			continue
+		presentation_labels.append(message_label)
+	if clue_label != null and diagnostic_label != null:
+		_assert(Rect2(clue_label.position, clue_label.size).is_equal_approx(Rect2(diagnostic_label.position, diagnostic_label.size)), "Clue i diagnostyka muszą współdzielić jedno pełne pole tekstowe i przełączać widoczność.")
+	for circuit_index: int in range(3):
+		var circuit_id: String = ["red", "blue", "yellow"][circuit_index]
+		var lever_id: String = POWER_LEVER_IDS[circuit_index]
+		var corresponding_lever := controller.power_lever(lever_id) as Node2D
+		var indicator := indicators_by_circuit.get(circuit_id, null) as Label
+		_assert(indicator != null, "Panel A musi publikować indicator %s." % circuit_id)
+		_assert(corresponding_lever != null, "Panel A musi publikować odpowiadającą dźwignię %s." % lever_id)
+		if indicator == null or corresponding_lever == null:
+			continue
+		var indicator_rect := Rect2(indicator.position, indicator.size)
+		_assert(is_equal_approx(indicator_rect.get_center().x, corresponding_lever.position.x), "Badge %s musi być wyśrodkowany dokładnie nad odpowiadającą dźwignią." % circuit_id)
+		var lever_native_rect := corresponding_lever.get_meta(&"native_visual_rect", Rect2()) as Rect2
+		var corresponding_lever_rect := Rect2(corresponding_lever.position + lever_native_rect.position, lever_native_rect.size)
+		_assert(indicator_rect.intersects(corresponding_lever_rect), "Badge %s ma być materialną tabliczką nagłówkową przypiętą do własnej dźwigni." % circuit_id)
+		var indicator_state := str(indicator.get_meta(&"visual_state", ""))
+		_assert(indicator_state in ["locked", "ready", "active", "latched"], "Indicator %s musi publikować wspierany stan." % circuit_id)
+		_verify_circuit_badge_content(indicator, circuit_id, indicator_state)
+	for label: Label in presentation_labels:
+		var label_rect := Rect2(label.position, label.size)
+		_assert(label.size.x > 0.0 and label.size.y > 0.0 and socket_rect.encloses(label_rect), "%s musi mieć dodatni rect w całości wewnątrz socketu A." % label.name)
+		for lever_id: String in POWER_LEVER_IDS:
+			var lever := controller.power_lever(lever_id) as Node2D
+			if lever == null:
+				continue
+			var lever_local_rect: Variant = lever.get_meta(&"native_visual_rect", Rect2())
+			if not lever_local_rect is Rect2:
+				continue
+			var lever_rect := Rect2(lever.position + (lever_local_rect as Rect2).position, (lever_local_rect as Rect2).size)
+			_assert(socket_rect.encloses(lever_rect), "Lever rect %s nie może wyjść poza socket panelu A." % lever_id)
+			var label_circuit_id := str(label.get_meta(&"circuit_id", ""))
+			var expected_lever_id: String = str({
+				"red": "a_lever_1",
+				"blue": "a_lever_2",
+				"yellow": "a_lever_3",
+			}.get(label_circuit_id, ""))
+			if not expected_lever_id.is_empty() and lever_id == expected_lever_id:
+				continue
+			_assert(
+				not label_rect.intersects(lever_rect),
+				"%s %s nie może nachodzić na lever rect %s %s." % [label.name, label_rect, lever_id, lever_rect],
+			)
+
+
+func _verify_circuit_badge_content(indicator: Label, circuit_id: String, expected_state: String) -> void:
+	var glyphs := {"red": "●", "blue": "▲", "yellow": "■"}
+	var state_tokens := {"locked": "BLOKADA", "ready": "GOTOWY", "active": "AKTYWNY", "latched": "RYGIEL"}
+	_assert(indicator != null, "Brakuje realnego badge dla obwodu %s." % circuit_id)
+	if indicator == null:
+		return
+	_assert(str(indicator.get_meta(&"visual_state", "")) == expected_state, "Badge %s ma niezgodne meta visual_state." % circuit_id)
+	_assert(
+		indicator.text.contains(str(glyphs.get(circuit_id, "")))
+		and indicator.text.contains(circuit_id.to_upper())
+		and indicator.text.contains(str(state_tokens.get(expected_state, ""))),
+		"Badge %s musi kodować obwód glyph+tekst oraz widoczny token stanu %s, nie tylko kolor: %s." % [circuit_id, expected_state, indicator.text],
+	)
+	var style := indicator.get_theme_stylebox(&"normal") as StyleBoxFlat
+	_assert(style != null, "Badge %s musi mieć realne tło i kontur StyleBoxFlat." % circuit_id)
+	if style == null:
+		return
+	var font_color := indicator.get_theme_color(&"font_color")
+	_assert(_contrast_ratio(font_color, style.bg_color) >= 3.0, "Tekst badge %s musi zachować kontrast co najmniej 3:1 względem tła." % circuit_id)
+	_assert(_contrast_ratio(style.border_color, style.bg_color) >= 3.0, "Istotny kontur badge %s musi zachować kontrast co najmniej 3:1 względem tła." % circuit_id)
+	_assert(
+		style.border_width_left >= 2
+		and style.border_width_top >= 2
+		and style.border_width_right >= 2
+		and style.border_width_bottom >= 2,
+		"Kontur badge %s musi mieć co najmniej 2 world px (2.4 px przy gameplay zoom 1.2)." % circuit_id,
+	)
+
+
+func _contrast_ratio(first: Color, second: Color) -> float:
+	var first_luminance := _relative_luminance(first)
+	var second_luminance := _relative_luminance(second)
+	return (maxf(first_luminance, second_luminance) + 0.05) / (minf(first_luminance, second_luminance) + 0.05)
+
+
+func _relative_luminance(color: Color) -> float:
+	return (
+		0.2126 * _linear_color_channel(color.r)
+		+ 0.7152 * _linear_color_channel(color.g)
+		+ 0.0722 * _linear_color_channel(color.b)
+	)
+
+
+func _linear_color_channel(channel: float) -> float:
+	return channel / 12.92 if channel <= 0.04045 else pow((channel + 0.055) / 1.055, 2.4)
+
+
+func _verify_power_feedback_labels(power_panel: Node2D, snapshot: Dictionary, expect_diagnostic: bool) -> void:
+	var clue_label := power_panel.get_node_or_null("DeductionClue") as Label
+	var diagnostic_label := power_panel.get_node_or_null("DiagnosticReason") as Label
+	_assert(clue_label != null and diagnostic_label != null, "Feedback A wymaga dwóch realnych, wzajemnie przełączanych Label.")
+	if clue_label == null or diagnostic_label == null:
+		return
+	var expected_diagnostic := str(snapshot.get("power_diagnostic_message", ""))
+	var power_logic := _manifest_power_logic()
+	if expect_diagnostic:
+		var reason_id := str(snapshot.get("power_diagnostic_id", ""))
+		var diagnostic := (power_logic.get("diagnostics", {}) as Dictionary).get(reason_id, {}) as Dictionary
+		var expected_manifest_message := str(diagnostic.get("message", ""))
+		var expected_summary := str(diagnostic.get("summary", ""))
+		_assert(
+			not expected_manifest_message.is_empty() and expected_diagnostic == expected_manifest_message,
+			"Stan diagnostyczny musi publikować dokładnie manifestowy message w snapshotcie.",
+		)
+		_assert(diagnostic_label.visible and not clue_label.visible, "Diagnostyka A musi pokazywać realny DiagnosticReason i ukrywać clue.")
+		_assert(not expected_summary.is_empty() and diagnostic_label.text == expected_summary and diagnostic_label.tooltip_text == expected_manifest_message, "DiagnosticReason musi pokazywać dokładnie manifestowy summary, a manifestowy message zachować w tooltipie.")
+		_assert(_label_multiline_content_fits(diagnostic_label), "Widoczny summary diagnostyki nie może być ucięty w polu panelu A: %s." % expected_summary)
+	else:
+		var clue_id := str(power_panel.get_meta(&"clue_id", ""))
+		var expected_clue := str((power_logic.get("clues", {}) as Dictionary).get(clue_id, ""))
+		var expected_summary := str((power_logic.get("clue_summaries", {}) as Dictionary).get(clue_id, ""))
+		_assert(expected_diagnostic.is_empty(), "Neutralny lub aktywny stan nie może zachować komunikatu diagnostycznego.")
+		_assert(clue_label.visible and not diagnostic_label.visible, "Neutralny lub aktywny stan A musi pokazywać clue i ukrywać DiagnosticReason.")
+		_assert(
+			not expected_clue.is_empty()
+			and not expected_summary.is_empty()
+			and str(clue_label.get_meta(&"clue_circuit_id", "")) == clue_id
+			and str(power_panel.get_meta(&"clue_text", "")) == expected_clue
+			and clue_label.text == expected_summary
+			and clue_label.tooltip_text == expected_clue,
+			"Kontroler musi przekazać jeden manifestowy clue_id, a panel wyrenderować z niego zgodne summary i pełny tekst.",
+		)
+		_assert(_label_multiline_content_fits(clue_label), "Widoczny summary clue nie może być ucięty w polu panelu A: %s." % expected_summary)
+
+
+func _label_multiline_content_fits(label: Label) -> bool:
+	if label.text.is_empty() or label.size.x <= 0.0 or label.size.y <= 0.0:
+		return false
+	var font := label.get_theme_font(&"font")
+	var font_size := label.get_theme_font_size(&"font_size")
+	if font == null or font_size <= 0:
+		return false
+	var measured := font.get_multiline_string_size(
+		label.text,
+		label.horizontal_alignment,
+		label.size.x,
+		font_size,
+	)
+	var font_height := maxf(font.get_height(font_size), 1.0)
+	var line_count := maxi(ceili(measured.y / font_height), 1)
+	var adjusted_height := measured.y + float(label.get_theme_constant(&"line_spacing")) * float(maxi(line_count - 1, 0))
+	return measured.x <= label.size.x + 0.5 and adjusted_height <= label.size.y + 0.5
+
+
+func _verify_runtime_visual_order(controller, power_panel: Node2D, dynamic_bodies: Array[Node]) -> void:
+	for body_value: Variant in dynamic_bodies:
+		var body := body_value as AnimatableBody2D
+		_assert(body.z_index == -10, "Każdy mechanizm musi być nad L04 (-20), lecz pod panelem A i bryłą L05.")
+	_assert(power_panel.z_index == -9 and power_panel.z_as_relative, "Tło panelu A musi pozostać na z=-9 pomiędzy mechanizmami a controls.")
+	for lever_id: String in POWER_LEVER_IDS:
+		var lever := controller.power_lever(lever_id) as Node2D
+		_assert(lever != null and lever.z_index == 1 and lever.z_as_relative, "Dźwignie A muszą dziedziczyć panel -9 i dawać efektywne z=-8.")
+	for control_id: String in ["b_red_relay", "c_blue_lock", "d_valve_v1", "d_valve_v2", "d_valve_v3", "d_reset", "basement_hatch_control"]:
+		var control := controller.control(control_id) as Node2D
+		_assert(control != null and control.z_index == -8 and control.z_as_relative, "Control %s musi być nad mechanizmami, ale pod bryłą L05." % control_id)
+
+
+func _mechanism_visual_by_kind(controller, dynamic_kind: String) -> Node2D:
+	for body_value: Variant in controller.find_children("*", "AnimatableBody2D", true, false):
+		var body := body_value as AnimatableBody2D
+		if str(body.get_meta(&"dynamic_kind", "")) == dynamic_kind:
+			return body.get_node_or_null("MechanismVisual") as Node2D
+	return null
+
+
+func _barrier_group_has_visual_state(controller, group_id: String, expected_state: String) -> bool:
+	var member_count := 0
+	for body_value: Variant in controller.find_children("*", "AnimatableBody2D", true, false):
+		var body := body_value as AnimatableBody2D
+		if str(body.get_meta(&"barrier_group_id", "")) != group_id:
+			continue
+		member_count += 1
+		var visual := body.get_node_or_null("MechanismVisual")
+		if str(body.get_meta(&"visual_state", "")) != expected_state:
+			return false
+		if visual == null or str(visual.call("visual_state")) != expected_state:
+			return false
+	return member_count > 0
+
+
+func _barrier_group_debug_snapshot(controller, group_id: String) -> Array[Dictionary]:
+	var members: Array[Dictionary] = []
+	for body_value: Variant in controller.find_children("*", "AnimatableBody2D", true, false):
+		var body := body_value as AnimatableBody2D
+		if str(body.get_meta(&"barrier_group_id", "")) != group_id:
+			continue
+		var visual := body.get_node_or_null("MechanismVisual")
+		members.append({
+			"socket_id": str(body.get_meta(&"socket_id", "")),
+			"position": body.position,
+			"target_position": body.get_meta(&"target_position", Vector2.ZERO),
+			"body_visual_state": str(body.get_meta(&"visual_state", "")),
+			"reached_target": bool(body.get_meta(&"reached_target", false)),
+			"mechanism_visual_state": (
+				str(visual.call("visual_state"))
+				if visual != null and visual.has_method("visual_state")
+				else ""
+			),
+		})
+	return members
+
+
+func _await_barrier_group_target(controller, group_id: String) -> void:
+	for _frame_index: int in range(180):
+		if controller.barrier_group_reached_target(group_id):
+			return
+		await physics_frame
 
 
 func _has_property(target: Object, property_name: StringName) -> bool:
@@ -432,10 +784,24 @@ func _verify_safety_envelopes(controller, structure_root: Node2D) -> void:
 	_assert(not controller.barrier_group_safety_clear("red_route"), "Safety envelope ma wykryć nurka w zamykanym otworze.")
 	_assert(not controller.request_barrier_group_open("red_route", false), "Drzwi nie mogą rozpocząć zamknięcia na nurku.")
 	_assert(controller.barrier_group_is_open("red_route"), "Odrzucone zamknięcie nie może zmienić stanu grupy.")
+	_set_power_pattern(controller, ["up", "up", "up"])
+	await physics_frame
+	_assert(
+		controller.barrier_group_is_open("red_route")
+		and _barrier_group_has_visual_state(controller, "red_route", "open"),
+		"Po odłączeniu RED drzwi muszą pozostać fizycznie i wizualnie open, dopóki Nurek zajmuje safety envelope.",
+	)
 	blocker.position = Vector2(400.0, 400.0)
 	await physics_frame
 	await physics_frame
 	_assert(controller.request_barrier_group_open("red_route", false), "Po opuszczeniu safety envelope zamknięcie ma być dozwolone.")
+	_assert(_barrier_group_has_visual_state(controller, "red_route", "closing"), "Dozwolone zamknięcie RED musi natychmiast opublikować stan closing.")
+	await _await_barrier_group_target(controller, "red_route")
+	_assert(
+		_barrier_group_has_visual_state(controller, "red_route", "closed"),
+		"Drzwi RED muszą zakończyć zamknięcie stanem closed: %s."
+		% [_barrier_group_debug_snapshot(controller, "red_route")],
+	)
 
 	controller.reset_attempt()
 	blocker.position = Vector2(1280.0, 180.0)
@@ -451,6 +817,12 @@ func _verify_safety_envelopes(controller, structure_root: Node2D) -> void:
 		await physics_frame
 	_assert(controller.elevator_current_stop_id() == "floor_12", "Pusty wózek ma czekać, gdy nurek zajmuje jego safety envelope: %s" % controller.state_snapshot())
 	_assert(str(controller.state_snapshot().get("trolley_visual_state", "")) == "blocked_by_diver", "Zablokowany pusty wózek musi mieć czytelny stan wizualny.")
+	var blocked_visual := _mechanism_visual_by_kind(controller, "empty_maintenance_trolley")
+	if blocked_visual != null:
+		var blocked_wheel_phase := float(blocked_visual.get("_wheel_phase"))
+		for _frame_index: int in range(4):
+			await process_frame
+		_assert(is_equal_approx(float(blocked_visual.get("_wheel_phase")), blocked_wheel_phase), "Sygnalizacja blocked_by_diver może pulsować, ale koła pustego wózka muszą stać.")
 	_assert(blocker.get_parent() == blocker_parent_before and blocker.position == blocker_position_before, "Pusty wózek nie może reparentować ani przewozić Nurka.")
 	blocker.position = Vector2(400.0, 400.0)
 	await physics_frame
@@ -492,6 +864,29 @@ func _load_package_manifest() -> Dictionary:
 	if not parsed is Dictionary:
 		return {}
 	return parsed as Dictionary
+
+
+func _manifest_power_logic() -> Dictionary:
+	return _power_logic_from_runtime(_package_manifest.get("runtime", null))
+
+
+func _power_logic_from_runtime(runtime_value: Variant) -> Dictionary:
+	if not runtime_value is Dictionary:
+		return {}
+	var interactives_value: Variant = (runtime_value as Dictionary).get("interactives", null)
+	if not interactives_value is Array:
+		return {}
+	for definition_value: Variant in interactives_value as Array:
+		if not definition_value is Dictionary:
+			continue
+		var definition := definition_value as Dictionary
+		if str(definition.get("kind", "")) != "power_distributor":
+			continue
+		var power_logic_value: Variant = definition.get("power_logic", null)
+		if power_logic_value is Dictionary:
+			return power_logic_value as Dictionary
+		return {}
+	return {}
 
 
 func _effective_structure_record(package_manifest: Dictionary) -> Dictionary:

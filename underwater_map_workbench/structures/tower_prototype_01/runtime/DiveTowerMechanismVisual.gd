@@ -4,7 +4,8 @@ var _mechanism_kind: StringName = &"bulkhead"
 var _visual_size := Vector2(80.0, 120.0)
 var _accent := Color(0.48, 0.68, 0.72, 1.0)
 var _visual_state := "closed"
-var _animation_phase := 0.0
+var _wheel_phase := 0.0
+var _signal_phase := 0.0
 
 
 func configure(mechanism_kind: StringName, visual_size: Vector2, accent: Color) -> void:
@@ -14,6 +15,10 @@ func configure(mechanism_kind: StringName, visual_size: Vector2, accent: Color) 
 	set_meta(&"mechanism_kind", _mechanism_kind)
 	set_meta(&"native_visual_size", _visual_size)
 	set_meta(&"native_visual_rect", Rect2(-_visual_size * 0.5, _visual_size))
+	set_meta(&"visual_state", _visual_state)
+	if _mechanism_kind == &"empty_service_trolley":
+		set_meta(&"open_aperture_local_rect", _empty_service_trolley_aperture_rect())
+		set_meta(&"open_aperture_expected_transparent", true)
 	set_process(true)
 	queue_redraw()
 
@@ -22,7 +27,7 @@ func set_visual_state(state: String) -> void:
 	if _visual_state == state:
 		return
 	_visual_state = state
-	_animation_phase = 0.0
+	_signal_phase = 0.0
 	set_meta(&"visual_state", _visual_state)
 	queue_redraw()
 
@@ -32,8 +37,21 @@ func visual_state() -> String:
 
 
 func _process(delta: float) -> void:
-	if _visual_state in ["moving_down", "returning", "blocked_by_diver", "contact_closed", "latched_floor_7"]:
-		_animation_phase = fmod(_animation_phase + maxf(delta, 0.0) * 4.0, TAU)
+	var wheels_are_moving := _visual_state in ["moving_down", "returning"]
+	var signal_is_active := _visual_state in [
+		"moving_down",
+		"returning",
+		"blocked_by_diver",
+		"contact_closed",
+		"opening",
+		"closing",
+		"moving",
+	]
+	if wheels_are_moving:
+		_wheel_phase = fmod(_wheel_phase + maxf(delta, 0.0) * 4.0, TAU)
+	if signal_is_active:
+		_signal_phase = fmod(_signal_phase + maxf(delta, 0.0) * 4.0, TAU)
+	if wheels_are_moving or signal_is_active:
 		queue_redraw()
 
 
@@ -55,15 +73,17 @@ func _draw_empty_service_trolley() -> void:
 	var frame := native_bounds.grow(-5.0)
 	var state_accent := _accent
 	if _visual_state == "blocked_by_diver":
-		state_accent = Color(0.95, 0.28, 0.22, 1.0).lerp(Color(1.0, 0.72, 0.24, 1.0), (sin(_animation_phase) + 1.0) * 0.5)
+		state_accent = Color(0.95, 0.28, 0.22, 1.0).lerp(Color(1.0, 0.72, 0.24, 1.0), (sin(_signal_phase) + 1.0) * 0.5)
 	elif _visual_state in ["contact_closed", "latched_floor_7"]:
 		state_accent = Color(0.34, 0.92, 0.68, 1.0)
 	elif _visual_state in ["moving_down", "returning"]:
 		state_accent = Color(0.92, 0.68, 0.26, 1.0)
 
-	draw_rect(frame, Color(0.025, 0.055, 0.065, 1.0), true)
+	# Wózek jest otwartą kratownicą: nie rysuj pełnej płyty pod ramą.
 	draw_rect(frame, Color(0.12, 0.20, 0.22, 1.0), false, 10.0)
 	draw_rect(frame.grow(-6.0), Color(0.48, 0.56, 0.55, 1.0), false, 3.0)
+	var open_aperture := _empty_service_trolley_aperture_rect()
+	draw_rect(open_aperture, Color(0.30, 0.45, 0.47, 1.0), false, 4.0)
 	var deck := Rect2(Vector2(-half.x + 18.0, half.y - 52.0), Vector2(_visual_size.x - 36.0, 34.0))
 	draw_rect(deck, Color(0.12, 0.20, 0.21, 1.0), true)
 	draw_rect(deck.grow(-2.5), state_accent.darkened(0.28), false, 5.0)
@@ -80,13 +100,10 @@ func _draw_empty_service_trolley() -> void:
 	for corner_x: float in [-half.x + 26.0, half.x - 26.0]:
 		draw_line(Vector2(corner_x, -half.y + 24.0), Vector2(corner_x, half.y - 30.0), Color(0.52, 0.62, 0.62, 1.0), 8.0)
 	for roller_x: float in [-half.x + 56.0, half.x - 56.0]:
-		_draw_roller(Vector2(roller_x, half.y - 20.0), 14.0, _animation_phase)
+		_draw_roller(Vector2(roller_x, half.y - 20.0), 14.0, _wheel_phase)
 		draw_circle(Vector2(roller_x, -half.y + 18.0), 11.0, Color(0.08, 0.12, 0.13, 1.0))
 		draw_circle(Vector2(roller_x, -half.y + 18.0), 11.0, state_accent.darkened(0.2), false, 4.0)
-	# Środek pozostaje fizycznie pusty: to kratownicowy wózek techniczny, nie kabina.
-	var empty_rect := Rect2(Vector2(-half.x + 76.0, -half.y + 50.0), Vector2(_visual_size.x - 152.0, _visual_size.y - 116.0))
-	draw_rect(empty_rect, Color(0.01, 0.025, 0.03, 1.0), true)
-	draw_rect(empty_rect, Color(0.30, 0.45, 0.47, 1.0), false, 4.0)
+	# Środek nie dostaje żadnego wypełnienia: przez kratownicę musi być widoczne tło świata.
 	# Mechaniczny odbierak styku C jest częścią wózka, ale nie tworzy kabiny.
 	var contact_arm_x := half.x - 58.0
 	draw_line(Vector2(contact_arm_x, -26.0), Vector2(contact_arm_x, 28.0), Color(0.46, 0.39, 0.28, 1.0), 9.0)
@@ -95,7 +112,18 @@ func _draw_empty_service_trolley() -> void:
 		draw_circle(rust_mark, 5.0, Color(0.43, 0.25, 0.14, 0.82))
 	if _visual_state in ["contact_closed", "latched_floor_7"]:
 		draw_circle(Vector2(half.x - 38.0, 0.0), 13.0, state_accent.darkened(0.08))
-		draw_circle(Vector2(half.x - 38.0, 0.0), 20.0, Color(state_accent.r, state_accent.g, state_accent.b, 0.46), false, 4.0)
+		var contact_radius := 20.0
+		if _visual_state == "contact_closed":
+			contact_radius += (sin(_signal_phase) + 1.0) * 1.5
+			draw_circle(Vector2(half.x - 38.0, 0.0), contact_radius, Color(state_accent.r, state_accent.g, state_accent.b, 0.46), false, 4.0)
+
+
+func _empty_service_trolley_aperture_rect() -> Rect2:
+	var half := _visual_size * 0.5
+	return Rect2(
+		Vector2(-half.x + 76.0, -half.y + 50.0),
+		Vector2(_visual_size.x - 152.0, _visual_size.y - 116.0),
+	)
 
 
 func _draw_roller(center: Vector2, radius: float, phase: float) -> void:
@@ -112,8 +140,9 @@ func _draw_bulkhead(horizontal: bool) -> void:
 	var edge := _accent
 	if _visual_state == "open":
 		edge = Color(0.32, 0.75, 0.62, 1.0)
-	elif _visual_state == "moving":
-		edge = Color(0.88, 0.66, 0.28, 1.0)
+	elif _visual_state in ["opening", "closing", "moving"]:
+		var pulse := (sin(_signal_phase) + 1.0) * 0.5
+		edge = Color(0.66, 0.42, 0.16, 1.0).lerp(Color(1.0, 0.78, 0.30, 1.0), pulse)
 	draw_rect(panel, Color(0.08, 0.15, 0.17, 1.0), true)
 	draw_rect(panel, edge.darkened(0.2), false, 7.0)
 	var inset := panel.grow(-11.0)
