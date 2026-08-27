@@ -1160,7 +1160,7 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         self.assertNotRegex(combined, r"(?m)^\s+(?:owner|repositories):")
         self.assertNotIn("github-actions", combined)
 
-    def test_ard_headers_are_unique_and_trusted_ci_is_final_ard_0110(self) -> None:
+    def test_ard_headers_are_unique_and_ard_0110_remains_trusted_ci(self) -> None:
         decisions = DECISIONS_PATH.read_text(encoding="utf-8")
         headers = re.findall(r"(?m)^## ARD-(\d{4})\s+-\s+(.+?)\s*$", decisions)
         self.assertTrue(headers, "DECISIONS.md has no ARD headers")
@@ -1171,8 +1171,9 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
             if identifiers.count(identifier) > 1
         )
         self.assertEqual([], duplicates, f"duplicate ARD identifiers: {duplicates}")
-        self.assertEqual("0110", identifiers[-1])
-        self.assertRegex(headers[-1][1].lower(), r"integr|github|zauf")
+        headers_by_identifier = dict(headers)
+        self.assertIn("0110", headers_by_identifier)
+        self.assertRegex(headers_by_identifier["0110"].lower(), r"integr|github|zauf")
         self.assertNotIn("Trusted integration gate", decisions)
         self.assertNotIn("Trusted main audit", decisions)
 
