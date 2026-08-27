@@ -7,7 +7,7 @@ param(
     [string]$RunReceipt,
 
     [Parameter(Mandatory = $true)]
-    [ValidatePattern('^(root|map|diver|integration|play|structure:[a-z][a-z0-9_]*)$')]
+    [ValidatePattern('^(root|map|diver|integration|structure:[a-z][a-z0-9_]*)$')]
     [string]$Owner,
 
     [Parameter(Mandatory = $true)]
@@ -15,9 +15,24 @@ param(
     [string]$TaskSlug,
 
     [Parameter(Mandatory = $true)]
+    [string]$TaskId,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ThreadId,
+
+    [Parameter(Mandatory = $true)]
+    [string]$TaskBrief,
+
+    [Parameter(Mandatory = $true)]
+    [string]$WriteSet,
+
+    [Parameter(Mandatory = $true)]
     [string]$Destination,
 
     [string]$Branch,
+
+    [ValidateRange(30, 86400)]
+    [int]$AckTimeoutSeconds = 300,
 
     [switch]$Create,
 
@@ -365,6 +380,11 @@ function Write-AgentWorktreePlan {
     param(
         [string]$PlanOwner,
         [string]$PlanTaskSlug,
+        [string]$PlanTaskId,
+        [string]$PlanThreadId,
+        [string]$PlanTaskBrief,
+        [string]$PlanWriteSet,
+        [int]$PlanAckTimeoutSeconds,
         [string]$PlanReceiptPath,
         [string]$PlanRunReceiptPath,
         [string]$PlanBaseline,
@@ -379,6 +399,12 @@ function Write-AgentWorktreePlan {
     Write-Output "Agent worktree plan"
     Write-Output "  owner:       $PlanOwner"
     Write-Output "  task:        $PlanTaskSlug"
+    Write-Output "  task-id:     $PlanTaskId"
+    Write-Output "  thread-id:   $PlanThreadId"
+    Write-Output "  brief:       $PlanTaskBrief"
+    Write-Output "  write-set:   $PlanWriteSet"
+    Write-Output "  ACK timeout: $PlanAckTimeoutSeconds seconds"
+    Write-Output "  assignment:  prospective WAITING_ACK (created only with -Create)"
     Write-Output "  candidate-receipt: $PlanReceiptPath"
     Write-Output "  run-receipt:       $PlanRunReceiptPath"
     Write-Output "  candidate:   $PlanBaseline"
@@ -503,6 +529,17 @@ $runReceiptPath = [System.IO.Path]::GetFullPath($RunReceipt)
 if (-not (Test-Path -LiteralPath $runReceiptPath -PathType Leaf)) {
     throw "Candidate full run receipt does not exist: $runReceiptPath"
 }
+$writeSetPath = [System.IO.Path]::GetFullPath($WriteSet)
+if (-not (Test-Path -LiteralPath $writeSetPath -PathType Leaf)) {
+    throw "Closed assignment write-set does not exist: $writeSetPath"
+}
+$writeSetValidation = Invoke-NativeResult -FilePath 'python' -Arguments @(
+    '-B', $contractTool, '--repo', $repoRoot, 'validate',
+    '--owner', $Owner, '--write-set', $writeSetPath
+)
+if ($writeSetValidation.ExitCode -ne 0) {
+    throw "Closed assignment write-set failed owner validation: $($writeSetValidation.Output)"
+}
 $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
 if ($receipt.status -ne 'PUBLICATION_READY' -or
     [string]::IsNullOrWhiteSpace([string]$receipt.head) -or
@@ -564,6 +601,9 @@ if (-not $Create) {
         -ReceiptPath $receiptPath `
         -RunReceiptPath $runReceiptPath -Commit $baseline
     Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
+        -PlanTaskId $TaskId -PlanThreadId $ThreadId `
+        -PlanTaskBrief $TaskBrief -PlanWriteSet $writeSetPath `
+        -PlanAckTimeoutSeconds $AckTimeoutSeconds `
         -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
         -PlanBaseline $baseline -PlanTree $tree `
         -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
@@ -578,6 +618,9 @@ if ($WhatIfPreference) {
         -ReceiptPath $receiptPath `
         -RunReceiptPath $runReceiptPath -Commit $baseline
     Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
+        -PlanTaskId $TaskId -PlanThreadId $ThreadId `
+        -PlanTaskBrief $TaskBrief -PlanWriteSet $writeSetPath `
+        -PlanAckTimeoutSeconds $AckTimeoutSeconds `
         -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
         -PlanBaseline $baseline -PlanTree $tree `
         -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
@@ -619,15 +662,18 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             -ReceiptPath $receiptPath `
             -RunReceiptPath $runReceiptPath -Commit $baseline
         Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
+            -PlanTaskId $TaskId -PlanThreadId $ThreadId `
+            -PlanTaskBrief $TaskBrief -PlanWriteSet $writeSetPath `
+            -PlanAckTimeoutSeconds $AckTimeoutSeconds `
             -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
             -PlanBaseline $baseline -PlanTree $tree `
             -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
             -PlanDestinationPath $destinationPath `
             -PlanCommonDirectory $commonDir -PlanPublicationLock $lockPath
 
-        $worktreeAttemptStartedByInvocation = $false
+        $worktreeCreatedByInvocation = $false
+        $assignmentPublished = $false
         try {
-            $worktreeAttemptStartedByInvocation = $true
             $addResult = Invoke-NativeResult -FilePath 'git' -Arguments @(
                 '-C', $repoRoot, 'worktree', 'add', '-b', $Branch,
                 $destinationPath, $baseline
@@ -635,6 +681,11 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             if ($addResult.ExitCode -ne 0) {
                 throw "git worktree add failed: $($addResult.Output)"
             }
+            # Only a successful `git worktree add` proves this invocation owns
+            # the new path and branch. A failed Git command may have raced with
+            # an uncoordinated external creator, so cleanup must fail safe and
+            # never delete resources whose ownership cannot be proven.
+            $worktreeCreatedByInvocation = $true
             if ($FaultInjection -eq 'AfterGitWorktreeAdd') {
                 throw "Injected failure after git worktree add."
             }
@@ -663,8 +714,8 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
                 )
             }
 
-            $doctorOwner = if ($Owner -in @('integration', 'play')) { 'integration' } else { $Owner }
-            $doctorIntent = if ($Owner -in @('integration', 'play')) { 'integration' } else { 'author' }
+            $doctorOwner = if ($Owner -eq 'integration') { 'integration' } else { $Owner }
+            $doctorIntent = if ($Owner -eq 'integration') { 'integration' } else { 'author' }
             $doctorArguments = @(
                 '-B', $newContract, '--repo', $destinationPath,
                 'doctor', '--owner', $doctorOwner, '--intent', $doctorIntent
@@ -676,12 +727,56 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             if ($doctorResult.ExitCode -ne 0) {
                 throw "The new worktree failed its ownership doctor check."
             }
+
+            # This is deliberately the final mutating marker. An exit 0 means
+            # the immutable bundle exists in the shared common Git directory;
+            # the task is still WAITING_ACK and must not be treated as RUNNING.
+            $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
+                $AckTimeoutSeconds
+            ).ToString(
+                'yyyy-MM-ddTHH:mm:ssZ',
+                [System.Globalization.CultureInfo]::InvariantCulture
+            )
+            $assignmentResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
+                '-B', $newContract, '--repo', $destinationPath,
+                'assignment', 'create',
+                '--task-id', $TaskId,
+                '--thread-id', $ThreadId,
+                '--owner', $Owner,
+                '--brief', $TaskBrief,
+                '--destination', $destinationPath,
+                '--common-dir', $commonDir,
+                '--branch', $Branch,
+                '--head', $newHead,
+                '--tree', $newTree,
+                '--write-set', $writeSetPath,
+                '--candidate-receipt', $receiptPath,
+                '--run-receipt', $runReceiptPath,
+                '--ack-deadline', $ackDeadline,
+                '--json'
+            )
+            if ($assignmentResult.ExitCode -ne 0) {
+                throw "Durable assignment creation failed: $($assignmentResult.Output)"
+            }
+            $assignmentPublished = $true
+            Write-Output $assignmentResult.Output
+            Write-Output (
+                "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +
+                "branch, HEAD/tree, owner, thread-id and write-set to the named task; " +
+                "only `assignment ack` changes it to RUNNING."
+            )
         }
         catch {
             $failure = $_.Exception.Message
-            if (-not $worktreeAttemptStartedByInvocation) {
+            if ($assignmentPublished) {
                 throw (
-                    "Worktree creation failed before this invocation established " +
+                    "Worktree setup reached its durable assignment marker; " +
+                    "the assigned worktree and branch were preserved: $failure"
+                )
+            }
+            if (-not $worktreeCreatedByInvocation) {
+                throw (
+                    "Worktree creation failed before this invocation proved " +
                     "ownership; no cleanup was attempted: $failure"
                 )
             }
