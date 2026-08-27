@@ -3,6 +3,17 @@ name: Agent auto-integrator
 # Loaded only from the protected default branch. No job checks out or executes
 # candidate-controlled content.
 on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_run:
+    workflows:
+      - Agent branch validation
+    types:
+      - completed
   repository_dispatch:
     types:
       - integrate-agent-handoff
@@ -11,10 +22,390 @@ on:
 permissions: {}
 
 concurrency:
-  group: agent-auto-integrator-pr-${{ github.event.client_payload.pr_number || github.run_id }}
+  group: agent-auto-integrator-pr-${{ github.event.client_payload.pr_number || (github.event.pull_request.head.repo.full_name && format('{0}:{1}', github.event.pull_request.head.repo.full_name, github.event.pull_request.head.ref)) || (github.event.workflow_run.head_repository.full_name && format('{0}:{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch)) || github.run_id }}
   cancel-in-progress: false
 
 jobs:
+  auto-admit-standard-pr:
+    name: Auto-admit ordinary immutable PR
+    if: >-
+      ${{
+        vars.AUTO_INTEGRATOR_ENABLED == 'true' &&
+        (
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+          (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false)
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Validate latest fast run and dispatch ordinary PR
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          EXPECTED_ATTESTER_APP_ID: ${{ vars.INTEGRATION_ATTESTER_APP_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $repository = $env:GITHUB_REPOSITORY
+          $requiredLabel = "integration-ready"
+          $requiredCheck = "integration-green"
+          $fastWorkflow = "agent-validation.yml"
+          $fastWorkflowName = "Agent branch validation"
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+
+          function Invoke-GitHubApi {
+            param(
+              [Parameter(Mandatory = $true)][ValidateSet("GET", "POST", "DELETE")][string]$Method,
+              [Parameter(Mandatory = $true)][string]$Path,
+              [AllowNull()][object]$Body = $null
+            )
+            $parameters = @{
+              Method = $Method
+              Uri = "https://api.github.com$Path"
+              Headers = $headers
+            }
+            if ($null -ne $Body) {
+              $parameters.ContentType = "application/json"
+              $parameters.Body = $Body | ConvertTo-Json -Depth 12 -Compress
+            }
+            return Invoke-RestMethod @parameters
+          }
+
+          function Assert-CommitSha {
+            param([Parameter(Mandatory = $true)][string]$Name, [AllowEmptyString()][string]$Value)
+            if ($Value -cnotmatch '^[0-9a-f]{40}$') {
+              throw "$Name must be a full lowercase Git SHA."
+            }
+          }
+
+          function Test-IsProtectedPath {
+            param([AllowEmptyString()][string]$Path)
+            if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+            $normalized = $Path.Replace('\', '/')
+            if ($normalized -match '(^|/)\.\.(/|$)') { return $true }
+            if (
+              $normalized.StartsWith(".github/", [System.StringComparison]::OrdinalIgnoreCase) -or
+              $normalized.StartsWith(".githooks/", [System.StringComparison]::OrdinalIgnoreCase) -or
+              $normalized.StartsWith("tools/ci_", [System.StringComparison]::OrdinalIgnoreCase) -or
+              $normalized.StartsWith("tests/ci_", [System.StringComparison]::OrdinalIgnoreCase)
+            ) { return $true }
+            $exact = @(
+              ".gitattributes", ".gitignore", ".gitmodules", ".lfsconfig",
+              ".ai/DECISIONS.md", "AGENTS.md",
+              "tools/workbench_contract.py", "tools/workbench_lock.py",
+              "tools/setup_agent_worktree.ps1", "tools/freeze_workbench_revision.py",
+              "tools/install_agent_git_hooks.ps1",
+              "tests/agent_integration_workflow_test.py",
+              "tests/run_all_tests.ps1", "tests/runner_isolation_test.ps1",
+              "tests/parallel_worktree_godot_test.ps1",
+              "tests/workbench_contract_test.py", "tests/workbench_lock_test.py",
+              "tests/setup_agent_worktree_test.ps1", "tests/freeze_workbench_revision_test.py",
+              "tests/pre_push_guard_test.ps1", "tests/map_atomic_write_test.py",
+              "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+              "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
+              "underwater_map_workbench/tools/build_underwater_map.py"
+            )
+            foreach ($protected in $exact) {
+              if ($normalized -ieq $protected) { return $true }
+            }
+            return $false
+          }
+
+          function Get-OpenPullForWorkflowRun {
+            param(
+              [Parameter(Mandatory = $true)][string]$Branch,
+              [Parameter(Mandatory = $true)][string]$CandidateSha
+            )
+            $owner = $repository.Split('/')[0]
+            $head = [Uri]::EscapeDataString("$owner`:$Branch")
+            $pulls = @(
+              Invoke-GitHubApi -Method GET -Path "/repos/$repository/pulls?state=open&head=$head&base=main&per_page=100"
+            )
+            $matching = @(
+              $pulls | Where-Object {
+                $_.state -ceq "open" -and
+                $_.base.ref -ceq "main" -and
+                $_.head.repo.full_name -ceq $repository -and
+                $_.head.ref -ceq $Branch -and
+                $_.head.sha -ceq $CandidateSha
+              }
+            )
+            if ($matching.Count -gt 1) {
+              throw "More than one open PR matches exact branch '$Branch' and SHA '$CandidateSha'."
+            }
+            if ($matching.Count -eq 0) { return $null }
+            return $matching[0]
+          }
+
+          function Get-LatestFastRun {
+            param(
+              [Parameter(Mandatory = $true)][string]$Branch,
+              [Parameter(Mandatory = $true)][string]$CandidateSha
+            )
+            $encodedBranch = [Uri]::EscapeDataString($Branch)
+            $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/actions/workflows/$fastWorkflow/runs?branch=$encodedBranch&event=push&status=completed&per_page=100"
+            $matching = @(
+              $response.workflow_runs |
+                Where-Object {
+                  $_.name -ceq $fastWorkflowName -and
+                  $_.event -ceq "push" -and
+                  $_.status -ceq "completed" -and
+                  $_.head_branch -ceq $Branch -and
+                  $_.head_sha -ceq $CandidateSha -and
+                  $_.head_repository.full_name -ceq $repository
+                } |
+                Sort-Object -Property @{ Expression = { [long]$_.id } } -Descending
+            )
+            if ($matching.Count -eq 0) { return $null }
+            return $matching[0]
+          }
+
+          function Get-LatestCandidateClaim {
+            param(
+              [Parameter(Mandatory = $true)][int]$PullNumber,
+              [Parameter(Mandatory = $true)][string]$BaseSha,
+              [Parameter(Mandatory = $true)][string]$CandidateSha,
+              [Parameter(Mandatory = $true)][long]$ExpectedAppId
+            )
+            $encoded = [Uri]::EscapeDataString($requiredCheck)
+            $handoffId = "handoff-v2:$PullNumber`:$BaseSha`:$CandidateSha"
+            $candidatePattern = "^candidate-v3:$([regex]::Escape($repository)):$PullNumber`:$BaseSha`:$CandidateSha`:[0-9a-f]{64}$"
+            $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$CandidateSha/check-runs?check_name=$encoded&filter=all&per_page=100"
+            $matching = @(
+              $response.check_runs |
+                Where-Object {
+                  $_.name -ceq $requiredCheck -and
+                  $_.head_sha -ceq $CandidateSha -and
+                  [long]$_.app.id -eq $ExpectedAppId -and
+                  ($_.external_id -ceq $handoffId -or $_.external_id -cmatch $candidatePattern)
+                } |
+                Sort-Object -Property @{ Expression = { [long]$_.id } } -Descending
+            )
+            if ($matching.Count -eq 0) { return $null }
+            return $matching[0]
+          }
+
+          function Get-CandidateClaimState {
+            param([AllowNull()][object]$Claim)
+            if ($null -eq $Claim) { return "retry" }
+            if ($Claim.status -ceq "in_progress") { return "active" }
+            if ($Claim.status -ceq "completed") {
+              if ($Claim.conclusion -ceq "success") { return "complete" }
+              return "retry"
+            }
+            if ($Claim.status -cne "queued") {
+              throw "Candidate claim has unsupported status '$($Claim.status)'."
+            }
+            $runPattern = "^$([regex]::Escape($env:GITHUB_SERVER_URL))/$([regex]::Escape($repository))/actions/runs/([0-9]+)$"
+            if ([string]$Claim.details_url -cnotmatch $runPattern) {
+              throw "Queued candidate claim is not bound to a trusted admission run."
+            }
+            $claimRunId = [long]$Matches[1]
+            $claimRun = Invoke-GitHubApi -Method GET -Path "/repos/$repository/actions/runs/$claimRunId"
+            if (
+              $claimRun.name -cne "Agent auto-integrator" -or
+              $claimRun.event -cne "repository_dispatch" -or
+              $claimRun.repository.full_name -cne $repository -or
+              $claimRun.path -cne ".github/workflows/agent-auto-integrator.yml"
+            ) { throw "Queued candidate claim points outside the trusted admission workflow." }
+            if ($claimRun.status -in @("queued", "in_progress")) { return "active" }
+            if ($claimRun.status -cne "completed") {
+              throw "Candidate claim admission run has unsupported status '$($claimRun.status)'."
+            }
+            if ($claimRun.conclusion -ceq "success") { return "active" }
+            return "retry"
+          }
+
+          function Test-PullHasProtectedPath {
+            param([Parameter(Mandatory = $true)][int]$PullNumber)
+            $page = 1
+            $inspected = 0
+            do {
+              $changedFiles = @(
+                Invoke-GitHubApi -Method GET -Path "/repos/$repository/pulls/$PullNumber/files?per_page=100&page=$page"
+              )
+              foreach ($changedFile in $changedFiles) {
+                $inspected++
+                if ($inspected -gt 3000) {
+                  throw "PR #$PullNumber exceeds the trusted 3000-file inspection limit."
+                }
+                foreach ($path in @([string]$changedFile.filename, [string]$changedFile.previous_filename)) {
+                  if (Test-IsProtectedPath -Path $path) { return $true }
+                }
+              }
+              if ($changedFiles.Count -eq 100 -and $page -ge 30) {
+                throw "PR #$PullNumber reaches GitHub's changed-file inspection limit."
+              }
+              $page++
+            } while ($changedFiles.Count -eq 100)
+            if ($inspected -eq 0) { throw "PR #$PullNumber has no changed files." }
+            return $false
+          }
+
+          $pullRequest = $null
+          if ($env:EVENT_NAME -ceq "workflow_run") {
+            $workflowRunId = 0L
+            if (-not [long]::TryParse($env:EVENT_WORKFLOW_RUN_ID, [ref]$workflowRunId) -or $workflowRunId -lt 1) {
+              throw "workflow_run.id must be a positive integer."
+            }
+            $workflowRun = Invoke-GitHubApi -Method GET -Path "/repos/$repository/actions/runs/$workflowRunId"
+            if (
+              $workflowRun.name -cne $fastWorkflowName -or
+              $workflowRun.event -cne "push" -or
+              $workflowRun.status -cne "completed" -or
+              $workflowRun.conclusion -cne "success" -or
+              $workflowRun.repository.full_name -cne $repository -or
+              $workflowRun.head_repository.full_name -cne $repository
+            ) { throw "workflow_run is not the trusted successful fast branch validation." }
+            $branch = [string]$workflowRun.head_branch
+            $candidateSha = [string]$workflowRun.head_sha
+            Assert-CommitSha -Name "workflow_run head_sha" -Value $candidateSha
+            $pullRequest = Get-OpenPullForWorkflowRun -Branch $branch -CandidateSha $candidateSha
+            if ($null -eq $pullRequest) {
+              Write-Output "AUTO ADMISSION SKIPPED: exact fast run has no open PR."
+              exit 0
+            }
+          }
+          elseif ($env:EVENT_NAME -ceq "pull_request_target") {
+            $pullNumber = 0
+            if (-not [int]::TryParse($env:EVENT_PR_NUMBER, [ref]$pullNumber) -or $pullNumber -lt 1) {
+              throw "pull_request.number must be a positive integer."
+            }
+            $pullRequest = Invoke-GitHubApi -Method GET -Path "/repos/$repository/pulls/$pullNumber"
+            $branch = [string]$pullRequest.head.ref
+            $candidateSha = [string]$pullRequest.head.sha
+            Assert-CommitSha -Name "pull_request head_sha" -Value $candidateSha
+          }
+          else {
+            throw "Unsupported automatic-admission event '$env:EVENT_NAME'."
+          }
+
+          $pullNumber = [int]$pullRequest.number
+          $attesterAppId = 0L
+          if (-not [long]::TryParse($env:EXPECTED_ATTESTER_APP_ID, [ref]$attesterAppId) -or $attesterAppId -lt 1) {
+            throw "INTEGRATION_ATTESTER_APP_ID must be a positive numeric GitHub App ID."
+          }
+          if ($pullRequest.state -cne "open" -or $pullRequest.draft) {
+            Write-Output "AUTO ADMISSION SKIPPED: PR #$pullNumber is closed or draft."
+            exit 0
+          }
+          if (
+            $pullRequest.base.ref -cne "main" -or
+            $pullRequest.head.repo.full_name -cne $repository -or
+            $pullRequest.head.ref -cne $branch -or
+            $pullRequest.head.sha -cne $candidateSha
+          ) {
+            Write-Output "AUTO ADMISSION SKIPPED: PR #$pullNumber is not an exact same-repository main candidate."
+            exit 0
+          }
+          if ($branch -cnotmatch '^codex/(root|map|diver|integration|structure-[a-z0-9][a-z0-9_-]*)/[a-z0-9][a-z0-9._-]*$') {
+            Write-Output "AUTO ADMISSION SKIPPED: PR #$pullNumber does not use a strict agent branch."
+            exit 0
+          }
+
+          $currentMain = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/main"
+          $baseSha = [string]$currentMain.sha
+          Assert-CommitSha -Name "current main SHA" -Value $baseSha
+          if ($pullRequest.base.sha -cne $baseSha) {
+            Write-Output "AUTO ADMISSION DEFERRED: PR #$pullNumber is not based on current main."
+            exit 0
+          }
+
+          $comparison = Invoke-GitHubApi -Method GET -Path "/repos/$repository/compare/$baseSha...$candidateSha"
+          if (
+            $comparison.status -cne "ahead" -or
+            [int]$comparison.behind_by -ne 0 -or
+            [int]$comparison.ahead_by -le 0 -or
+            [int]$comparison.total_commits -ne [int]$comparison.ahead_by -or
+            $comparison.base_commit.sha -cne $baseSha -or
+            $comparison.merge_base_commit.sha -cne $baseSha
+          ) {
+            Write-Output "AUTO ADMISSION DEFERRED: PR #$pullNumber is stale, unrelated, or moved."
+            exit 0
+          }
+
+          $latestFastRun = Get-LatestFastRun -Branch $branch -CandidateSha $candidateSha
+          if ($null -eq $latestFastRun -or $latestFastRun.conclusion -cne "success") {
+            Write-Output "AUTO ADMISSION DEFERRED: exact head has no latest successful fast validation."
+            exit 0
+          }
+          if (Test-PullHasProtectedPath -PullNumber $pullNumber) {
+            Write-Output "AUTO ADMISSION SKIPPED: PR #$pullNumber changes protected control-plane paths."
+            exit 0
+          }
+
+          $claim = Get-LatestCandidateClaim `
+            -PullNumber $pullNumber `
+            -BaseSha $baseSha `
+            -CandidateSha $candidateSha `
+            -ExpectedAppId $attesterAppId
+          $claimState = Get-CandidateClaimState -Claim $claim
+          $labels = @($pullRequest.labels | ForEach-Object { [string]$_.name })
+          $alreadyLabeled = $requiredLabel -cin $labels
+          $labelAdded = $false
+          try {
+            if (-not $alreadyLabeled) {
+              Invoke-GitHubApi -Method POST -Path "/repos/$repository/issues/$pullNumber/labels" -Body @{
+                labels = @($requiredLabel)
+              } | Out-Null
+              $labelAdded = $true
+            }
+            if ($claimState -ceq "active") {
+              Write-Output "AUTO ADMISSION SKIPPED: exact candidate already has an active trusted claim $($claim.id)."
+              exit 0
+            }
+            Invoke-GitHubApi -Method POST -Path "/repos/$repository/dispatches" -Body @{
+              event_type = "integrate-agent-handoff"
+              client_payload = @{
+                pr_number = $pullNumber
+                base_sha = $baseSha
+                candidate_sha = $candidateSha
+              }
+            } | Out-Null
+          }
+          catch {
+            if ($labelAdded) {
+              $encodedLabel = [Uri]::EscapeDataString($requiredLabel)
+              try {
+                Invoke-GitHubApi -Method DELETE -Path "/repos/$repository/issues/$pullNumber/labels/$encodedLabel" | Out-Null
+              }
+              catch {
+                Write-Warning "Failed to roll back '$requiredLabel' after dispatch failure."
+              }
+            }
+            throw
+          }
+
+          $claimObserved = $false
+          for ($attempt = 0; $attempt -lt 12; $attempt++) {
+            $observed = Get-LatestCandidateClaim `
+              -PullNumber $pullNumber `
+              -BaseSha $baseSha `
+              -CandidateSha $candidateSha `
+              -ExpectedAppId $attesterAppId
+            if ((Get-CandidateClaimState -Claim $observed) -in @("active", "complete")) {
+              $claimObserved = $true
+              break
+            }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $claimObserved) {
+            throw "Admission dispatch was accepted, but no active exact candidate claim appeared."
+          }
+          Write-Output "AUTO ADMISSION DISPATCHED: PR #$pullNumber base=$baseSha candidate=$candidateSha fast_run=$($latestFastRun.id)."
+
   admit-handoff:
     name: Admit immutable candidate handoff
     if: ${{ github.event.action == 'integrate-agent-handoff' && vars.AUTO_INTEGRATOR_ENABLED == 'true' }}
