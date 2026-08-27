@@ -995,7 +995,7 @@
         "package": {
           "format": "structure_package_v1",
           "path": "structures/tower_prototype_01/structure_manifest.json",
-          "sha256": "f1e37a8f99502e9743ae3e26406fa7e6aab806b5a64f2d6b04317d42cc5cc626"
+          "sha256": "8bb70c39c302e1e8a8cdb5f806487b2c408882b052feadbbeb3a654aaffed9a2"
         }
       },
       {
@@ -1008,7 +1008,7 @@
         "package": {
           "format": "structure_package_v1",
           "path": "structures/tower_three_inlets_02/structure_manifest.json",
-          "sha256": "c20e87fbda90f92e193cf613d72f36174c576bd746848800f9d9a02a2adf28cf"
+          "sha256": "6e592e135575ce548b6aab5e2fa40b60096e56ebcfe89d70abded1c5e1e4ed42"
         }
       }
     ]
