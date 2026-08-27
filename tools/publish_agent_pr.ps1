@@ -65,25 +65,6 @@ Invoke-Native -FilePath git -Arguments @(
 ) | Out-Null
 
 $contract = Join-Path $repo 'tools/workbench_contract.py'
-$assignmentStatus = (Invoke-Native -FilePath python -Arguments @(
-    '-B', $contract, '--repo', $repo,
-    'assignment', 'current', '--json'
-)).Output | ConvertFrom-Json
-$assignment = $assignmentStatus.assignment
-$Owner = [string]$assignment.owner
-$TaskId = [string]$assignment.task_id
-$ThreadId = [string]$assignment.thread_id
-$AssignmentId = [string]$assignment.assignment_id
-
-function Close-CurrentAssignment {
-    param([string]$Reason)
-    Invoke-Native -FilePath python -Arguments @(
-        '-B', $contract, '--repo', $repo, 'assignment', 'close',
-        '--task-id', $TaskId, '--assignment-id', $AssignmentId,
-        '--thread-id', $ThreadId, '--reason', $Reason
-    ) | Out-Null
-}
-
 Invoke-Native -FilePath python -Arguments @(
     '-B', $contract, '--repo', $repo, 'eol-check'
 ) | Out-Null
@@ -94,9 +75,11 @@ if ($mergeBase -cnotmatch '^[0-9a-f]{40}$') {
     throw "Cannot resolve exact branch/main merge-base: $mergeBase"
 }
 Invoke-Native -FilePath python -Arguments @(
-    '-B', $contract, '--repo', $repo, 'validate', '--owner', $Owner,
-    '--assignment', $AssignmentId, '--task-id', $TaskId,
-    '--thread-id', $ThreadId, '--base', $mergeBase
+    '-B', (Join-Path $repo 'tools/ci_branch_owner.py'), 'validate',
+    '--repo', $repo, '--branch', $branch,
+    '--base-ref', $mergeBase,
+    '--expected-head', $head,
+    '--expected-base', $mergeBase
 ) | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($Title)) {
@@ -156,12 +139,11 @@ if ([string]$pull.headRefOid -cne $head) {
     throw "PR head moved before auto-merge admission: expected=$head actual=$($pull.headRefOid)"
 }
 if ($null -ne $pull.mergedAt) {
-    Close-CurrentAssignment -Reason "merged PR #$($pull.number)"
-    Write-Output "PR_MERGED number=$($pull.number) url=$($pull.url) assignment=CLOSED"
+    Write-Output "PR_MERGED number=$($pull.number) url=$($pull.url)"
     return
 }
 if ([string]$pull.state -cne 'OPEN') {
-    throw "Exact PR #$($pull.number) is closed without merge; assignment stays RUNNING."
+    throw "Exact PR #$($pull.number) is closed without merge."
 }
 
 Invoke-Native -FilePath gh -Arguments @(
@@ -171,7 +153,7 @@ Invoke-Native -FilePath gh -Arguments @(
 Write-Output "PR_READY number=$($pull.number) url=$($pull.url) head=$head auto_merge=native"
 
 if ($NoWait) {
-    Write-Output 'Assignment remains RUNNING until the PR is merged.'
+    Write-Output 'Native auto-merge is enabled; GitHub will merge after fast-green.'
     return
 }
 
@@ -182,11 +164,10 @@ do {
         '--json', 'headRefOid,mergedAt,url,statusCheckRollup'
     )).Output | ConvertFrom-Json
     if ([string]$state.headRefOid -cne $head) {
-        throw 'PR head changed while waiting; assignment stays RUNNING.'
+        throw 'PR head changed while waiting.'
     }
     if ($null -ne $state.mergedAt) {
-        Close-CurrentAssignment -Reason "merged PR #$($pull.number)"
-        Write-Output "PR_MERGED number=$($pull.number) url=$($pull.url) assignment=CLOSED"
+        Write-Output "PR_MERGED number=$($pull.number) url=$($pull.url)"
         return
     }
     $failed = @($state.statusCheckRollup | Where-Object {
@@ -194,9 +175,9 @@ do {
     })
     if ($failed.Count -gt 0) {
         $names = ($failed | ForEach-Object { $_.name }) -join ', '
-        throw "PR checks failed: $names. Assignment stays RUNNING."
+        throw "PR checks failed: $names."
     }
     Start-Sleep -Seconds 5
 } while ([DateTime]::UtcNow -lt $deadline)
 
-throw "PR did not merge within $WaitForMergeSeconds seconds. Assignment stays RUNNING: $($pull.url)"
+throw "PR did not merge within $WaitForMergeSeconds seconds: $($pull.url)"

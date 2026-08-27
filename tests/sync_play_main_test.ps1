@@ -43,17 +43,21 @@ foreach ($required in @(
     '+refs/heads/main:refs/remotes/origin/main',
     "'clone', '--no-tags', '--single-branch', '--branch', 'main'",
     "'merge', '--ff-only'",
-    "'lfs', 'pull', 'origin', 'main'",
+    "'lfs', 'fetch', 'origin', `$targetSha",
+    "'lfs', 'checkout'",
+    "'lfs', 'fsck'",
     "'tools/build_underwater_map.py', '--check'",
-    "'--headless', '--editor', '--path'",
-    "'--audio-driver', 'Dummy'",
-    'SCRIPT ERROR|ERROR',
+    "'-SourceRepositoryPath', `$playRoot",
+    "'-Target', 'tests/smoke_test.gd'",
+    "'-RunReceiptOutputPath', `$attemptReceipt",
     'New-ScheduledTaskTrigger',
     'New-TimeSpan -Minutes 1',
     'SYNC_BUSY',
     "result = 'FAIL'",
     'current_main_sha',
-    'managed-clone.json'
+    'managed-clone.json',
+    'SYNC_FAILED_UNCHANGED',
+    'standalone clone with a .git directory'
 )) {
     Assert-Contract ($text.Contains($required)) "Missing sync/build contract marker: $required"
 }
@@ -92,8 +96,10 @@ try {
 
     $mapTools = Join-Path $source 'underwater_map_workbench\tools'
     $sourceTools = Join-Path $source 'tools'
+    $sourceTests = Join-Path $source 'tests'
     [IO.Directory]::CreateDirectory($mapTools) | Out-Null
     [IO.Directory]::CreateDirectory($sourceTools) | Out-Null
+    [IO.Directory]::CreateDirectory($sourceTests) | Out-Null
     [IO.File]::WriteAllText(
         (Join-Path $mapTools 'build_underwater_map.py'),
         "import sys`nprint('MAP_CHECK_PASS')`nsys.exit(0)`n",
@@ -101,6 +107,29 @@ try {
     )
     Copy-Item -LiteralPath $scriptUnderTest `
         -Destination (Join-Path $sourceTools 'sync_play_main.ps1')
+    [IO.File]::WriteAllText(
+        (Join-Path $sourceTests 'smoke_test.gd'),
+        "extends SceneTree`n",
+        [Text.UTF8Encoding]::new($false)
+    )
+    [IO.File]::WriteAllText(
+        (Join-Path $sourceTests 'run_all_tests.ps1'),
+        @'
+param(
+    [string]$GodotConsolePath,
+    [string]$SourceRepositoryPath,
+    [string]$Target,
+    [string]$RunReceiptOutputPath
+)
+$output = & $GodotConsolePath 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0 -or $output -match '(?im)^\s*(?:SCRIPT ERROR|ERROR)(?:\s|:)') {
+    throw "fake isolated build failed: $output"
+}
+[IO.File]::WriteAllText($RunReceiptOutputPath, "status=PASS`n", [Text.UTF8Encoding]::new($false))
+Write-Output 'ISOLATED_BUILD_PASS'
+'@,
+        [Text.UTF8Encoding]::new($false)
+    )
     [IO.File]::WriteAllText(
         (Join-Path $source 'project.godot'),
         "[application]`nconfig/name=`"Play Main Test`"`n",
@@ -165,6 +194,23 @@ try {
     Assert-Contract ([string]$status.target_sha -ceq $brokenSha) 'Failure status lost target SHA.'
     Assert-Contract ([string]$status.current_main_sha -ceq $brokenSha) 'Failure status lost current main SHA.'
     Assert-Contract ([string]$status.last_built_sha -ceq $secondSha) 'Failure status lost last built SHA.'
+    $unchangedOutput = & $scriptUnderTest -Mode RunOnce -SourceRepository $source `
+        -PlayPath $play -GodotConsolePath $fakeGodot
+    Assert-Contract (($unchangedOutput | Out-String) -match 'SYNC_FAILED_UNCHANGED') `
+        'Unchanged failed SHA did not use bounded retry suppression.'
+
+    [IO.File]::WriteAllText($fakeGodot, "@echo off`r`nexit /b 0`r`n", [Text.Encoding]::ASCII)
+    $retryOutput = & $scriptUnderTest -Mode RunOnce -SourceRepository $source `
+        -PlayPath $play -GodotConsolePath $fakeGodot -RetryFailed
+    Assert-Contract (($retryOutput | Out-String) -match 'SYNC_BUILT') `
+        'RetryFailed did not recover the unchanged SHA after a transient build failure.'
+    Assert-Contract ((Invoke-Git $play rev-parse 'HEAD^{commit}') -ceq $brokenSha) `
+        'Recovered build did not remain on the exact current main SHA.'
+    $retryStatus = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
+    Assert-Contract ([string]$retryStatus.result -ceq 'PASS') `
+        'Recovered build did not replace the red status with PASS.'
+    Assert-Contract ([string]$retryStatus.built_sha -ceq $brokenSha) `
+        'Recovered build did not promote the exact retried SHA.'
 
     $foreignPlay = Join-Path $testRoot 'foreign-play'
     [IO.Directory]::CreateDirectory((Join-Path $foreignPlay 'tools')) | Out-Null

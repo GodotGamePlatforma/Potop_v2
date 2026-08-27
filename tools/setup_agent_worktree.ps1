@@ -14,17 +14,13 @@ param(
     [ValidatePattern('^[a-z0-9][a-z0-9._-]*$')]
     [string]$TaskSlug,
 
-    [Parameter(Mandatory = $true)]
-    [string]$TaskId,
+    [string]$TaskId = '',
 
-    [Parameter(Mandatory = $true)]
-    [string]$ThreadId,
+    [string]$ThreadId = '',
 
-    [Parameter(Mandatory = $true)]
-    [string]$TaskBrief,
+    [string]$TaskBrief = '',
 
-    [Parameter(Mandatory = $true)]
-    [string]$WriteSet,
+    [string]$WriteSet = '',
 
     [Parameter(Mandatory = $true)]
     [string]$Destination,
@@ -400,14 +396,14 @@ function Write-AgentWorktreePlan {
     Write-Output "Agent worktree plan"
     Write-Output "  owner:       $PlanOwner"
     Write-Output "  task:        $PlanTaskSlug"
-    Write-Output "  task-id:     $PlanTaskId"
-    Write-Output "  thread-id:   $PlanThreadId"
-    Write-Output "  brief:       $PlanTaskBrief"
-    Write-Output "  write-set:   $PlanWriteSet"
-    Write-Output "  ACK timeout: $PlanAckTimeoutSeconds seconds"
-    Write-Output "  assignment:  prospective WAITING_ACK (created only with -Create)"
     Write-Output "  baseline:     $PlanBaselineKind"
     if ($PlanBaselineKind -eq 'verified-lkg') {
+        Write-Output "  task-id:     $PlanTaskId"
+        Write-Output "  thread-id:   $PlanThreadId"
+        Write-Output "  brief:       $PlanTaskBrief"
+        Write-Output "  write-set:   $PlanWriteSet"
+        Write-Output "  ACK timeout: $PlanAckTimeoutSeconds seconds"
+        Write-Output "  assignment:  prospective WAITING_ACK (created only with -Create)"
         Write-Output "  candidate-receipt: $PlanReceiptPath"
         Write-Output "  run-receipt:       $PlanRunReceiptPath"
         Write-Output "  last-green:  $PlanLastGreenRef -> $PlanBaseline"
@@ -538,6 +534,16 @@ if ($FromOriginMain) {
     }
 }
 else {
+    foreach ($legacyField in @{
+        TaskId = $TaskId
+        ThreadId = $ThreadId
+        TaskBrief = $TaskBrief
+        WriteSet = $WriteSet
+    }.GetEnumerator()) {
+        if ([string]::IsNullOrWhiteSpace([string]$legacyField.Value)) {
+            throw "$($legacyField.Key) is required for the legacy verified-LKG assignment mode."
+        }
+    }
     if ([string]::IsNullOrWhiteSpace($CandidateReceipt) -or
         [string]::IsNullOrWhiteSpace($RunReceipt)) {
         throw 'CandidateReceipt and RunReceipt are required unless -FromOriginMain is used.'
@@ -551,16 +557,19 @@ else {
         throw "Candidate full run receipt does not exist: $runReceiptPath"
     }
 }
-$writeSetPath = [System.IO.Path]::GetFullPath($WriteSet)
-if (-not (Test-Path -LiteralPath $writeSetPath -PathType Leaf)) {
-    throw "Closed assignment write-set does not exist: $writeSetPath"
-}
-$writeSetValidation = Invoke-NativeResult -FilePath 'python' -Arguments @(
-    '-B', $contractTool, '--repo', $repoRoot, 'validate',
-    '--owner', $Owner, '--write-set', $writeSetPath
-)
-if ($writeSetValidation.ExitCode -ne 0) {
-    throw "Closed assignment write-set failed owner validation: $($writeSetValidation.Output)"
+$writeSetPath = ''
+if (-not $FromOriginMain) {
+    $writeSetPath = [System.IO.Path]::GetFullPath($WriteSet)
+    if (-not (Test-Path -LiteralPath $writeSetPath -PathType Leaf)) {
+        throw "Closed assignment write-set does not exist: $writeSetPath"
+    }
+    $writeSetValidation = Invoke-NativeResult -FilePath 'python' -Arguments @(
+        '-B', $contractTool, '--repo', $repoRoot, 'validate',
+        '--owner', $Owner, '--write-set', $writeSetPath
+    )
+    if ($writeSetValidation.ExitCode -ne 0) {
+        throw "Closed assignment write-set failed owner validation: $($writeSetValidation.Output)"
+    }
 }
 $expectedLastGreen = ''
 if ($FromOriginMain) {
@@ -795,66 +804,43 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
                 throw "The new worktree failed its ownership doctor check."
             }
 
-            # This is deliberately the final mutating marker. An exit 0 means
-            # the immutable bundle exists in the shared common Git directory;
-            # Legacy receipt materialization preserves the explicit hand-off.
-            # Normal origin/main startup acknowledges internally so the author
-            # receives one ready RUNNING worktree without a second command.
-            $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
-                $AckTimeoutSeconds
-            ).ToString(
-                'yyyy-MM-ddTHH:mm:ssZ',
-                [System.Globalization.CultureInfo]::InvariantCulture
-            )
-            $assignmentCommand = if ($FromOriginMain) { 'create-main' } else { 'create' }
-            $assignmentArguments = @(
-                '-B', $newContract, '--repo', $destinationPath,
-                'assignment', $assignmentCommand,
-                '--task-id', $TaskId,
-                '--thread-id', $ThreadId,
-                '--owner', $Owner,
-                '--brief', $TaskBrief,
-                '--destination', $destinationPath,
-                '--common-dir', $commonDir,
-                '--branch', $Branch,
-                '--head', $newHead,
-                '--tree', $newTree,
-                '--write-set', $writeSetPath,
-                '--ack-deadline', $ackDeadline,
-                '--json'
-            )
-            if (-not $FromOriginMain) {
-                $assignmentArguments += @(
-                    '--candidate-receipt', $receiptPath,
-                    '--run-receipt', $runReceiptPath
-                )
-            }
-            $assignmentResult = Invoke-NativeResult -FilePath 'python' `
-                -Arguments $assignmentArguments
-            if ($assignmentResult.ExitCode -ne 0) {
-                throw "Durable assignment creation failed: $($assignmentResult.Output)"
-            }
-            $assignmentPublished = $true
             if ($FromOriginMain) {
-                $createdAssignment = $assignmentResult.Output | ConvertFrom-Json
-                $assignmentId = [string]$createdAssignment.assignment.assignment_id
-                $ackResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
-                    '-B', $newContract, '--repo', $destinationPath,
-                    'assignment', 'ack',
-                    '--task-id', $TaskId,
-                    '--assignment-id', $assignmentId,
-                    '--thread-id', $ThreadId,
-                    '--owner', $Owner,
-                    '--write-set', $writeSetPath,
-                    '--json'
+                Write-Output (
+                    "WORKTREE_READY branch=$Branch head=$newHead tree=$newTree " +
+                    "destination=$destinationPath baseline=origin/main"
                 )
-                if ($ackResult.ExitCode -ne 0) {
-                    throw "Automatic origin/main assignment ACK failed: $($ackResult.Output)"
-                }
-                Write-Output $ackResult.Output
-                Write-Output "ASSIGNMENT READY: RUNNING. Author may start immediately."
             }
             else {
+                # Legacy verified-LKG materialization preserves the durable
+                # assignment hand-off. It is not part of the normal CI-S1 path.
+                $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
+                    $AckTimeoutSeconds
+                ).ToString(
+                    'yyyy-MM-ddTHH:mm:ssZ',
+                    [System.Globalization.CultureInfo]::InvariantCulture
+                )
+                $assignmentResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
+                    '-B', $newContract, '--repo', $destinationPath,
+                    'assignment', 'create',
+                    '--task-id', $TaskId,
+                    '--thread-id', $ThreadId,
+                    '--owner', $Owner,
+                    '--brief', $TaskBrief,
+                    '--destination', $destinationPath,
+                    '--common-dir', $commonDir,
+                    '--branch', $Branch,
+                    '--head', $newHead,
+                    '--tree', $newTree,
+                    '--write-set', $writeSetPath,
+                    '--ack-deadline', $ackDeadline,
+                    '--candidate-receipt', $receiptPath,
+                    '--run-receipt', $runReceiptPath,
+                    '--json'
+                )
+                if ($assignmentResult.ExitCode -ne 0) {
+                    throw "Durable assignment creation failed: $($assignmentResult.Output)"
+                }
+                $assignmentPublished = $true
                 Write-Output $assignmentResult.Output
                 Write-Output (
                     "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +

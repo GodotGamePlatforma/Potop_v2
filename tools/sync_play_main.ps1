@@ -7,7 +7,8 @@ param(
     [string]$SourceRepository = (Split-Path -Parent $PSScriptRoot),
     [string]$PlayPath = '',
     [string]$GodotConsolePath = '',
-    [string]$TaskName = 'Potop v2 - sync and build play-main'
+    [string]$TaskName = 'Potop v2 - sync and build play-main',
+    [switch]$RetryFailed
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,6 +84,18 @@ function Get-TextSha256 {
     finally { $hash.Dispose() }
 }
 
+function Copy-ScriptAtomically {
+    param([string]$Source, [string]$Destination)
+    $sourcePath = [IO.Path]::GetFullPath($Source)
+    $destinationPath = [IO.Path]::GetFullPath($Destination)
+    if ([string]::Equals($sourcePath, $destinationPath, [StringComparison]::OrdinalIgnoreCase)) {
+        return
+    }
+    $temporary = "$destinationPath.$PID.tmp"
+    Copy-Item -LiteralPath $sourcePath -Destination $temporary -Force
+    Move-Item -LiteralPath $temporary -Destination $destinationPath -Force
+}
+
 $sourceRoot = [System.IO.Path]::GetFullPath($SourceRepository).TrimEnd('\', '/')
 if ([string]::IsNullOrWhiteSpace($PlayPath)) {
     $PlayPath = Join-Path (Split-Path -Parent $sourceRoot) 'play-main'
@@ -114,13 +127,26 @@ if ($Mode -eq 'Uninstall') {
 }
 
 if ($Mode -eq 'Install') {
-    & $PSCommandPath -Mode RunOnce -SourceRepository $sourceRoot `
-        -PlayPath $playRoot -GodotConsolePath $GodotConsolePath
-    $playScript = Join-Path $playRoot 'tools\sync_play_main.ps1'
-    if (-not (Test-Path -LiteralPath $playScript -PathType Leaf)) {
-        throw "play-main does not contain the sync script: $playScript"
+    if (-not $PSCmdlet.ShouldProcess(
+        $TaskName,
+        'validate managed clone, install one-minute synchronization and build main'
+    )) {
+        Write-Output "PLAN install task=$TaskName play=$playRoot interval=PT1M"
+        return
     }
-    Copy-Item -LiteralPath $playScript -Destination $installedScriptPath -Force
+    $initialFailure = ''
+    try {
+        & $PSCommandPath -Mode RunOnce -SourceRepository $sourceRoot `
+            -PlayPath $playRoot -GodotConsolePath $GodotConsolePath -RetryFailed
+    }
+    catch {
+        $initialFailure = $_.Exception.Message
+    }
+    if (-not (Test-Path -LiteralPath $managedClonePath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $playRoot '.git') -PathType Container)) {
+        throw "Cannot install sync without a verified standalone managed clone: $initialFailure"
+    }
+    Copy-ScriptAtomically -Source $PSCommandPath -Destination $installedScriptPath
     $pwsh = (Get-Command pwsh.exe -CommandType Application -ErrorAction Stop).Source
     $arguments = @(
         '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
@@ -141,10 +167,11 @@ if ($Mode -eq 'Install') {
     $principal = New-ScheduledTaskPrincipal `
         -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) `
         -LogonType Interactive -RunLevel Limited
-    if ($PSCmdlet.ShouldProcess($TaskName, 'register one-minute play-main synchronization')) {
-        Register-ScheduledTask -TaskName $TaskName -Action $action `
-            -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
-        Write-Output "TASK_INSTALLED name=$TaskName interval=PT1M play=$playRoot"
+    Register-ScheduledTask -TaskName $TaskName -Action $action `
+        -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+    Write-Output "TASK_INSTALLED name=$TaskName interval=PT1M play=$playRoot"
+    if (-not [string]::IsNullOrWhiteSpace($initialFailure)) {
+        Write-Output "INITIAL_BUILD_FAILED task remains installed error=$initialFailure"
     }
     return
 }
@@ -227,6 +254,20 @@ try {
     )) {
         throw "Play path is not the exact standalone clone root: $playRoot"
     }
+    $dotGit = Join-Path $playRoot '.git'
+    if (-not (Test-Path -LiteralPath $dotGit -PathType Container)) {
+        throw 'Managed play-main must be a standalone clone with a .git directory.'
+    }
+    $commonDirectory = (Invoke-Native -FilePath git -Arguments @(
+        '-C', $playRoot, 'rev-parse', '--path-format=absolute', '--git-common-dir'
+    )).Output
+    if (-not [string]::Equals(
+        [IO.Path]::GetFullPath($commonDirectory).TrimEnd('\', '/'),
+        [IO.Path]::GetFullPath($dotGit).TrimEnd('\', '/'),
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+        throw 'Managed play-main Git common directory is not its standalone .git.'
+    }
     $actualOrigin = (Invoke-Native -FilePath git -Arguments @(
         '-C', $playRoot, 'remote', 'get-url', 'origin'
     )).Output
@@ -270,6 +311,14 @@ try {
         Write-Output "SYNC_UNCHANGED sha=$targetSha play=$playRoot"
         return
     }
+    if (-not $RetryFailed -and $previousSha -ceq $targetSha -and
+        $null -ne $previousStatus -and
+        [string]$previousStatus.result -ceq 'FAIL' -and
+        $null -ne $previousStatus.PSObject.Properties['target_sha'] -and
+        [string]$previousStatus.target_sha -ceq $targetSha) {
+        Write-Output "SYNC_FAILED_UNCHANGED sha=$targetSha use=-RetryFailed"
+        return
+    }
 
     if (-not $PSCmdlet.ShouldProcess($playRoot, "fast-forward main and build exact $targetSha")) {
         Write-Output "PLAN play=$playRoot target=$targetSha"
@@ -291,28 +340,55 @@ try {
     $currentMainSha = $updatedSha
     $failureStage = 'lfs'
     Invoke-Native -FilePath git -Arguments @(
-        '-C', $playRoot, 'lfs', 'pull', 'origin', 'main'
+        '-C', $playRoot, 'lfs', 'fetch', 'origin', $targetSha
+    ) | Out-Null
+    Invoke-Native -FilePath git -Arguments @(
+        '-C', $playRoot, 'lfs', 'checkout'
+    ) | Out-Null
+    Invoke-Native -FilePath git -Arguments @(
+        '-C', $playRoot, 'lfs', 'fsck'
     ) | Out-Null
     $failureStage = 'map-check'
     $mapRoot = Join-Path $playRoot 'underwater_map_workbench'
     $mapResult = Invoke-Native -FilePath python -Arguments @(
         '-B', 'tools/build_underwater_map.py', '--check'
     ) -WorkingDirectory $mapRoot
-    $failureStage = 'godot-import'
+    $failureStage = 'isolated-build'
     $godot = Resolve-GodotConsole -Requested $GodotConsolePath
-    $godotResult = Invoke-Native -FilePath $godot -Arguments @(
-        '--headless', '--editor', '--path', $playRoot,
-        '--audio-driver', 'Dummy', '--quit-after', '1'
-    ) -AllowFailure
-    if ($godotResult.ExitCode -ne 0 -or
-        $godotResult.Output -match '(?im)^\s*(?:SCRIPT ERROR|ERROR)(?:\s|:)') {
-        throw "Godot import/build failed: $($godotResult.Output)"
+    $runner = Join-Path $playRoot 'tests\run_all_tests.ps1'
+    if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) {
+        throw "Missing isolated build runner: $runner"
+    }
+    $attemptId = "{0}-{1}-{2}" -f (
+        [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ'),
+        $PID,
+        [Guid]::NewGuid().ToString('N')
+    )
+    $attemptReceipt = Join-Path $stateRoot "build-attempt-$targetSha-$attemptId.receipt"
+    $buildReceipt = Join-Path $stateRoot "build-pass-$targetSha.receipt"
+    $buildResult = Invoke-Native -FilePath powershell.exe -Arguments @(
+        '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-File', $runner,
+        '-GodotConsolePath', $godot,
+        '-SourceRepositoryPath', $playRoot,
+        '-Target', 'tests/smoke_test.gd',
+        '-RunReceiptOutputPath', $attemptReceipt
+    )
+    if (-not (Test-Path -LiteralPath $attemptReceipt -PathType Leaf)) {
+        throw 'Isolated build passed without producing its exact run receipt.'
+    }
+    $postBuildHead = (Invoke-Native -FilePath git -Arguments @(
+        '-C', $playRoot, 'rev-parse', 'HEAD^{commit}'
+    )).Output
+    if ($postBuildHead -cne $targetSha) {
+        throw "play-main HEAD moved during isolated build: $postBuildHead"
     }
     if (-not [string]::IsNullOrWhiteSpace((Invoke-Native -FilePath git -Arguments @(
         '-C', $playRoot, 'status', '--porcelain=v1', '--untracked-files=all'
     )).Output)) {
         throw 'Build changed tracked or nonignored source files in play-main.'
     }
+    Move-Item -LiteralPath $attemptReceipt -Destination $buildReceipt -Force
     Write-Status -Path $statusPath -Value @{
         result = 'PASS'
         built_sha = $targetSha
@@ -320,11 +396,12 @@ try {
         play_path = $playRoot
         godot = $godot
         map_check = $mapResult.Output
+        build_receipt = $buildReceipt
+        build_output = $buildResult.Output
     }
     $newPlayScript = Join-Path $playRoot 'tools\sync_play_main.ps1'
     if (Test-Path -LiteralPath $newPlayScript -PathType Leaf) {
-        Copy-Item -LiteralPath $newPlayScript `
-            -Destination $installedScriptPath -Force
+        Copy-ScriptAtomically -Source $newPlayScript -Destination $installedScriptPath
     }
     Write-Output "SYNC_BUILT sha=$targetSha play=$playRoot status=$statusPath"
 }

@@ -453,26 +453,29 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
 
     # Normal author startup uses the freshly fetched origin/main directly and
     # never waits for candidate/full-run evidence or refs/last-green.
-    $originWriteSet = New-TestWriteSet -TaskSlug 'origin-main'
+    $assignmentStore = Join-Path (Invoke-Git $repository rev-parse --path-format=absolute --git-common-dir) `
+        'codex-agent-assignments/v1'
+    $originAssignmentCountBefore = @(
+        Get-ChildItem -LiteralPath $assignmentStore -Recurse -Filter assignment.json -File
+    ).Count
     Push-Location $repository
     try {
-        & $helper -FromOriginMain -Owner root `
-            -TaskSlug origin-main -TaskId 'task/origin-main' `
-            -ThreadId 'thread/origin-main' -TaskBrief 'fast main assignment' `
-            -WriteSet $originWriteSet -Destination $originMainWorktree `
-            -Create | Out-Null
+        $originOutput = & $helper -FromOriginMain -Owner root `
+            -TaskSlug origin-main -Destination $originMainWorktree `
+            -Create 2>&1 | Out-String
     }
     finally {
         Pop-Location
     }
-    $originAssignment = Get-TestAssignmentRecord `
-        -Repo $repository -TaskId 'task/origin-main'
-    if ([int]$originAssignment.Record.schema_version -ne 2 -or
-        [string]$originAssignment.Record.baseline_kind -ne 'origin-main' -or
-        [string]$originAssignment.Record.head -ne [string]$receiptData.head -or
-        -not (Test-Path -LiteralPath (Join-Path $originAssignment.Bundle 'ack.json') -PathType Leaf) -or
-        -not (Test-WorktreeRegistered -Repo $repository -Path $originMainWorktree)) {
-        throw 'Origin-main setup did not create and auto-ACK the exact fast-start assignment.'
+    $originAssignmentCountAfter = @(
+        Get-ChildItem -LiteralPath $assignmentStore -Recurse -Filter assignment.json -File
+    ).Count
+    if ($originOutput -notmatch 'WORKTREE_READY' -or
+        $originAssignmentCountAfter -ne $originAssignmentCountBefore -or
+        -not (Test-WorktreeRegistered -Repo $repository -Path $originMainWorktree) -or
+        (Invoke-Git $originMainWorktree branch --show-current) -ne 'codex/root/origin-main' -or
+        (Invoke-Git $originMainWorktree rev-parse 'HEAD^{commit}') -ne [string]$receiptData.head) {
+        throw 'Origin-main setup did not create one ready assignment-free worktree.'
     }
 
     # An overlapping active write-set is detected only after the second exact
