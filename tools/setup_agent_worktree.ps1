@@ -32,8 +32,16 @@ param(
 
     [switch]$Create,
 
-    [ValidateSet('', 'AfterGitWorktreeAdd')]
-    [string]$FaultInjection = ''
+    [ValidateSet(
+        '',
+        'AfterGitWorktreeAdd',
+        'WaitAfterGitWorktreeAdd',
+        'AfterAssignmentPublicationProcessFailure'
+    )]
+    [string]$FaultInjection = '',
+
+    [ValidatePattern('^[0-9a-f]{32}$')]
+    [string]$FaultInjectionToken = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -111,6 +119,87 @@ function Test-SamePath {
         (Get-NormalizedPath -Path $Right),
         [System.StringComparison]::OrdinalIgnoreCase
     )
+}
+
+function Get-WriteSetPaths {
+    param([string]$Path)
+
+    $raw = [System.IO.File]::ReadAllBytes($Path)
+    $text = [System.Text.Encoding]::UTF8.GetString($raw)
+    $records = if ([Array]::IndexOf($raw, [byte]0) -ge 0) {
+        $text.Split([char[]]@([char]0), [System.StringSplitOptions]::None)
+    }
+    else {
+        $text -split "`r?`n"
+    }
+    $paths = @()
+    foreach ($record in $records) {
+        $candidate = ([string]$record).Trim()
+        if ([string]::IsNullOrWhiteSpace($candidate) -or
+            $candidate.StartsWith('#')) {
+            continue
+        }
+        $paths += $candidate.Replace('\', '/')
+    }
+    return @($paths | Sort-Object -Unique -CaseSensitive)
+}
+
+function Test-ExactPublishedAssignment {
+    param(
+        [string]$Contract,
+        [string]$Repository,
+        [string]$TaskId,
+        [string]$ThreadId,
+        [string]$Owner,
+        [string]$Brief,
+        [string]$Destination,
+        [string]$CommonDirectory,
+        [string]$BranchName,
+        [string]$Head,
+        [string]$Tree,
+        [string]$WriteSetPath,
+        [bool]$OriginMain
+    )
+
+    $statusResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
+        '-B', $Contract, '--repo', $Repository,
+        'assignment', 'status', '--task-id', $TaskId, '--json'
+    )
+    if ($statusResult.ExitCode -ne 0 -or
+        [string]::IsNullOrWhiteSpace($statusResult.Output)) {
+        return $false
+    }
+    try { $status = ConvertFrom-Json -InputObject $statusResult.Output }
+    catch { return $false }
+    if ([string]$status.state -cne 'WAITING_ACK' -or
+        $null -eq $status.assignment) {
+        return $false
+    }
+    $assignment = $status.assignment
+    $expectedSchema = if ($OriginMain) { 2 } else { 1 }
+    $expectedBaseline = if ($OriginMain) { 'origin-main' } else { '' }
+    if ([int]$assignment.schema_version -ne $expectedSchema -or
+        [string]$assignment.task_id -cne $TaskId -or
+        [string]$assignment.thread_id -cne $ThreadId -or
+        [string]$assignment.owner -cne $Owner -or
+        [string]$assignment.brief -cne $Brief.Trim() -or
+        [string]$assignment.branch -cne $BranchName -or
+        [string]$assignment.head -cne $Head -or
+        [string]$assignment.tree -cne $Tree -or
+        -not (Test-SamePath -Left ([string]$assignment.destination) -Right $Destination) -or
+        -not (Test-SamePath -Left ([string]$assignment.common_git_dir) -Right $CommonDirectory) -or
+        ($OriginMain -and
+            [string]$assignment.baseline_kind -cne $expectedBaseline)) {
+        return $false
+    }
+    $expectedPaths = @(Get-WriteSetPaths -Path $WriteSetPath)
+    $actualPaths = @(@($assignment.write_set) | ForEach-Object {
+        ([string]$_).Replace('\', '/')
+    } | Sort-Object -Unique -CaseSensitive)
+    return @(
+        Compare-Object -ReferenceObject $expectedPaths `
+            -DifferenceObject $actualPaths -CaseSensitive
+    ).Count -eq 0
 }
 
 function Test-IsWithinPath {
@@ -527,6 +616,16 @@ if (-not (Test-Path -LiteralPath $contractTool -PathType Leaf)) {
 $baselineKind = if ($FromOriginMain) { 'origin-main' } else { 'verified-lkg' }
 $receiptPath = ''
 $runReceiptPath = ''
+foreach ($assignmentField in @{
+    TaskId = $TaskId
+    ThreadId = $ThreadId
+    TaskBrief = $TaskBrief
+    WriteSet = $WriteSet
+}.GetEnumerator()) {
+    if ([string]::IsNullOrWhiteSpace([string]$assignmentField.Value)) {
+        throw "$($assignmentField.Key) is required for assignment setup."
+    }
+}
 if ($FromOriginMain) {
     if (-not [string]::IsNullOrWhiteSpace($CandidateReceipt) -or
         -not [string]::IsNullOrWhiteSpace($RunReceipt)) {
@@ -534,16 +633,6 @@ if ($FromOriginMain) {
     }
 }
 else {
-    foreach ($legacyField in @{
-        TaskId = $TaskId
-        ThreadId = $ThreadId
-        TaskBrief = $TaskBrief
-        WriteSet = $WriteSet
-    }.GetEnumerator()) {
-        if ([string]::IsNullOrWhiteSpace([string]$legacyField.Value)) {
-            throw "$($legacyField.Key) is required for the legacy verified-LKG assignment mode."
-        }
-    }
     if ([string]::IsNullOrWhiteSpace($CandidateReceipt) -or
         [string]::IsNullOrWhiteSpace($RunReceipt)) {
         throw 'CandidateReceipt and RunReceipt are required unless -FromOriginMain is used.'
@@ -557,19 +646,16 @@ else {
         throw "Candidate full run receipt does not exist: $runReceiptPath"
     }
 }
-$writeSetPath = ''
-if (-not $FromOriginMain) {
-    $writeSetPath = [System.IO.Path]::GetFullPath($WriteSet)
-    if (-not (Test-Path -LiteralPath $writeSetPath -PathType Leaf)) {
-        throw "Closed assignment write-set does not exist: $writeSetPath"
-    }
-    $writeSetValidation = Invoke-NativeResult -FilePath 'python' -Arguments @(
-        '-B', $contractTool, '--repo', $repoRoot, 'validate',
-        '--owner', $Owner, '--write-set', $writeSetPath
-    )
-    if ($writeSetValidation.ExitCode -ne 0) {
-        throw "Closed assignment write-set failed owner validation: $($writeSetValidation.Output)"
-    }
+$writeSetPath = [System.IO.Path]::GetFullPath($WriteSet)
+if (-not (Test-Path -LiteralPath $writeSetPath -PathType Leaf)) {
+    throw "Closed assignment write-set does not exist: $writeSetPath"
+}
+$writeSetValidation = Invoke-NativeResult -FilePath 'python' -Arguments @(
+    '-B', $contractTool, '--repo', $repoRoot, 'validate',
+    '--owner', $Owner, '--write-set', $writeSetPath
+)
+if ($writeSetValidation.ExitCode -ne 0) {
+    throw "Closed assignment write-set failed owner validation: $($writeSetValidation.Output)"
 }
 $expectedLastGreen = ''
 if ($FromOriginMain) {
@@ -755,18 +841,65 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             if ($FaultInjection -eq 'AfterGitWorktreeAdd') {
                 throw "Injected failure after git worktree add."
             }
-
-            $newContract = Join-Path $destinationPath 'tools/workbench_contract.py'
-            if (-not $FromOriginMain) {
-                $newVerify = Invoke-NativeResult -FilePath 'python' -Arguments @(
-                    '-B', $newContract, '--repo', $destinationPath,
-                    'lkg', 'resolve', '--candidate-receipt', $receiptPath,
-                    '--run-receipt', $runReceiptPath
-                )
-                if ($newVerify.ExitCode -ne 0) {
-                    throw "The new worktree no longer resolves to authoritative last-green."
+            if ($FaultInjection -eq 'WaitAfterGitWorktreeAdd') {
+                if ([string]::IsNullOrWhiteSpace($FaultInjectionToken)) {
+                    throw 'WaitAfterGitWorktreeAdd requires one unique ownership token.'
+                }
+                $faultReadyPath = "$destinationPath.setup-$FaultInjectionToken.ready"
+                $faultContinuePath = "$destinationPath.setup-$FaultInjectionToken.continue"
+                $faultEncoding = New-Object System.Text.UTF8Encoding($false)
+                try {
+                    $readyBytes = $faultEncoding.GetBytes($FaultInjectionToken)
+                    $readyStream = [System.IO.File]::Open(
+                        $faultReadyPath,
+                        [System.IO.FileMode]::CreateNew,
+                        [System.IO.FileAccess]::Write,
+                        [System.IO.FileShare]::None
+                    )
+                    try {
+                        $readyStream.Write($readyBytes, 0, $readyBytes.Length)
+                        $readyStream.Flush($true)
+                    }
+                    finally { $readyStream.Dispose() }
+                    $faultDeadline = [System.DateTime]::UtcNow.AddSeconds(30)
+                    while ($true) {
+                        if (Test-Path -LiteralPath $faultContinuePath -PathType Leaf) {
+                            $continueToken = [System.IO.File]::ReadAllText(
+                                $faultContinuePath,
+                                $faultEncoding
+                            )
+                            if ($continueToken -cne $FaultInjectionToken) {
+                                throw 'Controlled synchronization token does not match its owner.'
+                            }
+                            break
+                        }
+                        if ([System.DateTime]::UtcNow -ge $faultDeadline) {
+                            throw 'Timed out at the controlled post-add synchronization point.'
+                        }
+                        Start-Sleep -Milliseconds 20
+                    }
+                }
+                finally {
+                    foreach ($ownedPath in @($faultReadyPath, $faultContinuePath)) {
+                        if (Test-Path -LiteralPath $ownedPath -PathType Leaf) {
+                            try {
+                                if ([System.IO.File]::ReadAllText(
+                                        $ownedPath,
+                                        $faultEncoding
+                                    ) -ceq $FaultInjectionToken) {
+                                    Remove-Item -LiteralPath $ownedPath -Force
+                                }
+                            }
+                            catch {
+                                # Never delete a synchronization file whose
+                                # ownership cannot be proven by exact content.
+                            }
+                        }
+                    }
                 }
             }
+
+            $newContract = Join-Path $destinationPath 'tools/workbench_contract.py'
             $newHead = Invoke-GitText -Arguments @(
                 '-C', $destinationPath, 'rev-parse', 'HEAD'
             )
@@ -804,50 +937,69 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
                 throw "The new worktree failed its ownership doctor check."
             }
 
-            if ($FromOriginMain) {
-                Write-Output (
-                    "WORKTREE_READY branch=$Branch head=$newHead tree=$newTree " +
-                    "destination=$destinationPath baseline=origin/main"
-                )
-            }
-            else {
-                # Legacy verified-LKG materialization preserves the durable
-                # assignment hand-off. It is not part of the normal CI-S1 path.
-                $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
-                    $AckTimeoutSeconds
-                ).ToString(
-                    'yyyy-MM-ddTHH:mm:ssZ',
-                    [System.Globalization.CultureInfo]::InvariantCulture
-                )
-                $assignmentResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
-                    '-B', $newContract, '--repo', $destinationPath,
-                    'assignment', 'create',
-                    '--task-id', $TaskId,
-                    '--thread-id', $ThreadId,
-                    '--owner', $Owner,
-                    '--brief', $TaskBrief,
-                    '--destination', $destinationPath,
-                    '--common-dir', $commonDir,
-                    '--branch', $Branch,
-                    '--head', $newHead,
-                    '--tree', $newTree,
-                    '--write-set', $writeSetPath,
-                    '--ack-deadline', $ackDeadline,
+            # The immutable WAITING_ACK bundle is the final durable marker for
+            # both baselines. No authoring is permitted before a separate ACK.
+            # The verified-LKG create command also performs the final receipt
+            # verification, so setup never runs the expensive resolver twice.
+            $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
+                $AckTimeoutSeconds
+            ).ToString(
+                'yyyy-MM-ddTHH:mm:ssZ',
+                [System.Globalization.CultureInfo]::InvariantCulture
+            )
+            $assignmentCommand = if ($FromOriginMain) { 'create-main' } else { 'create' }
+            $assignmentArguments = @(
+                '-B', $newContract, '--repo', $destinationPath,
+                'assignment', $assignmentCommand,
+                '--task-id', $TaskId,
+                '--thread-id', $ThreadId,
+                '--owner', $Owner,
+                '--brief', $TaskBrief,
+                '--destination', $destinationPath,
+                '--common-dir', $commonDir,
+                '--branch', $Branch,
+                '--head', $newHead,
+                '--tree', $newTree,
+                '--write-set', $writeSetPath,
+                '--ack-deadline', $ackDeadline,
+                '--json'
+            )
+            if (-not $FromOriginMain) {
+                $assignmentArguments += @(
                     '--candidate-receipt', $receiptPath,
-                    '--run-receipt', $runReceiptPath,
-                    '--json'
-                )
-                if ($assignmentResult.ExitCode -ne 0) {
-                    throw "Durable assignment creation failed: $($assignmentResult.Output)"
-                }
-                $assignmentPublished = $true
-                Write-Output $assignmentResult.Output
-                Write-Output (
-                    "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +
-                    "branch, HEAD/tree, owner, thread-id and write-set to the named task; " +
-                    "only `assignment ack` changes it to RUNNING."
+                    '--run-receipt', $runReceiptPath
                 )
             }
+            $assignmentResult = Invoke-NativeResult -FilePath 'python' `
+                -Arguments $assignmentArguments
+            if ($assignmentResult.ExitCode -eq 0 -and
+                $FaultInjection -eq 'AfterAssignmentPublicationProcessFailure') {
+                $assignmentResult = [pscustomobject]@{
+                    ExitCode = 79
+                    Output = 'Injected child-process failure after durable publication.'
+                }
+            }
+            if ($assignmentResult.ExitCode -ne 0) {
+                # A child can publish the immutable bundle and then die before
+                # its JSON/exit status reaches setup. Re-resolve that exact
+                # task and preserve resources only when every immutable field
+                # matches this invocation; otherwise normal owned cleanup is safe.
+                $assignmentPublished = Test-ExactPublishedAssignment `
+                    -Contract $newContract -Repository $destinationPath `
+                    -TaskId $TaskId -ThreadId $ThreadId -Owner $Owner `
+                    -Brief $TaskBrief -Destination $destinationPath `
+                    -CommonDirectory $commonDir -BranchName $Branch `
+                    -Head $newHead -Tree $newTree -WriteSetPath $writeSetPath `
+                    -OriginMain ([bool]$FromOriginMain)
+                throw "Durable assignment creation failed: $($assignmentResult.Output)"
+            }
+            $assignmentPublished = $true
+            Write-Output $assignmentResult.Output
+            Write-Output (
+                "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +
+                "branch, HEAD/tree, owner, thread-id and write-set to the named task; " +
+                "only `assignment ack` changes it to RUNNING."
+            )
         }
         catch {
             $failure = $_.Exception.Message

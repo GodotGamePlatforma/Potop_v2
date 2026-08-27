@@ -26,139 +26,69 @@ git lfs pull
 
 ## Równoległa praca agentów
 
-Każdy jednocześnie zapisujący agent pracuje w osobnym pełnym Git worktree i na gałęzi `codex/<owner>/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem, zgodnym pełnym run receiptem `PASS` oraz lokalnym refem `refs/last-green/integration`. Osobny katalog roboczy wewnątrz tego samego checkoutu nie izoluje indeksu Git, plików ani Godota. Nie twórz baseline'u z bieżącego dirty stanu ani nie traktuj samego `HEAD` lub candidate receiptu jako dowodu zielonych testów.
+Codzienny przepływ użytkownika pozostaje krótki: osobny worktree, commit i zwykły PR. Helper nie wymaga receiptów ani lokalnego LKG, ale pod spodem zachowuje jeden trwały assignment, ACK i zamknięty write-set, aby równolegli agenci nie zapisywali tych samych plików.
 
-Sprawdzenie właściciela i planowanego diffu:
+Utworzenie worktree z aktualnego `origin/main`:
 
 ```powershell
+$destination = Join-Path (Resolve-Path ..) "agent-worktrees\map-lighting"
+.\tools\setup_agent_worktree.ps1 `
+  -FromOriginMain -Owner map -TaskSlug map-lighting `
+  -TaskId <task-id> -ThreadId <thread-id> -TaskBrief "Mapa: oświetlenie" `
+  -WriteSet <pełna-ścieżka-do-write-set> `
+  -Destination $destination -Branch codex/map/map-lighting
+.\tools\setup_agent_worktree.ps1 `
+  -FromOriginMain -Owner map -TaskSlug map-lighting `
+  -TaskId <task-id> -ThreadId <thread-id> -TaskBrief "Mapa: oświetlenie" `
+  -WriteSet <pełna-ścieżka-do-write-set> `
+  -Destination $destination -Branch codex/map/map-lighting -Create
+```
+
+Druga komenda kończy się stanem `WAITING_ACK`. Agent wykonuje dokładny `assignment ack` podany w wyniku helpera i zaczyna zapis dopiero po stanie `RUNNING`.
+
+Po zmianach uruchom testy celowane, zrób commit i opublikuj PR:
+
+```powershell
+git fetch --prune origin
 python -B .\tools\workbench_contract.py --repo . eol-check
-python -B .\tools\workbench_contract.py doctor --owner map --intent author
-python -B .\tools\workbench_contract.py validate --owner map --diff
-```
-
-Dozwoleni ownerzy to `root`, `map`, `diver`, `structure:<id>` i `integration`. Strażnik uwzględnia pliki śledzone oraz wymagane niesledzone pliki niewykluczone przez `.gitignore`, a `generated/**` struktur przypisuje Mapie. `eol-check` dopuszcza dirty treść zapisaną LF, lecz odrzuca tracked `w/crlf` i `w/mixed` przy `eol=lf`; runner i builder wykonują tę samą bramkę automatycznie. Candidate receipt sprawdza mocniej surowe bajty śledzonych plików względem exact HEAD/index, więc nieprzenośnego checkoutu nie da się ukryć samym czystym statusem Git.
-
-Helper domyślnie tylko pokazuje plan. Candidate receipt potwierdza exact commit/tree i zamknięty zestaw plików, ale sam nie dowodzi przejścia testów. Właściwe utworzenie wymaga receiptu kandydata, unikalnego task slugu, dokładnego ID tasku i threadu, krótkiego briefu, zamkniętego write-setu oraz jawnego `-Create`:
-
-```powershell
-$evidenceRoot = Join-Path (Resolve-Path ..) ("agent-evidence\" + (git rev-parse --short HEAD))
-New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
-$runReceipt = Join-Path $evidenceRoot "full-run.receipt"
-$candidateReceipt = Join-Path $evidenceRoot "candidate-receipt.json"
-$inputList = Join-Path $evidenceRoot "candidate-inputs.list"
-$outputList = Join-Path $evidenceRoot "candidate-outputs.list"
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[IO.File]::WriteAllLines($inputList, @("project.godot"), $utf8NoBom)
-[IO.File]::WriteAllLines($outputList, @("underwater_map_workbench/UnderwaterMap.tscn"), $utf8NoBom)
-
-.\tests\run_all_tests.ps1 -Full -RunReceiptOutputPath $runReceipt
-if ($LASTEXITCODE -ne 0) { throw "Pełna bramka nie przeszła; candidate nie jest green." }
-python -B .\tools\workbench_contract.py publication create `
-  --input-list $inputList --output-list $outputList `
-  --input-root project.godot `
-  --output-root underwater_map_workbench/UnderwaterMap.tscn `
-  --receipt $candidateReceipt
-
-$expectedOld = (& git rev-parse --verify --quiet refs/last-green/integration 2>$null)
-if ([string]::IsNullOrWhiteSpace($expectedOld)) { $expectedOld = "missing" }
-python -B .\tools\workbench_contract.py lkg promote `
-  --candidate-receipt $candidateReceipt --run-receipt $runReceipt `
-  --expected-old $expectedOld
-if ($LASTEXITCODE -ne 0) { throw "Lokalna promocja LKG nie przeszła." }
-python -B .\tools\workbench_contract.py lkg resolve `
-  --candidate-receipt $candidateReceipt --run-receipt $runReceipt
-
-$taskId = "task/map-art-pass"
-$threadId = "<exact-codex-thread-id>"
-$taskBrief = "Dopracuj wyłącznie mapowe assety L01/L02 i ich lokalną dokumentację."
-$writeSet = Join-Path $evidenceRoot "map-art-pass.write-set"
-[IO.File]::WriteAllLines($writeSet, @(
-  "underwater_map_workbench/assets/environment/l01_water",
-  "underwater_map_workbench/assets/environment/l02_background"
-), $utf8NoBom)
-$destination = Join-Path (Resolve-Path ..) "agent-worktrees\map-map-art-pass"
-$setup = @{
-  CandidateReceipt = $candidateReceipt
-  RunReceipt = $runReceipt
-  Owner = "map"
-  TaskSlug = "map-art-pass"
-  TaskId = $taskId
-  ThreadId = $threadId
-  TaskBrief = $taskBrief
-  WriteSet = $writeSet
-  Destination = $destination
-}
-.\tools\setup_agent_worktree.ps1 @setup
-.\tools\setup_agent_worktree.ps1 @setup -Create
-
-$assignment = (python -B .\tools\workbench_contract.py --repo . `
-  assignment status --task-id $taskId --json | Out-String) | ConvertFrom-Json
-$assignmentId = [string]$assignment.assignment.assignment_id
-Push-Location $destination
-python -B .\tools\workbench_contract.py --repo . assignment ack `
-  --task-id $taskId --assignment-id $assignmentId --thread-id $threadId `
-  --owner map --write-set $writeSet
-if ($LASTEXITCODE -ne 0) { throw "Task nie uzyskał ACK; nie wolno zaczynać zapisów." }
-Pop-Location
-```
-
-Listy w przykładzie są zamkniętymi kotwicami wejścia/wyjścia, a candidate receipt dodatkowo przypina cały exact `HEAD^{tree}`. `lkg promote` ponownie weryfikuje oba receipty i przesuwa ref wyłącznie fast-forward przez compare-and-swap względem jawnego `--expected-old`; nie uruchamia ponownie Godota. `setup_agent_worktree.ps1` sprawdza przed i po materializacji, że candidate HEAD, pełny run HEAD i ref są nadal identyczne, a wyścig wycofuje wyłącznie zasoby własnej próby. Jego ostatnim markerem jest hashowany bundle `<git-common-dir>/codex-agent-assignments/v1/...` w stanie `WAITING_ACK`; samo istnienie worktree nie oznacza uruchomionego autora. Dopiero ACK z dokładnego, czystego destination zmienia stan na `RUNNING`. Nowe zadanie otrzymuje gałąź `codex/<owner>/<task-slug>`. Targeted `PASS` nie wystarcza. Pierwsza migracja wymaga nowego pełnego green na rewizji zawierającej resolver i promocji z `--expected-old missing`; historyczny candidate bez resolvera nie jest automatycznie uznawany za LKG.
-
-Po ACK używaj węższej bramki przydziału. Timeout nie tworzy nowego autora: koordynator ponawia ten sam task/thread/worktree przez `assignment redispatch`; po hand-offie zamyka go przez `assignment close`. `gc` wyłącznie raportuje plan retencji i nie usuwa bundle'i:
-
-```powershell
-python -B .\tools\workbench_contract.py --repo $destination validate `
-  --owner map --assignment $assignmentId --task-id $taskId `
-  --thread-id $threadId --diff
-python -B .\tools\workbench_contract.py --repo $destination assignment status `
-  --task-id $taskId
-python -B .\tools\workbench_contract.py --repo $destination assignment close `
-  --task-id $taskId --assignment-id $assignmentId --thread-id $threadId `
-  --reason "handoff complete"
-python -B .\tools\workbench_contract.py --repo . assignment gc --retention-days 30
-```
-
-`refs/last-green/integration` jest wyłącznie lokalnym authority wspólnego Git common-dir: widzą go wszystkie linked worktrees tego klonu, ale nie jest przesyłany przez clone, fetch ani push. Zdalny LKG wymagałby osobnego chronionego refspecu albo authority CI i nie jest tutaj wdrożony. Osobne worktrees przeznacz dla integracji oraz ręcznego edytora/playtestu. Producent przekazuje integratorowi niezmienny commit albo zweryfikowaną rewizję FROZEN i może od razu rozwijać N+1. Wspólny lock jest potrzebny tylko przy krótkiej publikacji wieloplikowego wyniku Mapy, nie podczas prywatnego authoringu ani testów.
-
-Repozytoryjny hook blokuje bezpośrednie pushe agentów do `main`, tagi, kasowanie refów i non-fast-forward/force-push istniejących gałęzi `codex/*`. Ten sam zachowany strumień rekordów push najpierw przechodzi lokalną politykę refów, a po jej akceptacji trafia do `git lfs pre-push`; brak albo błąd Git LFS blokuje push. Instalator jest domyślnie plan-only; właściwa instalacja ustawia współdzielone przez linked worktrees `core.hooksPath=.githooks`:
-
-```powershell
-.\tools\install_agent_git_hooks.ps1
-.\tools\install_agent_git_hooks.ps1 -Install
-```
-
-Przed hand-offem agent pobiera wyłącznie referencje, sprawdza swój owner/diff i celowane testy, tworzy mały logiczny commit, a następnie po raz pierwszy pushuje własną gałąź:
-
-```powershell
-git fetch --prune
-python -B .\tools\workbench_contract.py doctor --owner <owner> --intent author
-python -B .\tools\workbench_contract.py validate --owner <owner> `
+python -B .\tools\workbench_contract.py --repo . doctor --owner map --intent author
+python -B .\tools\workbench_contract.py --repo . validate `
   --assignment <assignment-id> --task-id <task-id> --thread-id <thread-id> --diff
-git push -u origin HEAD
-git rev-parse HEAD
+git add <własne-pliki>
+git commit -m "Opis zmiany"
+.\tools\publish_agent_pr.ps1 -Title "Opis zmiany"
 ```
 
-Handoff podaje exact SHA i receipty. Po jego przekazaniu nie wykonuj rebase ani force-pusha tej rewizji; poprawka jest nowym commitem i nowym receiptem. Cudzą zależność pobieraj po `fetch` z exact SHA albo stacked PR, nigdy z live worktree i nigdy z ruchomego tipa gałęzi.
+Publisher wymaga czystego worktree, gałęzi `codex/*`, aktualnej bazy `origin/main`, dokładnie jednego assignmentu `RUNNING` i poprawnego assignment-scoped diffu. Pushuje exact HEAD, tworzy PR, wysyła `verify-fast-pr` do zaufanego receivera z `main` i włącza natywne auto-merge `squash` przypięte do tego HEAD. Wszystkie PR-y, także control-plane, przechodzą ten sam automatyczny przepływ.
 
-GitHub Actions rozdziela szybką informację zwrotną od pełnej bramki. `.github/workflows/agent-validation.yml` uruchamia lekki, read-only kontrakt po pushu `codex/*`; cel 30 sekund dotyczy tej warstwy, nie pełnego przebiegu Godota. `.github/workflows/agent-integration.yml` przyjmuje immutable base/head, tworzy centralny plan Git LFS i uruchamia równolegle cztery osobne Windows VM headless, jedną natywną oraz zaufany, niedestrukcyjny check authority Mapy. Każdy target powstaje w świeżej kopii importowanego seedu, ma prywatne `.godot`, `user://`, TEMP/TMP i porty, a wynik wraca jako receipt v2. Agregator pobiera plan, dokładnie pięć receiptów shardów oraz osobny mapowy receipt z logiem po exact artifact ID, a następnie sprawdza digest, run ID i zgodność z tym samym kandydatem oraz planem. Dopiero komplet terminalnych PASS może opublikować jedyny check `integration-green`; jego external ID v3 zawiera digest kanonicznego receipt-setu, który hashuje w ustalonej kolejności SHA-256 candidate receipt, pełnego agregatu Godota i mapowego receiptu.
+## CI
 
-Shardy nie mają sekretów ani prawa zapisu repozytorium. Proces Godota dostaje oczyszczone środowisko, a zaufany rodzic przechwytuje stdout/stderr, domyślnie oznacza wynik jako FAIL i wymaga pojedynczego completion record. To skutecznie rozdziela współpracujących agentów i przypadkowe zapisy, ale nie jest sandboxem na złośliwy kod działający jako konto runnera; taki model wymaga restricted SID/DACL albo dodatkowej guest VM.
+PR blokuje dokładnie jeden App-owned check `fast-green`. Kandydacki workflow bez sekretów daje szybki feedback, natomiast zaufany receiver `repository_dispatch` z wersji `main` ponownie wiąże exact base/head, paginowany diff, ownera i EOL, a dopiero potem publikuje wymagany wynik. Ta sama bramka działa dla syntetycznego `merge_group`, dzięki czemu natywna kolejka testuje zmianę na aktualnym `main`. Celem operacyjnym jest około 30-60 sekund.
 
-Publiczne repo ma aktywny GitHub ruleset wymagający PR do `main`, rozwiązania wątków review oraz blokujący deletion i non-fast-forward bez bypassu. `AUTO_INTEGRATOR_ENABLED` pozostaje wyłączone. Włącz je dopiero po opublikowaniu workflow na `main`, pierwszym zielonym exact-main runie, konfiguracji GitHub App/environment oraz strict rulesetu wymagającego dokładnie jednego `integration-green`. Do tego czasu jeden integrator kolejkuje i scala kandydatów sekwencyjnie; lokalne assignment/candidate/run digesty nie są dowodem zdalnego status checku.
+Zaufany klasyfikator z `main` oznacza jako wrażliwe między innymi cały control-plane. Wrażliwy PR przechodzi automatyczny Codex gate na exact head: tożsamość PR jest sprawdzana przed i po pobraniu diffu, kod kandydata nie jest wykonywany w jobie z sekretem, diff jest traktowany wyłącznie jako niezaufane dane, a wynik ma ścisłe `PASS`/`FAIL`. Diff łączący trust-root z runtime jest odrzucany automatycznie i trzeba go rozdzielić na dwa PR-y. Nie ma ręcznego review, merge, environment approval ani bypassu.
 
-GitHub App attestera instaluj wyłącznie w tym repozytorium z uprawnieniami Checks R/W i Commit statuses R/W; token workflow jest dodatkowo zawężany do `checks:write`. Repozytorium wymaga variables `INTEGRATION_ATTESTER_CLIENT_ID` i `INTEGRATION_ATTESTER_APP_ID`. Ten sam sekret `INTEGRATION_ATTESTER_PRIVATE_KEY` zapisz osobno w environments `integration-attester` i `control-plane-maintenance`; nie zapisuj go jako sekret shardów. Environment maintenance ma dokładnie jednego reviewera — właściciela repo — z jawnym dopuszczeniem self-review, ponieważ repo ma jednego maintainera, oraz wyłączony administracyjny bypass. To jest świadomy jednoosobowy trust, nie dwuosobowy review.
+Po każdym merge workflow `.github/workflows/agent-integration.yml` uruchamia w tle niedestrukcyjny check Mapy, cztery odseparowane shardy headless i jeden natywny. Nowszy `main` anuluje starszy przebieg. Pełna regresja jest informacyjna: czerwony wynik jest widoczny w GitHub i artefaktach, ale nie cofa `main` i nie blokuje następnych agentów.
 
-Zwykły PR nie może zmieniać chronionego buildera Mapy ani jego dwóch testów wykonywalnych. Taka rzadka zmiana jest dwufazowa: pierwszy PR zawiera od jednego do trzech plików wyłącznie z listy `underwater_map_workbench/{tools/build_underwater_map.py,tests/portal_backdrop_clearance_test.py,tests/underwater_map_smoke_test.gd}`, ma label `control-plane-reviewed` i zewnętrzny bundle przeglądu. Uruchom z exact `main`:
+Jednorazowy bootstrap GitHub następuje dopiero po immutable review i zielonym exact-main. Najpierw instaluje istniejącą App `potop-v2-integration-attester` w organizacji, bezpiecznie potwierdza App ID 4737404 oraz dostępność `INTEGRATION_ATTESTER_PRIVATE_KEY` i `OPENAI_API_KEY` w automatycznym environment `integration-attester`, a `AUTO_INTEGRATOR_ENABLED` pozostawia wyłączone. Następnie dodaje App-owned `fast-green` obok starego `integration-green`, włącza AUTO jeszcze przy obu strict checkach i wykonuje osobne canary dla PR head oraz syntetycznego `merge_group`; niezależny pięciominutowy watchdog z `main` musi odtworzyć wynik także po regeneracji grupy. Dopiero po obu sukcesach usuwa stary check oraz ustawia `SQUASH` i `merge_queue` (`ALLGREEN`, maksymalnie jeden PR w grupie). PR, strict checks oraz zakaz deletion/non-fast-forward pozostają aktywne; exact JSON i SHA-256 rulesetu są zapisywane przed i po, a błąd przywraca poprzedni ruleset i AUTO=false. Ten commit nie ustawia sekretów, nie zmienia rulesetu i nie instaluje runnera.
+
+## Lokalny builder i `current`
+
+`tools/sync_play_main.ps1` rozdziela najnowszy kod od najnowszej zweryfikowanej gry. Osobny standalone source clone jest wyłącznie czystym mirrorem `main`. Jeden runner zapisuje trwałą kolejkę wszystkich nowych SHA, przetwarza je sekwencyjnie i dla każdego tworzy oddzielny immutable katalog build/test. Dopiero LFS fsck, map-check, realny eksport, pełne testy i smoke wyeksportowanego programu atomowo przełączają wskaźnik `current`; FAIL publikuje czerwony status i alert bez zmiany ostatniego grywalnego builda.
+
+Jednorazowa próba i instalacja zadania uruchamianego co minutę:
 
 ```powershell
-gh workflow run "Map control-plane maintenance authorization" --ref main `
-  -f pr_number=<PR> `
-  -f base_sha=<exact-main-SHA> `
-  -f candidate_sha=<exact-PR-head-SHA> `
-  -f evidence_sha256=<SHA-256-bundle-przegladu>
+$play = 'D:\Dev\Game\potop-playable'
+$latest = 'D:\Dev\Game\potop-main-mirror'
+$godot = '<pełna-ścieżka-do-Godot_v4.7.1-stable_win64_console.exe>'
+.\tools\sync_play_main.ps1 -Mode RunOnce -LatestPath $latest -PlayPath $play -GodotConsolePath $godot
+.\tools\sync_play_main.ps1 -Mode Install -LatestPath $latest -PlayPath $play -GodotConsolePath $godot
+.\tools\sync_play_main.ps1 -Mode Status -PlayPath $play
 ```
 
-Po ręcznej akceptacji environment workflow certyfikuje kandydata tym samym `integration-green`, lecz nigdy go nie scala. Właściciel scala PR ręcznie; handler `pull_request: closed` sprawdza najnowszą exact rodzinę `PR/base/head` ponad wszystkimi authorization SHA, zamkniętą listę ścieżek i ancestry, po czym automatycznie uruchamia `verify-integrated-main`. Dopiero zielony exact-main audyt pozwala utworzyć osobny zwykły PR z runtime, manifestem, sceną, generated albo dokumentacją Mapy. Pozostawiony `queued` jest redispatchowany. Ręczny retry po wiszącym `in_progress` lub failure tworzy nowszy Check Run; stare wykonanie pozostaje przypięte do starszego ID i nie może wygrać najnowszej rodziny. Authorization i audit mają osobne kolejki per exact zgoda oraz PR/head, a nieudany dispatch kończy wybrany check jako failure.
+Po restarcie runner wznawia pierwszy nieterminalny element i nie pomija żadnego SHA. W repo nie ma jeszcze `export_presets.cfg` ani produkcyjnego smoke eksportu, dlatego dzisiejszy przebieg kończy się jawnie `EXPORT_BOOTSTRAP_REQUIRED` i nie może ustanowić grywalnego `current`.
+
+Receipty i LKG są wewnętrzną diagnostyką CI/buildera, a nie ręcznym wejściem autora. Assignment i ACK pozostają automatyczną koordynacją identity/write-setu worktree, nie dowodem jakości produktu.
 
 ## Mapa podwodna
 

@@ -37,7 +37,7 @@ Root steruje ruchem avatara przez publiczne metody `DiverController`, a ruchome 
 
 ## Uruchamianie i testy
 
-Równoległy autor Nurka pracuje w osobnym pełnym Git worktree na gałęzi `codex/diver/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem oraz zgodnym pełnym run receiptem `PASS`. Wszystkie komendy korzystają ze wspólnego runnera i izolowanej pełnej kopii projektu z prywatnym `.godot`, `user://`, logami, portami procesu i capture. Jawny cel Nurka nie wykonuje globalnego discovery ani walidacji niezwiązanych pakietów Mapy. Z katalogu `diver_workbench/`:
+Równoległy autor Nurka pracuje w osobnym pełnym Git worktree z aktualnego `origin/main` na gałęzi `codex/diver/<task-slug>`. Setup nie wymaga receiptu ani LKG, lecz tworzy assignment z zamkniętym write-setem i wymaga ACK przed zapisem. Po testach autor tworzy commit i PR przez `..\tools\publish_agent_pr.ps1`; automatyczny App-owned `fast-green`, w razie potrzeby zaufany Codex gate, przekazuje go do natywnej kolejki i squash merge. Wszystkie komendy korzystają ze wspólnego runnera i izolowanej pełnej kopii projektu z prywatnym `.godot`, `user://`, logami, portami procesu i capture. Jawny cel Nurka nie wykonuje globalnego discovery ani walidacji niezwiązanych pakietów Mapy. Z katalogu `diver_workbench/`:
 
 ```powershell
 ..\tests\run_all_tests.ps1 -Target diver_workbench/tests/DiverPresentationTest.tscn

@@ -9,6 +9,7 @@ import io
 import subprocess
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from unittest import mock
 
@@ -107,6 +108,47 @@ class ProtectedPathMatcherTest(unittest.TestCase):
             with self.subTest(path=path):
                 with self.assertRaises(CI_PROTECTED_PATHS.ProtectedPathError):
                     CI_PROTECTED_PATHS.normalize_repo_path(path)
+
+    def test_control_plane_is_sensitive_not_manual(self) -> None:
+        result = CI_PROTECTED_PATHS.classify_paths((
+            ".github/workflows/agent-validation.yml",
+            "tools/ci_protected_paths.py",
+            "docs/Ostatni_Pomost_architektura_Godot.txt",
+        ))
+        self.assertEqual(result["status"], "PASS")
+        self.assertTrue(result["sensitive"])
+        self.assertEqual(result["protected_path_count"], 2)
+        self.assertEqual(result["sensitive_path_count"], 2)
+        self.assertFalse(result["mixed_trust_root_runtime"])
+        self.assertNotIn("manual", json.dumps(result).lower())
+
+    def test_mixed_trust_root_and_runtime_diff_is_automatically_rejected(self) -> None:
+        runtime_paths = (
+            "scripts/core/SaveManager.gd",
+            "data/campaign/default.json",
+            "diver_workbench/definitions/DiverSocketProfile.gd",
+            "underwater_map_workbench/UnderwaterMap.tscn",
+            "underwater_map_workbench/structures/tower_prototype_01/structure_manifest.json",
+        )
+        for runtime_path in runtime_paths:
+            with self.subTest(runtime_path=runtime_path):
+                result = CI_PROTECTED_PATHS.classify_paths((
+                    ".github/workflows/agent-validation.yml",
+                    runtime_path,
+                ))
+                self.assertEqual(
+                    result["status"], "REJECTED_MIXED_TRUST_ROOT_RUNTIME"
+                )
+                self.assertTrue(result["sensitive"])
+                self.assertTrue(result["mixed_trust_root_runtime"])
+                self.assertEqual(result["runtime_path_count"], 1)
+
+    def test_ordinary_product_diff_is_not_sensitive(self) -> None:
+        result = CI_PROTECTED_PATHS.classify_paths(
+            ("scripts/ui/DiveHud.gd", "docs/OgolnyZarys.txt")
+        )
+        self.assertFalse(result["sensitive"])
+        self.assertEqual(result["sensitive_path_count"], 0)
 
 
 class NulDiffParserTest(unittest.TestCase):
@@ -443,6 +485,34 @@ class CommandLineTest(unittest.TestCase):
                 )
         self.assertEqual(exit_code, 1)
         self.assertIn(".github/previous.yml", stderr.getvalue())
+
+    def test_classify_diff_preserves_both_rename_endpoints(self) -> None:
+        base = "1" * 40
+        head = "2" * 40
+        repository = Path("candidate").resolve()
+        payload = b"R100\0.github/workflows/old.yml\0docs/new.yml\0"
+        with (
+            mock.patch.object(
+                CI_PROTECTED_PATHS, "_repository_root", return_value=repository
+            ),
+            mock.patch.object(
+                CI_PROTECTED_PATHS,
+                "_resolve_exact_commit",
+                side_effect=(base, head),
+            ),
+            mock.patch.object(
+                CI_PROTECTED_PATHS, "_git_bytes", return_value=payload
+            ) as git_bytes,
+        ):
+            result = CI_PROTECTED_PATHS.classify_diff(repository, base, head)
+        self.assertTrue(result["sensitive"])
+        self.assertEqual(result["record_count"], 1)
+        self.assertEqual(result["path_count"], 2)
+        self.assertIn(".github/workflows/old.yml", result["protected_paths"])
+        self.assertEqual(
+            git_bytes.call_args.args[1:4],
+            ("diff", "--name-status", "--find-renames"),
+        )
 
 
 if __name__ == "__main__":

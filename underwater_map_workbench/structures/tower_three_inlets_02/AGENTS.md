@@ -27,7 +27,7 @@ Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publi
 
 ### Współbieżność
 
-- Jeden autor `tower_three_inlets_02/**` pracuje w osobnym pełnym Git worktree i na własnej gałęzi z ostatniego zielonego commita. Audytorzy korzystają z innych worktrees tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji.
+- Jeden autor `tower_three_inlets_02/**` pracuje w osobnym pełnym Git worktree utworzonym z aktualnego `origin/main` i na własnej gałęzi `codex/structure-tower_three_inlets_02/<task-slug>`. Audytorzy korzystają z innych worktrees tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji. Setup nie wymaga receiptu ani LKG, ale zapis wymaga ACK trwałego assignmentu z prywatnym write-setem. Po testach zwykły PR przechodzi automatyczny `fast-green`, ewentualny zaufany Codex gate, natywną kolejkę GitHub i squash merge.
 - Autor wykonuje lokalny seal i celowane testy bez `map-promotion`, a następnie przekazuje niezmienny commit albo zweryfikowaną rewizję FROZEN. Może od razu rozpocząć N+1; integrator Mapy pobiera wyłącznie wskazany hash i aktualizuje mapowy pin.
 - Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture; wspólna blokada dotyczy wyłącznie krótkiej publikacji Mapy.
 

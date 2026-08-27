@@ -14,7 +14,10 @@ $parallelWorktree = Join-Path $testRoot 'parallel-worktree'
 $crossDestinationWorktree = Join-Path $testRoot 'cross-destination-worktree'
 $crossBranchWorktreeA = Join-Path $testRoot 'cross-branch-worktree-a'
 $crossBranchWorktreeB = Join-Path $testRoot 'cross-branch-worktree-b'
+$disjointWorktreeA = Join-Path $testRoot 'disjoint-worktree-a'
+$disjointWorktreeB = Join-Path $testRoot 'disjoint-worktree-b'
 $faultWorktree = Join-Path $testRoot 'fault-worktree'
+$postPublicationWorktree = Join-Path $testRoot 'post-publication-worktree'
 $overlapWorktree = Join-Path $testRoot 'overlap-worktree'
 $lkgRaceWorktree = Join-Path $testRoot 'lkg-race-worktree'
 $unavailableWorktree = Join-Path $testRoot 'unavailable-worktree'
@@ -142,6 +145,11 @@ function Assert-NoCallerLeakage {
         (Test-Path -LiteralPath (Join-Path $Worktree 'untracked-caller.txt'))) {
         throw "Dirty or untracked caller state leaked into $Worktree"
     }
+}
+
+$helperSource = Get-Content -LiteralPath $helper -Raw
+if ($helperSource -match '\$newVerify') {
+    throw 'Setup must not run the same candidate/full receipt verifier twice.'
 }
 
 try {
@@ -451,17 +459,40 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         throw "Acknowledged assignment did not validate its clean diff: $assignmentValidate"
     }
 
-    # Normal author startup uses the freshly fetched origin/main directly and
-    # never waits for candidate/full-run evidence or refs/last-green.
+    # Origin-main skips candidate/full-run evidence, but it still publishes the
+    # exact schema-v2 WAITING_ACK bundle as the final durable setup marker.
     $assignmentStore = Join-Path (Invoke-Git $repository rev-parse --path-format=absolute --git-common-dir) `
         'codex-agent-assignments/v1'
+    $originMainWriteSet = New-TestWriteSet -TaskSlug 'origin-main'
     $originAssignmentCountBefore = @(
         Get-ChildItem -LiteralPath $assignmentStore -Recurse -Filter assignment.json -File
     ).Count
+    $missingOriginIdentityRejected = $false
+    Push-Location $repository
+    try {
+        try {
+            & $helper -FromOriginMain -Owner root `
+                -TaskSlug origin-main -Destination $originMainWorktree `
+                -Create 2>&1 | Out-Null
+        }
+        catch {
+            $missingOriginIdentityRejected = $_.Exception.Message -match 'required for assignment setup'
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    if (-not $missingOriginIdentityRejected -or
+        (Test-Path -LiteralPath $originMainWorktree) -or
+        (Test-BranchExists -Repo $repository -Branch 'codex/root/origin-main')) {
+        throw 'Origin-main setup accepted missing task/thread/brief/write-set identity.'
+    }
     Push-Location $repository
     try {
         $originOutput = & $helper -FromOriginMain -Owner root `
-            -TaskSlug origin-main -Destination $originMainWorktree `
+            -TaskSlug origin-main -TaskId 'task/origin-main' `
+            -ThreadId 'thread/origin-main' -TaskBrief 'origin main assignment' `
+            -WriteSet $originMainWriteSet -Destination $originMainWorktree `
             -Create 2>&1 | Out-String
     }
     finally {
@@ -470,12 +501,37 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
     $originAssignmentCountAfter = @(
         Get-ChildItem -LiteralPath $assignmentStore -Recurse -Filter assignment.json -File
     ).Count
-    if ($originOutput -notmatch 'WORKTREE_READY' -or
-        $originAssignmentCountAfter -ne $originAssignmentCountBefore -or
+    $originAssignment = Get-TestAssignmentRecord -Repo $originMainWorktree `
+        -TaskId 'task/origin-main'
+    $originStatusOutput = & python -B (Join-Path $originMainWorktree 'tools/workbench_contract.py') `
+        --repo $originMainWorktree assignment status `
+        --task-id 'task/origin-main' --json 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot read origin-main assignment: $originStatusOutput"
+    }
+    $originStatus = $originStatusOutput | ConvertFrom-Json
+    if ($originOutput -match 'WORKTREE_READY' -or
+        $originOutput -notmatch 'ASSIGNMENT CREATED: WAITING_ACK' -or
+        $originAssignmentCountAfter -ne ($originAssignmentCountBefore + 1) -or
+        [int]$originAssignment.Record.schema_version -ne 2 -or
+        [string]$originAssignment.Record.baseline_kind -ne 'origin-main' -or
+        [string]$originAssignment.Record.baseline_ref -ne 'refs/remotes/origin/main' -or
+        $originAssignment.Record.PSObject.Properties.Name -contains 'candidate_receipt_sha256' -or
+        [string]$originStatus.state -ne 'WAITING_ACK' -or
+        (Test-Path -LiteralPath (Join-Path $originAssignment.Bundle 'ack.json')) -or
         -not (Test-WorktreeRegistered -Repo $repository -Path $originMainWorktree) -or
         (Invoke-Git $originMainWorktree branch --show-current) -ne 'codex/root/origin-main' -or
         (Invoke-Git $originMainWorktree rev-parse 'HEAD^{commit}') -ne [string]$receiptData.head) {
-        throw 'Origin-main setup did not create one ready assignment-free worktree.'
+        throw "Origin-main setup did not end at one schema-v2 WAITING_ACK marker: $originOutput"
+    }
+    $originAckOutput = & python -B (Join-Path $originMainWorktree 'tools/workbench_contract.py') `
+        --repo $originMainWorktree assignment ack `
+        --task-id 'task/origin-main' `
+        --assignment-id ([string]$originAssignment.Record.assignment_id) `
+        --thread-id 'thread/origin-main' --owner root `
+        --write-set $originMainWriteSet --json 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0 -or $originAckOutput -notmatch '"state": "RUNNING"') {
+        throw "Origin-main schema-v2 ACK failed: $originAckOutput"
     }
 
     # An overlapping active write-set is detected only after the second exact
@@ -537,6 +593,54 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         throw 'Partial git worktree add was not fully rolled back.'
     }
 
+    # If the assignment child publishes its immutable WAITING_ACK bundle and
+    # then fails before returning success, setup must discover the exact marker
+    # and preserve both worktree and branch instead of orphaning the bundle.
+    $postPublicationTask = 'task/post-publication-failure'
+    $postPublicationThread = 'thread/post-publication-failure'
+    $postPublicationBranch = 'codex/root/post-publication-failure'
+    $postPublicationWriteSet = New-TestWriteSet -TaskSlug 'post-publication-failure'
+    $postPublicationFailed = $false
+    Push-Location $repository
+    try {
+        try {
+            & $helper -FromOriginMain -Owner root `
+                -TaskSlug post-publication-failure `
+                -TaskId $postPublicationTask -ThreadId $postPublicationThread `
+                -TaskBrief 'preserve exact durable marker after child failure' `
+                -WriteSet $postPublicationWriteSet `
+                -Destination $postPublicationWorktree `
+                -Branch $postPublicationBranch -Create `
+                -FaultInjection AfterAssignmentPublicationProcessFailure `
+                2>&1 | Out-Null
+        }
+        catch {
+            $postPublicationFailed = $_.Exception.Message -match `
+                'reached its durable assignment marker'
+        }
+    }
+    finally { Pop-Location }
+    $postPublicationAssignment = Get-TestAssignmentRecord `
+        -Repo $repository -TaskId $postPublicationTask
+    if (-not $postPublicationFailed -or
+        -not (Test-WorktreeRegistered -Repo $repository `
+            -Path $postPublicationWorktree) -or
+        -not (Test-BranchExists -Repo $repository `
+            -Branch $postPublicationBranch) -or
+        [int]$postPublicationAssignment.Record.schema_version -ne 2 -or
+        (Test-Path -LiteralPath (Join-Path `
+            $postPublicationAssignment.Bundle 'ack.json'))) {
+        throw 'Post-publication child failure did not preserve the exact WAITING_ACK marker.'
+    }
+    $postPublicationClose = & python -B $contract --repo $postPublicationWorktree `
+        assignment close --task-id $postPublicationTask `
+        --assignment-id ([string]$postPublicationAssignment.Record.assignment_id) `
+        --thread-id $postPublicationThread --reason test_cleanup --json `
+        2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0 -or $postPublicationClose -notmatch '"state": "CLOSED"') {
+        throw "Cannot close post-publication test assignment: $postPublicationClose"
+    }
+
     $lkgRaceWorker = {
         param(
             [string]$Helper,
@@ -544,7 +648,8 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
             [string]$CandidateReceipt,
             [string]$RunReceipt,
             [string]$Destination,
-            [string]$WriteSetPath
+            [string]$WriteSetPath,
+            [string]$FaultToken
         )
 
         $ErrorActionPreference = 'Stop'
@@ -555,7 +660,9 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
                     -RunReceipt $RunReceipt -Owner root -TaskSlug lkg-race `
                     -TaskId 'task/lkg-race' -ThreadId 'thread/lkg-race' `
                     -TaskBrief 'LKG race rollback' -WriteSet $WriteSetPath `
-                    -Destination $Destination -Create 2>&1 | Out-String
+                    -Destination $Destination -Create `
+                    -FaultInjection WaitAfterGitWorktreeAdd `
+                    -FaultInjectionToken $FaultToken 2>&1 | Out-String
                 return [pscustomobject]@{ Succeeded = $true; Output = $output }
             }
             catch {
@@ -569,12 +676,15 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
             Pop-Location
         }
     }
+    $lkgRaceToken = [Guid]::NewGuid().ToString('N')
     $lkgRaceJob = Start-Job -ScriptBlock $lkgRaceWorker -ArgumentList @(
         $helper, $repository, $candidateReceipt, $runReceipt, $lkgRaceWorktree,
-        (New-TestWriteSet -TaskSlug 'lkg-race')
+        (New-TestWriteSet -TaskSlug 'lkg-race'), $lkgRaceToken
     )
+    $lkgRaceReady = "$lkgRaceWorktree.setup-$lkgRaceToken.ready"
+    $lkgRaceContinue = "$lkgRaceWorktree.setup-$lkgRaceToken.continue"
     $lkgRaceDeadline = [System.DateTime]::UtcNow.AddSeconds(30)
-    while (-not (Test-BranchExists -Repo $repository -Branch 'codex/root/lkg-race')) {
+    while (-not (Test-Path -LiteralPath $lkgRaceReady -PathType Leaf)) {
         if ($lkgRaceJob.State -in @('Completed', 'Failed', 'Stopped')) {
             break
         }
@@ -585,17 +695,21 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
     }
     Invoke-Git $repository update-ref refs/last-green/integration `
         ([string]$legacyReceiptData.head) ([string]$receiptData.head) | Out-Null
+    Write-Utf8NoBom -Path $lkgRaceContinue -Value $lkgRaceToken
     Wait-Job -Job $lkgRaceJob -Timeout 30 | Out-Null
     if ($lkgRaceJob.State -notin @('Completed', 'Failed')) {
         throw 'LKG race setup process did not finish within 30 seconds.'
     }
     $lkgRaceResult = Receive-Job -Job $lkgRaceJob
     if ($null -eq $lkgRaceResult -or $lkgRaceResult.Succeeded -eq $true -or
-        [string]$lkgRaceResult.Output -notmatch 'last-green|Last-green' -or
+        [string]$lkgRaceResult.Output -notmatch 'last-green|Last-green|authority|Authoritative' -or
         (Test-Path -LiteralPath $lkgRaceWorktree) -or
         (Test-WorktreeRegistered -Repo $repository -Path $lkgRaceWorktree) -or
         (Test-BranchExists -Repo $repository -Branch 'codex/root/lkg-race')) {
-        throw 'Post-materialization LKG race did not fail closed and roll back.'
+        throw (
+            'Post-materialization LKG race did not fail closed and roll back. ' +
+            [string]$lkgRaceResult.Output
+        )
     }
     Remove-Job -Job $lkgRaceJob -Force -ErrorAction SilentlyContinue
     $lkgRaceJob = $null
@@ -648,6 +762,7 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
                 $output = & $Helper @helperArguments 2>&1 | Out-String
                 return [pscustomobject]@{
                     Succeeded = $true
+                    ExitCode = 0
                     ProcessId = $PID
                     Output = $output
                     Destination = $Destination
@@ -658,6 +773,7 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
             catch {
                 return [pscustomobject]@{
                     Succeeded = $false
+                    ExitCode = 1
                     ProcessId = $PID
                     Output = (($_ | Out-String) + $_.Exception.Message)
                     Destination = $Destination
@@ -739,6 +855,127 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
                 ((Test-Path -LiteralPath $loser.Destination -PathType Container) -and
                     [string]$loser.Destination -ne [string]$winner.Destination)) {
                 throw "$CaseName loser damaged or bypassed the winning resource."
+            }
+        }
+        finally {
+            foreach ($job in @($jobs)) {
+                if ($job.State -notin @('Completed', 'Failed', 'Stopped')) {
+                    Stop-Job -Job $job -ErrorAction SilentlyContinue
+                }
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    function Invoke-DisjointSetupPair {
+        param(
+            [string]$DestinationA,
+            [string]$DestinationB,
+            [string]$TaskSlugA,
+            [string]$TaskSlugB,
+            [string]$BranchA,
+            [string]$BranchB
+        )
+
+        $readyA = Join-Path $testRoot 'disjoint-a.ready'
+        $readyB = Join-Path $testRoot 'disjoint-b.ready'
+        $startGate = Join-Path $testRoot 'disjoint.start'
+        $writeSetA = New-TestWriteSet -TaskSlug $TaskSlugA
+        $writeSetB = New-TestWriteSet -TaskSlug $TaskSlugB
+        $jobs = @()
+        try {
+            $jobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
+                $helper, $repository, $candidateReceipt, $runReceipt,
+                $DestinationA, $readyA, $startGate, $TaskSlugA, $BranchA,
+                $writeSetA
+            )
+            $jobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
+                $helper, $repository, $candidateReceipt, $runReceipt,
+                $DestinationB, $readyB, $startGate, $TaskSlugB, $BranchB,
+                $writeSetB
+            )
+            $readyDeadline = [System.DateTime]::UtcNow.AddSeconds(15)
+            while (-not (
+                (Test-Path -LiteralPath $readyA -PathType Leaf) -and
+                (Test-Path -LiteralPath $readyB -PathType Leaf)
+            )) {
+                if ([System.DateTime]::UtcNow -ge $readyDeadline) {
+                    throw 'Disjoint setup workers did not reach their shared start gate.'
+                }
+                Start-Sleep -Milliseconds 20
+            }
+            Write-Utf8NoBom -Path $startGate -Value "start`n"
+            Wait-Job -Job $jobs -Timeout 90 | Out-Null
+            if (@($jobs | Where-Object {
+                $_.State -notin @('Completed', 'Failed')
+            }).Count -gt 0) {
+                throw 'Disjoint setup workers did not finish within 90 seconds.'
+            }
+            $results = @(Receive-Job -Job $jobs -ErrorAction SilentlyContinue)
+            if ($results.Count -ne 2 -or @($results | Where-Object {
+                $_.Succeeded -ne $true -or $_.ExitCode -ne 0
+            }).Count -ne 0) {
+                throw (
+                    'Both disjoint setup processes must exit 0. ' +
+                    (($results | ForEach-Object { $_.Output }) -join "`n")
+                )
+            }
+
+            $expected = @(
+                [pscustomobject]@{
+                    Destination = $DestinationA
+                    TaskSlug = $TaskSlugA
+                    Branch = $BranchA
+                    WriteSet = $writeSetA
+                },
+                [pscustomobject]@{
+                    Destination = $DestinationB
+                    TaskSlug = $TaskSlugB
+                    Branch = $BranchB
+                    WriteSet = $writeSetB
+                }
+            )
+            foreach ($item in $expected) {
+                if (-not (Test-Path -LiteralPath $item.Destination -PathType Container) -or
+                    -not (Test-WorktreeRegistered -Repo $repository -Path $item.Destination) -or
+                    -not (Test-BranchExists -Repo $repository -Branch $item.Branch)) {
+                    throw "Disjoint setup did not preserve $($item.TaskSlug)."
+                }
+                $actualHead = Invoke-Git $item.Destination rev-parse HEAD
+                $actualTree = Invoke-Git $item.Destination rev-parse 'HEAD^{tree}'
+                $actualBranch = Invoke-Git $item.Destination branch --show-current
+                if ($actualHead -ne [string]$receiptData.head -or
+                    $actualTree -ne [string]$receiptData.tree -or
+                    $actualBranch -ne $item.Branch) {
+                    throw "Disjoint setup identity mismatch for $($item.TaskSlug)."
+                }
+
+                $taskId = "task/$($item.TaskSlug)"
+                $threadId = "thread/$($item.TaskSlug)"
+                $assignment = Get-TestAssignmentRecord -Repo $item.Destination `
+                    -TaskId $taskId
+                $statusOutput = & python -B $contract --repo $item.Destination `
+                    assignment status --task-id $taskId --json 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Cannot read disjoint assignment status: $statusOutput"
+                }
+                $status = $statusOutput | ConvertFrom-Json
+                if ([string]$status.state -ne 'WAITING_ACK') {
+                    throw "Disjoint assignment did not start in WAITING_ACK: $taskId"
+                }
+
+                $ackOutput = & python -B $contract --repo $item.Destination `
+                    assignment ack --task-id $taskId `
+                    --assignment-id ([string]$assignment.Record.assignment_id) `
+                    --thread-id $threadId --owner root `
+                    --write-set $item.WriteSet --json 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Disjoint assignment ACK failed: $ackOutput"
+                }
+                $ack = $ackOutput | ConvertFrom-Json
+                if ([string]$ack.state -ne 'RUNNING') {
+                    throw "Disjoint assignment did not reach RUNNING: $taskId"
+                }
             }
         }
         finally {
@@ -838,6 +1075,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         -TaskSlugA 'cross-branch-a' -TaskSlugB 'cross-branch-b' `
         -BranchA 'codex/root/shared-cross-branch' `
         -BranchB 'codex/root/shared-cross-branch'
+    Invoke-DisjointSetupPair `
+        -DestinationA $disjointWorktreeA -DestinationB $disjointWorktreeB `
+        -TaskSlugA 'disjoint-a' -TaskSlugB 'disjoint-b' `
+        -BranchA 'codex/root/disjoint-a' -BranchB 'codex/root/disjoint-b'
 
     Push-Location $repository
     try {
@@ -914,7 +1155,7 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         throw 'Receipt with an unavailable commit object was accepted.'
     }
 
-    Write-Host 'PASS setup_agent_worktree candidate/full-run receipts/parallel reservation/dirty isolation/rollback contract'
+    Write-Host 'PASS setup_agent_worktree receipts/disjoint concurrency/reservations/ACK/dirty isolation/rollback contract'
 }
 finally {
     if ($null -ne $lkgRaceJob) {
@@ -931,9 +1172,10 @@ finally {
     }
     if (Test-Path -LiteralPath (Join-Path $repository '.git')) {
         foreach ($candidateWorktree in @(
-            $worktreeA, $worktreeB, $parallelWorktree,
+            $worktreeA, $worktreeB, $originMainWorktree, $parallelWorktree,
             $crossDestinationWorktree, $crossBranchWorktreeA,
-            $crossBranchWorktreeB, $faultWorktree, $overlapWorktree,
+            $crossBranchWorktreeB, $disjointWorktreeA, $disjointWorktreeB,
+            $faultWorktree, $overlapWorktree,
             $lkgRaceWorktree, $unavailableWorktree,
             $mismatchRunWorktree, $failedRunWorktree, $missingLkgWorktree,
             $legacyWorktree

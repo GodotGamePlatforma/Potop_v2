@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -228,6 +230,19 @@ def _assignment_candidate(
         "ack_deadline": now + timedelta(minutes=5),
         "now": now,
     }
+
+
+def _configure_origin_main(fixture: dict[str, object]) -> str:
+    repository = Path(fixture["repository"])
+    origin_url = str(repository.resolve())
+    _git(repository, "remote", "add", "origin", origin_url)
+    _git(
+        repository,
+        "update-ref",
+        "refs/remotes/origin/main",
+        str(fixture["head"]),
+    )
+    return hashlib.sha256(origin_url.encode("utf-8")).hexdigest()
 
 
 class WorkbenchOwnershipTest(unittest.TestCase):
@@ -524,6 +539,50 @@ class PublicationReceiptTest(unittest.TestCase):
             self.assertEqual(created["head"], verified["head"])
             self.assertEqual(created["tree"], verified["tree"])
             self.assertEqual(created["status"], "PUBLICATION_READY")
+
+    def test_receipt_verification_is_lock_free_and_checks_stable_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            _create_receipt(candidate)
+            repository = candidate["repository"]
+
+            with mock.patch.object(
+                contract,
+                "publication_lock",
+                side_effect=AssertionError("read-only verification must not lock"),
+            ):
+                verified = contract.verify_publication_receipt(
+                    repository, candidate["receipt"]
+                )
+            self.assertEqual(verified["status"], contract.PUBLICATION_RECEIPT_STATUS)
+
+            original_records = contract._publication_records
+            call_count = 0
+
+            def mutate_receipt_after_second_snapshot(
+                root: Path, paths: object
+            ) -> tuple[contract.PublicationFileRecord, ...]:
+                nonlocal call_count
+                result = original_records(root, paths)
+                call_count += 1
+                if call_count == 4:
+                    candidate["receipt"].write_bytes(
+                        candidate["receipt"].read_bytes() + b" "
+                    )
+                return result
+
+            with mock.patch.object(
+                contract,
+                "_publication_records",
+                side_effect=mutate_receipt_after_second_snapshot,
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "receipt or file bytes changed",
+                ):
+                    contract.verify_publication_receipt(
+                        repository, candidate["receipt"]
+                    )
 
     def test_receipt_creation_rejects_clean_filter_crlf_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -844,32 +903,259 @@ class LastGreenRefTest(unittest.TestCase):
 
 
 class AgentAssignmentTest(unittest.TestCase):
-    def _create(self, fixture: dict[str, object]) -> dict[str, object]:
+    def test_machine_json_is_ascii_safe_after_durable_publication(self) -> None:
+        raw = io.BytesIO()
+        console = io.TextIOWrapper(raw, encoding="cp1250", newline="")
+        with mock.patch.object(sys, "stdout", console):
+            contract._write_json({"brief": "uruchom rakietę 🚀"})
+            console.flush()
+        decoded = raw.getvalue().decode("cp1250")
+        self.assertEqual(json.loads(decoded)["brief"], "uruchom rakietę 🚀")
+
+    def test_assignment_metadata_lock_retries_and_fails_closed(self) -> None:
+        class FlakyLock:
+            def __init__(self) -> None:
+                self.attempts = 0
+                self.released = False
+
+            def acquire(self) -> "FlakyLock":
+                self.attempts += 1
+                if self.attempts < 3:
+                    raise contract.WorkspaceLockError("busy")
+                return self
+
+            def release(self) -> None:
+                self.released = True
+
+        lock = FlakyLock()
+        with mock.patch.object(contract, "assignment_lock", return_value=lock), \
+            mock.patch.object(contract.time, "sleep") as sleeper:
+            with contract.assignment_metadata_lock("ignored", wait_seconds=1.0):
+                self.assertEqual(lock.attempts, 3)
+
+        self.assertTrue(lock.released)
+        self.assertEqual(sleeper.call_count, 2)
+
+        never_available = mock.Mock()
+        never_available.acquire.side_effect = contract.WorkspaceLockError("busy")
+        with mock.patch.object(
+            contract, "assignment_lock", return_value=never_available
+        ):
+            with self.assertRaisesRegex(contract.ContractError, "Timed out waiting"):
+                with contract.assignment_metadata_lock("ignored", wait_seconds=0):
+                    self.fail("An unavailable metadata lock must fail closed.")
+        never_available.release.assert_not_called()
+
+    def test_assignment_metadata_lock_recovers_after_holder_process_death(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            repository = Path(fixture["repository"])
+            ready = Path(temporary) / "assignment-lock-holder.ready"
+            child_hold = """
+import os
+import sys
+import time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import workbench_contract as contract
+lock = contract.assignment_lock(Path(sys.argv[2]))
+lock.acquire()
+Path(sys.argv[3]).write_text(str(os.getpid()), encoding="utf-8")
+time.sleep(60)
+"""
+            holder = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    child_hold,
+                    str(TOOLS_DIR),
+                    str(repository),
+                    str(ready),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                deadline = time.monotonic() + 5
+                while not ready.is_file() and holder.poll() is None:
+                    if time.monotonic() >= deadline:
+                        self.fail("Assignment lock holder did not become ready.")
+                    time.sleep(0.01)
+                if holder.poll() is not None:
+                    stdout, stderr = holder.communicate(timeout=1)
+                    self.fail(
+                        "Assignment lock holder exited early: "
+                        f"stdout={stdout!r} stderr={stderr!r}"
+                    )
+                self.assertEqual(int(ready.read_text(encoding="utf-8")), holder.pid)
+                with self.assertRaisesRegex(contract.ContractError, "Timed out waiting"):
+                    with contract.assignment_metadata_lock(repository, wait_seconds=0):
+                        self.fail("A live holder must keep the metadata lock exclusive.")
+
+                holder.kill()
+                holder.communicate(timeout=5)
+                with contract.assignment_metadata_lock(repository, wait_seconds=1.0):
+                    pass
+            finally:
+                if holder.poll() is None:
+                    holder.kill()
+                    holder.communicate(timeout=5)
+
+    def test_assignment_rejects_receipt_byte_drift_during_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary), task_id="receipt-drift")
+
+            def mutate_run_receipt(*_arguments: object) -> None:
+                run_receipt = Path(fixture["run_receipt"])
+                run_receipt.write_bytes(run_receipt.read_bytes() + b" ")
+
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=mutate_run_receipt,
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "receipt bytes changed",
+                ):
+                    contract.create_assignment(
+                        fixture["repository"],
+                        task_id=fixture["task_id"],
+                        thread_id=fixture["thread_id"],
+                        owner=fixture["owner"],
+                        brief=fixture["brief"],
+                        destination=fixture["destination"],
+                        common_git_dir=fixture["common_git_dir"],
+                        branch=fixture["branch"],
+                        head=fixture["head"],
+                        tree=fixture["tree"],
+                        write_set_path=fixture["write_set_path"],
+                        candidate_receipt=fixture["candidate_receipt"],
+                        run_receipt=fixture["run_receipt"],
+                        ack_deadline=fixture["ack_deadline"],
+                        now=fixture["now"],
+                    )
+
+    def test_assignment_rechecks_verified_lkg_evidence_under_publish_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(
+                Path(temporary),
+                task_id="receipt-publish-window-drift",
+            )
+            original = contract._assert_assignment_evidence
+            calls = 0
+
+            def mutate_after_first_verification(*args: object, **kwargs: object) -> tuple[str, str]:
+                nonlocal calls
+                result = original(*args, **kwargs)
+                calls += 1
+                if calls == 1:
+                    run_receipt = Path(fixture["run_receipt"])
+                    run_receipt.write_bytes(run_receipt.read_bytes() + b"\n")
+                return result
+
+            with mock.patch.object(
+                contract,
+                "_assert_assignment_evidence",
+                side_effect=mutate_after_first_verification,
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "evidence changed before publication",
+                ):
+                    contract.create_assignment(
+                        fixture["repository"],
+                        task_id=fixture["task_id"],
+                        thread_id=fixture["thread_id"],
+                        owner=fixture["owner"],
+                        brief=fixture["brief"],
+                        destination=fixture["destination"],
+                        common_git_dir=fixture["common_git_dir"],
+                        branch=fixture["branch"],
+                        head=fixture["head"],
+                        tree=fixture["tree"],
+                        write_set_path=fixture["write_set_path"],
+                        candidate_receipt=fixture["candidate_receipt"],
+                        run_receipt=fixture["run_receipt"],
+                        ack_deadline=fixture["ack_deadline"],
+                        now=fixture["now"],
+                    )
+            self.assertEqual(calls, 1)
+
+    def _create(
+        self,
+        fixture: dict[str, object],
+        *,
+        task_id: str | None = None,
+        thread_id: str | None = None,
+        brief: str | None = None,
+        write_set_path: str | Path | None = None,
+        ack_deadline: datetime | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, object]:
         with mock.patch.object(
             contract, "_verify_full_run_receipt", return_value=None
         ) as verifier:
             created = contract.create_assignment(
                 fixture["repository"],
-                task_id=fixture["task_id"],
-                thread_id=fixture["thread_id"],
+                task_id=task_id or str(fixture["task_id"]),
+                thread_id=thread_id or str(fixture["thread_id"]),
                 owner=fixture["owner"],
-                brief=fixture["brief"],
+                brief=brief or str(fixture["brief"]),
                 destination=fixture["destination"],
                 common_git_dir=fixture["common_git_dir"],
                 branch=fixture["branch"],
                 head=fixture["head"],
                 tree=fixture["tree"],
-                write_set_path=fixture["write_set_path"],
+                write_set_path=write_set_path or fixture["write_set_path"],
                 candidate_receipt=fixture["candidate_receipt"],
                 run_receipt=fixture["run_receipt"],
-                ack_deadline=fixture["ack_deadline"],
-                now=fixture["now"],
+                ack_deadline=ack_deadline or fixture["ack_deadline"],
+                now=fixture["now"] if now is None else now,
             )
         verifier.assert_called_once_with(
             Path(fixture["repository"]).resolve(),
             fixture["candidate_receipt"],
             fixture["run_receipt"],
         )
+        return created
+
+    def _create_main(
+        self,
+        fixture: dict[str, object],
+        *,
+        task_id: str | None = None,
+        thread_id: str | None = None,
+        brief: str | None = None,
+        write_set_path: str | Path | None = None,
+        ack_deadline: datetime | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, object]:
+        with mock.patch.object(
+            contract,
+            "_verify_full_run_receipt",
+            side_effect=AssertionError("origin-main must not verify receipts"),
+        ) as verifier:
+            created = contract.create_assignment(
+                fixture["repository"],
+                task_id=task_id or str(fixture["task_id"]),
+                thread_id=thread_id or str(fixture["thread_id"]),
+                owner=str(fixture["owner"]),
+                brief=brief or str(fixture["brief"]),
+                destination=fixture["destination"],
+                common_git_dir=fixture["common_git_dir"],
+                branch=str(fixture["branch"]),
+                head=str(fixture["head"]),
+                tree=str(fixture["tree"]),
+                write_set_path=write_set_path or fixture["write_set_path"],
+                candidate_receipt=None,
+                run_receipt=None,
+                ack_deadline=ack_deadline or fixture["ack_deadline"],
+                baseline_kind="origin-main",
+                now=fixture["now"] if now is None else now,
+            )
+        verifier.assert_not_called()
         return created
 
     def _ack(
@@ -889,6 +1175,27 @@ class AgentAssignmentTest(unittest.TestCase):
         }
         arguments.update(overrides)
         return contract.acknowledge_assignment(fixture["repository"], **arguments)
+
+    def _rewrite_assignment_record(
+        self,
+        bundle: Path,
+        changes: dict[str, object],
+    ) -> tuple[Path, dict[str, object]]:
+        record_path = bundle / "assignment.json"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        record.update(changes)
+        record.pop("assignment_digest", None)
+        record.pop("assignment_id", None)
+        assignment_id = contract._canonical_digest(record)[:32]
+        record["assignment_id"] = assignment_id
+        record["assignment_digest"] = contract._canonical_digest(record)
+        rewritten_bundle = bundle.parent / assignment_id
+        bundle.rename(rewritten_bundle)
+        (rewritten_bundle / "assignment.json").write_text(
+            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        return rewritten_bundle, record
 
     def test_lifecycle_ack_validate_close_and_retention_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -946,94 +1253,419 @@ class AgentAssignmentTest(unittest.TestCase):
             self.assertEqual(plan["eligible_count"], 1)
             self.assertTrue(bundle.exists(), "retention planning must never delete")
 
-    def test_origin_main_assignment_skips_full_receipt_and_preserves_guards(self) -> None:
+    def test_schema_v2_history_remains_readable_closeable_and_collectable(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = _assignment_candidate(Path(temporary))
-            repository = fixture["repository"]
-            _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
-            _git(
-                repository,
-                "update-ref",
-                "refs/remotes/origin/main",
-                str(fixture["head"]),
+            created = self._create(fixture)
+            old_bundle = Path(created["bundle"])
+            record_path = old_bundle / "assignment.json"
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            record["schema_version"] = contract.MAIN_ASSIGNMENT_SCHEMA_VERSION
+            del record["candidate_receipt_sha256"]
+            del record["run_receipt_sha256"]
+            record["baseline_kind"] = "origin-main"
+            record["baseline_ref"] = "refs/remotes/origin/main"
+            record["origin_url_sha256"] = hashlib.sha256(
+                b"https://example.invalid/repository.git"
+            ).hexdigest()
+            del record["assignment_digest"]
+            del record["assignment_id"]
+            assignment_id = contract._canonical_digest(record)[:32]
+            record["assignment_id"] = assignment_id
+            record["assignment_digest"] = contract._canonical_digest(record)
+            new_bundle = old_bundle.parent / assignment_id
+            old_bundle.rename(new_bundle)
+            (new_bundle / "assignment.json").write_text(
+                json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
             )
 
-            with mock.patch.object(
-                contract,
-                "_verify_full_run_receipt",
-                side_effect=AssertionError("origin/main startup must not verify full tests"),
-            ) as verifier:
-                created = contract.create_assignment(
-                    repository,
-                    task_id=fixture["task_id"],
-                    thread_id=fixture["thread_id"],
-                    owner=fixture["owner"],
-                    brief=fixture["brief"],
-                    destination=fixture["destination"],
-                    common_git_dir=fixture["common_git_dir"],
-                    branch=fixture["branch"],
-                    head=fixture["head"],
-                    tree=fixture["tree"],
-                    write_set_path=fixture["write_set_path"],
-                    candidate_receipt=None,
-                    run_receipt=None,
-                    baseline_kind="origin-main",
-                    ack_deadline=fixture["ack_deadline"],
-                    now=fixture["now"],
+            status = contract.assignment_status(
+                fixture["repository"],
+                assignment_id=assignment_id,
+                now=fixture["now"],
+            )
+            self.assertEqual(status["state"], contract.ASSIGNMENT_WAITING)
+            closed = contract.close_assignment(
+                fixture["repository"],
+                task_id=fixture["task_id"],
+                assignment_id=assignment_id,
+                thread_id=fixture["thread_id"],
+                reason="historical v2 cleanup",
+                now=fixture["now"] + timedelta(days=2),
+            )
+            self.assertEqual(closed["state"], contract.ASSIGNMENT_CLOSED)
+            self.assertEqual(closed["close"]["schema_version"], 2)
+            plan = contract.assignment_gc_plan(
+                fixture["repository"],
+                retention_days=7,
+                now=fixture["now"] + timedelta(days=10),
+            )
+            self.assertEqual(plan["eligible_count"], 1)
+            self.assertTrue(new_bundle.exists())
+
+    def test_schema_v2_rollout_closed_history_and_active_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            fixture = _assignment_candidate(parent, task_id="origin-main-first")
+            origin_digest = _configure_origin_main(fixture)
+            first = self._create_main(fixture)
+            first_assignment = first["assignment"]
+
+            self.assertEqual(first["state"], contract.ASSIGNMENT_WAITING)
+            self.assertEqual(
+                first_assignment["schema_version"],
+                contract.MAIN_ASSIGNMENT_SCHEMA_VERSION,
+            )
+            self.assertEqual(first_assignment["baseline_kind"], "origin-main")
+            self.assertEqual(
+                first_assignment["baseline_ref"],
+                "refs/remotes/origin/main",
+            )
+            self.assertEqual(first_assignment["origin_url_sha256"], origin_digest)
+            self.assertNotIn("candidate_receipt_sha256", first_assignment)
+            self.assertTrue(
+                Path(first["bundle"]).is_relative_to(
+                    contract.assignment_store(fixture["repository"])
                 )
-            verifier.assert_not_called()
-            assignment = created["assignment"]
-            self.assertEqual(assignment["schema_version"], 2)
-            self.assertEqual(assignment["baseline_kind"], "origin-main")
-            self.assertEqual(assignment["baseline_ref"], "refs/remotes/origin/main")
-            self.assertNotIn("candidate_receipt_sha256", assignment)
+            )
+
+            retry = self._create_main(
+                fixture,
+                now=fixture["now"] + timedelta(seconds=1),
+            )
+            self.assertFalse(retry["created"])
+            self.assertEqual(retry["bundle"], first["bundle"])
+
+            with self.assertRaisesRegex(contract.ContractError, "overlaps"):
+                self._create(
+                    fixture,
+                    task_id="verified-lkg-overlap",
+                    thread_id="thread-verified-lkg-overlap",
+                    brief="active v2 blocks overlapping v1",
+                    now=fixture["now"] + timedelta(seconds=2),
+                )
+
+            closed = contract.close_assignment(
+                fixture["repository"],
+                task_id=str(fixture["task_id"]),
+                assignment_id=str(first_assignment["assignment_id"]),
+                thread_id=str(fixture["thread_id"]),
+                reason="rollout history",
+                now=fixture["now"] + timedelta(minutes=1),
+            )
+            self.assertEqual(closed["state"], contract.ASSIGNMENT_CLOSED)
+
+            # CLOSED records are still fully parsed and authenticated, but no
+            # longer reserve their paths.  Reusing the exact same write-set is
+            # the strongest regression for the rollout unblock.
+            second = self._create(
+                fixture,
+                task_id="verified-lkg-same-path",
+                thread_id="thread-verified-lkg-same-path",
+                brief="new same-path v1 task after closed v2 history",
+                now=fixture["now"] + timedelta(minutes=2),
+            )
+            self.assertTrue(second["created"])
+            self.assertEqual(second["state"], contract.ASSIGNMENT_WAITING)
+            self.assertEqual(
+                second["assignment"]["schema_version"],
+                contract.ASSIGNMENT_SCHEMA_VERSION,
+            )
+
+    def test_schema_v2_origin_is_admission_provenance_not_live_remote_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(
+                Path(temporary),
+                task_id="origin-main-remote-history",
+            )
+            _configure_origin_main(fixture)
+            created = self._create_main(fixture)
             acknowledged = self._ack(fixture, created)
             self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
-            current = contract.current_assignment(repository)
-            self.assertEqual(
-                current["assignment"]["assignment_id"],
-                assignment["assignment_id"],
+
+            repository = Path(fixture["repository"])
+            _git(repository, "remote", "set-url", "origin", "https://example.invalid/moved.git")
+            verified, outside = contract.validate_assignment_context(
+                repository,
+                assignment_id=str(created["assignment"]["assignment_id"]),
+                task_id=str(fixture["task_id"]),
+                thread_id=str(fixture["thread_id"]),
+                owner=str(fixture["owner"]),
+                paths=("tracked.txt",),
+                now=fixture["now"] + timedelta(minutes=1),
             )
-            _git(repository, "remote", "set-url", "origin", "https://example.invalid/other.git")
-            with self.assertRaisesRegex(contract.ContractError, "origin_url"):
-                contract.validate_assignment_context(
+            self.assertEqual(verified["state"], contract.ASSIGNMENT_RUNNING)
+            self.assertEqual(outside, ())
+
+            _git(repository, "remote", "remove", "origin")
+            closed = contract.close_assignment(
+                repository,
+                task_id=str(fixture["task_id"]),
+                assignment_id=str(created["assignment"]["assignment_id"]),
+                thread_id=str(fixture["thread_id"]),
+                reason="repository transferred",
+                now=fixture["now"] + timedelta(minutes=2),
+            )
+            self.assertEqual(closed["state"], contract.ASSIGNMENT_CLOSED)
+            self.assertEqual(
+                contract.assignment_status(
                     repository,
-                    assignment_id=str(assignment["assignment_id"]),
-                    task_id=str(assignment["task_id"]),
-                    thread_id=str(assignment["thread_id"]),
-                    owner=str(assignment["owner"]),
-                    paths=(),
+                    task_id=str(fixture["task_id"]),
+                    assignment_id=str(created["assignment"]["assignment_id"]),
+                    now=fixture["now"] + timedelta(minutes=3),
+                )["state"],
+                contract.ASSIGNMENT_CLOSED,
+            )
+
+    def test_assignment_and_lifecycle_schema_versions_are_exact_integers(self) -> None:
+        for index, invalid_version in enumerate((True, 1.0, 2.0)):
+            with self.subTest(record_schema_version=repr(invalid_version)):
+                with tempfile.TemporaryDirectory() as temporary:
+                    fixture = _assignment_candidate(
+                        Path(temporary),
+                        task_id=f"strict-record-schema-{index}",
+                    )
+                    created = self._create(fixture)
+                    rewritten_bundle, rewritten = self._rewrite_assignment_record(
+                        Path(created["bundle"]),
+                        {"schema_version": invalid_version},
+                    )
+                    with self.assertRaisesRegex(contract.ContractError, "exact integer"):
+                        contract.assignment_status(
+                            fixture["repository"],
+                            task_id=str(fixture["task_id"]),
+                            assignment_id=str(rewritten["assignment_id"]),
+                            now=fixture["now"],
+                        )
+                    self.assertTrue(rewritten_bundle.exists())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(
+                Path(temporary),
+                task_id="strict-event-schema",
+            )
+            _configure_origin_main(fixture)
+            created = self._create_main(fixture)
+            self._ack(fixture, created)
+            ack_path = Path(created["bundle"]) / "ack.json"
+            ack_record = json.loads(ack_path.read_text(encoding="utf-8"))
+            ack_record["schema_version"] = 2.0
+            ack_record.pop("ack_digest")
+            ack_record["ack_digest"] = contract._canonical_digest(ack_record)
+            ack_path.write_text(
+                json.dumps(ack_record, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(contract.ContractError, "event identity"):
+                contract.assignment_status(
+                    fixture["repository"],
+                    task_id=str(fixture["task_id"]),
+                    assignment_id=str(created["assignment"]["assignment_id"]),
+                    now=fixture["now"] + timedelta(minutes=1),
                 )
 
-    def test_origin_main_assignment_rejects_stale_remote_tracking_ref(self) -> None:
+    def test_schema_v2_hybrid_and_tampered_closed_event_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            fixture = _assignment_candidate(Path(temporary))
-            repository = fixture["repository"]
-            _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
-            (repository / "later.txt").write_text("later\n", encoding="utf-8")
-            _commit_all(repository, "later origin main")
-            later = _git(repository, "rev-parse", "HEAD")
-            _git(repository, "update-ref", "refs/remotes/origin/main", later)
-            _git(repository, "reset", "--hard", str(fixture["head"]))
+            parent = Path(temporary)
+            hybrid_parent = parent / "hybrid"
+            hybrid_parent.mkdir()
+            hybrid = _assignment_candidate(hybrid_parent, task_id="origin-main-hybrid")
+            _configure_origin_main(hybrid)
+            hybrid_created = self._create_main(hybrid)
+            _, hybrid_record = self._rewrite_assignment_record(
+                Path(hybrid_created["bundle"]),
+                {"candidate_receipt_sha256": "0" * 64},
+            )
+            with self.assertRaisesRegex(contract.ContractError, "invalid exact schema"):
+                contract.assignment_status(
+                    hybrid["repository"],
+                    task_id=str(hybrid["task_id"]),
+                    assignment_id=str(hybrid_record["assignment_id"]),
+                    now=hybrid["now"],
+                )
 
-            with self.assertRaisesRegex(contract.ContractError, "differs from fetched"):
-                contract.create_assignment(
-                    repository,
-                    task_id=fixture["task_id"],
-                    thread_id=fixture["thread_id"],
-                    owner=fixture["owner"],
-                    brief=fixture["brief"],
-                    destination=fixture["destination"],
-                    common_git_dir=fixture["common_git_dir"],
-                    branch=fixture["branch"],
-                    head=fixture["head"],
-                    tree=fixture["tree"],
-                    write_set_path=fixture["write_set_path"],
-                    candidate_receipt=None,
-                    run_receipt=None,
-                    baseline_kind="origin-main",
-                    ack_deadline=fixture["ack_deadline"],
+            closed_parent = parent / "closed"
+            closed_parent.mkdir()
+            closed_fixture = _assignment_candidate(
+                closed_parent,
+                task_id="origin-main-closed-tamper",
+            )
+            _configure_origin_main(closed_fixture)
+            closed_created = self._create_main(closed_fixture)
+            contract.close_assignment(
+                closed_fixture["repository"],
+                task_id=str(closed_fixture["task_id"]),
+                assignment_id=str(closed_created["assignment"]["assignment_id"]),
+                thread_id=str(closed_fixture["thread_id"]),
+                reason="closed before tamper",
+                now=closed_fixture["now"] + timedelta(minutes=1),
+            )
+            close_path = Path(closed_created["bundle"]) / "close.json"
+            close_record = json.loads(close_path.read_text(encoding="utf-8"))
+            close_record["reason"] = "tampered after close"
+            close_path.write_text(
+                json.dumps(close_record, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(contract.ContractError, "event digest"):
+                contract.assignment_status(
+                    closed_fixture["repository"],
+                    task_id=str(closed_fixture["task_id"]),
+                    assignment_id=str(closed_created["assignment"]["assignment_id"]),
+                    now=closed_fixture["now"] + timedelta(minutes=2),
+                )
+
+    def test_schema_v2_unknown_record_and_tampered_event_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+
+            unknown_parent = parent / "unknown"
+            unknown_parent.mkdir()
+            unknown = _assignment_candidate(
+                unknown_parent,
+                task_id="origin-main-unknown",
+            )
+            _configure_origin_main(unknown)
+            unknown_created = self._create_main(unknown)
+            unknown_record_path = Path(unknown_created["bundle"]) / "assignment.json"
+            unknown_record = json.loads(
+                unknown_record_path.read_text(encoding="utf-8")
+            )
+            unknown_record["schema_version"] = 999
+            unknown_record_path.write_text(
+                json.dumps(unknown_record, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(contract.ContractError, "invalid exact schema"):
+                contract.assignment_status(
+                    unknown["repository"],
+                    task_id=str(unknown["task_id"]),
+                    assignment_id=str(
+                        unknown_created["assignment"]["assignment_id"]
+                    ),
+                    now=unknown["now"],
+                )
+
+            tampered_parent = parent / "tampered"
+            tampered_parent.mkdir()
+            tampered = _assignment_candidate(
+                tampered_parent,
+                task_id="origin-main-tampered",
+            )
+            _configure_origin_main(tampered)
+            tampered_created = self._create_main(tampered)
+            acknowledged = self._ack(tampered, tampered_created)
+            self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+            ack_path = Path(tampered_created["bundle"]) / "ack.json"
+            ack_record = json.loads(ack_path.read_text(encoding="utf-8"))
+            ack_record["owner"] = "integration"
+            ack_path.write_text(
+                json.dumps(ack_record, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(contract.ContractError, "event digest"):
+                contract.assignment_status(
+                    tampered["repository"],
+                    task_id=str(tampered["task_id"]),
+                    assignment_id=str(
+                        tampered_created["assignment"]["assignment_id"]
+                    ),
+                    now=tampered["now"] + timedelta(minutes=1),
+                )
+
+    def test_unknown_bundle_event_and_redispatch_file_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            fixture = _assignment_candidate(parent, task_id="unknown-event")
+            _configure_origin_main(fixture)
+            created = self._create_main(fixture)
+            bundle = Path(created["bundle"])
+
+            (bundle / "future-event.json").write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "unknown event or file"):
+                contract.assignment_status(
+                    fixture["repository"],
+                    assignment_id=str(created["assignment"]["assignment_id"]),
                     now=fixture["now"],
+                )
+            (bundle / "future-event.json").unlink()
+
+            redispatch = bundle / "redispatch"
+            redispatch.mkdir()
+            (redispatch / "notes.txt").write_text("not an event\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "unknown event"):
+                contract.assignment_status(
+                    fixture["repository"],
+                    assignment_id=str(created["assignment"]["assignment_id"]),
+                    now=fixture["now"],
+                )
+
+    def test_store_level_hidden_or_non_directory_tamper_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            hidden_parent = Path(temporary) / "hidden"
+            hidden_parent.mkdir()
+            hidden_fixture = _assignment_candidate(
+                hidden_parent,
+                task_id="hidden-active-bundle",
+            )
+            hidden_created = self._create(hidden_fixture)
+            bundle = Path(hidden_created["bundle"])
+            bundle.rename(bundle.parent / f".{bundle.name}.hidden")
+            with self.assertRaisesRegex(contract.ContractError, "Unexpected assignment bundle"):
+                self._create(
+                    hidden_fixture,
+                    task_id="hidden-overlap-request",
+                    thread_id="hidden-overlap-thread",
+                    brief="must not bypass hidden active reservation",
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            file_fixture = _assignment_candidate(
+                Path(temporary),
+                task_id="store-file-tamper",
+            )
+            self._create(file_fixture)
+            unexpected = contract.assignment_store(file_fixture["repository"]) / "future-entry"
+            unexpected.write_text("not a task directory\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                contract.ContractError,
+                "Unexpected assignment task directory",
+            ):
+                contract.assignment_gc_plan(
+                    file_fixture["repository"],
+                    retention_days=7,
+                    now=file_fixture["now"] + timedelta(days=10),
+                )
+    def test_current_resolves_exactly_one_running_assignment_for_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(
+                Path(temporary), task_id="current-origin-main"
+            )
+            _configure_origin_main(fixture)
+            created = self._create_main(fixture)
+            running = self._ack(fixture, created)
+
+            current = contract.current_assignment(
+                fixture["repository"], now=fixture["now"] + timedelta(seconds=1)
+            )
+            self.assertEqual(current["state"], contract.ASSIGNMENT_RUNNING)
+            self.assertEqual(
+                current["assignment"]["assignment_id"],
+                running["assignment"]["assignment_id"],
+            )
+
+            contract.close_assignment(
+                fixture["repository"],
+                task_id=str(fixture["task_id"]),
+                assignment_id=str(created["assignment"]["assignment_id"]),
+                thread_id=str(fixture["thread_id"]),
+                reason="current test complete",
+                now=fixture["now"] + timedelta(minutes=1),
+            )
+            with self.assertRaisesRegex(contract.ContractError, "exactly one RUNNING"):
+                contract.current_assignment(
+                    fixture["repository"], now=fixture["now"] + timedelta(minutes=2)
                 )
 
     def test_ack_rejects_wrong_context_dirty_and_outside_write_set(self) -> None:
@@ -1144,6 +1776,54 @@ class AgentAssignmentTest(unittest.TestCase):
                 now=timed_out_at + timedelta(minutes=1),
             )
             self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+
+    def test_retry_across_created_at_boundary_keeps_first_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            first = _assignment_candidate(Path(temporary), task_id="first")
+            created = self._create(first)
+            assignment_bytes = (
+                Path(created["bundle"]) / "assignment.json"
+            ).read_bytes()
+            duplicate = self._create(
+                first,
+                ack_deadline=first["ack_deadline"] + timedelta(minutes=2),
+                now=first["now"] + timedelta(seconds=1),
+            )
+            self.assertFalse(duplicate["created"])
+            self.assertEqual(duplicate["bundle"], created["bundle"])
+            self.assertEqual(
+                duplicate["assignment"]["assignment_id"],
+                created["assignment"]["assignment_id"],
+            )
+            self.assertEqual(
+                (Path(created["bundle"]) / "assignment.json").read_bytes(),
+                assignment_bytes,
+            )
+
+            with mock.patch.object(
+                contract, "_verify_full_run_receipt", return_value=None
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "already has an immutable assignment",
+                ):
+                    contract.create_assignment(
+                        first["repository"],
+                        task_id=first["task_id"],
+                        thread_id=first["thread_id"],
+                        owner=first["owner"],
+                        brief=str(first["brief"]) + " changed",
+                        destination=first["destination"],
+                        common_git_dir=first["common_git_dir"],
+                        branch=first["branch"],
+                        head=first["head"],
+                        tree=first["tree"],
+                        write_set_path=first["write_set_path"],
+                        candidate_receipt=first["candidate_receipt"],
+                        run_receipt=first["run_receipt"],
+                        ack_deadline=first["ack_deadline"],
+                        now=first["now"] + timedelta(seconds=2),
+                    )
 
     def test_duplicate_and_overlapping_assignments_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1335,7 +2015,14 @@ class AgentAssignmentTest(unittest.TestCase):
                 subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for _ in range(2)
             ]
-            create_results = [process.communicate(timeout=30) for process in creators]
+            create_results = []
+            for process in creators:
+                stdout, stderr = process.communicate(timeout=30)
+                create_results.append((process.returncode, stdout, stderr))
+            self.assertTrue(
+                all(return_code == 0 for return_code, _stdout, _stderr in create_results),
+                create_results,
+            )
             task_directory = (
                 contract.assignment_store(fixture["repository"])
                 / contract._assignment_task_hash(str(fixture["task_id"]))
@@ -1346,7 +2033,8 @@ class AgentAssignmentTest(unittest.TestCase):
                 (bundles[0] / "assignment.json").read_text(encoding="utf-8")
             )
             created_true = sum(
-                b'"created": true' in stdout for stdout, _stderr in create_results
+                b'"created": true' in stdout
+                for _return_code, stdout, _stderr in create_results
             )
             self.assertEqual(created_true, 1, create_results)
 
@@ -1374,10 +2062,18 @@ class AgentAssignmentTest(unittest.TestCase):
                 subprocess.Popen(ack_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for _ in range(2)
             ]
-            ack_results = [process.communicate(timeout=30) for process in acknowledgers]
+            ack_results = []
+            for process in acknowledgers:
+                stdout, stderr = process.communicate(timeout=30)
+                ack_results.append((process.returncode, stdout, stderr))
+            self.assertTrue(
+                all(return_code == 0 for return_code, _stdout, _stderr in ack_results),
+                ack_results,
+            )
             self.assertTrue((bundles[0] / "ack.json").is_file(), ack_results)
             ack_created_true = sum(
-                b'"created": true' in stdout for stdout, _stderr in ack_results
+                b'"created": true' in stdout
+                for _return_code, stdout, _stderr in ack_results
             )
             self.assertEqual(ack_created_true, 1, ack_results)
 

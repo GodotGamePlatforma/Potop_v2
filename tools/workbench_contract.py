@@ -21,13 +21,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
-from workbench_lock import InterprocessWorkspaceLock
+from workbench_lock import InterprocessWorkspaceLock, WorkspaceLockError
 
 
 OWNER_ROOT = "root"
@@ -45,6 +47,9 @@ ASSIGNMENT_SCHEMA_VERSION = 1
 MAIN_ASSIGNMENT_SCHEMA_VERSION = 2
 ASSIGNMENT_STORE_RELATIVE = Path("codex-agent-assignments") / "v1"
 ASSIGNMENT_LOCK_NAME = "agent-assignments"
+ASSIGNMENT_LOCK_WAIT_SECONDS = 5.0
+ASSIGNMENT_LOCK_INITIAL_BACKOFF_SECONDS = 0.01
+ASSIGNMENT_LOCK_MAX_BACKOFF_SECONDS = 0.1
 ASSIGNMENT_ID_PATTERN = re.compile(r"[0-9a-f]{32}\Z")
 ASSIGNMENT_DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 ASSIGNMENT_WAITING = "WAITING_ACK"
@@ -1089,6 +1094,38 @@ def assignment_lock(repository: str | Path = ".") -> InterprocessWorkspaceLock:
     return publication_lock(repository, ASSIGNMENT_LOCK_NAME)
 
 
+@contextmanager
+def assignment_metadata_lock(
+    repository: str | Path = ".",
+    *,
+    wait_seconds: float = ASSIGNMENT_LOCK_WAIT_SECONDS,
+) -> Iterator[InterprocessWorkspaceLock]:
+    """Acquire the short shared assignment metadata window with bounded retry."""
+
+    if wait_seconds < 0:
+        raise ValueError("Assignment lock wait must not be negative.")
+    lock = assignment_lock(repository)
+    deadline = time.monotonic() + wait_seconds
+    delay = ASSIGNMENT_LOCK_INITIAL_BACKOFF_SECONDS
+    while True:
+        try:
+            lock.acquire()
+            break
+        except WorkspaceLockError as error:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ContractError(
+                    "Timed out waiting for the short shared assignment metadata "
+                    f"window after {wait_seconds:.3f} seconds."
+                ) from error
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, ASSIGNMENT_LOCK_MAX_BACKOFF_SECONDS)
+    try:
+        yield lock
+    finally:
+        lock.release()
+
+
 def _assignment_task_hash(task_id: str) -> str:
     return hashlib.sha256(task_id.encode("utf-8")).hexdigest()
 
@@ -1145,6 +1182,12 @@ def _assignment_record(bundle: Path) -> dict[str, object]:
         "ack_deadline",
     }
     schema_version = record.get("schema_version")
+    # JSON booleans and integral floats compare equal to Python integers.  The
+    # durable assignment envelope deliberately does not: accepting ``true`` or
+    # ``2.0`` here would make the version discriminator ambiguous during a
+    # rolling schema upgrade.
+    if type(schema_version) is not int:
+        raise ContractError("Assignment record schema_version must be an exact integer.")
     if schema_version == ASSIGNMENT_SCHEMA_VERSION:
         required = common_required | {
             "candidate_receipt_sha256",
@@ -1230,8 +1273,10 @@ def _event_record(
     event = _read_json_object(path, event_type.lower())
     if set(event) != required_fields or event.get("event") != event_type:
         raise ContractError(f"Assignment {event_type} event has an invalid exact schema.")
+    event_schema_version = event.get("schema_version")
     if (
-        event.get("schema_version") != assignment.get("schema_version")
+        type(event_schema_version) is not int
+        or event_schema_version != assignment.get("schema_version")
         or event.get("assignment_id") != assignment["assignment_id"]
         or event.get("assignment_digest") != assignment["assignment_digest"]
         or ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(event.get(digest_field, ""))) is None
@@ -1359,20 +1404,65 @@ def _assignment_redispatches(
     return tuple(events)
 
 
+def _validate_assignment_bundle_layout(bundle: Path) -> None:
+    """Reject unrecognised mutable surfaces in an immutable assignment bundle."""
+    allowed = {"assignment.json", "ack.json", "close.json", "redispatch"}
+    try:
+        entries = tuple(bundle.iterdir())
+    except OSError as error:
+        raise ContractError(f"Assignment bundle cannot be enumerated: {bundle}: {error}") from error
+    unexpected = sorted(entry.name for entry in entries if entry.name not in allowed)
+    if unexpected:
+        raise ContractError(
+            "Assignment bundle contains an unknown event or file: "
+            + ", ".join(unexpected)
+        )
+    assignment_path = bundle / "assignment.json"
+    if (
+        not assignment_path.is_file()
+        or assignment_path.is_symlink()
+        or any(
+            entry.name in {"ack.json", "close.json"}
+            and (not entry.is_file() or entry.is_symlink())
+            for entry in entries
+        )
+    ):
+        raise ContractError("Assignment bundle has an invalid immutable file layout.")
+    redispatch = bundle / "redispatch"
+    if redispatch.exists():
+        if not redispatch.is_dir() or redispatch.is_symlink():
+            raise ContractError("Assignment redispatch surface is not a real directory.")
+        for event in redispatch.iterdir():
+            if (
+                not event.is_file()
+                or event.is_symlink()
+                or re.fullmatch(r"[0-9]{6}\.json", event.name) is None
+            ):
+                raise ContractError(
+                    f"Assignment redispatch contains an unknown event: {event.name}"
+                )
+
+
 def _all_assignment_bundles(repository: str | Path) -> tuple[Path, ...]:
     store = assignment_store(repository)
     if not store.exists():
         return ()
+    if not store.is_dir() or store.is_symlink():
+        raise ContractError(f"Assignment store is not a real directory: {store}")
     bundles: list[Path] = []
     for task_directory in sorted(store.iterdir()):
-        if not task_directory.is_dir() or task_directory.name.startswith("."):
-            continue
-        if ASSIGNMENT_DIGEST_PATTERN.fullmatch(task_directory.name) is None:
+        if (
+            not task_directory.is_dir()
+            or task_directory.is_symlink()
+            or ASSIGNMENT_DIGEST_PATTERN.fullmatch(task_directory.name) is None
+        ):
             raise ContractError(f"Unexpected assignment task directory: {task_directory}")
         for bundle in sorted(task_directory.iterdir()):
-            if not bundle.is_dir() or bundle.name.startswith("."):
-                continue
-            if ASSIGNMENT_ID_PATTERN.fullmatch(bundle.name) is None:
+            if (
+                not bundle.is_dir()
+                or bundle.is_symlink()
+                or ASSIGNMENT_ID_PATTERN.fullmatch(bundle.name) is None
+            ):
                 raise ContractError(f"Unexpected assignment bundle: {bundle}")
             bundles.append(bundle)
     return tuple(bundles)
@@ -1423,6 +1513,7 @@ def _assignment_status_unlocked(
     *,
     now: datetime,
 ) -> dict[str, object]:
+    _validate_assignment_bundle_layout(bundle)
     assignment = _assignment_record(bundle)
     redispatches = _assignment_redispatches(bundle, assignment)
     ack = _assignment_ack(bundle, assignment)
@@ -1458,7 +1549,7 @@ def assignment_status(
     now: datetime | None = None,
 ) -> dict[str, object]:
     root = repository_root(repository)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         return _assignment_status_unlocked(bundle, now=now or _utc_now())
 
@@ -1468,31 +1559,31 @@ def current_assignment(
     *,
     now: datetime | None = None,
 ) -> dict[str, object]:
-    """Resolve the one RUNNING assignment bound to this exact worktree."""
+    """Return the one RUNNING assignment bound to this exact worktree."""
     root = repository_root(repository)
     current_branch = _branch_name(root)
     current_common_dir = git_common_dir(root)
-    current_time = now or _utc_now()
-    matches: list[dict[str, object]] = []
-    with assignment_lock(root):
+    instant = now or _utc_now()
+    with assignment_metadata_lock(root):
+        matches: list[dict[str, object]] = []
         for bundle in _all_assignment_bundles(root):
-            status = _assignment_status_unlocked(bundle, now=current_time)
+            status = _assignment_status_unlocked(bundle, now=instant)
             assignment = status["assignment"]
             if (
                 status["state"] == ASSIGNMENT_RUNNING
-                and _same_path(str(assignment["destination"]), root)
+                and _same_path(str(assignment["destination"]), str(root))
                 and _same_path(
-                    str(assignment["common_git_dir"]), current_common_dir
+                    str(assignment["common_git_dir"]), str(current_common_dir)
                 )
                 and assignment["branch"] == current_branch
             ):
                 matches.append(status)
-    if len(matches) != 1:
-        raise ContractError(
-            "Current worktree must resolve to exactly one RUNNING assignment; "
-            f"found {len(matches)}."
-        )
-    return matches[0]
+        if len(matches) != 1:
+            raise ContractError(
+                "Current worktree must resolve to exactly one RUNNING assignment; "
+                f"found {len(matches)}."
+            )
+        return matches[0]
 
 
 def _write_sets_overlap(left: Iterable[str], right: Iterable[str]) -> tuple[str, str] | None:
@@ -1516,11 +1607,60 @@ def _assert_assignment_evidence(
     run_receipt: str | Path,
     head: str,
     tree: str,
-) -> None:
-    candidate = _publication_receipt_header(repository, candidate_receipt)
+) -> tuple[str, str]:
+    before_candidate_sha = _file_sha256(candidate_receipt, "candidate receipt")
+    before_run_sha = _file_sha256(run_receipt, "run receipt")
+    before_last_green = last_green_head(repository)
+    if before_last_green != head:
+        raise ContractError(
+            "Assignment HEAD must remain the authoritative last-green candidate."
+        )
+    candidate = verify_publication_receipt(repository, candidate_receipt)
     if candidate["head"] != head or candidate["tree"] != tree:
         raise ContractError("Assignment candidate receipt does not bind the exact HEAD/tree.")
     _verify_full_run_receipt(repository, candidate_receipt, run_receipt)
+    after_last_green = last_green_head(repository)
+    if after_last_green != before_last_green or after_last_green != head:
+        raise ContractError(
+            "Authoritative last-green moved while assignment evidence was verified."
+        )
+    after_candidate_sha = _file_sha256(candidate_receipt, "candidate receipt")
+    after_run_sha = _file_sha256(run_receipt, "run receipt")
+    if (
+        before_candidate_sha != after_candidate_sha
+        or before_run_sha != after_run_sha
+    ):
+        raise ContractError(
+            "Candidate or run receipt bytes changed while assignment evidence "
+            "was verified."
+        )
+    return before_candidate_sha, before_run_sha
+
+
+def _assert_assignment_evidence_unchanged(
+    repository: Path,
+    *,
+    candidate_receipt: str | Path,
+    run_receipt: str | Path,
+    expected_candidate_sha256: str,
+    expected_run_sha256: str,
+    head: str,
+    tree: str,
+) -> None:
+    """Lightweight final CAS immediately before a v1 bundle is published."""
+
+    if (
+        _git_text(repository, "rev-parse", "HEAD") != head
+        or _git_text(repository, "rev-parse", "HEAD^{tree}") != tree
+        or changed_paths(repository)
+        or last_green_head(repository) != head
+        or _file_sha256(candidate_receipt, "candidate receipt")
+        != expected_candidate_sha256
+        or _file_sha256(run_receipt, "run receipt") != expected_run_sha256
+    ):
+        raise ContractError(
+            "Verified-LKG assignment evidence changed before publication."
+        )
 
 
 def create_assignment(
@@ -1572,8 +1712,6 @@ def create_assignment(
         )
     if changed_paths(root):
         raise ContractError("Assignment creation requires a clean destination worktree.")
-    if baseline_kind not in {"verified-lkg", "origin-main"}:
-        raise ContractError("Assignment baseline_kind must be verified-lkg or origin-main.")
     write_set = _closed_write_set(write_set_path)
     violations = validate_paths(normalized_owner, write_set)
     if violations:
@@ -1581,8 +1719,12 @@ def create_assignment(
             "Assignment write-set crosses its owner boundary: "
             + ", ".join(item.path for item in violations)
         )
+    if baseline_kind not in {"verified-lkg", "origin-main"}:
+        raise ContractError("Assignment baseline_kind must be verified-lkg or origin-main.")
     evidence: dict[str, object]
     schema_version: int
+    expected_origin_head: str | None = None
+    expected_origin_url_sha256: str | None = None
     if baseline_kind == "verified-lkg":
         if candidate_receipt is None or run_receipt is None:
             raise ContractError("Verified-LKG assignment requires both receipts.")
@@ -1590,7 +1732,7 @@ def create_assignment(
             raise ContractError(
                 "Assignment HEAD must equal the authoritative last-green ref."
             )
-        _assert_assignment_evidence(
+        candidate_receipt_sha, run_receipt_sha = _assert_assignment_evidence(
             root,
             candidate_receipt=candidate_receipt,
             run_receipt=run_receipt,
@@ -1599,29 +1741,35 @@ def create_assignment(
         )
         schema_version = ASSIGNMENT_SCHEMA_VERSION
         evidence = {
-            "candidate_receipt_sha256": _file_sha256(
-                candidate_receipt, "candidate receipt"
-            ),
-            "run_receipt_sha256": _file_sha256(run_receipt, "run receipt"),
+            "candidate_receipt_sha256": candidate_receipt_sha,
+            "run_receipt_sha256": run_receipt_sha,
         }
     else:
+        if candidate_receipt is not None or run_receipt is not None:
+            raise ContractError("Origin-main assignment does not accept receipts.")
         remote_ref = "refs/remotes/origin/main"
         try:
-            remote_head = _git_text(root, "rev-parse", "--verify", f"{remote_ref}^{{commit}}")
+            expected_origin_head = _git_text(
+                root, "rev-parse", "--verify", f"{remote_ref}^{{commit}}"
+            )
             origin_url = _git_text(root, "remote", "get-url", "origin")
         except ContractError as error:
             raise ContractError(
                 "Origin-main assignment requires a configured, fetched origin/main."
             ) from error
-        if remote_head != head:
+        if expected_origin_head != head:
             raise ContractError(
-                f"Assignment HEAD {head} differs from fetched origin/main {remote_head}."
+                f"Assignment HEAD {head} differs from fetched origin/main "
+                f"{expected_origin_head}."
             )
+        expected_origin_url_sha256 = hashlib.sha256(
+            origin_url.encode("utf-8")
+        ).hexdigest()
         schema_version = MAIN_ASSIGNMENT_SCHEMA_VERSION
         evidence = {
             "baseline_kind": "origin-main",
             "baseline_ref": remote_ref,
-            "origin_url_sha256": hashlib.sha256(origin_url.encode("utf-8")).hexdigest(),
+            "origin_url_sha256": expected_origin_url_sha256,
         }
     payload: dict[str, object] = {
         "schema_version": schema_version,
@@ -1647,7 +1795,46 @@ def create_assignment(
     record = dict(payload)
     record["assignment_digest"] = _canonical_digest(payload)
 
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
+        if baseline_kind == "origin-main":
+            try:
+                locked_origin_head = _git_text(
+                    root,
+                    "rev-parse",
+                    "--verify",
+                    "refs/remotes/origin/main^{commit}",
+                )
+                locked_origin_url_sha256 = hashlib.sha256(
+                    _git_text(root, "remote", "get-url", "origin").encode("utf-8")
+                ).hexdigest()
+            except ContractError as error:
+                raise ContractError(
+                    "Origin-main authority became unavailable before assignment "
+                    "publication."
+                ) from error
+            if (
+                locked_origin_head != expected_origin_head
+                or locked_origin_head != head
+                or locked_origin_url_sha256 != expected_origin_url_sha256
+            ):
+                raise ContractError(
+                    "Origin-main authority changed before assignment publication."
+                )
+        else:
+            # The expensive semantic verification intentionally happens before
+            # the global metadata lock.  A lightweight final CAS closes the
+            # publication window without serialising the full runner verifier.
+            _assert_assignment_evidence_unchanged(
+                root,
+                candidate_receipt=candidate_receipt,
+                run_receipt=run_receipt,
+                expected_candidate_sha256=str(
+                    evidence["candidate_receipt_sha256"]
+                ),
+                expected_run_sha256=str(evidence["run_receipt_sha256"]),
+                head=head,
+                tree=tree,
+            )
         task_directory = assignment_store(root) / str(record["task_id_sha256"])
         task_directory.mkdir(parents=True, exist_ok=True)
         existing_bundles = [
@@ -1661,7 +1848,23 @@ def create_assignment(
             existing = _assignment_record(existing_bundles[0])
             if existing.get("task_id") != normalized_task:
                 raise ContractError("Assignment task hash collision detected.")
-            if existing == record:
+            retry_variant_fields = {
+                "created_at",
+                "ack_deadline",
+                "assignment_id",
+                "assignment_digest",
+            }
+            existing_identity = {
+                key: value
+                for key, value in existing.items()
+                if key not in retry_variant_fields
+            }
+            requested_identity = {
+                key: value
+                for key, value in record.items()
+                if key not in retry_variant_fields
+            }
+            if existing_identity == requested_identity:
                 status = _assignment_status_unlocked(
                     existing_bundles[0], now=created_at
                 )
@@ -1714,7 +1917,7 @@ def acknowledge_assignment(
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_owner = normalize_owner(owner)
     write_set = _closed_write_set(write_set_path)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=acknowledged_at)
         assignment = status["assignment"]
@@ -1803,7 +2006,7 @@ def redispatch_assignment(
         raise ContractError("Redispatch ACK deadline must be in the future.")
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_reason = _assignment_text(reason, "redispatch reason", 2000)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=redispatched_at)
         assignment = status["assignment"]
@@ -1844,7 +2047,7 @@ def close_assignment(
     closed_at = (now or _utc_now()).astimezone(timezone.utc)
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_reason = _assignment_text(reason, "close reason", 2000)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=closed_at)
         assignment = status["assignment"]
@@ -1878,7 +2081,7 @@ def assignment_gc_plan(
     current = (now or _utc_now()).astimezone(timezone.utc)
     cutoff = current - timedelta(days=retention_days)
     eligible: list[dict[str, object]] = []
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         for bundle in _all_assignment_bundles(root):
             status = _assignment_status_unlocked(bundle, now=current)
             if status["state"] != ASSIGNMENT_CLOSED:
@@ -1924,7 +2127,7 @@ def validate_assignment_context(
     root = repository_root(repository)
     normalized_thread = _assignment_text(thread_id, "thread_id", 512)
     normalized_owner = normalize_owner(owner)
-    with assignment_lock(root):
+    with assignment_metadata_lock(root):
         bundle = _find_assignment_bundle(root, assignment_id, task_id)
         status = _assignment_status_unlocked(bundle, now=now or _utc_now())
         assignment = status["assignment"]
@@ -1943,14 +2146,10 @@ def validate_assignment_context(
             mismatches.append("common_git_dir")
         if assignment["branch"] != _branch_name(root):
             mismatches.append("branch")
-        if (
-            assignment["schema_version"] == MAIN_ASSIGNMENT_SCHEMA_VERSION
-            and hashlib.sha256(
-                _git_text(root, "remote", "get-url", "origin").encode("utf-8")
-            ).hexdigest()
-            != assignment["origin_url_sha256"]
-        ):
-            mismatches.append("origin_url")
+        # ``origin_url_sha256`` is immutable admission provenance.  A later
+        # repository transfer or remote rename must not invalidate an already
+        # durable assignment lifecycle.  Fresh-base admission/publishing still
+        # resolves and verifies the current ``origin/main`` independently.
         ancestor = _run_git(
             root,
             "merge-base",
@@ -2300,75 +2499,110 @@ def verify_publication_receipt(
 ) -> dict[str, object]:
     root = repository_root(repository)
     target = _receipt_target(root, receipt_path)
-    with publication_lock(root):
-        _assert_clean_publication_candidate(root)
-        _assert_tracked_text_bytes_reproducible(root)
-        try:
-            receipt = json.loads(target.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ContractError(f"Publication receipt is unreadable: {error}") from error
-        required_keys = {
-            "schema_version",
-            "status",
-            "head",
-            "tree",
-            "branch",
-            "input_roots",
-            "output_roots",
-            "inputs",
-            "outputs",
-            "input_digest",
-            "output_digest",
-        }
-        if not isinstance(receipt, dict) or set(receipt) != required_keys:
-            raise ContractError("Publication receipt has an invalid exact key set.")
-        if (
-            receipt["schema_version"] != PUBLICATION_RECEIPT_SCHEMA_VERSION
-            or receipt["status"] != PUBLICATION_RECEIPT_STATUS
-        ):
-            raise ContractError("Publication receipt schema/status is invalid.")
-        current_head = _git_text(root, "rev-parse", "HEAD")
-        current_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
-        if receipt["head"] != current_head or receipt["tree"] != current_tree:
-            raise ContractError(
-                "Publication receipt HEAD/tree does not match the candidate."
-            )
-        input_roots, actual_input_paths = _closed_root_inventory(
-            root, receipt["input_roots"], "input"
+    before_head = _git_text(root, "rev-parse", "HEAD")
+    before_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    try:
+        before_receipt_bytes = target.read_bytes()
+        receipt = json.loads(before_receipt_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContractError(f"Publication receipt is unreadable: {error}") from error
+
+    _assert_clean_publication_candidate(root)
+    _assert_tracked_text_bytes_reproducible(root)
+    required_keys = {
+        "schema_version",
+        "status",
+        "head",
+        "tree",
+        "branch",
+        "input_roots",
+        "output_roots",
+        "inputs",
+        "outputs",
+        "input_digest",
+        "output_digest",
+    }
+    if not isinstance(receipt, dict) or set(receipt) != required_keys:
+        raise ContractError("Publication receipt has an invalid exact key set.")
+    if (
+        receipt["schema_version"] != PUBLICATION_RECEIPT_SCHEMA_VERSION
+        or receipt["status"] != PUBLICATION_RECEIPT_STATUS
+    ):
+        raise ContractError("Publication receipt schema/status is invalid.")
+    if receipt["head"] != before_head or receipt["tree"] != before_tree:
+        raise ContractError(
+            "Publication receipt HEAD/tree does not match the candidate."
         )
-        output_roots, actual_output_paths = _closed_root_inventory(
-            root, receipt["output_roots"], "output"
+    input_roots, actual_input_paths = _closed_root_inventory(
+        root, receipt["input_roots"], "input"
+    )
+    output_roots, actual_output_paths = _closed_root_inventory(
+        root, receipt["output_roots"], "output"
+    )
+    if tuple(receipt["input_roots"]) != input_roots:
+        raise ContractError("Publication receipt input roots are not canonical.")
+    if tuple(receipt["output_roots"]) != output_roots:
+        raise ContractError("Publication receipt output roots are not canonical.")
+    expected_inputs = _receipt_records(receipt["inputs"], "inputs")
+    expected_outputs = _receipt_records(receipt["outputs"], "outputs")
+    if tuple(record.path for record in expected_inputs) != actual_input_paths:
+        raise ContractError(
+            "Publication input set changed (extra or omitted file)."
         )
-        if tuple(receipt["input_roots"]) != input_roots:
-            raise ContractError("Publication receipt input roots are not canonical.")
-        if tuple(receipt["output_roots"]) != output_roots:
-            raise ContractError("Publication receipt output roots are not canonical.")
-        expected_inputs = _receipt_records(receipt["inputs"], "inputs")
-        expected_outputs = _receipt_records(receipt["outputs"], "outputs")
-        if tuple(record.path for record in expected_inputs) != actual_input_paths:
-            raise ContractError(
-                "Publication input set changed (extra or omitted file)."
-            )
-        if tuple(record.path for record in expected_outputs) != actual_output_paths:
-            raise ContractError(
-                "Publication output set changed (extra or omitted file)."
-            )
-        _assert_publication_paths_tracked(
-            root,
-            actual_input_paths,
-            actual_output_paths,
+    if tuple(record.path for record in expected_outputs) != actual_output_paths:
+        raise ContractError(
+            "Publication output set changed (extra or omitted file)."
         )
-        actual_inputs = _publication_records(root, actual_input_paths)
-        actual_outputs = _publication_records(root, actual_output_paths)
-        if expected_inputs != actual_inputs:
-            raise ContractError("Publication input file content changed.")
-        if expected_outputs != actual_outputs:
-            raise ContractError("Publication output file content changed.")
-        if receipt["input_digest"] != _records_digest(actual_inputs):
-            raise ContractError("Publication input digest is invalid.")
-        if receipt["output_digest"] != _records_digest(actual_outputs):
-            raise ContractError("Publication output digest is invalid.")
-        return receipt
+    _assert_publication_paths_tracked(
+        root,
+        actual_input_paths,
+        actual_output_paths,
+    )
+    actual_inputs = _publication_records(root, actual_input_paths)
+    actual_outputs = _publication_records(root, actual_output_paths)
+    if expected_inputs != actual_inputs:
+        raise ContractError("Publication input file content changed.")
+    if expected_outputs != actual_outputs:
+        raise ContractError("Publication output file content changed.")
+    if receipt["input_digest"] != _records_digest(actual_inputs):
+        raise ContractError("Publication input digest is invalid.")
+    if receipt["output_digest"] != _records_digest(actual_outputs):
+        raise ContractError("Publication output digest is invalid.")
+
+    # Verification is deliberately lock-free. Re-snapshot every relevant
+    # identity and byte set, and fail closed if a cooperative writer raced us.
+    after_input_roots, after_input_paths = _closed_root_inventory(
+        root, receipt["input_roots"], "input"
+    )
+    after_output_roots, after_output_paths = _closed_root_inventory(
+        root, receipt["output_roots"], "output"
+    )
+    after_inputs = _publication_records(root, after_input_paths)
+    after_outputs = _publication_records(root, after_output_paths)
+    _assert_clean_publication_candidate(root)
+    _assert_tracked_text_bytes_reproducible(root)
+    after_head = _git_text(root, "rev-parse", "HEAD")
+    after_tree = _git_text(root, "rev-parse", "HEAD^{tree}")
+    try:
+        after_receipt_bytes = target.read_bytes()
+    except OSError as error:
+        raise ContractError(f"Publication receipt is unreadable: {error}") from error
+    if (
+        before_head != after_head
+        or before_tree != after_tree
+        or before_receipt_bytes != after_receipt_bytes
+        or input_roots != after_input_roots
+        or output_roots != after_output_roots
+        or actual_input_paths != after_input_paths
+        or actual_output_paths != after_output_paths
+        or actual_inputs != after_inputs
+        or actual_outputs != after_outputs
+    ):
+        raise ContractError(
+            "Publication candidate HEAD/tree, receipt or file bytes changed "
+            "during lock-free verification."
+        )
+    return receipt
 
 
 def _publication_receipt_header(
@@ -2725,7 +2959,11 @@ def doctor_report(
 
 
 def _write_json(value: object) -> None:
-    print(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True))
+    # CLI JSON must remain writable on Windows hosts whose inherited console
+    # encoding is cp1250 or another legacy code page. Assignment publication
+    # is already durable before this response is emitted, so an encoding error
+    # here would create a false setup failure after the final marker exists.
+    print(json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True))
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -2891,7 +3129,10 @@ def _parser() -> argparse.ArgumentParser:
 
     assignment_create_main = assignment_commands.add_parser(
         "create-main",
-        help="create an assignment from the exact fetched origin/main without full-suite evidence",
+        help=(
+            "atomically create an assignment from the exact fetched "
+            "origin/main without candidate/full-run receipts"
+        ),
     )
     assignment_create_main.add_argument("--task-id", required=True)
     assignment_create_main.add_argument("--thread-id", required=True)

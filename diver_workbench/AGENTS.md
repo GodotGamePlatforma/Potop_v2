@@ -23,7 +23,7 @@ Zmiana wyłącznie organizacji albo źródła prezentacji, która zachowuje zatw
 
 ### Współbieżność
 
-- Agent Nurka pracujący równolegle z Rootem, Mapą lub strukturami używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem oraz zgodnym pełnym run receiptem `PASS`. Osobny CWD nie izoluje wspólnego checkoutu; rozłączna allowlista pozostaje obowiązkowa także w osobnym worktree.
+- Agent Nurka pracujący równolegle z Rootem, Mapą lub strukturami używa osobnego pełnego Git worktree z aktualnego `origin/main` i gałęzi `codex/diver/<task-slug>`. Setup nie wymaga receiptu ani LKG, lecz tworzy assignment z zamkniętym write-setem; zapis zaczyna się dopiero po ACK i stanie `RUNNING`. Zielony PR przechodzi automatyczny `fast-green`, w razie wrażliwego diffu także zaufany Codex gate, natywną kolejkę GitHub i squash merge. Osobny CWD nie izoluje wspólnego checkoutu.
 - Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Do integracji trafia niezmienny commit lub zweryfikowana rewizja FROZEN, dzięki czemu autor może rozwijać N+1 bez czekania na testy poprzedniej rewizji.
 - Celowany test Nurka nie wykonuje discovery, refreshu ani walidacji prywatnych pakietów Mapy. Runner tworzy pełną FROZEN kopię z osobnym `.godot`, `user://`, logami i capture; równoległy Godot działa tylko w osobnych workspace z jawnym `--path`. `-InPlace` jest odrzucane.
 

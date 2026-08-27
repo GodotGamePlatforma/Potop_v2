@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Fail closed when an automatic candidate changes CI control-plane files."""
+"""Classify exact candidate diffs for the trusted automatic PR gate.
+
+The historical ``validate-*`` commands remain fail-closed compatibility
+surfaces.  CI-S1A uses ``classify-diff``: protected control-plane paths are
+accepted into the single automatic lane, but are always marked sensitive so
+the default-branch receiver can require the trusted Codex review.
+"""
 
 from __future__ import annotations
 
@@ -58,6 +64,39 @@ MAP_MAINTENANCE_EXACT_PATHS = frozenset(
 # alongside the three verifier changes.
 MAP_MAINTENANCE_ALLOWED_PATHS = MAP_MAINTENANCE_EXACT_PATHS
 
+# These product/runtime surfaces have broad persistence, boot, or packaging
+# consequences.  They use the same automatic lane as every other PR, with the
+# additional trusted review.  ``is_protected_path`` is deliberately included
+# below, so every control-plane change is sensitive without becoming manual.
+SENSITIVE_DIRECTORIES = frozenset(("scripts/core", "scripts/data"))
+SENSITIVE_EXACT_PATHS = frozenset(
+    (
+        "project.godot",
+        "export_presets.cfg",
+        "underwater_map_workbench/map_manifest.json",
+    )
+)
+RUNTIME_DIRECTORIES = frozenset(
+    (
+        "scripts",
+        "data",
+        "scenes",
+        "assets",
+        "resources",
+        "underwater_map_workbench/runtime",
+        "underwater_map_workbench/generated",
+        "underwater_map_workbench/assets",
+        "diver_workbench/runtime",
+        "diver_workbench/generated",
+        "diver_workbench/assets",
+        "diver_workbench/definitions",
+        "underwater_map_workbench/structures",
+    )
+)
+RUNTIME_EXACT_PATHS = SENSITIVE_EXACT_PATHS | frozenset(
+    ("underwater_map_workbench/underwatermap.tscn",)
+)
+
 
 class ProtectedPathError(RuntimeError):
     """Raised when path input or a candidate diff cannot be trusted."""
@@ -112,6 +151,28 @@ def is_protected_path(path: str | Path) -> bool:
     return False
 
 
+def is_sensitive_path(path: str | Path) -> bool:
+    normalized = normalize_repo_path(path).lower()
+    if is_protected_path(normalized):
+        return True
+    if normalized in SENSITIVE_EXACT_PATHS:
+        return True
+    return any(
+        normalized == directory or normalized.startswith(directory + "/")
+        for directory in SENSITIVE_DIRECTORIES
+    )
+
+
+def is_runtime_path(path: str | Path) -> bool:
+    normalized = normalize_repo_path(path).lower()
+    if normalized in RUNTIME_EXACT_PATHS:
+        return True
+    return any(
+        normalized == directory or normalized.startswith(directory + "/")
+        for directory in RUNTIME_DIRECTORIES
+    )
+
+
 def _bounded_paths(paths: Iterable[str | Path]) -> tuple[str, ...]:
     normalized: list[str] = []
     for path in paths:
@@ -137,6 +198,31 @@ def validate_paths(paths: Iterable[str | Path]) -> dict[str, object]:
         "status": "PASS",
         "path_count": len(normalized),
         "protected_path_count": 0,
+    }
+
+
+def classify_paths(paths: Iterable[str | Path]) -> dict[str, object]:
+    normalized = _bounded_paths(paths)
+    unique_paths = tuple(sorted(set(normalized)))
+    protected = tuple(path for path in unique_paths if is_protected_path(path))
+    sensitive = tuple(path for path in unique_paths if is_sensitive_path(path))
+    runtime = tuple(path for path in unique_paths if is_runtime_path(path))
+    mixed_trust_root_runtime = bool(protected and runtime)
+    return {
+        "status": (
+            "REJECTED_MIXED_TRUST_ROOT_RUNTIME"
+            if mixed_trust_root_runtime
+            else "PASS"
+        ),
+        "path_count": len(unique_paths),
+        "protected_path_count": len(protected),
+        "protected_paths": protected,
+        "sensitive": bool(sensitive),
+        "sensitive_path_count": len(sensitive),
+        "sensitive_paths": sensitive,
+        "runtime_path_count": len(runtime),
+        "runtime_paths": runtime,
+        "mixed_trust_root_runtime": mixed_trust_root_runtime,
     }
 
 
@@ -312,6 +398,39 @@ def validate_diff(
     }
 
 
+def classify_diff(
+    repository: str | Path,
+    base: str,
+    head: str,
+) -> dict[str, object]:
+    root = _repository_root(repository)
+    base_commit = _resolve_exact_commit(root, base, "Base")
+    head_commit = _resolve_exact_commit(root, head, "Head")
+    payload = _git_bytes(
+        root,
+        "diff",
+        "--name-status",
+        "--find-renames",
+        "-z",
+        base_commit,
+        head_commit,
+        "--",
+    )
+    records = parse_name_status_records_z(payload)
+    paths = tuple(path for _status, record_paths in records for path in record_paths)
+    if not paths:
+        raise ProtectedPathError("Candidate diff is empty.")
+    result = classify_paths(paths)
+    result.update(
+        {
+            "base": base_commit,
+            "head": head_commit,
+            "record_count": len(records),
+        }
+    )
+    return result
+
+
 def validate_map_maintenance_diff(
     repository: str | Path,
     base: str,
@@ -377,6 +496,11 @@ def _parser() -> argparse.ArgumentParser:
     validate_diff_parser.add_argument("--base", required=True)
     validate_diff_parser.add_argument("--head", required=True)
 
+    classify_diff_parser = commands.add_parser("classify-diff")
+    classify_diff_parser.add_argument("--repo", required=True)
+    classify_diff_parser.add_argument("--base", required=True)
+    classify_diff_parser.add_argument("--head", required=True)
+
     validate_map_parser = commands.add_parser("validate-map-maintenance-diff")
     validate_map_parser.add_argument("--repo", required=True)
     validate_map_parser.add_argument("--base", required=True)
@@ -398,6 +522,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if arguments.command == "validate-diff":
             result = validate_diff(arguments.repo, arguments.base, arguments.head)
+        elif arguments.command == "classify-diff":
+            result = classify_diff(arguments.repo, arguments.base, arguments.head)
         elif arguments.command == "validate-map-maintenance-diff":
             result = validate_map_maintenance_diff(
                 arguments.repo,

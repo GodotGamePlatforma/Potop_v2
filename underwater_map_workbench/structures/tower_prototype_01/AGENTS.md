@@ -27,7 +27,7 @@ Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publi
 
 ### Współbieżność
 
-- Jeden autor pakietu pracuje w osobnym pełnym Git worktree i na własnej gałęzi z ostatniego zielonego commita. Audytor może korzystać z innego worktree tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji.
+- Jeden autor pakietu pracuje w osobnym pełnym Git worktree utworzonym z aktualnego `origin/main` i na własnej gałęzi `codex/structure-tower_prototype_01/<task-slug>`. Audytor może korzystać z innego worktree tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji. Setup nie wymaga receiptu ani LKG, ale zapis wymaga ACK trwałego assignmentu z prywatnym write-setem. Po testach zwykły PR przechodzi automatyczny `fast-green`, ewentualny zaufany Codex gate, natywną kolejkę GitHub i squash merge.
 - Autor wykonuje lokalny seal i testy bez globalnego `map-promotion`, po czym przekazuje niezmienny commit albo rewizję FROZEN. Może natychmiast rozwijać N+1; integrator Mapy pobiera wyłącznie wskazany hash, aktualizuje mapowy pin i publikuje wspólne pochodne.
 - Lokalny build/check i celowane testy pakietu nie odkrywają innych struktur. Runner izoluje `.godot`, `user://`, logi i capture w pełnej kopii oraz odrzuca `-InPlace`.
 - Autor nie poprawia ręcznie `generated/**` ani mapowego pinu. Zajęta blokada `map-promotion` dotyczy wyłącznie integratora Mapy i nie blokuje prywatnej pracy pakietu.

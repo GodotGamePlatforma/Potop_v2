@@ -25,29 +25,31 @@ Aktualne rewizje, format schema, globalne pozycje, liczności, podpisy i wynik o
 
 ## Bootstrap worktree agenta
 
-Zadanie Mapy rozpoczynaj w osobnym worktree utworzonym z potwierdzonej pary candidate/full-run. Z CWD istniejącego `underwater_map_workbench/`:
+Zadanie Mapy rozpoczynaj w osobnym worktree z aktualnego `origin/main`. Z CWD istniejącego `underwater_map_workbench/`:
 
 ```powershell
+$destination = Join-Path (Resolve-Path ..\..) "agent-worktrees\map-<slug>"
 ..\tools\setup_agent_worktree.ps1 `
-  -CandidateReceipt <candidate.json> -RunReceipt <full.receipt> `
-  -Owner map -TaskSlug <slug> -Destination <absolute-path> `
-  -Branch codex/map/<slug> -Create
+  -FromOriginMain -Owner map -TaskSlug <slug> `
+  -TaskId <task-id> -ThreadId <thread-id> -TaskBrief "Mapa: <brief>" `
+  -WriteSet <pełna-ścieżka-do-write-set> `
+  -Destination $destination -Branch codex/map/<slug>
+..\tools\setup_agent_worktree.ps1 `
+  -FromOriginMain -Owner map -TaskSlug <slug> `
+  -TaskId <task-id> -ThreadId <thread-id> -TaskBrief "Mapa: <brief>" `
+  -WriteSet <pełna-ścieżka-do-write-set> `
+  -Destination $destination -Branch codex/map/<slug> -Create
 ```
 
-Po wejściu do nowego warsztatu, jeszcze przed pierwszym zapisem, zadeklaruj zamknięty write-set i uruchom:
+Po utworzeniu helper zwraca `WAITING_ACK`; wykonaj podaną komendę ACK i zacznij zapis dopiero po stanie `RUNNING`. Przed handoffem sprawdź przypisany diff:
 
 ```powershell
 python -B ..\tools\workbench_contract.py --repo .. doctor --owner map --intent author
+python -B ..\tools\workbench_contract.py --repo .. validate `
+  --assignment <assignment-id> --task-id <task-id> --thread-id <thread-id> --diff
 ```
 
-Przed hand-offem pobierz aktualne refy i zweryfikuj pełny diff względem ownera:
-
-```powershell
-git -C .. fetch --prune
-python -B ..\tools\workbench_contract.py --repo .. validate --owner map --diff
-```
-
-Następnie wykonaj logiczny commit i wypchnij wyłącznie własną gałąź `codex/map/<slug>`; nie pushuj bezpośrednio do `main`, nie rebase'uj ani nie force-pushuj przekazanej rewizji.
+Po testach utwórz commit i zwykły PR przez `..\tools\publish_agent_pr.ps1`. Codzienna ścieżka nie wymaga candidate/run receiptów ani lokalnego LKG; assignment/ACK chroni tylko identity i write-set. App-owned `fast-green`, a dla wrażliwego diffu także automatyczny zaufany Codex gate, przekazuje każdy PR do tej samej natywnej kolejki i squash merge. Pełny test Mapy i projektu działa po merge w tle.
 
 ## Szybki start
 
@@ -111,7 +113,7 @@ python .\tools\build_underwater_map.py --build-structure <id>
 python .\tools\build_underwater_map.py --check-structure <id>
 ```
 
-Każdy tryb buildera wykonuje najpierw wspólny repozytoryjny preflight EOL. Tracked plik z atrybutem `eol=lf` w stanie `w/crlf` albo `w/mixed` zatrzymuje polecenie przed sealem, renderem lub publikacją; dirty zmiana zapisana LF pozostaje poprawnym wejściem authoringu. Sam `git status` nie certyfikuje późniejszego candidate receiptu, który porównuje także surowe bajty z exact HEAD/index. Official isolated runner celowanego testu struktury nie kopiuje `.git`: po byte-identycznym snapshotcie sam wystawia jednorazowy, podpisany dowód EOL związany z pełnym manifestem bajtów i exact ID pakietu, a builder przed lokalnym renderem ponownie sprawdza podpis i wszystkie pliki. Nie jest to ręczna komenda ani obejście dla zwykłego buildera uruchomionego poza Git; brak, manipulacja albo drift dowodu zatrzymują przebieg.
+Każdy tryb buildera wykonuje najpierw wspólny repozytoryjny preflight EOL. Tracked plik z atrybutem `eol=lf` w stanie `w/crlf` albo `w/mixed` zatrzymuje polecenie przed sealem, renderem lub publikacją; dirty zmiana zapisana LF pozostaje poprawnym wejściem authoringu. Wewnętrzny isolated runner celowanego testu struktury nie kopiuje `.git`: po byte-identycznym snapshotcie sam wystawia jednorazowy, podpisany dowód EOL związany z pełnym manifestem bajtów i exact ID pakietu, a builder przed lokalnym renderem ponownie sprawdza podpis i wszystkie pliki. Nie jest to ręczna komenda ani obejście dla zwykłego buildera uruchomionego poza Git; brak, manipulacja albo drift dowodu zatrzymują przebieg.
 
 Następnie uruchom dwa cele wskazane w lokalnym `structures/<id>/README.md` i przekaż niezmienny commit albo zweryfikowaną rewizję FROZEN. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
 
