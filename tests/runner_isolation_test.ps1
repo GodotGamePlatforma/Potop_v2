@@ -171,6 +171,12 @@ Assert-RunnerInvariant `
     ($runnerText.Contains('$testSelection = if ($shardMode)') -and
         $runnerText.Contains('ManifestTargets = @($activeShardTargets | ForEach-Object Name)')) `
     "Shard execution must consume only the immutable plan target list without rediscovery."
+Assert-RunnerInvariant `
+    ([regex]::Matches(
+        $runnerText,
+        '(?m)^\s+"underwater_map_workbench/tests/underwater_map_smoke_test\.gd"\s*$'
+    ).Count -eq 1) `
+    "The closed full-suite manifest must contain map smoke exactly once."
 
 $tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd([char[]]"\/")
 $fixtureRoot = [System.IO.Path]::GetFullPath((Join-Path $tempParent ("ostatni_pomost_runner_test_" + [Guid]::NewGuid().ToString("N"))))

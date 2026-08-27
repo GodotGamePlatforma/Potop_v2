@@ -40,6 +40,8 @@ PROTECTED_EXACT_PATHS = frozenset(
         "tests/pre_push_guard_test.ps1",
         "tests/map_atomic_write_test.py",
         "tests/parallel_worktree_godot_test.ps1",
+        "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+        "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
         "underwater_map_workbench/tools/build_underwater_map.py",
     )
 )

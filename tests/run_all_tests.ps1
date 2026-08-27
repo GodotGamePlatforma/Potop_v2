@@ -406,6 +406,7 @@ $fullHeadlessScriptTests = @(
     "building_system_test.gd"
     "campaign_map_contract_test.gd"
     "workbench_boundary_test.gd"
+    "underwater_map_workbench/tests/underwater_map_smoke_test.gd"
     "structure_world_link_test.gd"
     "campaign_story_system_test.gd"
     "career_progression_system_test.gd"

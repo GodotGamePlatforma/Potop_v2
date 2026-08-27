@@ -117,6 +117,8 @@ jobs:
               "tests/workbench_contract_test.py", "tests/workbench_lock_test.py",
               "tests/setup_agent_worktree_test.ps1", "tests/freeze_workbench_revision_test.py",
               "tests/pre_push_guard_test.ps1", "tests/map_atomic_write_test.py",
+              "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+              "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
               "underwater_map_workbench/tools/build_underwater_map.py"
             )
             foreach ($protected in $exact) {
@@ -437,6 +439,8 @@ jobs:
               "tests/workbench_contract_test.py", "tests/workbench_lock_test.py",
               "tests/setup_agent_worktree_test.ps1", "tests/freeze_workbench_revision_test.py",
               "tests/pre_push_guard_test.ps1", "tests/map_atomic_write_test.py",
+              "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+              "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
               "underwater_map_workbench/tools/build_underwater_map.py"
             )
             foreach ($protected in $exact) {

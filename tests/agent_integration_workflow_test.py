@@ -448,6 +448,7 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         workflow = _workflow("agent-integration.yml")
         plan = _job(workflow, "prepare-lfs-plan")
         shard = _job(workflow, "shard")
+        runner = RUNNER_PATH.read_text(encoding="utf-8")
 
         self.assertIn('HEADLESS_SHARD_COUNT: "4"', workflow)
         self.assertIn('NATIVE_SHARD_COUNT: "1"', workflow)
@@ -477,6 +478,61 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         self.assertIn("-ShardPlan $planPath", shard)
         self.assertIn('-ShardId "${{ matrix.shard_id }}"', shard)
         self.assertIn("-RunReceiptOutputPath $receiptPath", shard)
+
+        smoke_target = "underwater_map_workbench/tests/underwater_map_smoke_test.gd"
+        quick_match = re.search(
+            r"(?ms)\$quickHeadlessScriptTests\s*=\s*@\((.*?)^\)", runner
+        )
+        full_match = re.search(
+            r"(?ms)\$fullHeadlessScriptTests\s*=\s*@\((.*?)^\)", runner
+        )
+        self.assertIsNotNone(quick_match)
+        self.assertIsNotNone(full_match)
+        self.assertNotIn(smoke_target, quick_match.group(1))
+        self.assertEqual(1, full_match.group(1).count(f'"{smoke_target}"'))
+
+    def test_trusted_map_check_and_smoke_are_fail_closed(self) -> None:
+        workflow = _workflow("agent-integration.yml")
+        infra = _job(workflow, "infra-contracts")
+        plan = _job(workflow, "prepare-lfs-plan")
+
+        portal_contract = (
+            "underwater_map_workbench/tests/portal_backdrop_clearance_test.py"
+        )
+        self.assertEqual(1, infra.count(portal_contract))
+        self.assertIn(
+            f'(Join-Path $trustedRoot "{portal_contract}")',
+            infra,
+        )
+
+        trusted_dependencies = (
+            "underwater_map_workbench/tools/build_underwater_map.py",
+            "tools/workbench_contract.py",
+            "tools/workbench_lock.py",
+        )
+        dependency_match = re.search(
+            r"(?ms)\$trustedMapFiles\s*=\s*@\((.*?)^\s*\)", plan
+        )
+        self.assertIsNotNone(dependency_match)
+        self.assertEqual(
+            set(trusted_dependencies),
+            set(re.findall(r'"([^"\r\n]+)"', dependency_match.group(1))),
+        )
+        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $trustedPath", plan)
+        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $candidatePath", plan)
+        self.assertIn("$candidateSha -cne $trustedSha", plan)
+        self.assertIn("$candidateHead -cne $env:EXPECTED_HEAD_SHA", plan)
+        self.assertEqual(1, len(re.findall(r"build_underwater_map\.py\"\) --check", plan)))
+        self.assertNotRegex(plan, r"build_underwater_map\.py\"\) --build")
+        self.assertIn("Trusted map authority check changed the exact candidate", plan)
+        self.assertLess(
+            plan.index("Verify cache bytes and hydrate exact candidate"),
+            plan.index("Verify exact candidate map with trusted code"),
+        )
+        self.assertLess(
+            plan.index("Verify exact candidate map with trusted code"),
+            plan.index("Create candidate receipt and immutable shard plan"),
+        )
 
     def test_artifacts_are_bound_by_exact_id_digest_and_run(self) -> None:
         workflow = _workflow("agent-integration.yml")
@@ -618,6 +674,14 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         self.assertEqual(helper_exact, inline_admit)
         self.assertEqual(inline_admit, inline_merge)
         self.assertIn("underwater_map_workbench/tools/build_underwater_map.py", helper_exact)
+        self.assertIn(
+            "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+            helper_exact,
+        )
+        self.assertIn(
+            "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
+            helper_exact,
+        )
 
         for job in (admit, merge):
             self.assertIn('.StartsWith(".github/"', job)

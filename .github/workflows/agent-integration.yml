@@ -296,6 +296,9 @@ jobs:
           Invoke-LoggedCommand "workbench lock" "python" @("-I", "-B", (Join-Path $trustedRoot "tests/workbench_lock_test.py"))
           Invoke-LoggedCommand "freeze workbench revision" "python" @("-I", "-B", (Join-Path $trustedRoot "tests/freeze_workbench_revision_test.py"))
           Invoke-LoggedCommand "map atomic write" "python" @("-I", "-B", (Join-Path $trustedRoot "tests/map_atomic_write_test.py"))
+          Invoke-LoggedCommand "portal backdrop clearance" "python" @(
+            "-I", "-B", (Join-Path $trustedRoot "underwater_map_workbench/tests/portal_backdrop_clearance_test.py")
+          )
           Invoke-LoggedCommand "setup agent worktree" "pwsh" @(
             "-NoLogo", "-NoProfile", "-File", (Join-Path $trustedRoot "tests/setup_agent_worktree_test.ps1")
           )
@@ -498,6 +501,57 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not [string]::IsNullOrEmpty((git -C $candidateRoot status --porcelain=v1 --untracked-files=all))) {
             throw "Hydrated candidate checkout is not clean."
+          }
+
+      - name: Verify exact candidate map with trusted code
+        shell: pwsh
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.trust-preflight.outputs.target-sha }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+          $trustedRoot = Join-Path $env:GITHUB_WORKSPACE "trusted-control"
+          $candidateRoot = Join-Path $env:GITHUB_WORKSPACE "candidate"
+          $mapCheckLog = Join-Path $env:RUNNER_TEMP "ci-plan\map-check.log"
+          $trustedMapFiles = @(
+            "underwater_map_workbench/tools/build_underwater_map.py",
+            "tools/workbench_contract.py",
+            "tools/workbench_lock.py"
+          )
+          foreach ($relativePath in $trustedMapFiles) {
+            $trustedPath = Join-Path $trustedRoot $relativePath
+            $candidatePath = Join-Path $candidateRoot $relativePath
+            if (-not (Test-Path -LiteralPath $trustedPath -PathType Leaf) -or
+                -not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+              throw "Trusted map verifier dependency is missing: $relativePath"
+            }
+            $trustedSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $trustedPath).Hash
+            $candidateSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidatePath).Hash
+            if ($candidateSha -cne $trustedSha) {
+              throw "Candidate map verifier dependency differs from trusted control: $relativePath"
+            }
+          }
+
+          $candidateHead = (git -C $candidateRoot rev-parse "HEAD^{commit}" | Out-String).Trim()
+          if ($candidateHead -cne $env:EXPECTED_HEAD_SHA) {
+            throw "Map check candidate HEAD moved before verification."
+          }
+          Push-Location (Join-Path $candidateRoot "underwater_map_workbench")
+          try {
+            & python -I -B (Join-Path $candidateRoot "underwater_map_workbench/tools/build_underwater_map.py") --check `
+              *>&1 | Tee-Object -FilePath $mapCheckLog
+            $mapCheckExitCode = $LASTEXITCODE
+          }
+          finally {
+            Pop-Location
+          }
+          if ($mapCheckExitCode -ne 0) {
+            throw "Trusted map authority check failed with exit code $mapCheckExitCode."
+          }
+          if (-not [string]::IsNullOrEmpty((git -C $candidateRoot status --porcelain=v1 --untracked-files=all))) {
+            throw "Trusted map authority check changed the exact candidate."
           }
 
       - name: Create candidate receipt and immutable shard plan
