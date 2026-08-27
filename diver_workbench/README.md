@@ -25,7 +25,7 @@ Agent rozpoczynający pracę w tym katalogu czyta kolejno `.ai/PROJECT_CONTEXT.m
 | `definitions/DiverFrameEnvelope.gd` | Zmierzone granice alfy 48 klatek konsumowane przez runtime i test. |
 | `definitions/DiverFrameEnvelopeProfile.gd` | Walidowany typ docelowej koperty, skali i wycentrowania grafiki. |
 | `assets/animation/` | Trzy aktywne arkusze 16-klatkowe i jeden zasób `SpriteFrames`. |
-| `assets/profiles/` | Aktywny profil 288 socketów oraz walidowany profil koperty `70 × 40`. |
+| `assets/profiles/` | Aktywny profil 288 socketów oraz walidowany profil koperty `105 × 60`. |
 | `assets/shaders/` | Shader czytelności sylwetki; radialną teksturę latarni tworzy rootowy `LightSystem`. |
 | `tests/` | Lokalny test Godot oraz natywny capture prezentacji. |
 
@@ -57,7 +57,7 @@ Natywny capture prezentacji:
 ..\tests\run_all_tests.ps1 -NativeTarget diver_workbench/tests/DiverPresentationCapture.tscn
 ```
 
-Capture zapisuje swoje artefakty w izolowanym workspace testu. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `70 × 40`, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*` z centralnym radialnym światłem, markerami kierunków oraz okluderami. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera ani odczucia sterowania.
+Capture zapisuje swoje artefakty w izolowanym workspace testu. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `105 × 60`, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*` z centralnym radialnym światłem, markerami kierunków oraz okluderami. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera, prześwitów produkcyjnej mapy ani odczucia sterowania.
 
 Pełna regresja nadal jest uruchamiana z root:
 

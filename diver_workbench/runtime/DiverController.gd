@@ -32,6 +32,7 @@ const DIVE_PLAYER_GROUP := &"dive_player"
 const REDUCED_PRESENTATION_MOTION_SCALE := 0.34
 const PRESENTATION_POSE_RESPONSE := 13.0
 const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
+const DEFAULT_VISUAL_TARGET_SIZE := Vector2(105.0, 60.0)
 const CUE_DURATIONS := {
 	&"knife_attack": 0.30,
 	&"harpoon_attack": 0.36,
@@ -494,7 +495,7 @@ func _visual_target_size() -> Vector2:
 		var configured: Vector2 = frame_envelope_profile.get("target_size")
 		if configured.x > 0.0 and configured.y > 0.0:
 			return configured
-	return Vector2(70.0, 40.0)
+	return DEFAULT_VISUAL_TARGET_SIZE
 
 
 func _authored_visual_position(sprite: AnimatedSprite2D) -> Vector2:
@@ -511,6 +512,7 @@ func _transformed_alpha_bounds(
 	var source_bounds: Rect2 = DiverFrameEnvelopeScript.bounds_for(sprite.animation, sprite.frame)
 	if source_bounds.size.is_zero_approx():
 		return Rect2()
+	source_bounds = source_bounds.grow(DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING)
 	var source_corners := PackedVector2Array([
 		source_bounds.position,
 		Vector2(source_bounds.end.x, source_bounds.position.y),
