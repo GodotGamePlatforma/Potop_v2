@@ -18,15 +18,15 @@ shader_parameter/texture_tiling = Vector2(18.373206, 10.334928)
 
 [node name="UnderwaterMap" type="Node2D"]
 metadata/manifest_path = "res://underwater_map_workbench/map_manifest.json"
-metadata/manifest_sha256 = "b8c3a2292232bcd017f481ef3b4b1b970d03dd9e34099662fe110f5c470bb012"
+metadata/manifest_sha256 = "b43bc2cd8674da4f5893e6f5fbb89c40916a59cc3d3e814d55ac0c4bdab161e3"
 metadata/schema_version = 6
 metadata/source_version = 5
-metadata/revision = {"presentation_revision": "center-station-right-city-two-tower-production-v18", "revision_id": "center-station-right-city-two-tower-runtime-v13", "topology_revision": "l05-owned-two-tower-route-v5"}
+metadata/revision = {"presentation_revision": "center-station-right-city-two-tower-production-v19", "revision_id": "center-station-right-city-two-tower-runtime-v13", "topology_revision": "l05-owned-two-tower-route-v5"}
 metadata/gameplay_signature = "manifest-v2:fbde2d70e22f93d46d32416bdc7d74b68c4bd44736b3fae0e888b221edb17325"
-metadata/presentation_fingerprint = "presentation-v2:ef2338168cdfa8ad224b5bf216aba980136e19e940dff00238b592deabd6a284"
+metadata/presentation_fingerprint = "presentation-v2:7e0c2c80b00f22a41a265db3ccb131b4ac9d29d5bcd7f23cddeca64ba32e044f"
 metadata/revision_id = "center-station-right-city-two-tower-runtime-v13"
 metadata/topology_revision = "l05-owned-two-tower-route-v5"
-metadata/presentation_revision = "center-station-right-city-two-tower-production-v18"
+metadata/presentation_revision = "center-station-right-city-two-tower-production-v19"
 metadata/grid_size = Vector2i(12, 12)
 metadata/cell_size = Vector2(1920, 1080)
 metadata/navigation_cell_size = Vector2(40, 40)
