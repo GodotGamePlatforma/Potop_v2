@@ -129,6 +129,13 @@ STRUCTURE_INTERIOR_TEXTURE_KIND = "structure_interior_texture"
 STRUCTURE_OWNER_MASKED_TEXTURE_KIND = "structure_owner_masked_texture"
 STRUCTURE_INTERIOR_AFFORDANCE = "open_water_clipped_interior"
 STRUCTURE_OWNER_AFFORDANCE = "exact_owner_solid_surface"
+PORTAL_BACKDROP_CLEARANCE_CONTRACT = "raster_boundary_opening_clearance_v1"
+PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID = "L04"
+PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS = ("L01", "L02")
+PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS = ("L03", "L04")
+PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS = 5
+PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS = 1
+PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS = 2
 STRUCTURE_CLIP_SHADER_PATH = "assets/shaders/structure_clip_masked.gdshader"
 STRUCTURE_CLIP_SHADER_RESOURCE_PATH = (
     "res://underwater_map_workbench/assets/shaders/structure_clip_masked.gdshader"
@@ -1334,6 +1341,7 @@ def _presentation_fingerprint(manifest: dict[str, Any]) -> str:
     revision = _object(manifest.get("revision"), "revision")
     payload = {
         "presentation_revision": revision["presentation_revision"],
+        "portal_backdrop_clearance_contract": PORTAL_BACKDROP_CLEARANCE_CONTRACT,
         "map": {
             "grid": copy.deepcopy(manifest["map"]["grid"]),
             "world_size": copy.deepcopy(manifest["map"]["world_size"]),
@@ -3474,6 +3482,191 @@ def _surface_detail_mask(topology_build: dict[str, Any]) -> bytes:
     return bytes(detail)
 
 
+def _portal_backdrop_clearances(
+    topology_build: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Derive visual-only backdrop clearances from anonymous boundary openings.
+
+    The stable identity contains only raster geometry.  Structure IDs, package
+    paths, socket names and runtime roles are deliberately excluded so a pure
+    identifier rename cannot alter either the digest or the presentation.
+    """
+    if topology_build.get("mode") != L05_MODE:
+        return []
+    width, height = topology_build["pixel_size"]
+    cell_width, cell_height = topology_build["world_units_per_pixel"]
+    cells: bytes = topology_build["cells"]
+    open_water_value = int(topology_build["encoding"]["open_water"])
+    if len(cells) != width * height:
+        raise ManifestError("portal backdrop clearance source has an invalid size")
+
+    def is_open(x: int, y: int) -> bool:
+        return (
+            0 <= x < width
+            and 0 <= y < height
+            and cells[y * width + x] == open_water_value
+        )
+
+    clearances_by_digest: dict[str, dict[str, Any]] = {}
+
+    def append_runs(
+        scan_start: int,
+        scan_end_exclusive: int,
+        inside_fixed: int,
+        outside_fixed: int,
+        *,
+        vertical_scan: bool,
+        boundary_cell: int,
+        outward_cell: tuple[int, int],
+    ) -> None:
+        run_start = -1
+        for cursor in range(scan_start, scan_end_exclusive + 1):
+            run_is_open = False
+            if cursor < scan_end_exclusive:
+                inside = (
+                    (inside_fixed, cursor)
+                    if vertical_scan
+                    else (cursor, inside_fixed)
+                )
+                outside = (
+                    (outside_fixed, cursor)
+                    if vertical_scan
+                    else (cursor, outside_fixed)
+                )
+                run_is_open = is_open(*inside) and is_open(*outside)
+            if run_is_open and run_start < 0:
+                run_start = cursor
+                continue
+            if run_is_open or run_start < 0:
+                continue
+
+            geometry = {
+                "axis": "vertical" if vertical_scan else "horizontal",
+                "boundary_cell": boundary_cell,
+                "run_start_cell": run_start,
+                "run_end_cell": cursor,
+                "outward_cell": list(outward_cell),
+                "cell_size": [cell_width, cell_height],
+            }
+            geometry_digest = _canonical_sha256(geometry)
+            if geometry_digest in clearances_by_digest:
+                raise ManifestError(
+                    "duplicate portal backdrop clearance geometry "
+                    f"{geometry_digest}"
+                )
+
+            if vertical_scan:
+                boundary_world = boundary_cell * cell_width
+                opening_start = run_start * cell_height
+                opening_end = cursor * cell_height
+                normal_depth = (
+                    PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS * cell_width
+                )
+                tangent_padding = (
+                    PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS
+                    * cell_height
+                )
+                core_rect = [
+                    boundary_world - normal_depth,
+                    opening_start - tangent_padding,
+                    normal_depth * 2.0,
+                    opening_end - opening_start + tangent_padding * 2.0,
+                ]
+                opening_center = [
+                    boundary_world,
+                    (opening_start + opening_end) * 0.5,
+                ]
+                span = opening_end - opening_start
+            else:
+                boundary_world = boundary_cell * cell_height
+                opening_start = run_start * cell_width
+                opening_end = cursor * cell_width
+                normal_depth = (
+                    PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS * cell_height
+                )
+                tangent_padding = (
+                    PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS
+                    * cell_width
+                )
+                core_rect = [
+                    opening_start - tangent_padding,
+                    boundary_world - normal_depth,
+                    opening_end - opening_start + tangent_padding * 2.0,
+                    normal_depth * 2.0,
+                ]
+                opening_center = [
+                    (opening_start + opening_end) * 0.5,
+                    boundary_world,
+                ]
+                span = opening_end - opening_start
+            feather_x = PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS * cell_width
+            feather_y = PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS * cell_height
+            outer_rect = [
+                core_rect[0] - feather_x,
+                core_rect[1] - feather_y,
+                core_rect[2] + feather_x * 2.0,
+                core_rect[3] + feather_y * 2.0,
+            ]
+            clearances_by_digest[geometry_digest] = {
+                "geometry": geometry,
+                "geometry_digest": geometry_digest,
+                "opening_center": opening_center,
+                "outward": list(outward_cell),
+                "span": span,
+                "core_rect": core_rect,
+                "outer_rect": outer_rect,
+            }
+            run_start = -1
+
+    for instance in topology_build["structure_build"]["instances"]:
+        if not instance["enabled"]:
+            continue
+        origin_x, origin_y = (int(value) for value in instance["origin_px"])
+        size_x, size_y = (int(value) for value in instance["size_px"])
+        right_exclusive = origin_x + size_x
+        bottom_exclusive = origin_y + size_y
+        append_runs(
+            origin_y,
+            bottom_exclusive,
+            origin_x,
+            origin_x - 1,
+            vertical_scan=True,
+            boundary_cell=origin_x,
+            outward_cell=(-1, 0),
+        )
+        append_runs(
+            origin_y,
+            bottom_exclusive,
+            right_exclusive - 1,
+            right_exclusive,
+            vertical_scan=True,
+            boundary_cell=right_exclusive,
+            outward_cell=(1, 0),
+        )
+        append_runs(
+            origin_x,
+            right_exclusive,
+            origin_y,
+            origin_y - 1,
+            vertical_scan=False,
+            boundary_cell=origin_y,
+            outward_cell=(0, -1),
+        )
+        append_runs(
+            origin_x,
+            right_exclusive,
+            bottom_exclusive - 1,
+            bottom_exclusive,
+            vertical_scan=False,
+            boundary_cell=bottom_exclusive,
+            outward_cell=(0, 1),
+        )
+    return [
+        clearances_by_digest[digest]
+        for digest in sorted(clearances_by_digest)
+    ]
+
+
 def _structure_surface_detail_crop(
     topology_build: dict[str, Any],
     instance: dict[str, Any],
@@ -5017,6 +5210,194 @@ def _append_l00_content(
         )
 
 
+def _append_portal_backdrop_clearances(
+    lines: list[str],
+    manifest: dict[str, Any],
+    topology_build: dict[str, Any],
+) -> None:
+    layers_by_id = {
+        str(layer["id"]): layer
+        for layer in manifest["visual"]["layers"]
+    }
+    missing_layers = [
+        layer_id
+        for layer_id in (
+            *PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS,
+            *PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS,
+        )
+        if layer_id not in layers_by_id
+    ]
+    if missing_layers:
+        raise ManifestError(
+            "portal backdrop clearance misses visual layers: "
+            + ", ".join(missing_layers)
+        )
+    backdrop_z = max(
+        int(layers_by_id[layer_id]["z_index"])
+        for layer_id in PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS
+    )
+    foreground_z = min(
+        int(layers_by_id[layer_id]["z_index"])
+        for layer_id in PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS
+    )
+    clearance_z = backdrop_z + 1
+    if clearance_z >= foreground_z:
+        raise ManifestError(
+            "portal backdrop clearance requires z-order above L01/L02 "
+            "and below L03/L04"
+        )
+    clearances = _portal_backdrop_clearances(topology_build)
+    aggregate_digest = _canonical_sha256(
+        [clearance["geometry"] for clearance in clearances]
+    )
+    root_path = (
+        f"VisualLayers/{PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID}/"
+        "PortalBackdropClearances"
+    )
+    lines.extend(
+        (
+            "",
+            '[node name="PortalBackdropClearances" type="Node2D" '
+            f'parent="VisualLayers/{PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID}"]',
+            "position = Vector2(0, 0)",
+            "scale = Vector2(1, 1)",
+            "z_as_relative = false",
+            f"z_index = {clearance_z}",
+            f"metadata/contract = {_gd_string(PORTAL_BACKDROP_CLEARANCE_CONTRACT)}",
+            'metadata/role = "portal_backdrop_clearance"',
+            'metadata/space = "world_locked"',
+            "metadata/visual_only = true",
+            "metadata/occluded_layer_ids = PackedStringArray("
+            + ", ".join(
+                _gd_string(layer_id)
+                for layer_id in PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS
+            )
+            + ")",
+            f"metadata/host_layer_id = {_gd_string(PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID)}",
+            f"metadata/geometry_digest = {_gd_string(aggregate_digest)}",
+            f"metadata/clearance_count = {len(clearances)}",
+            "metadata/normal_core_cells = "
+            f"{PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS}",
+            "metadata/tangent_padding_cells = "
+            f"{PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS}",
+            "metadata/feather_cells = "
+            f"{PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS}",
+        )
+    )
+    water_color = _gd_color(
+        manifest["visual"]["water_color"],
+        "visual.water_color",
+    )
+    transparent = "1, 1, 1, 0"
+    opaque = "1, 1, 1, 1"
+    for clearance in clearances:
+        geometry_digest = str(clearance["geometry_digest"])
+        node_name = f"Clearance_{geometry_digest}"
+        node_path = f"{root_path}/{node_name}"
+        core_x, core_y, core_width, core_height = clearance["core_rect"]
+        outer_x, outer_y, outer_width, outer_height = clearance["outer_rect"]
+        core_right = core_x + core_width
+        core_bottom = core_y + core_height
+        outer_right = outer_x + outer_width
+        outer_bottom = outer_y + outer_height
+        core_points = (
+            (core_x, core_y),
+            (core_right, core_y),
+            (core_right, core_bottom),
+            (core_x, core_bottom),
+        )
+        feather_records = (
+            (
+                "FeatherLeft",
+                (
+                    (outer_x, core_y),
+                    (core_x, core_y),
+                    (core_x, core_bottom),
+                    (outer_x, core_bottom),
+                ),
+                (transparent, opaque, opaque, transparent),
+            ),
+            (
+                "FeatherRight",
+                (
+                    (core_right, core_y),
+                    (outer_right, core_y),
+                    (outer_right, core_bottom),
+                    (core_right, core_bottom),
+                ),
+                (opaque, transparent, transparent, opaque),
+            ),
+            (
+                "FeatherTop",
+                (
+                    (core_x, outer_y),
+                    (core_right, outer_y),
+                    (core_right, core_y),
+                    (core_x, core_y),
+                ),
+                (transparent, transparent, opaque, opaque),
+            ),
+            (
+                "FeatherBottom",
+                (
+                    (core_x, core_bottom),
+                    (core_right, core_bottom),
+                    (core_right, outer_bottom),
+                    (core_x, outer_bottom),
+                ),
+                (opaque, opaque, transparent, transparent),
+            ),
+        )
+        lines.extend(
+            (
+                "",
+                f'[node name="{node_name}" type="Node2D" parent="{root_path}"]',
+                "position = Vector2(0, 0)",
+                "scale = Vector2(1, 1)",
+                f"metadata/geometry_digest = {_gd_string(geometry_digest)}",
+                f"metadata/source_geometry = {_gd_variant(clearance['geometry'])}",
+                "metadata/opening_center = "
+                + _gd_vector(
+                    clearance["opening_center"],
+                    "portal_backdrop_clearance.opening_center",
+                ),
+                "metadata/outward = "
+                + _gd_vector(
+                    clearance["outward"],
+                    "portal_backdrop_clearance.outward",
+                ),
+                f"metadata/span = {_gd_number(clearance['span'])}",
+                "metadata/core_rect = Rect2("
+                f"{_gd_number(core_x)}, {_gd_number(core_y)}, "
+                f"{_gd_number(core_width)}, {_gd_number(core_height)})",
+                "metadata/outer_rect = Rect2("
+                f"{_gd_number(outer_x)}, {_gd_number(outer_y)}, "
+                f"{_gd_number(outer_width)}, {_gd_number(outer_height)})",
+                "metadata/visual_only = true",
+                "",
+                f'[node name="Core" type="Polygon2D" parent="{node_path}"]',
+                f"polygon = {_gd_points(core_points)}",
+                f"color = {water_color}",
+                "antialiased = true",
+                'metadata/role = "portal_backdrop_clearance_core"',
+            )
+        )
+        for feather_name, feather_points, vertex_colors in feather_records:
+            lines.extend(
+                (
+                    "",
+                    f'[node name="{feather_name}" type="Polygon2D" parent="{node_path}"]',
+                    f"polygon = {_gd_points(feather_points)}",
+                    f"color = {water_color}",
+                    "vertex_colors = PackedColorArray("
+                    + ", ".join(vertex_colors)
+                    + ")",
+                    "antialiased = true",
+                    'metadata/role = "portal_backdrop_clearance_feather"',
+                )
+            )
+
+
 def _append_landmarks(lines: list[str], manifest: dict[str, Any]) -> None:
     visual = manifest["visual"]
     marker_color = _color(visual["station_color"], "visual.station_color")
@@ -5267,6 +5648,12 @@ def render_scene(
             _append_l00_content(lines, manifest, world_size)
         elif layer_id == "L03":
             _append_landmarks(lines, manifest)
+        elif layer_id == PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID:
+            _append_portal_backdrop_clearances(
+                lines,
+                manifest,
+                topology_build,
+            )
         elif layer_id == "L05" and topology_build.get("mode") == "open_world":
             _append_world_border(lines, manifest, world_size)
     _append_visual_assets(lines, asset_bindings)
