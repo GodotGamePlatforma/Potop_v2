@@ -389,6 +389,7 @@ $fullHeadlessScriptTests = @(
     "disease_system_test.gd"
     "dive_risk_system_test.gd"
     "dive_system_test.gd"
+    "diver_clearance_integration_test.gd"
     "diving_equipment_test.gd"
     "expedition_preparation_selection_test.gd"
     "interactable_visual_style_test.gd"

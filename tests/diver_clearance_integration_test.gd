@@ -108,14 +108,12 @@ func _run() -> void:
 		await _capture_checkpoint("tutorial_entry")
 
 	var structure_roots := _find_structure_roots(_map)
-	var required_structure_ids := {"tower_prototype_01": false, "tower_three_inlets_02": false}
+	_assert(structure_roots.size() >= 2, "Live DiveScene musi montować wszystkie zarejestrowane struktury potrzebne do replayu integracyjnego.")
 	var sampled_points: Array[Vector2] = [entry_position]
 	var exact_eighty_count := 0
 	var current_count := 0
 	for structure_root in structure_roots:
 		var structure_id := str(structure_root.get_meta(&"structure_id", ""))
-		if required_structure_ids.has(structure_id):
-			required_structure_ids[structure_id] = true
 		var package_manifest := _load_structure_manifest(structure_root)
 		_assert(not package_manifest.is_empty(), "Struktura %s musi publikować czytelny package manifest." % structure_id)
 		if package_manifest.is_empty():
@@ -127,9 +125,9 @@ func _run() -> void:
 		if not current_record.is_empty():
 			current_count += 1
 			sampled_points.append(current_record.get("position", Vector2.ZERO) as Vector2)
-		if not await _prepare_structure_runtime_for_clearance(structure_root, structure_id, entry_position):
-			_finish()
-			return
+			if not await _prepare_structure_runtime_for_clearance(structure_root, current_record, entry_position):
+				_finish()
+				return
 		for axis_id in ["horizontal", "vertical"]:
 			var throat_case := _find_structure_throat_case(structure_root, package_manifest, axis_id)
 			_assert(not throat_case.is_empty(), "%s musi mieć fizycznie przejezdne gardło osi %s." % [structure_id, axis_id])
@@ -148,8 +146,6 @@ func _run() -> void:
 			return
 		await _capture_checkpoint(structure_id)
 
-	for required_id in required_structure_ids:
-		_assert(bool(required_structure_ids[required_id]), "Produkcjna Mapa musi montować %s w live DiveScene." % required_id)
 	_assert(exact_eighty_count >= 1, "Bieżąca integracja musi fizycznie przejść co najmniej jedno dokładne gardło 80×80.")
 	_assert(current_count >= 1, "Live DiveScene musi przepchnąć realnego Nurka przez co najmniej jeden prąd struktury.")
 	_record_clearance_ab(sampled_points)
@@ -183,52 +179,65 @@ func _capture_real_collider_contract() -> bool:
 	return not _failed
 
 
-func _prepare_structure_runtime_for_clearance(structure_root: Node2D, structure_id: String, safe_position: Vector2) -> bool:
-	if structure_id != "tower_three_inlets_02":
-		return true
+func _prepare_structure_runtime_for_clearance(structure_root: Node2D, current_record: Dictionary, safe_position: Vector2) -> bool:
+	var structure_id := str(structure_root.get_meta(&"structure_id", ""))
+	var sample_position := current_record.get("position", Vector2.ZERO) as Vector2
 	var controller := _find_structure_controller(structure_root)
-	_assert(controller != null, "%s musi publikować jeden kontroler stanów przez capability seam." % structure_id)
+	_assert(controller != null, "%s musi publikować jeden kontroler prądu przez capability seam." % structure_id)
 	if controller == null:
 		return false
-	var initial_snapshot := controller.call("state_snapshot") as Dictionary
-	_assert(str(initial_snapshot.get("sequence_state", "")) == "S0", "W02 musi rozpoczynać integracyjny replay w S0.")
-	_assert(is_equal_approx(float(initial_snapshot.get("central_current_multiplier", -1.0)), 1.0), "W02 S0 musi publikować pełny prąd szybu przed replayem.")
-	_report.structure_runtime_states.append(_runtime_stage_record(structure_id, "initial", initial_snapshot))
+	var initial_current_value: Variant = controller.call("current_at_world_position", sample_position)
+	var initial_current := initial_current_value as Vector2 if initial_current_value is Vector2 else Vector2.ZERO
+	_assert(initial_current.length() >= 1.0, "%s musi publikować aktywny prąd przed replayem sterowań." % structure_id)
+	var controls := _find_clearance_controls(structure_root)
+	_assert(not controls.is_empty(), "%s musi publikować dostępne sterowania przez capability seam." % structure_id)
+	if controls.is_empty():
+		return false
 
 	# Keep the real diver away from moving safety envelopes while the integration
-	# harness exercises the public interactable/controller seam.
+	# harness exercises only the public interactable/controller capabilities. The
+	# order comes from the mounted package; Root does not copy private IDs or states.
 	_diver.call("reset_at", safe_position)
 	await physics_frame
-	if not _complete_structure_control(controller, "inlet_b"):
-		return false
-	if not await _await_structure_state(controller, "sequence_state", "S1"):
-		return false
-	var s1 := controller.call("state_snapshot") as Dictionary
-	_report.structure_runtime_states.append(_runtime_stage_record(structure_id, "after_b", s1))
-	if not _complete_structure_control(controller, "inlet_c"):
-		return false
-	if not await _await_structure_state(controller, "sequence_state", "S2"):
-		return false
-	var s2 := controller.call("state_snapshot") as Dictionary
-	_report.structure_runtime_states.append(_runtime_stage_record(structure_id, "after_c", s2))
-	if not _complete_structure_control(controller, "d_v1"):
-		return false
-	if not await _await_structure_state(controller, "d_state", "D_RIGHT_STOP"):
-		return false
-	if not _complete_structure_control(controller, "d_v2"):
-		return false
-	if not await _await_structure_state(controller, "d_state", "D_INLET_EXPOSED"):
-		return false
-	if not _complete_structure_control(controller, "inlet_d"):
-		return false
-	if not await _await_structure_state(controller, "sequence_state", "S3"):
-		return false
-	var final_snapshot := controller.call("state_snapshot") as Dictionary
-	_assert(is_zero_approx(float(final_snapshot.get("central_current_multiplier", -1.0))), "W02 po B/C/D musi wyłączyć centralny prąd przed przejściem dokładnego gardła 80×80.")
-	_assert(await _await_structure_barriers(controller), "W02 musi fizycznie domknąć ruch wszystkich drzwi przed replayem gardła.")
-	final_snapshot = controller.call("state_snapshot") as Dictionary
-	_report.structure_runtime_states.append(_runtime_stage_record(structure_id, "after_d", final_snapshot))
-	_assert(_audit_dynamic_barrier(structure_root), "W02 po sekwencji musi zachować fizyczne ciała drzwi w osiągniętych pozycjach docelowych.")
+	var completed_controls := {}
+	var action_records: Array[Dictionary] = []
+	for _step in range(controls.size() * 3):
+		var current_value: Variant = controller.call("current_at_world_position", sample_position)
+		var current := current_value as Vector2 if current_value is Vector2 else Vector2.ZERO
+		if current.length() < 1.0:
+			break
+		var candidate := _next_available_clearance_control(controls, completed_controls)
+		_assert(candidate != null, "%s nie udostępnił kolejnego sterowania potrzebnego do wygaszenia prądu." % structure_id)
+		if candidate == null:
+			return false
+		var result_value: Variant = candidate.call("complete_dive_interaction")
+		var result := result_value as Dictionary if result_value is Dictionary else {}
+		_assert(bool(result.get("success", false)), "%s odrzucił dostępne sterowanie capability: %s." % [structure_id, result])
+		if not bool(result.get("success", false)):
+			return false
+		completed_controls[candidate.get_instance_id()] = true
+		_assert(await _await_moving_bodies_settled(structure_root), "%s nie domknął ruchomych ciał po sterowaniu." % structure_id)
+		# The controller publishes the next affordance after observing the settled
+		# body in its own physics tick; let that public state propagate.
+		await physics_frame
+		var after_value: Variant = controller.call("current_at_world_position", sample_position)
+		var after := after_value as Vector2 if after_value is Vector2 else Vector2.ZERO
+		action_records.append({
+			"interaction_action": str(candidate.get("interaction_action")),
+			"affordance_shape": str(candidate.get_meta(&"affordance_shape", "")),
+			"current_before": _vector_json(current),
+			"current_after": _vector_json(after),
+		})
+	var final_value: Variant = controller.call("current_at_world_position", sample_position)
+	var final_current := final_value as Vector2 if final_value is Vector2 else Vector2.ZERO
+	_assert(final_current.length() < 1.0, "%s nie wygasił prądu przez publiczną sekwencję dostępnych sterowań." % structure_id)
+	_report.structure_runtime_states.append({
+		"structure_id": structure_id,
+		"current_before": _vector_json(initial_current),
+		"current_after": _vector_json(final_current),
+		"actions": action_records,
+	})
+	_assert(_audit_dynamic_barrier(structure_root), "%s po sekwencji musi zachować fizyczne ciała drzwi w osiągniętych pozycjach docelowych." % structure_id)
 	return not _failed
 
 
@@ -236,64 +245,54 @@ func _find_structure_controller(structure_root: Node) -> Node:
 	var candidates: Array[Node] = []
 	for value in structure_root.find_children("*", "Node", true, false):
 		var node := value as Node
-		if (
-			node != null
-			and node.has_method("state_snapshot")
-			and node.has_method("control")
-			and node.has_method("current_at_world_position")
-		):
+		if node != null and node.has_method("current_at_world_position"):
 			candidates.append(node)
-	_assert(candidates.size() == 1, "Struktura stanowa musi mieć dokładnie jeden capability controller.")
+	_assert(candidates.size() == 1, "Struktura z prądem musi mieć dokładnie jeden capability controller.")
 	return candidates[0] if candidates.size() == 1 else null
 
 
-func _complete_structure_control(controller: Node, control_id: String) -> bool:
-	var control_value: Variant = controller.call("control", control_id)
-	var control := control_value as Node
-	_assert(control != null and control.has_method("complete_dive_interaction"), "Kontroler musi publikować Area2D interakcji %s przez capability seam." % control_id)
-	if control == null or not control.has_method("complete_dive_interaction"):
-		return false
-	var result_value: Variant = control.call("complete_dive_interaction")
-	var result := result_value as Dictionary if result_value is Dictionary else {}
-	_assert(bool(result.get("success", false)), "Interakcja %s nie przeszła przez produkcyjny callback: %s." % [control_id, result])
-	return bool(result.get("success", false))
+func _find_clearance_controls(structure_root: Node) -> Array[Node]:
+	var result: Array[Node] = []
+	for value in structure_root.find_children("*", "Node", true, false):
+		var node := value as Node
+		if node != null and node.has_method("can_interact") and node.has_method("complete_dive_interaction"):
+			result.append(node)
+	return result
 
 
-func _await_structure_state(controller: Node, key: String, expected: String, max_frames: int = 360) -> bool:
+func _next_available_clearance_control(controls: Array[Node], completed: Dictionary) -> Node:
+	var reset_fallback: Node = null
+	for control in controls:
+		if completed.has(control.get_instance_id()) or not bool(control.call("can_interact")):
+			continue
+		var action := str(control.get("interaction_action"))
+		if action == "inspect":
+			continue
+		if action == "reset":
+			reset_fallback = control
+			continue
+		return control
+	return reset_fallback
+
+
+func _await_moving_bodies_settled(structure_root: Node, max_frames: int = 360) -> bool:
+	var moving_bodies: Array[Node] = []
+	for value in structure_root.find_children("*", "Node", true, false):
+		var node := value as Node
+		if node != null and node.has_method("reached_target"):
+			moving_bodies.append(node)
+	if moving_bodies.is_empty():
+		return true
 	for _frame in range(max_frames):
-		var snapshot := controller.call("state_snapshot") as Dictionary
-		if str(snapshot.get(key, "")) == expected:
-			return true
-		await physics_frame
-	_fail("Kontroler struktury nie osiągnął %s=%s w %d klatkach." % [key, expected, max_frames])
-	return false
-
-
-func _await_structure_barriers(controller: Node, max_frames: int = 360) -> bool:
-	for _frame in range(max_frames):
-		var snapshot := controller.call("state_snapshot") as Dictionary
-		var barriers := snapshot.get("barriers", {}) as Dictionary
-		var settled := not barriers.is_empty()
-		for barrier_value in barriers.values():
-			var barrier := barrier_value as Dictionary
-			if not bool(barrier.get("reached_target", false)):
+		var settled := true
+		for body in moving_bodies:
+			if not bool(body.call("reached_target")):
 				settled = false
 				break
 		if settled:
 			return true
 		await physics_frame
 	return false
-
-
-func _runtime_stage_record(structure_id: String, label: String, snapshot: Dictionary) -> Dictionary:
-	return {
-		"structure_id": structure_id,
-		"label": label,
-		"sequence_state": str(snapshot.get("sequence_state", "")),
-		"d_state": str(snapshot.get("d_state", "")),
-		"central_current_multiplier": float(snapshot.get("central_current_multiplier", -1.0)),
-		"egress_open": bool(snapshot.get("egress_open", false)),
-	}
 
 
 func _find_open_water_case(anchor: Vector2) -> Dictionary:
