@@ -1,10 +1,10 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
-    [Parameter(Mandatory = $true)]
     [string]$CandidateReceipt,
 
-    [Parameter(Mandatory = $true)]
     [string]$RunReceipt,
+
+    [switch]$FromOriginMain,
 
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^(root|map|diver|integration|structure:[a-z][a-z0-9_]*)$')]
@@ -385,6 +385,7 @@ function Write-AgentWorktreePlan {
         [string]$PlanTaskBrief,
         [string]$PlanWriteSet,
         [int]$PlanAckTimeoutSeconds,
+        [string]$PlanBaselineKind,
         [string]$PlanReceiptPath,
         [string]$PlanRunReceiptPath,
         [string]$PlanBaseline,
@@ -405,11 +406,17 @@ function Write-AgentWorktreePlan {
     Write-Output "  write-set:   $PlanWriteSet"
     Write-Output "  ACK timeout: $PlanAckTimeoutSeconds seconds"
     Write-Output "  assignment:  prospective WAITING_ACK (created only with -Create)"
-    Write-Output "  candidate-receipt: $PlanReceiptPath"
-    Write-Output "  run-receipt:       $PlanRunReceiptPath"
+    Write-Output "  baseline:     $PlanBaselineKind"
+    if ($PlanBaselineKind -eq 'verified-lkg') {
+        Write-Output "  candidate-receipt: $PlanReceiptPath"
+        Write-Output "  run-receipt:       $PlanRunReceiptPath"
+        Write-Output "  last-green:  $PlanLastGreenRef -> $PlanBaseline"
+    }
+    else {
+        Write-Output "  origin/main:  $PlanBaseline"
+    }
     Write-Output "  candidate:   $PlanBaseline"
     Write-Output "  tree:        $PlanTree"
-    Write-Output "  last-green:  $PlanLastGreenRef -> $PlanBaseline"
     Write-Output "  branch:      $PlanBranch"
     Write-Output "  destination: $PlanDestinationPath"
     Write-Output "  common-dir:  $PlanCommonDirectory"
@@ -521,13 +528,28 @@ if (-not (Test-Path -LiteralPath $contractTool -PathType Leaf)) {
     throw "Missing ownership tool: $contractTool"
 }
 
-$receiptPath = [System.IO.Path]::GetFullPath($CandidateReceipt)
-if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
-    throw "Candidate publication receipt does not exist: $receiptPath"
+$baselineKind = if ($FromOriginMain) { 'origin-main' } else { 'verified-lkg' }
+$receiptPath = ''
+$runReceiptPath = ''
+if ($FromOriginMain) {
+    if (-not [string]::IsNullOrWhiteSpace($CandidateReceipt) -or
+        -not [string]::IsNullOrWhiteSpace($RunReceipt)) {
+        throw '-FromOriginMain cannot be combined with candidate/run receipts.'
+    }
 }
-$runReceiptPath = [System.IO.Path]::GetFullPath($RunReceipt)
-if (-not (Test-Path -LiteralPath $runReceiptPath -PathType Leaf)) {
-    throw "Candidate full run receipt does not exist: $runReceiptPath"
+else {
+    if ([string]::IsNullOrWhiteSpace($CandidateReceipt) -or
+        [string]::IsNullOrWhiteSpace($RunReceipt)) {
+        throw 'CandidateReceipt and RunReceipt are required unless -FromOriginMain is used.'
+    }
+    $receiptPath = [System.IO.Path]::GetFullPath($CandidateReceipt)
+    if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+        throw "Candidate publication receipt does not exist: $receiptPath"
+    }
+    $runReceiptPath = [System.IO.Path]::GetFullPath($RunReceipt)
+    if (-not (Test-Path -LiteralPath $runReceiptPath -PathType Leaf)) {
+        throw "Candidate full run receipt does not exist: $runReceiptPath"
+    }
 }
 $writeSetPath = [System.IO.Path]::GetFullPath($WriteSet)
 if (-not (Test-Path -LiteralPath $writeSetPath -PathType Leaf)) {
@@ -540,28 +562,46 @@ $writeSetValidation = Invoke-NativeResult -FilePath 'python' -Arguments @(
 if ($writeSetValidation.ExitCode -ne 0) {
     throw "Closed assignment write-set failed owner validation: $($writeSetValidation.Output)"
 }
-$receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-if ($receipt.status -ne 'PUBLICATION_READY' -or
-    [string]::IsNullOrWhiteSpace([string]$receipt.head) -or
-    [string]::IsNullOrWhiteSpace([string]$receipt.tree)) {
-    throw "Receipt is not a PUBLICATION_READY candidate."
-}
-
-$baseline = Invoke-GitText -Arguments @(
-    '-C', $repoRoot, 'rev-parse', '--verify', "$($receipt.head)`^{commit}"
-)
-$tree = Invoke-GitText -Arguments @(
-    '-C', $repoRoot, 'rev-parse', "$baseline`^{tree}"
-)
-if ($baseline -ne [string]$receipt.head -or $tree -ne [string]$receipt.tree) {
-    throw "Candidate receipt HEAD/tree differs from the available Git object."
-}
-$expectedLastGreen = Get-LastGreenHead -Repository $repoRoot
-if ($expectedLastGreen -ne $baseline) {
-    throw (
-        "Candidate receipt HEAD $baseline differs from authoritative " +
-        "$($script:LastGreenRef) $expectedLastGreen."
+$expectedLastGreen = ''
+if ($FromOriginMain) {
+    $fetch = Invoke-NativeResult -FilePath 'git' -Arguments @(
+        '-C', $repoRoot, 'fetch', '--no-tags', 'origin',
+        '+refs/heads/main:refs/remotes/origin/main'
     )
+    if ($fetch.ExitCode -ne 0) {
+        throw "Cannot fetch exact origin/main: $($fetch.Output)"
+    }
+    $baseline = Invoke-GitText -Arguments @(
+        '-C', $repoRoot, 'rev-parse', '--verify',
+        'refs/remotes/origin/main^{commit}'
+    )
+    $tree = Invoke-GitText -Arguments @(
+        '-C', $repoRoot, 'rev-parse', "$baseline`^{tree}"
+    )
+}
+else {
+    $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+    if ($receipt.status -ne 'PUBLICATION_READY' -or
+        [string]::IsNullOrWhiteSpace([string]$receipt.head) -or
+        [string]::IsNullOrWhiteSpace([string]$receipt.tree)) {
+        throw "Receipt is not a PUBLICATION_READY candidate."
+    }
+    $baseline = Invoke-GitText -Arguments @(
+        '-C', $repoRoot, 'rev-parse', '--verify', "$($receipt.head)`^{commit}"
+    )
+    $tree = Invoke-GitText -Arguments @(
+        '-C', $repoRoot, 'rev-parse', "$baseline`^{tree}"
+    )
+    if ($baseline -ne [string]$receipt.head -or $tree -ne [string]$receipt.tree) {
+        throw "Candidate receipt HEAD/tree differs from the available Git object."
+    }
+    $expectedLastGreen = Get-LastGreenHead -Repository $repoRoot
+    if ($expectedLastGreen -ne $baseline) {
+        throw (
+            "Candidate receipt HEAD $baseline differs from authoritative " +
+            "$($script:LastGreenRef) $expectedLastGreen."
+        )
+    }
 }
 
 $safeOwner = $Owner.Replace(':', '-')
@@ -597,30 +637,34 @@ if (-not $Create) {
     # Both verifiers deliberately run in a detached worktree materialized from
     # the receipt commit. The candidate's own runner verifies the full run
     # receipt. Dirty caller state does not participate in either proof.
-    Test-CandidateReceiptsAtCommit -Repository $repoRoot `
-        -ReceiptPath $receiptPath `
-        -RunReceiptPath $runReceiptPath -Commit $baseline
+    if (-not $FromOriginMain) {
+        Test-CandidateReceiptsAtCommit -Repository $repoRoot `
+            -ReceiptPath $receiptPath `
+            -RunReceiptPath $runReceiptPath -Commit $baseline
+    }
     Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
         -PlanTaskId $TaskId -PlanThreadId $ThreadId `
         -PlanTaskBrief $TaskBrief -PlanWriteSet $writeSetPath `
-        -PlanAckTimeoutSeconds $AckTimeoutSeconds `
+        -PlanAckTimeoutSeconds $AckTimeoutSeconds -PlanBaselineKind $baselineKind `
         -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
         -PlanBaseline $baseline -PlanTree $tree `
         -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
         -PlanDestinationPath $destinationPath `
         -PlanCommonDirectory $commonDir -PlanPublicationLock $lockPath
-    Write-Output "PLAN ONLY: pass -Create (or use -WhatIf with -Create) after reviewing the verified candidate and full run receipts."
+    Write-Output "PLAN ONLY: pass -Create (or use -WhatIf with -Create) after reviewing the exact baseline and assignment."
     return
 }
 
 if ($WhatIfPreference) {
-    Test-CandidateReceiptsAtCommit -Repository $repoRoot `
-        -ReceiptPath $receiptPath `
-        -RunReceiptPath $runReceiptPath -Commit $baseline
+    if (-not $FromOriginMain) {
+        Test-CandidateReceiptsAtCommit -Repository $repoRoot `
+            -ReceiptPath $receiptPath `
+            -RunReceiptPath $runReceiptPath -Commit $baseline
+    }
     Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
         -PlanTaskId $TaskId -PlanThreadId $ThreadId `
         -PlanTaskBrief $TaskBrief -PlanWriteSet $writeSetPath `
-        -PlanAckTimeoutSeconds $AckTimeoutSeconds `
+        -PlanAckTimeoutSeconds $AckTimeoutSeconds -PlanBaselineKind $baselineKind `
         -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
         -PlanBaseline $baseline -PlanTree $tree `
         -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
@@ -631,7 +675,7 @@ if ($WhatIfPreference) {
 Assert-WorktreeTargetAvailable -Repository $repoRoot `
     -DestinationPath $destinationPath -BranchName $Branch
 
-$description = "create $Owner/$TaskSlug worktree at $destinationPath from candidate $baseline with a verified full run receipt"
+$description = "create $Owner/$TaskSlug worktree at $destinationPath from exact $baselineKind $baseline"
 if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
     $reservation = $null
     try {
@@ -647,24 +691,37 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
         # every linked worktree and before this invocation owns any resource.
         Assert-WorktreeTargetAvailable -Repository $repoRoot `
             -DestinationPath $destinationPath -BranchName $Branch
-        $reservedLastGreen = Get-LastGreenHead -Repository $repoRoot
-        if ($reservedLastGreen -ne $expectedLastGreen) {
-            throw (
-                "$($script:LastGreenRef) moved before materialization: " +
-                "expected $expectedLastGreen, actual $reservedLastGreen."
+        if ($FromOriginMain) {
+            $reservedMain = Invoke-GitText -Arguments @(
+                '-C', $repoRoot, 'rev-parse', '--verify',
+                'refs/remotes/origin/main^{commit}'
             )
+            if ($reservedMain -ne $baseline) {
+                throw "origin/main moved before materialization; rerun setup."
+            }
+        }
+        else {
+            $reservedLastGreen = Get-LastGreenHead -Repository $repoRoot
+            if ($reservedLastGreen -ne $expectedLastGreen) {
+                throw (
+                    "$($script:LastGreenRef) moved before materialization: " +
+                    "expected $expectedLastGreen, actual $reservedLastGreen."
+                )
+            }
         }
 
         # The reservation covers verification as well as final creation. This
         # prevents duplicate create processes from colliding in the verifier's
         # own shared Git/publication locks before one request is selected.
-        Test-CandidateReceiptsAtCommit -Repository $repoRoot `
-            -ReceiptPath $receiptPath `
-            -RunReceiptPath $runReceiptPath -Commit $baseline
+        if (-not $FromOriginMain) {
+            Test-CandidateReceiptsAtCommit -Repository $repoRoot `
+                -ReceiptPath $receiptPath `
+                -RunReceiptPath $runReceiptPath -Commit $baseline
+        }
         Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
             -PlanTaskId $TaskId -PlanThreadId $ThreadId `
             -PlanTaskBrief $TaskBrief -PlanWriteSet $writeSetPath `
-            -PlanAckTimeoutSeconds $AckTimeoutSeconds `
+            -PlanAckTimeoutSeconds $AckTimeoutSeconds -PlanBaselineKind $baselineKind `
             -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
             -PlanBaseline $baseline -PlanTree $tree `
             -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
@@ -691,13 +748,15 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             }
 
             $newContract = Join-Path $destinationPath 'tools/workbench_contract.py'
-            $newVerify = Invoke-NativeResult -FilePath 'python' -Arguments @(
-                '-B', $newContract, '--repo', $destinationPath,
-                'lkg', 'resolve', '--candidate-receipt', $receiptPath,
-                '--run-receipt', $runReceiptPath
-            )
-            if ($newVerify.ExitCode -ne 0) {
-                throw "The new worktree no longer resolves to authoritative last-green."
+            if (-not $FromOriginMain) {
+                $newVerify = Invoke-NativeResult -FilePath 'python' -Arguments @(
+                    '-B', $newContract, '--repo', $destinationPath,
+                    'lkg', 'resolve', '--candidate-receipt', $receiptPath,
+                    '--run-receipt', $runReceiptPath
+                )
+                if ($newVerify.ExitCode -ne 0) {
+                    throw "The new worktree no longer resolves to authoritative last-green."
+                }
             }
             $newHead = Invoke-GitText -Arguments @(
                 '-C', $destinationPath, 'rev-parse', 'HEAD'
@@ -705,12 +764,20 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             $newTree = Invoke-GitText -Arguments @(
                 '-C', $destinationPath, 'rev-parse', 'HEAD^{tree}'
             )
-            $postLastGreen = Get-LastGreenHead -Repository $repoRoot
+            $postBaseline = if ($FromOriginMain) {
+                Invoke-GitText -Arguments @(
+                    '-C', $repoRoot, 'rev-parse', '--verify',
+                    'refs/remotes/origin/main^{commit}'
+                )
+            }
+            else {
+                Get-LastGreenHead -Repository $repoRoot
+            }
             if ($newHead -ne $baseline -or $newTree -ne $tree -or
-                $postLastGreen -ne $expectedLastGreen) {
+                $postBaseline -ne $baseline) {
                 throw (
-                    "Post-materialization identity mismatch: candidate=$baseline/$tree " +
-                    "worktree=$newHead/$newTree last-green=$postLastGreen."
+                    "Post-materialization identity mismatch: baseline=$baseline/$tree " +
+                    "worktree=$newHead/$newTree authority=$postBaseline."
                 )
             }
 
@@ -730,16 +797,19 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
 
             # This is deliberately the final mutating marker. An exit 0 means
             # the immutable bundle exists in the shared common Git directory;
-            # the task is still WAITING_ACK and must not be treated as RUNNING.
+            # Legacy receipt materialization preserves the explicit hand-off.
+            # Normal origin/main startup acknowledges internally so the author
+            # receives one ready RUNNING worktree without a second command.
             $ackDeadline = [System.DateTime]::UtcNow.AddSeconds(
                 $AckTimeoutSeconds
             ).ToString(
                 'yyyy-MM-ddTHH:mm:ssZ',
                 [System.Globalization.CultureInfo]::InvariantCulture
             )
-            $assignmentResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
+            $assignmentCommand = if ($FromOriginMain) { 'create-main' } else { 'create' }
+            $assignmentArguments = @(
                 '-B', $newContract, '--repo', $destinationPath,
-                'assignment', 'create',
+                'assignment', $assignmentCommand,
                 '--task-id', $TaskId,
                 '--thread-id', $ThreadId,
                 '--owner', $Owner,
@@ -750,21 +820,48 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
                 '--head', $newHead,
                 '--tree', $newTree,
                 '--write-set', $writeSetPath,
-                '--candidate-receipt', $receiptPath,
-                '--run-receipt', $runReceiptPath,
                 '--ack-deadline', $ackDeadline,
                 '--json'
             )
+            if (-not $FromOriginMain) {
+                $assignmentArguments += @(
+                    '--candidate-receipt', $receiptPath,
+                    '--run-receipt', $runReceiptPath
+                )
+            }
+            $assignmentResult = Invoke-NativeResult -FilePath 'python' `
+                -Arguments $assignmentArguments
             if ($assignmentResult.ExitCode -ne 0) {
                 throw "Durable assignment creation failed: $($assignmentResult.Output)"
             }
             $assignmentPublished = $true
-            Write-Output $assignmentResult.Output
-            Write-Output (
-                "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +
-                "branch, HEAD/tree, owner, thread-id and write-set to the named task; " +
-                "only `assignment ack` changes it to RUNNING."
-            )
+            if ($FromOriginMain) {
+                $createdAssignment = $assignmentResult.Output | ConvertFrom-Json
+                $assignmentId = [string]$createdAssignment.assignment.assignment_id
+                $ackResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
+                    '-B', $newContract, '--repo', $destinationPath,
+                    'assignment', 'ack',
+                    '--task-id', $TaskId,
+                    '--assignment-id', $assignmentId,
+                    '--thread-id', $ThreadId,
+                    '--owner', $Owner,
+                    '--write-set', $writeSetPath,
+                    '--json'
+                )
+                if ($ackResult.ExitCode -ne 0) {
+                    throw "Automatic origin/main assignment ACK failed: $($ackResult.Output)"
+                }
+                Write-Output $ackResult.Output
+                Write-Output "ASSIGNMENT READY: RUNNING. Author may start immediately."
+            }
+            else {
+                Write-Output $assignmentResult.Output
+                Write-Output (
+                    "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +
+                    "branch, HEAD/tree, owner, thread-id and write-set to the named task; " +
+                    "only `assignment ack` changes it to RUNNING."
+                )
+            }
         }
         catch {
             $failure = $_.Exception.Message

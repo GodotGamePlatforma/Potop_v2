@@ -21,7 +21,7 @@ env:
 
 jobs:
   fast-contract:
-    name: Agent fast contract
+    name: fast-green
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -132,4 +132,16 @@ jobs:
           }
           if ($failures.Count -gt 0) {
             throw "CI contract failures: $([string]::Join(', ', $failures))"
+          }
+
+      - name: Verify simple PR and play-main automation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($test in @(
+            "tests/publish_agent_pr_test.ps1",
+            "tests/sync_play_main_test.ps1"
+          )) {
+            & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $test
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }

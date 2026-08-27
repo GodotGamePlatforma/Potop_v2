@@ -9,6 +9,7 @@ $testRoot = Join-Path $systemTemp ("codex-setup-agent-worktree-test-" + [guid]::
 $repository = Join-Path $testRoot 'repository'
 $worktreeA = Join-Path $testRoot 'worktree-a'
 $worktreeB = Join-Path $testRoot 'worktree-b'
+$originMainWorktree = Join-Path $testRoot 'worktree-origin-main'
 $parallelWorktree = Join-Path $testRoot 'parallel-worktree'
 $crossDestinationWorktree = Join-Path $testRoot 'cross-destination-worktree'
 $crossBranchWorktreeA = Join-Path $testRoot 'cross-branch-worktree-a'
@@ -147,9 +148,11 @@ try {
     New-Item -ItemType Directory -Path $repository -Force | Out-Null
     & git init -q $repository
     if ($LASTEXITCODE -ne 0) { throw 'git init failed' }
+    Invoke-Git $repository symbolic-ref HEAD refs/heads/main | Out-Null
     Invoke-Git $repository config user.email 'worktree-test@example.invalid' | Out-Null
     Invoke-Git $repository config user.name 'Worktree Test' | Out-Null
     Invoke-Git $repository config core.autocrlf false | Out-Null
+    Invoke-Git $repository remote add origin $repository | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $repository 'src') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $repository 'build') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $repository 'tests') -Force | Out-Null
@@ -446,6 +449,30 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         --task-id 'task/actual-a' --thread-id 'thread/actual-a' --diff 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0 -or $assignmentValidate -notmatch 'PASS owner=root paths=0') {
         throw "Acknowledged assignment did not validate its clean diff: $assignmentValidate"
+    }
+
+    # Normal author startup uses the freshly fetched origin/main directly and
+    # never waits for candidate/full-run evidence or refs/last-green.
+    $originWriteSet = New-TestWriteSet -TaskSlug 'origin-main'
+    Push-Location $repository
+    try {
+        & $helper -FromOriginMain -Owner root `
+            -TaskSlug origin-main -TaskId 'task/origin-main' `
+            -ThreadId 'thread/origin-main' -TaskBrief 'fast main assignment' `
+            -WriteSet $originWriteSet -Destination $originMainWorktree `
+            -Create | Out-Null
+    }
+    finally {
+        Pop-Location
+    }
+    $originAssignment = Get-TestAssignmentRecord `
+        -Repo $repository -TaskId 'task/origin-main'
+    if ([int]$originAssignment.Record.schema_version -ne 2 -or
+        [string]$originAssignment.Record.baseline_kind -ne 'origin-main' -or
+        [string]$originAssignment.Record.head -ne [string]$receiptData.head -or
+        -not (Test-Path -LiteralPath (Join-Path $originAssignment.Bundle 'ack.json') -PathType Leaf) -or
+        -not (Test-WorktreeRegistered -Repo $repository -Path $originMainWorktree)) {
+        throw 'Origin-main setup did not create and auto-ACK the exact fast-start assignment.'
     }
 
     # An overlapping active write-set is detected only after the second exact

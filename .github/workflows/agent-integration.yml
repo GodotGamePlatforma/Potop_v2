@@ -1,6 +1,9 @@
 name: Agent integration executor
 
 on:
+  push:
+    branches:
+      - main
   repository_dispatch:
     types:
       - verify-agent-candidate
@@ -11,8 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: agent-integration-${{ github.event.client_payload.candidate_sha || github.event.client_payload.integrated_sha || github.sha || github.run_id }}
-  cancel-in-progress: false
+  group: agent-integration-${{ github.event_name == 'push' && 'main-latest' || github.event.client_payload.candidate_sha || github.event.client_payload.integrated_sha || github.sha || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 env:
   GIT_LFS_SKIP_SMUDGE: "1"
@@ -76,6 +79,7 @@ jobs:
         shell: pwsh
         env:
           EVENT_ACTION: ${{ github.event.action }}
+          PUSH_AFTER: ${{ github.event.after }}
           REQUESTED_BASE_SHA: ${{ github.event.client_payload.base_sha }}
           REQUESTED_CANDIDATE_SHA: ${{ github.event.client_payload.candidate_sha }}
           REQUESTED_INTEGRATED_SHA: ${{ github.event.client_payload.integrated_sha }}
@@ -207,8 +211,21 @@ jobs:
               throw "Unsupported repository_dispatch action '$env:EVENT_ACTION'."
             }
           }
+          elseif ($env:GITHUB_EVENT_NAME -ceq "push") {
+            if ($env:GITHUB_REF -cne "refs/heads/main") {
+              throw "Background integration accepts push only for refs/heads/main."
+            }
+            Assert-CommitSha -Name "GITHUB_SHA" -Value $env:GITHUB_SHA
+            Assert-CommitSha -Name "push after" -Value $env:PUSH_AFTER
+            if ($env:GITHUB_SHA -cne $env:PUSH_AFTER) {
+              throw "Push event after SHA differs from GITHUB_SHA."
+            }
+            $mode = "main"
+            $targetSha = $env:GITHUB_SHA
+            $baseSha = $targetSha
+          }
           else {
-            throw "Only trusted repository_dispatch events may execute integration."
+            throw "Only exact main push or trusted repository_dispatch may execute integration."
           }
 
           $trustedHead = Invoke-GitChecked -Repository $trustedRepository rev-parse "HEAD^{commit}"
@@ -1479,6 +1496,7 @@ jobs:
         shell: pwsh
         env:
           EVENT_ACTION: ${{ github.event.action }}
+          PUSH_AFTER: ${{ github.event.after }}
           REQUESTED_BASE_SHA: ${{ github.event.client_payload.base_sha }}
           REQUESTED_CANDIDATE_SHA: ${{ github.event.client_payload.candidate_sha }}
           REQUESTED_INTEGRATED_SHA: ${{ github.event.client_payload.integrated_sha }}
@@ -1578,6 +1596,19 @@ jobs:
             $mode = "main"
             $targetSha = $env:REQUESTED_INTEGRATED_SHA
             Assert-CommitSha -Name "integrated main SHA" -Value $targetSha
+            $baseSha = $targetSha
+          }
+          elseif ($env:GITHUB_EVENT_NAME -ceq "push") {
+            if ($env:GITHUB_REF -cne "refs/heads/main") {
+              throw "Background publisher accepts push only for refs/heads/main."
+            }
+            Assert-CommitSha -Name "GITHUB_SHA" -Value $env:GITHUB_SHA
+            Assert-CommitSha -Name "push after" -Value $env:PUSH_AFTER
+            if ($env:GITHUB_SHA -cne $env:PUSH_AFTER) {
+              throw "Push publisher received a stale event SHA."
+            }
+            $mode = "main"
+            $targetSha = $env:GITHUB_SHA
             $baseSha = $targetSha
           }
           else {

@@ -946,6 +946,96 @@ class AgentAssignmentTest(unittest.TestCase):
             self.assertEqual(plan["eligible_count"], 1)
             self.assertTrue(bundle.exists(), "retention planning must never delete")
 
+    def test_origin_main_assignment_skips_full_receipt_and_preserves_guards(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            repository = fixture["repository"]
+            _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
+            _git(
+                repository,
+                "update-ref",
+                "refs/remotes/origin/main",
+                str(fixture["head"]),
+            )
+
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=AssertionError("origin/main startup must not verify full tests"),
+            ) as verifier:
+                created = contract.create_assignment(
+                    repository,
+                    task_id=fixture["task_id"],
+                    thread_id=fixture["thread_id"],
+                    owner=fixture["owner"],
+                    brief=fixture["brief"],
+                    destination=fixture["destination"],
+                    common_git_dir=fixture["common_git_dir"],
+                    branch=fixture["branch"],
+                    head=fixture["head"],
+                    tree=fixture["tree"],
+                    write_set_path=fixture["write_set_path"],
+                    candidate_receipt=None,
+                    run_receipt=None,
+                    baseline_kind="origin-main",
+                    ack_deadline=fixture["ack_deadline"],
+                    now=fixture["now"],
+                )
+            verifier.assert_not_called()
+            assignment = created["assignment"]
+            self.assertEqual(assignment["schema_version"], 2)
+            self.assertEqual(assignment["baseline_kind"], "origin-main")
+            self.assertEqual(assignment["baseline_ref"], "refs/remotes/origin/main")
+            self.assertNotIn("candidate_receipt_sha256", assignment)
+            acknowledged = self._ack(fixture, created)
+            self.assertEqual(acknowledged["state"], contract.ASSIGNMENT_RUNNING)
+            current = contract.current_assignment(repository)
+            self.assertEqual(
+                current["assignment"]["assignment_id"],
+                assignment["assignment_id"],
+            )
+            _git(repository, "remote", "set-url", "origin", "https://example.invalid/other.git")
+            with self.assertRaisesRegex(contract.ContractError, "origin_url"):
+                contract.validate_assignment_context(
+                    repository,
+                    assignment_id=str(assignment["assignment_id"]),
+                    task_id=str(assignment["task_id"]),
+                    thread_id=str(assignment["thread_id"]),
+                    owner=str(assignment["owner"]),
+                    paths=(),
+                )
+
+    def test_origin_main_assignment_rejects_stale_remote_tracking_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            repository = fixture["repository"]
+            _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
+            (repository / "later.txt").write_text("later\n", encoding="utf-8")
+            _commit_all(repository, "later origin main")
+            later = _git(repository, "rev-parse", "HEAD")
+            _git(repository, "update-ref", "refs/remotes/origin/main", later)
+            _git(repository, "reset", "--hard", str(fixture["head"]))
+
+            with self.assertRaisesRegex(contract.ContractError, "differs from fetched"):
+                contract.create_assignment(
+                    repository,
+                    task_id=fixture["task_id"],
+                    thread_id=fixture["thread_id"],
+                    owner=fixture["owner"],
+                    brief=fixture["brief"],
+                    destination=fixture["destination"],
+                    common_git_dir=fixture["common_git_dir"],
+                    branch=fixture["branch"],
+                    head=fixture["head"],
+                    tree=fixture["tree"],
+                    write_set_path=fixture["write_set_path"],
+                    candidate_receipt=None,
+                    run_receipt=None,
+                    baseline_kind="origin-main",
+                    ack_deadline=fixture["ack_deadline"],
+                    now=fixture["now"],
+                )
+
     def test_ack_rejects_wrong_context_dirty_and_outside_write_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             parent = Path(temporary)

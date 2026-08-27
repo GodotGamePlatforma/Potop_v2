@@ -42,6 +42,7 @@ LAST_GREEN_REF = "refs/last-green/integration"
 PUBLICATION_RECEIPT_SCHEMA_VERSION = 1
 PUBLICATION_RECEIPT_STATUS = "PUBLICATION_READY"
 ASSIGNMENT_SCHEMA_VERSION = 1
+MAIN_ASSIGNMENT_SCHEMA_VERSION = 2
 ASSIGNMENT_STORE_RELATIVE = Path("codex-agent-assignments") / "v1"
 ASSIGNMENT_LOCK_NAME = "agent-assignments"
 ASSIGNMENT_ID_PATTERN = re.compile(r"[0-9a-f]{32}\Z")
@@ -1124,7 +1125,7 @@ def _write_json_file(path: Path, value: object) -> None:
 
 def _assignment_record(bundle: Path) -> dict[str, object]:
     record = _read_json_object(bundle / "assignment.json", "record")
-    required = {
+    common_required = {
         "schema_version",
         "assignment_id",
         "assignment_digest",
@@ -1140,12 +1141,24 @@ def _assignment_record(bundle: Path) -> dict[str, object]:
         "tree",
         "write_set",
         "write_set_digest",
-        "candidate_receipt_sha256",
-        "run_receipt_sha256",
         "created_at",
         "ack_deadline",
     }
-    if set(record) != required or record.get("schema_version") != ASSIGNMENT_SCHEMA_VERSION:
+    schema_version = record.get("schema_version")
+    if schema_version == ASSIGNMENT_SCHEMA_VERSION:
+        required = common_required | {
+            "candidate_receipt_sha256",
+            "run_receipt_sha256",
+        }
+    elif schema_version == MAIN_ASSIGNMENT_SCHEMA_VERSION:
+        required = common_required | {
+            "baseline_kind",
+            "baseline_ref",
+            "origin_url_sha256",
+        }
+    else:
+        required = set()
+    if set(record) != required:
         raise ContractError("Assignment record has an invalid exact schema.")
     assignment_id = str(record["assignment_id"])
     assignment_digest = str(record["assignment_digest"])
@@ -1183,11 +1196,16 @@ def _assignment_record(bundle: Path) -> dict[str, object]:
         raise ContractError("Assignment record write_set digest is invalid.")
     if validate_paths(normalized_owner, write_set):
         raise ContractError("Assignment record write_set crosses its owner boundary.")
-    for field in (
-        "candidate_receipt_sha256",
-        "run_receipt_sha256",
-        "task_id_sha256",
-    ):
+    digest_fields = ["task_id_sha256"]
+    if schema_version == ASSIGNMENT_SCHEMA_VERSION:
+        digest_fields.extend(("candidate_receipt_sha256", "run_receipt_sha256"))
+    else:
+        if record["baseline_kind"] != "origin-main":
+            raise ContractError("Assignment record baseline_kind is invalid.")
+        if record["baseline_ref"] != "refs/remotes/origin/main":
+            raise ContractError("Assignment record baseline_ref is invalid.")
+        digest_fields.append("origin_url_sha256")
+    for field in digest_fields:
         if ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(record[field])) is None:
             raise ContractError(f"Assignment record {field} is invalid.")
     for field in ("head", "tree"):
@@ -1213,7 +1231,7 @@ def _event_record(
     if set(event) != required_fields or event.get("event") != event_type:
         raise ContractError(f"Assignment {event_type} event has an invalid exact schema.")
     if (
-        event.get("schema_version") != ASSIGNMENT_SCHEMA_VERSION
+        event.get("schema_version") != assignment.get("schema_version")
         or event.get("assignment_id") != assignment["assignment_id"]
         or event.get("assignment_digest") != assignment["assignment_digest"]
         or ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(event.get(digest_field, ""))) is None
@@ -1445,6 +1463,38 @@ def assignment_status(
         return _assignment_status_unlocked(bundle, now=now or _utc_now())
 
 
+def current_assignment(
+    repository: str | Path,
+    *,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Resolve the one RUNNING assignment bound to this exact worktree."""
+    root = repository_root(repository)
+    current_branch = _branch_name(root)
+    current_common_dir = git_common_dir(root)
+    current_time = now or _utc_now()
+    matches: list[dict[str, object]] = []
+    with assignment_lock(root):
+        for bundle in _all_assignment_bundles(root):
+            status = _assignment_status_unlocked(bundle, now=current_time)
+            assignment = status["assignment"]
+            if (
+                status["state"] == ASSIGNMENT_RUNNING
+                and _same_path(str(assignment["destination"]), root)
+                and _same_path(
+                    str(assignment["common_git_dir"]), current_common_dir
+                )
+                and assignment["branch"] == current_branch
+            ):
+                matches.append(status)
+    if len(matches) != 1:
+        raise ContractError(
+            "Current worktree must resolve to exactly one RUNNING assignment; "
+            f"found {len(matches)}."
+        )
+    return matches[0]
+
+
 def _write_sets_overlap(left: Iterable[str], right: Iterable[str]) -> tuple[str, str] | None:
     for left_path in left:
         left_key = normalize_repo_path(left_path).casefold()
@@ -1486,9 +1536,10 @@ def create_assignment(
     head: str,
     tree: str,
     write_set_path: str | Path,
-    candidate_receipt: str | Path,
-    run_receipt: str | Path,
+    candidate_receipt: str | Path | None,
+    run_receipt: str | Path | None,
     ack_deadline: datetime,
+    baseline_kind: str = "verified-lkg",
     now: datetime | None = None,
 ) -> dict[str, object]:
     root = repository_root(repository)
@@ -1521,8 +1572,8 @@ def create_assignment(
         )
     if changed_paths(root):
         raise ContractError("Assignment creation requires a clean destination worktree.")
-    if last_green_head(root) != head:
-        raise ContractError("Assignment HEAD must equal the authoritative last-green ref.")
+    if baseline_kind not in {"verified-lkg", "origin-main"}:
+        raise ContractError("Assignment baseline_kind must be verified-lkg or origin-main.")
     write_set = _closed_write_set(write_set_path)
     violations = validate_paths(normalized_owner, write_set)
     if violations:
@@ -1530,15 +1581,50 @@ def create_assignment(
             "Assignment write-set crosses its owner boundary: "
             + ", ".join(item.path for item in violations)
         )
-    _assert_assignment_evidence(
-        root,
-        candidate_receipt=candidate_receipt,
-        run_receipt=run_receipt,
-        head=head,
-        tree=tree,
-    )
+    evidence: dict[str, object]
+    schema_version: int
+    if baseline_kind == "verified-lkg":
+        if candidate_receipt is None or run_receipt is None:
+            raise ContractError("Verified-LKG assignment requires both receipts.")
+        if last_green_head(root) != head:
+            raise ContractError(
+                "Assignment HEAD must equal the authoritative last-green ref."
+            )
+        _assert_assignment_evidence(
+            root,
+            candidate_receipt=candidate_receipt,
+            run_receipt=run_receipt,
+            head=head,
+            tree=tree,
+        )
+        schema_version = ASSIGNMENT_SCHEMA_VERSION
+        evidence = {
+            "candidate_receipt_sha256": _file_sha256(
+                candidate_receipt, "candidate receipt"
+            ),
+            "run_receipt_sha256": _file_sha256(run_receipt, "run receipt"),
+        }
+    else:
+        remote_ref = "refs/remotes/origin/main"
+        try:
+            remote_head = _git_text(root, "rev-parse", "--verify", f"{remote_ref}^{{commit}}")
+            origin_url = _git_text(root, "remote", "get-url", "origin")
+        except ContractError as error:
+            raise ContractError(
+                "Origin-main assignment requires a configured, fetched origin/main."
+            ) from error
+        if remote_head != head:
+            raise ContractError(
+                f"Assignment HEAD {head} differs from fetched origin/main {remote_head}."
+            )
+        schema_version = MAIN_ASSIGNMENT_SCHEMA_VERSION
+        evidence = {
+            "baseline_kind": "origin-main",
+            "baseline_ref": remote_ref,
+            "origin_url_sha256": hashlib.sha256(origin_url.encode("utf-8")).hexdigest(),
+        }
     payload: dict[str, object] = {
-        "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+        "schema_version": schema_version,
         "task_id": normalized_task,
         "task_id_sha256": _assignment_task_hash(normalized_task),
         "thread_id": normalized_thread,
@@ -1551,13 +1637,10 @@ def create_assignment(
         "tree": tree,
         "write_set": list(write_set),
         "write_set_digest": _write_set_digest(write_set),
-        "candidate_receipt_sha256": _file_sha256(
-            candidate_receipt, "candidate receipt"
-        ),
-        "run_receipt_sha256": _file_sha256(run_receipt, "run receipt"),
         "created_at": _utc_text(created_at),
         "ack_deadline": _utc_text(deadline),
     }
+    payload.update(evidence)
     identity_digest = _canonical_digest(payload)
     assignment_id = identity_digest[:32]
     payload["assignment_id"] = assignment_id
@@ -1682,7 +1765,7 @@ def acknowledge_assignment(
             status["created"] = False
             return status
         event: dict[str, object] = {
-            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "schema_version": assignment["schema_version"],
             "event": "ACK",
             "assignment_id": assignment_id,
             "assignment_digest": assignment["assignment_digest"],
@@ -1732,7 +1815,7 @@ def redispatch_assignment(
             )
         sequence = len(status["redispatches"]) + 1
         event: dict[str, object] = {
-            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "schema_version": assignment["schema_version"],
             "event": "REDISPATCH",
             "assignment_id": assignment_id,
             "assignment_digest": assignment["assignment_digest"],
@@ -1770,7 +1853,7 @@ def close_assignment(
         if status["close"] is not None:
             return status
         event: dict[str, object] = {
-            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "schema_version": assignment["schema_version"],
             "event": "CLOSE",
             "assignment_id": assignment_id,
             "assignment_digest": assignment["assignment_digest"],
@@ -1860,6 +1943,14 @@ def validate_assignment_context(
             mismatches.append("common_git_dir")
         if assignment["branch"] != _branch_name(root):
             mismatches.append("branch")
+        if (
+            assignment["schema_version"] == MAIN_ASSIGNMENT_SCHEMA_VERSION
+            and hashlib.sha256(
+                _git_text(root, "remote", "get-url", "origin").encode("utf-8")
+            ).hexdigest()
+            != assignment["origin_url_sha256"]
+        ):
+            mismatches.append("origin_url")
         ancestor = _run_git(
             root,
             "merge-base",
@@ -2798,6 +2889,23 @@ def _parser() -> argparse.ArgumentParser:
     assignment_create.add_argument("--ack-deadline", required=True)
     assignment_create.add_argument("--json", action="store_true")
 
+    assignment_create_main = assignment_commands.add_parser(
+        "create-main",
+        help="create an assignment from the exact fetched origin/main without full-suite evidence",
+    )
+    assignment_create_main.add_argument("--task-id", required=True)
+    assignment_create_main.add_argument("--thread-id", required=True)
+    assignment_create_main.add_argument("--owner", required=True)
+    assignment_create_main.add_argument("--brief", required=True)
+    assignment_create_main.add_argument("--destination", required=True)
+    assignment_create_main.add_argument("--common-dir", required=True)
+    assignment_create_main.add_argument("--branch", required=True)
+    assignment_create_main.add_argument("--head", required=True)
+    assignment_create_main.add_argument("--tree", required=True)
+    assignment_create_main.add_argument("--write-set", required=True)
+    assignment_create_main.add_argument("--ack-deadline", required=True)
+    assignment_create_main.add_argument("--json", action="store_true")
+
     assignment_ack = assignment_commands.add_parser(
         "ack",
         help="acknowledge from the exact clean assigned worktree",
@@ -2816,6 +2924,12 @@ def _parser() -> argparse.ArgumentParser:
     assignment_status_parser.add_argument("--assignment-id")
     assignment_status_parser.add_argument("--task-id")
     assignment_status_parser.add_argument("--json", action="store_true")
+
+    assignment_current = assignment_commands.add_parser(
+        "current",
+        help="resolve the one RUNNING assignment for the current worktree",
+    )
+    assignment_current.add_argument("--json", action="store_true")
 
     assignment_redispatch = assignment_commands.add_parser(
         "redispatch",
@@ -3031,7 +3145,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
 
         if args.command == "assignment":
-            if args.assignment_command == "create":
+            if args.assignment_command in {"create", "create-main"}:
+                from_origin_main = args.assignment_command == "create-main"
                 status = create_assignment(
                     root,
                     task_id=args.task_id,
@@ -3044,10 +3159,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                     head=args.head,
                     tree=args.tree,
                     write_set_path=args.write_set,
-                    candidate_receipt=args.candidate_receipt,
-                    run_receipt=args.run_receipt,
+                    candidate_receipt=(
+                        None if from_origin_main else args.candidate_receipt
+                    ),
+                    run_receipt=None if from_origin_main else args.run_receipt,
                     ack_deadline=_parse_utc_text(
                         args.ack_deadline, "ack_deadline"
+                    ),
+                    baseline_kind=(
+                        "origin-main" if from_origin_main else "verified-lkg"
                     ),
                 )
             elif args.assignment_command == "ack":
@@ -3069,6 +3189,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     task_id=args.task_id,
                     assignment_id=args.assignment_id,
                 )
+            elif args.assignment_command == "current":
+                status = current_assignment(root)
             elif args.assignment_command == "redispatch":
                 status = redispatch_assignment(
                     root,
