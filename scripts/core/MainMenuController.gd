@@ -29,7 +29,7 @@ func _ready() -> void:
 	_new_game_confirmation = ConfirmationDialog.new()
 	_new_game_confirmation.name = "NewGameConfirmation"
 	_new_game_confirmation.title = "Nowa kampania"
-	_new_game_confirmation.dialog_text = "Rozpoczęcie nowej kampanii nieodwracalnie usunie bieżący zapis kampanii."
+	_new_game_confirmation.dialog_text = "Nowa kampania nieodwracalnie zastąpi bieżącą dopiero po poprawnym utworzeniu i bezpiecznym zapisie."
 	_new_game_confirmation.ok_button_text = "ROZPOCZNIJ"
 	_new_game_confirmation.cancel_button_text = "ANULUJ"
 	_new_game_confirmation.confirmed.connect(_start_pending_campaign)
@@ -44,10 +44,12 @@ func bind(root: Node, _state = null) -> void:
 	_rebuild_difficulties()
 	var has_saved_campaign: bool = bool(game_root.has_saved_campaign())
 	continue_button.disabled = not has_saved_campaign
-	if has_saved_campaign:
+	if game_root.has_unresolved_campaign_replacement():
+		status_label.text = game_root.last_new_campaign_failure_text()
+	elif has_saved_campaign:
 		status_label.text = "Znaleziono zapis kampanii."
 	elif game_root.has_campaign_storage_for_new_campaign():
-		status_label.text = "Znaleziono nieprawidłowy zapis. Nowa kampania usunie go przed rozpoczęciem."
+		status_label.text = "Znaleziono nieprawidłowe dane zapisu. Nowa kampania zastąpi je dopiero po bezpiecznym utworzeniu."
 	else:
 		status_label.text = "Brak zapisu — rozpocznij nową kampanię."
 
@@ -82,10 +84,12 @@ func _on_new_game_pressed() -> void:
 
 func _request_campaign_start() -> void:
 	if game_root.has_campaign_storage_for_new_campaign():
-		if game_root.has_saved_campaign():
-			_new_game_confirmation.dialog_text = "Rozpoczęcie nowej kampanii nieodwracalnie usunie bieżący zapis kampanii."
+		if game_root.has_unresolved_campaign_replacement():
+			_new_game_confirmation.dialog_text = game_root.last_new_campaign_failure_text()
+		elif game_root.has_saved_campaign():
+			_new_game_confirmation.dialog_text = "Nowa kampania nieodwracalnie zastąpi bieżącą dopiero po poprawnym utworzeniu i bezpiecznym zapisie."
 		else:
-			_new_game_confirmation.dialog_text = "Na dysku jest nieprawidłowy zapis. Rozpoczęcie nowej kampanii nieodwracalnie go usunie."
+			_new_game_confirmation.dialog_text = "Na dysku są nieprawidłowe dane zapisu. Nowa kampania zastąpi je dopiero po poprawnym utworzeniu."
 		_new_game_confirmation.popup_centered()
 	else:
 		_start_pending_campaign()
@@ -97,7 +101,8 @@ func _start_pending_campaign() -> void:
 	else:
 		started = game_root.start_new_campaign(_pending_profile_id, 0, true, true, true)
 	if not started:
-		status_label.text = "Nie udało się rozpocząć kampanii. Sprawdź dane gry lub możliwość zapisu."
+		status_label.text = game_root.last_new_campaign_failure_text()
+		continue_button.disabled = not game_root.has_saved_campaign()
 
 
 func _on_difficulty_selected(index: int) -> void:

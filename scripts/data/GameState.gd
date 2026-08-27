@@ -71,7 +71,7 @@ func _campaign_profile_snapshot(source) -> Resource:
 	return fallback.create_campaign_snapshot()
 
 
-func setup_new_campaign(campaign_seed: int = 0, profile = null) -> void:
+func setup_new_campaign(campaign_seed: int = 0, profile = null, map_compiler = null) -> PackedStringArray:
 	format_revision = GameFormatScript.CAMPAIGN_FORMAT_REVISION
 	campaign_id = "%d-%d" % [int(Time.get_unix_time_from_system()), randi()]
 	created_at = Time.get_datetime_string_from_system(true)
@@ -87,9 +87,12 @@ func setup_new_campaign(campaign_seed: int = 0, profile = null) -> void:
 	platform.setup_starting_slots()
 	underwater_world = UnderwaterWorldStateScript.new()
 	underwater_world.setup(seed)
-	var map_errors := UnderwaterMapSceneCompilerScript.new().generate(underwater_world, seed)
-	for map_error in map_errors:
-		push_error("Nie udało się zainicjalizować sceny mapy: %s" % map_error)
+	var resolved_map_compiler = map_compiler if map_compiler != null else UnderwaterMapSceneCompilerScript.new()
+	if resolved_map_compiler == null or not resolved_map_compiler.has_method("generate"):
+		return PackedStringArray(["Kompilator sceny mapy nie udostępnia operacji generate()."])
+	var map_errors: PackedStringArray = resolved_map_compiler.generate(underwater_world, seed)
+	if not map_errors.is_empty():
+		return map_errors
 	story_flags = StoryProgressStateScript.new()
 	active_policies = PolicyStateScript.new()
 	pending_settlement_event = null
@@ -111,6 +114,7 @@ func setup_new_campaign(campaign_seed: int = 0, profile = null) -> void:
 	_setup_starting_buildings()
 	prepare_pressure_for_day(null, null)
 	begin_new_day_plan()
+	return PackedStringArray()
 
 func load_validation_errors() -> PackedStringArray:
 	if int(format_revision) != GameFormatScript.CAMPAIGN_FORMAT_REVISION:
