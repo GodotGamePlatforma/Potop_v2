@@ -413,7 +413,7 @@ func _capture_kick_matrix() -> bool:
 				_diver._update_presentation_pose(0.0)
 				_diver._update_socket_markers()
 				queue_redraw()
-				_status.text = "KOPNIĘCIE W PRZECIWFAZIE — %s  |  FRAME %02d  |  %s\nMIEDŹ: NOGA BLIŻSZA  •  CYJAN: NOGA DALSZA" % [animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
+				_status.text = "KOPNIĘCIE W PRZECIWFAZIE — %s  |  FRAME %02d  |  %s\nRASTER: MIEDŹ=NOGA BLIŻSZA • CYJAN=NOGA DALSZA  |  OKRĘGI: SOCKETY" % [animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
 				await get_tree().process_frame
 				await RenderingServer.frame_post_draw
 				var side := "left" if flip_h else "right"

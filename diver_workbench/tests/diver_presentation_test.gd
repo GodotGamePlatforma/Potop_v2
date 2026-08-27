@@ -17,6 +17,7 @@ const MINIMUM_CUE_FIT_RATIO := 0.95
 const MINIMUM_AUTHORED_FRAME_WORLD_SIZE := Vector2(99.0, 38.5)
 const MINIMUM_CELL_PADDING := 10
 const STABLE_BODY_REGION := Rect2i(300, 30, 190, 110)
+const FIN_MARKER_REGION := Rect2i(95, 0, 66, 256)
 const FIN_RASTER_REGION := Rect2i(0, 0, 140, 256)
 const FIN_ALPHA_THRESHOLD := 32
 const MINIMUM_FIN_COMPONENT_AREA := 1000
@@ -303,26 +304,119 @@ func _test_raster_kick_contract(source_images: Dictionary) -> void:
 		_check(sheet != null, "%s sheet should be available for raster kick validation." % animation_name)
 		if sheet == null:
 			continue
+		var near_marker_centroids: Array[Vector2] = []
+		var far_marker_centroids: Array[Vector2] = []
+		var near_marker_y: Array[float] = []
+		var far_marker_y: Array[float] = []
+		var marker_track_complete := true
+		for frame in range(16):
+			var frame_origin := Vector2i((frame % 4) * 512, (frame / 4) * 256)
+			var frame_image := sheet.get_region(Rect2i(frame_origin, DiverFrameEnvelopeScript.FRAME_SIZE))
+			var near_marker := _raster_fin_marker(frame_image, &"near")
+			var far_marker := _raster_fin_marker(frame_image, &"far")
+			var near_count := int(near_marker["count"])
+			var far_count := int(far_marker["count"])
+			_check(near_count >= 100, "%s frame %d should retain at least 100 copper near-leg marker pixels, got %d." % [animation_name, frame, near_count])
+			_check(far_count >= 12, "%s frame %d should retain at least 12 cyan far-leg marker pixels, got %d." % [animation_name, frame, far_count])
+			marker_track_complete = marker_track_complete and near_count >= 100 and far_count >= 12
+			var near_centroid: Vector2 = near_marker["centroid"]
+			var far_centroid: Vector2 = far_marker["centroid"]
+			near_marker_centroids.append(near_centroid)
+			far_marker_centroids.append(far_centroid)
+			near_marker_y.append(near_centroid.y)
+			far_marker_y.append(far_centroid.y)
+		if marker_track_complete:
+			_check(_series_range(near_marker_y) >= 50.0, "%s copper near-leg marker should travel through a readable vertical range." % animation_name)
+			_check(_series_range(far_marker_y) >= 50.0, "%s cyan far-leg marker should travel through a readable vertical range." % animation_name)
+			_check(_pearson_correlation(near_marker_y, far_marker_y) <= -0.90, "%s copper/cyan raster markers should remain strongly anti-correlated through all 16 frames." % animation_name)
+			_check(near_marker_y[4] - far_marker_y[4] <= -40.0, "%s raster identity markers should place the copper near leg above the cyan far leg at frame 4." % animation_name)
+			_check(near_marker_y[12] - far_marker_y[12] >= 40.0, "%s raster identity markers should place the copper near leg below the cyan far leg at frame 12." % animation_name)
 		var raster_leg_delta := {}
 		for frame: int in [4, 12]:
 			var frame_origin := Vector2i((frame % 4) * 512, (frame / 4) * 256)
 			var frame_image := sheet.get_region(Rect2i(frame_origin, DiverFrameEnvelopeScript.FRAME_SIZE))
 			var components := _alpha_components_in_region(frame_image, FIN_RASTER_REGION, FIN_ALPHA_THRESHOLD, MINIMUM_FIN_COMPONENT_AREA)
 			_check(components.size() == 2, "%s frame %d should show two distinct, substantial fin silhouettes in the rear raster, got %s." % [animation_name, frame, components])
-			if components.size() != 2:
+			if components.size() != 2 or not marker_track_complete:
 				continue
-			var upper_socket := SocketProfile.position_for(animation_name, &"fin_upper", frame, false) + Vector2(DiverFrameEnvelopeScript.FRAME_SIZE) * 0.5
-			var lower_socket := SocketProfile.position_for(animation_name, &"fin_lower", frame, false) + Vector2(DiverFrameEnvelopeScript.FRAME_SIZE) * 0.5
-			var upper_index := _nearest_component_index(components, upper_socket)
-			var lower_index := _nearest_component_index(components, lower_socket)
-			_check(upper_index != lower_index, "%s frame %d anatomical fin tracks should resolve to different raster silhouettes." % [animation_name, frame])
-			var upper_centroid: Vector2 = components[upper_index]["centroid"]
-			var lower_centroid: Vector2 = components[lower_index]["centroid"]
-			_check(absf(upper_centroid.y - upper_socket.y) <= 8.0, "%s frame %d near-leg socket should follow the vertical center of its raster fin mass." % [animation_name, frame])
-			_check(absf(lower_centroid.y - lower_socket.y) <= 8.0, "%s frame %d far-leg socket should follow the vertical center of its raster fin mass." % [animation_name, frame])
-			raster_leg_delta[frame] = upper_centroid.y - lower_centroid.y
+			var near_index := _nearest_component_index(components, near_marker_centroids[frame])
+			var far_index := _nearest_component_index(components, far_marker_centroids[frame])
+			_check(near_index != far_index, "%s frame %d copper/cyan raster markers should resolve to different substantial fin silhouettes." % [animation_name, frame])
+			if near_index == far_index:
+				continue
+			var near_centroid: Vector2 = components[near_index]["centroid"]
+			var far_centroid: Vector2 = components[far_index]["centroid"]
+			var near_socket := SocketProfile.position_for(animation_name, &"fin_upper", frame, false) + Vector2(DiverFrameEnvelopeScript.FRAME_SIZE) * 0.5
+			var far_socket := SocketProfile.position_for(animation_name, &"fin_lower", frame, false) + Vector2(DiverFrameEnvelopeScript.FRAME_SIZE) * 0.5
+			_check(absf(near_centroid.y - near_socket.y) <= 8.0, "%s frame %d near-leg socket should independently follow the copper raster fin mass." % [animation_name, frame])
+			_check(absf(far_centroid.y - far_socket.y) <= 8.0, "%s frame %d far-leg socket should independently follow the cyan raster fin mass." % [animation_name, frame])
+			raster_leg_delta[frame] = near_centroid.y - far_centroid.y
 		_check(float(raster_leg_delta.get(4, 0.0)) <= -40.0, "%s quarter-cycle should visibly place the near fin above the far fin in the raster." % animation_name)
 		_check(float(raster_leg_delta.get(12, 0.0)) >= 40.0, "%s opposite quarter-cycle should visibly place the near fin below the far fin in the raster." % animation_name)
+
+
+func _raster_fin_marker(image: Image, identity: StringName) -> Dictionary:
+	var rgba: Image = image
+	if rgba.get_format() != Image.FORMAT_RGBA8:
+		rgba = image.duplicate()
+		rgba.convert(Image.FORMAT_RGBA8)
+	var pixels: PackedByteArray = rgba.get_data()
+	var width: int = rgba.get_width()
+	var coordinate_sum := Vector2.ZERO
+	var count := 0
+	for y in range(FIN_MARKER_REGION.position.y, FIN_MARKER_REGION.end.y):
+		for x in range(FIN_MARKER_REGION.position.x, FIN_MARKER_REGION.end.x):
+			var pixel_index: int = (y * width + x) * 4
+			var red := int(pixels[pixel_index])
+			var green := int(pixels[pixel_index + 1])
+			var blue := int(pixels[pixel_index + 2])
+			var alpha := int(pixels[pixel_index + 3])
+			var matches := false
+			if identity == &"near":
+				matches = alpha >= 128 and red >= 140 and green >= 105 and blue <= 115 and red - blue >= 45 and green - blue >= 15
+			else:
+				matches = alpha >= 128 and red <= 100 and green >= 105 and blue >= 105 and green - red >= 35 and blue - red >= 30
+			if matches:
+				coordinate_sum += Vector2(x, y)
+				count += 1
+	return {
+		"count": count,
+		"centroid": coordinate_sum / float(count) if count > 0 else Vector2(-1.0, -1.0),
+	}
+
+
+func _series_range(values: Array[float]) -> float:
+	if values.is_empty():
+		return 0.0
+	var minimum := INF
+	var maximum := -INF
+	for value in values:
+		minimum = minf(minimum, value)
+		maximum = maxf(maximum, value)
+	return maximum - minimum
+
+
+func _pearson_correlation(first: Array[float], second: Array[float]) -> float:
+	if first.size() != second.size() or first.size() < 2:
+		return 1.0
+	var first_mean := 0.0
+	var second_mean := 0.0
+	for index in range(first.size()):
+		first_mean += first[index]
+		second_mean += second[index]
+	first_mean /= float(first.size())
+	second_mean /= float(second.size())
+	var numerator := 0.0
+	var first_variance := 0.0
+	var second_variance := 0.0
+	for index in range(first.size()):
+		var first_delta := first[index] - first_mean
+		var second_delta := second[index] - second_mean
+		numerator += first_delta * second_delta
+		first_variance += first_delta * first_delta
+		second_variance += second_delta * second_delta
+	var denominator := sqrt(first_variance * second_variance)
+	return numerator / denominator if denominator > 0.000001 else 1.0
 
 
 func _nearest_component_index(components: Array[Dictionary], point: Vector2) -> int:
@@ -479,8 +573,8 @@ func _test_runtime_presentation_contract() -> void:
 	var lower_recovery_ratio := wake_lower.amount_ratio
 	diver._set_animation_phase(sprite, 0.75)
 	visual_effects._update_wake()
-	_check(upper_push_ratio > lower_recovery_ratio, "The first half-cycle should emphasize the upper-fin propulsion wake.")
-	_check(wake_lower.amount_ratio > wake_upper.amount_ratio, "The opposite half-cycle should transfer propulsion emphasis to the lower fin.")
+	_check(upper_push_ratio > lower_recovery_ratio, "The first half-cycle should emphasize the near-leg propulsion wake.")
+	_check(wake_lower.amount_ratio > wake_upper.amount_ratio, "The opposite half-cycle should transfer propulsion emphasis to the far-leg wake.")
 
 	diver.set_visual_context(0.8, &"repair", 0.5, true)
 	visual_effects._update_leak()
