@@ -955,7 +955,7 @@
     "collision_source": {
       "format": "l05_owned_rect_ops_v2",
       "path": "assets/topology/l05_ground_mask_source.json",
-      "sha256": "5a66d4b7d2c4f88ae0379457228a16991eca1c0ff6629a09e1f7ef96f6ab048d",
+      "sha256": "75b8bf49fdb01934b40eff429c5f8c29bb6a5f40cecdf4755507b7c6f923533d",
       "canonical_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e",
       "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
       "pixel_size": [

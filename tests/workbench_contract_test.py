@@ -42,6 +42,27 @@ def _git(repository: Path, *arguments: str) -> str:
     return result.stdout.strip()
 
 
+def _git_bytes(repository: Path, *arguments: str) -> bytes:
+    result = subprocess.run(
+        [
+            "git",
+            "-c",
+            f"safe.directory={repository}",
+            "-C",
+            str(repository),
+            *arguments,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(
+            f"git {' '.join(arguments)} failed ({result.returncode}): "
+            f"{result.stderr.decode('utf-8', errors='replace')}"
+        )
+    return result.stdout
+
+
 def _new_repository(parent: Path) -> Path:
     repository = parent / "repository"
     repository.mkdir()
@@ -52,8 +73,9 @@ def _new_repository(parent: Path) -> Path:
     )
     _git(repository, "config", "user.email", "contract-test@example.invalid")
     _git(repository, "config", "user.name", "Contract Test")
-    (repository / ".gitignore").write_text("*.ignored\n", encoding="utf-8")
-    (repository / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+    _git(repository, "config", "core.autocrlf", "false")
+    (repository / ".gitignore").write_bytes(b"*.ignored\n")
+    (repository / "tracked.txt").write_bytes(b"baseline\n")
     _git(repository, "add", ".gitignore", "tracked.txt")
     _git(repository, "commit", "-q", "-m", "baseline")
     return repository
@@ -104,12 +126,15 @@ def _publication_candidate(parent: Path) -> dict[str, object]:
     generated = repository / "generated"
     source.mkdir()
     generated.mkdir()
-    (source / "input.txt").write_text("input\n", encoding="utf-8")
+    (repository / ".gitattributes").write_bytes(
+        b"* text=auto eol=lf\n"
+        b"generated/two.bin filter=lfs diff=lfs merge=lfs -text\n"
+    )
+    (source / "input.txt").write_bytes(b"input\n")
     (generated / "one.bin").write_bytes(b"one")
     (generated / "two.bin").write_bytes(b"two")
-    (repository / ".gitignore").write_text(
-        "*.ignored\ngenerated/extra.bin\n",
-        encoding="utf-8",
+    (repository / ".gitignore").write_bytes(
+        b"*.ignored\ngenerated/extra.bin\n"
     )
     _commit_all(repository, "publication candidate")
 
@@ -356,15 +381,99 @@ class PublicationReceiptTest(unittest.TestCase):
     def test_receipt_verifies_clean_closed_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            self.assertEqual(
+                _git(repository, "status", "--porcelain"),
+                "",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            self.assertEqual(
+                (repository / "source" / "input.txt").read_bytes(),
+                _git_bytes(repository, "show", "HEAD:source/input.txt"),
+            )
+            self.assertIn(
+                "filter: lfs",
+                _git(
+                    repository,
+                    "check-attr",
+                    "filter",
+                    "--",
+                    "generated/two.bin",
+                ),
+            )
+            self.assertNotEqual(
+                (repository / "generated" / "two.bin").read_bytes(),
+                _git_bytes(repository, "show", "HEAD:generated/two.bin"),
+            )
             created = _create_receipt(candidate)
 
             verified = contract.verify_publication_receipt(
-                candidate["repository"], candidate["receipt"]
+                repository, candidate["receipt"]
             )
 
             self.assertEqual(created["head"], verified["head"])
             self.assertEqual(created["tree"], verified["tree"])
             self.assertEqual(created["status"], "PUBLICATION_READY")
+
+    def test_receipt_creation_rejects_clean_filter_crlf_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            (repository / "source" / "input.txt").write_bytes(b"input\r\n")
+            _git(repository, "add", "source/input.txt")
+
+            self.assertEqual(
+                _git(repository, "status", "--porcelain"),
+                "",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            with self.assertRaisesRegex(
+                contract.ContractError,
+                "clean-filter drift: source/input.txt",
+            ):
+                _create_receipt(candidate)
+
+    def test_receipt_creation_rejects_clean_filter_mixed_eol_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            input_path = repository / "source" / "input.txt"
+            input_path.write_bytes(b"first\nsecond\n")
+            _commit_all(repository, "mixed eol baseline")
+            input_path.write_bytes(b"first\r\nsecond\n")
+            _git(repository, "add", "source/input.txt")
+
+            self.assertEqual(
+                _git(repository, "status", "--porcelain"),
+                "",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            self.assertIn(
+                "w/mixed",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            with self.assertRaisesRegex(
+                contract.ContractError,
+                "clean-filter drift: source/input.txt",
+            ):
+                _create_receipt(candidate)
+
+    def test_receipt_verification_rejects_clean_filter_crlf_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            _create_receipt(candidate)
+            repository = candidate["repository"]
+            (repository / "source" / "input.txt").write_bytes(b"input\r\n")
+            _git(repository, "add", "source/input.txt")
+
+            self.assertEqual(_git(repository, "status", "--porcelain"), "")
+            with self.assertRaisesRegex(
+                contract.ContractError,
+                "clean-filter drift: source/input.txt",
+            ):
+                contract.verify_publication_receipt(
+                    repository, candidate["receipt"]
+                )
 
     def test_receipt_rejects_output_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -452,6 +561,80 @@ class PublicationReceiptTest(unittest.TestCase):
                 "output list is not closed",
             ):
                 _create_receipt(candidate)
+
+
+class TrackedEolCheckTest(unittest.TestCase):
+    def test_eol_check_accepts_dirty_lf_and_hydrated_lfs_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            (repository / "source" / "input.txt").write_bytes(
+                b"ordinary dirty authoring\n"
+            )
+
+            self.assertNotEqual(_git(repository, "status", "--porcelain"), "")
+            self.assertIn(
+                "w/lf",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            self.assertNotEqual(
+                (repository / "generated" / "two.bin").read_bytes(),
+                _git_bytes(repository, "show", "HEAD:generated/two.bin"),
+            )
+            self.assertGreater(contract.assert_tracked_lf_eol(repository), 0)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = contract.main(
+                    ["--repo", str(repository), "eol-check"]
+                )
+            self.assertEqual(exit_code, 0, stderr.getvalue())
+            self.assertIn("PASS tracked_eol_lf=", stdout.getvalue())
+
+    def test_eol_check_rejects_crlf_in_dirty_authoring_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            (repository / "source" / "input.txt").write_bytes(b"dirty\r\n")
+
+            self.assertIn(
+                "w/crlf",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            with self.assertRaisesRegex(
+                contract.ContractError,
+                r"source/input\.txt \(w/crlf\)",
+            ):
+                contract.assert_tracked_lf_eol(repository)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = contract.main(
+                    ["--repo", str(repository), "eol-check"]
+                )
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn("source/input.txt (w/crlf)", stderr.getvalue())
+
+    def test_eol_check_rejects_mixed_eol_in_dirty_authoring_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            repository = candidate["repository"]
+            (repository / "source" / "input.txt").write_bytes(
+                b"first\r\nsecond\n"
+            )
+
+            self.assertIn(
+                "w/mixed",
+                _git(repository, "ls-files", "--eol", "source/input.txt"),
+            )
+            with self.assertRaisesRegex(
+                contract.ContractError,
+                r"source/input\.txt \(w/mixed\)",
+            ):
+                contract.assert_tracked_lf_eol(repository)
 
 
 if __name__ == "__main__":

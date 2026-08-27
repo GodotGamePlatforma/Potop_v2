@@ -87,6 +87,7 @@ def _run_git(
     repository: str | Path,
     *arguments: str,
     check: bool = True,
+    input_data: bytes | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     boundary = _find_git_boundary(repository)
     command = [
@@ -97,7 +98,12 @@ def _run_git(
         str(boundary),
         *arguments,
     ]
-    result = subprocess.run(command, check=False, capture_output=True)
+    result = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        input=input_data,
+    )
     if check and result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
         raise ContractError(
@@ -250,6 +256,284 @@ def _tracked_paths(repository: Path) -> tuple[str, ...]:
     return _decode_nul_paths(
         _run_git(repository, "ls-files", "--cached", "-z").stdout
     )
+
+
+def _tracked_git_attributes(
+    repository: Path,
+    paths: Iterable[str],
+) -> dict[str, dict[str, str]]:
+    normalized_paths = tuple(sorted({normalize_repo_path(path) for path in paths}))
+    if not normalized_paths:
+        return {}
+    standard_input = b"".join(
+        os.fsencode(path) + b"\0" for path in normalized_paths
+    )
+    payload = _run_git(
+        repository,
+        "check-attr",
+        "--cached",
+        "-z",
+        "--stdin",
+        "text",
+        "eol",
+        "filter",
+        input_data=standard_input,
+    ).stdout
+    fields = payload.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if len(fields) % 3 != 0:
+        raise ContractError("Git returned malformed check-attr output.")
+
+    expected_attributes = {"text", "eol", "filter"}
+    result: dict[str, dict[str, str]] = {}
+    for offset in range(0, len(fields), 3):
+        path = normalize_repo_path(os.fsdecode(fields[offset]))
+        attribute = fields[offset + 1].decode("ascii", errors="strict")
+        value = os.fsdecode(fields[offset + 2])
+        if path not in normalized_paths or attribute not in expected_attributes:
+            raise ContractError("Git returned unexpected check-attr output.")
+        values = result.setdefault(path, {})
+        if attribute in values:
+            raise ContractError("Git returned duplicate check-attr output.")
+        values[attribute] = value
+
+    if set(result) != set(normalized_paths) or any(
+        set(values) != expected_attributes for values in result.values()
+    ):
+        raise ContractError("Git check-attr output is incomplete.")
+    return result
+
+
+def _index_entries(repository: Path) -> dict[str, tuple[str, str]]:
+    payload = _run_git(repository, "ls-files", "--stage", "-z").stdout
+    result: dict[str, tuple[str, str]] = {}
+    for raw_record in payload.split(b"\0"):
+        if not raw_record:
+            continue
+        try:
+            metadata, raw_path = raw_record.split(b"\t", 1)
+            mode, object_id, stage = metadata.split(b" ")
+        except ValueError as error:
+            raise ContractError("Git returned malformed index metadata.") from error
+        path = normalize_repo_path(os.fsdecode(raw_path))
+        if stage != b"0" or path in result:
+            raise ContractError(
+                f"Publication candidate has unresolved index stages: {path}"
+            )
+        result[path] = (
+            mode.decode("ascii", errors="strict"),
+            object_id.decode("ascii", errors="strict"),
+        )
+    return result
+
+
+def _head_tree_entries(repository: Path) -> dict[str, tuple[str, str, str]]:
+    payload = _run_git(
+        repository,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        "HEAD",
+    ).stdout
+    result: dict[str, tuple[str, str, str]] = {}
+    for raw_record in payload.split(b"\0"):
+        if not raw_record:
+            continue
+        try:
+            metadata, raw_path = raw_record.split(b"\t", 1)
+            mode, object_type, object_id = metadata.split(b" ")
+        except ValueError as error:
+            raise ContractError("Git returned malformed HEAD tree metadata.") from error
+        path = normalize_repo_path(os.fsdecode(raw_path))
+        if path in result:
+            raise ContractError(f"Git returned duplicate HEAD tree path: {path}")
+        result[path] = (
+            mode.decode("ascii", errors="strict"),
+            object_type.decode("ascii", errors="strict"),
+            object_id.decode("ascii", errors="strict"),
+        )
+    return result
+
+
+def _working_tree_raw_blob_ids(
+    repository: Path,
+    paths: Iterable[str],
+) -> dict[str, str]:
+    normalized_paths = tuple(sorted({normalize_repo_path(path) for path in paths}))
+    result: dict[str, str] = {}
+    chunk: list[str] = []
+    chunk_length = 0
+
+    def flush() -> None:
+        nonlocal chunk, chunk_length
+        if not chunk:
+            return
+        payload = _run_git(
+            repository,
+            "hash-object",
+            "--no-filters",
+            "--",
+            *chunk,
+        ).stdout
+        object_ids = payload.decode("ascii", errors="strict").splitlines()
+        if len(object_ids) != len(chunk):
+            raise ContractError("Git hash-object returned an incomplete raw-byte set.")
+        result.update(zip(chunk, object_ids, strict=True))
+        chunk = []
+        chunk_length = 0
+
+    for path in normalized_paths:
+        # Keep command lines comfortably below Windows' process limit while
+        # preserving argv-safe handling of every repository-relative path.
+        path_length = len(os.fsencode(path)) + 1
+        if chunk and (len(chunk) >= 128 or chunk_length + path_length > 12_000):
+            flush()
+        chunk.append(path)
+        chunk_length += path_length
+    flush()
+    return result
+
+
+def _assert_tracked_text_bytes_reproducible(repository: Path) -> None:
+    """Reject clean-filter-only equality that cannot reproduce raw worktree bytes."""
+
+    tracked_paths = _tracked_paths(repository)
+    attributes = _tracked_git_attributes(repository, tracked_paths)
+    index_entries = _index_entries(repository)
+    head_entries = _head_tree_entries(repository)
+    protected: list[tuple[str, str]] = []
+    for path in tracked_paths:
+        values = attributes[path]
+        if values["filter"].lower() == "lfs" or values["text"] == "unset":
+            # Git LFS intentionally has a pointer in Git and a payload in the
+            # worktree. Comparing those as ordinary text would reject every
+            # valid hydrated checkout.
+            continue
+        is_text = values["text"] not in {"unset", "unspecified"} or values["eol"] == "lf"
+        if not is_text:
+            continue
+        index_entry = index_entries.get(path)
+        head_entry = head_entries.get(path)
+        if index_entry is None or head_entry is None:
+            raise ContractError(
+                f"Tracked publication path is absent from HEAD/index: {path}"
+            )
+        index_mode, index_object = index_entry
+        head_mode, head_type, head_object = head_entry
+        if not index_mode.startswith("100") or head_type != "blob":
+            # A submodule or symlink is not a tracked text file payload.
+            continue
+        if index_mode != head_mode or index_object != head_object:
+            raise ContractError(
+                f"Tracked text path differs between exact HEAD and index: {path}"
+            )
+        protected.append((path, index_object))
+
+    working_objects = _working_tree_raw_blob_ids(
+        repository,
+        (path for path, _ in protected),
+    )
+    mismatched = [
+        path
+        for path, object_id in protected
+        if working_objects[path] != object_id
+    ]
+    if mismatched:
+        raise ContractError(
+            "Publication requires raw bytes of tracked text files to match "
+            "their exact HEAD/index blobs; clean-filter drift: "
+            + ", ".join(mismatched)
+        )
+
+
+def assert_tracked_text_bytes_reproducible(
+    repository: str | Path = ".",
+) -> None:
+    """Public fail-closed check reusable by candidate builders and runners."""
+
+    root = repository_root(repository)
+    _assert_tracked_text_bytes_reproducible(root)
+
+
+def _tracked_worktree_eol_states(repository: Path) -> dict[str, str]:
+    """Return Git's working-tree EOL classification for every tracked path."""
+
+    payload = _run_git(
+        repository,
+        "ls-files",
+        "--eol",
+        "-z",
+        "--",
+    ).stdout
+    result: dict[str, str] = {}
+    for raw_record in payload.split(b"\0"):
+        if not raw_record:
+            continue
+        try:
+            metadata, raw_path = raw_record.split(b"\t", 1)
+        except ValueError as error:
+            raise ContractError("Git returned malformed ls-files --eol output.") from error
+        worktree_states = [
+            token.decode("ascii", errors="strict")
+            for token in metadata.split()
+            if token.startswith(b"w/")
+        ]
+        if len(worktree_states) != 1:
+            raise ContractError("Git returned malformed ls-files --eol metadata.")
+        path = normalize_repo_path(os.fsdecode(raw_path))
+        if path in result:
+            raise ContractError(f"Git returned duplicate EOL metadata: {path}")
+        result[path] = worktree_states[0]
+
+    tracked_paths = set(_tracked_paths(repository))
+    if set(result) != tracked_paths:
+        missing = sorted(tracked_paths - set(result))
+        unexpected = sorted(set(result) - tracked_paths)
+        details: list[str] = []
+        if missing:
+            details.append("missing=" + ", ".join(missing))
+        if unexpected:
+            details.append("unexpected=" + ", ".join(unexpected))
+        raise ContractError(
+            "Git ls-files --eol output is incomplete: " + "; ".join(details)
+        )
+    return result
+
+
+def assert_tracked_lf_eol(repository: str | Path = ".") -> int:
+    """Reject CRLF/mixed worktree bytes for tracked files governed by eol=lf.
+
+    Unlike the immutable publication check above, this format-only gate permits
+    ordinary dirty authoring changes. The returned count is the number of
+    tracked, non-LFS paths whose cached Git attributes require ``eol=lf``.
+    """
+
+    root = repository_root(repository)
+    tracked_paths = _tracked_paths(root)
+    attributes = _tracked_git_attributes(root, tracked_paths)
+    worktree_states = _tracked_worktree_eol_states(root)
+    checked = 0
+    violations: list[tuple[str, str]] = []
+    for path in tracked_paths:
+        values = attributes[path]
+        if values["eol"].lower() != "lf":
+            continue
+        if values["filter"].lower() == "lfs" or values["text"] == "unset":
+            continue
+        checked += 1
+        state = worktree_states[path]
+        if state in {"w/crlf", "w/mixed"}:
+            violations.append((path, state))
+
+    if violations:
+        raise ContractError(
+            "Tracked files governed by eol=lf must use LF worktree bytes; "
+            "invalid EOL: "
+            + ", ".join(f"{path} ({state})" for path, state in violations)
+        )
+    return checked
 
 
 def changed_paths(
@@ -515,6 +799,7 @@ def create_publication_receipt(
     target = _receipt_target(root, receipt_path)
     with publication_lock(root):
         _assert_clean_publication_candidate(root)
+        _assert_tracked_text_bytes_reproducible(root)
         if target.exists():
             raise ContractError(
                 f"Publication receipt already exists and is immutable: {target}"
@@ -622,6 +907,7 @@ def verify_publication_receipt(
     target = _receipt_target(root, receipt_path)
     with publication_lock(root):
         _assert_clean_publication_candidate(root)
+        _assert_tracked_text_bytes_reproducible(root)
         try:
             receipt = json.loads(target.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -847,6 +1133,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     lock_path.add_argument("--name", default=DEFAULT_PUBLICATION_LOCK)
 
+    commands.add_parser(
+        "eol-check",
+        help="reject tracked eol=lf files with CRLF or mixed worktree bytes",
+    )
+
     publication = commands.add_parser(
         "publication",
         help="create or verify a fail-closed publication receipt",
@@ -991,6 +1282,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.command == "lock-path":
             print(publication_lock_path(root, args.name))
+            return 0
+        if args.command == "eol-check":
+            checked = assert_tracked_lf_eol(root)
+            print(f"PASS tracked_eol_lf={checked}")
             return 0
         raise ContractError(f"Unsupported command: {args.command}")
     except (ContractError, OSError) as error:

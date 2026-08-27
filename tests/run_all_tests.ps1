@@ -195,6 +195,64 @@ function Assert-RunnerInvocationMode {
     }
 }
 
+function Assert-TrackedLfEol {
+    param([string]$ProjectRoot)
+
+    $contractTool = Join-Path $ProjectRoot "tools/workbench_contract.py"
+    if (-not (Test-Path -LiteralPath $contractTool -PathType Leaf)) {
+        throw "Tracked EOL verifier is missing: '$contractTool'."
+    }
+    $pythonCommand = Get-Command -Name "python" -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($null -eq $pythonCommand) {
+        throw "Python is required for the tracked EOL preflight."
+    }
+
+    $process = $null
+    try {
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = $pythonCommand.Source
+        $arguments = @(
+            "-B", $contractTool,
+            "--repo", $ProjectRoot,
+            "eol-check"
+        )
+        $startInfo.Arguments = (@($arguments) | ForEach-Object {
+            ConvertTo-ProcessArgument -Argument ([string]$_)
+        }) -join " "
+        $startInfo.WorkingDirectory = $ProjectRoot
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw "Tracked EOL preflight process could not be started."
+        }
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+        $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(60000)) {
+            try { $process.Kill($true) } catch { $process.Kill() }
+            $process.WaitForExit()
+            throw "Tracked EOL preflight timed out after 60 seconds."
+        }
+        $standardOutput = $standardOutputTask.GetAwaiter().GetResult().Trim()
+        $standardError = $standardErrorTask.GetAwaiter().GetResult().Trim()
+        if ($process.ExitCode -ne 0) {
+            throw "Tracked EOL preflight failed: $standardOutput $standardError"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($standardOutput)) {
+            Write-Verbose $standardOutput
+        }
+    }
+    finally {
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+    }
+}
+
 function ConvertTo-NormalizedProjectPath {
     param(
         [string]$Candidate,
@@ -2646,6 +2704,7 @@ if ($InPlace -and $KeepWorkspace) {
     throw "-KeepWorkspace applies only to the default isolated workspace mode and cannot be combined with -InPlace."
 }
 Assert-RunnerInvocationMode -InPlaceRequested ([bool]$InPlace)
+Assert-TrackedLfEol -ProjectRoot $sourceProjectRoot
 if ($hasTargetUserArguments -and -not ($hasTarget -or $hasNativeTarget)) {
     throw "Target user arguments require -Target or -NativeTarget."
 }

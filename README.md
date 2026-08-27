@@ -31,11 +31,12 @@ Każdy jednocześnie zapisujący agent pracuje w osobnym pełnym Git worktree i 
 Sprawdzenie właściciela i planowanego diffu:
 
 ```powershell
+python -B .\tools\workbench_contract.py --repo . eol-check
 python -B .\tools\workbench_contract.py doctor --owner map --intent author
 python -B .\tools\workbench_contract.py validate --owner map --diff
 ```
 
-Dozwoleni ownerzy to `root`, `map`, `diver`, `structure:<id>` i `integration`. Strażnik uwzględnia pliki śledzone oraz wymagane niesledzone pliki niewykluczone przez `.gitignore`, a `generated/**` struktur przypisuje Mapie.
+Dozwoleni ownerzy to `root`, `map`, `diver`, `structure:<id>` i `integration`. Strażnik uwzględnia pliki śledzone oraz wymagane niesledzone pliki niewykluczone przez `.gitignore`, a `generated/**` struktur przypisuje Mapie. `eol-check` dopuszcza dirty treść zapisaną LF, lecz odrzuca tracked `w/crlf` i `w/mixed` przy `eol=lf`; runner i builder wykonują tę samą bramkę automatycznie. Candidate receipt sprawdza mocniej surowe bajty śledzonych plików względem exact HEAD/index, więc nieprzenośnego checkoutu nie da się ukryć samym czystym statusem Git.
 
 Helper domyślnie tylko pokazuje plan. Candidate receipt potwierdza exact commit/tree i zamknięty zestaw plików, ale sam nie dowodzi przejścia testów. Właściwe utworzenie wymaga receiptu kandydata, unikalnego task slugu i jawnego `-Create`:
 

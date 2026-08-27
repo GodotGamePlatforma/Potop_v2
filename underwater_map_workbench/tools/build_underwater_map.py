@@ -31,6 +31,10 @@ from workbench_lock import (  # noqa: E402
     InterprocessWorkspaceLock,
     WorkspaceLockError,
 )
+from workbench_contract import (  # noqa: E402
+    ContractError,
+    assert_tracked_lf_eol,
+)
 
 MANIFEST_PATH = WORKBENCH_DIR / "map_manifest.json"
 SCENE_PATH = WORKBENCH_DIR / "UnderwaterMap.tscn"
@@ -6479,6 +6483,10 @@ def _run_render_mode(args: argparse.Namespace) -> int:
 def main() -> int:
     args = _parse_args()
     try:
+        try:
+            assert_tracked_lf_eol(WORKBENCH_DIR.parent)
+        except ContractError as error:
+            raise ManifestError(f"tracked EOL preflight failed: {error}") from error
         if args.seal_structure_package:
             _seal_structure_package(args.seal_structure_package)
             return 0

@@ -155,15 +155,26 @@ func _frames(count: int) -> void:
 
 func _finish() -> void:
 	if _game != null:
+		var base_music := _game.find_child("BaseMusicPlayer", true, false) as AudioStreamPlayer
+		if base_music != null:
+			base_music.stop()
+			base_music.stream = null
+		await _frames(2)
 		_game.queue_free()
-	await _frames(2)
+		_game = null
+	await _frames(4)
+	await get_tree().create_timer(0.1, true).timeout
 	SaveManager.reset_paths()
 	_remove_test_saves()
 	if _failed:
-		get_tree().quit(1)
+		call_deferred("_quit_after_cleanup", 1)
 		return
 	print("Day transition performance test passed: both persisted clicks stay responsive and reuse BaseScene.")
-	get_tree().quit(0)
+	call_deferred("_quit_after_cleanup", 0)
+
+
+func _quit_after_cleanup(exit_code: int) -> void:
+	get_tree().quit(exit_code)
 
 
 func _remove_test_saves() -> void:

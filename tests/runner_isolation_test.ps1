@@ -33,6 +33,7 @@ $requiredFunctions = @(
     "Get-StructurePackageTestTargets",
     "Get-RunnerTestSelection",
     "Assert-RunnerInvocationMode",
+    "Assert-TrackedLfEol",
     "Remove-IsolatedTestWorkspace",
     "ConvertTo-ProcessArgument",
     "Get-GitSnapshotProjectPaths",
@@ -96,6 +97,10 @@ Assert-RunnerInvariant `
         $runnerText.Contains('[string]$CandidateReceipt') -and
         $runnerText.Contains('RUN RECEIPT VERIFIED:')) `
     -Message "Runner must expose fail-closed full-suite receipt verification against a candidate receipt."
+Assert-RunnerInvariant `
+    -Condition ($runnerText.Contains('Assert-TrackedLfEol -ProjectRoot $sourceProjectRoot') -and
+        $runnerText.Contains('"eol-check"')) `
+    -Message "Runner must reject tracked CRLF/mixed bytes before closing the source snapshot."
 
 $tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd([char[]]"\/")
 $fixtureRoot = [System.IO.Path]::GetFullPath((Join-Path $tempParent ("ostatni_pomost_runner_test_" + [Guid]::NewGuid().ToString("N"))))

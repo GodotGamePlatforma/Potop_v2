@@ -28,7 +28,7 @@
     "solid": 0
   },
   "generated": true,
-  "manifest_sha256": "79a79b3f56261cb320bf6a9af120635a11ac14c0829fcfa360a87ac365f733d3",
+  "manifest_sha256": "5c1065e5562ab41b883e0cf18386870603971155297f3c682821417f964c6754",
   "mapping": {
     "pixel_reference": "pixel_edge",
     "rounding": "floor",
@@ -66,7 +66,7 @@
   ],
   "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
   "payload_path": "assets/topology/l05_ground_mask_source.json",
-  "payload_sha256": "5a66d4b7d2c4f88ae0379457228a16991eca1c0ff6629a09e1f7ef96f6ab048d",
+  "payload_sha256": "75b8bf49fdb01934b40eff429c5f8c29bb6a5f40cecdf4755507b7c6f923533d",
   "pixel_size": [
     576,
     324
