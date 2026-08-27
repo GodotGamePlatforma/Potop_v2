@@ -319,6 +319,11 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
             post_merge,
         )
         self.assertIn(
+            "contains(github.event.pull_request.labels.*.name, "
+            "'control-plane-reviewed')",
+            post_merge,
+        )
+        self.assertIn(
             "Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw",
             post_merge,
         )
@@ -407,6 +412,44 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
                 check=False,
             )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_map_maintenance_post_merge_requires_the_review_label(self) -> None:
+        post_merge = _job(
+            _workflow("map-control-plane-maintenance.yml"), "audit-merged-main"
+        )
+        eligibility = re.search(r"(?m)^\s*if:\s*(.+)$", post_merge)
+        self.assertIsNotNone(eligibility, "post-merge job eligibility is missing")
+        condition = eligibility.group(1)
+        self.assertIn("github.event.pull_request.merged == true", condition)
+        self.assertIn(
+            "startsWith(github.event.pull_request.head.ref, 'codex/map/')",
+            condition,
+        )
+        self.assertIn(
+            "contains(github.event.pull_request.labels.*.name, "
+            "'control-plane-reviewed')",
+            condition,
+        )
+
+        def qualifies(*, merged: bool, branch: str, labels: set[str]) -> bool:
+            return (
+                merged
+                and branch.startswith("codex/map/")
+                and "control-plane-reviewed" in labels
+            )
+
+        self.assertFalse(
+            qualifies(merged=True, branch="codex/map/ordinary-art", labels=set()),
+            "An ordinary merged map PR must leave the maintenance job skipped.",
+        )
+        self.assertTrue(
+            qualifies(
+                merged=True,
+                branch="codex/map/verifier-fix",
+                labels={"control-plane-reviewed"},
+            ),
+            "A reviewed maintenance PR must qualify for the exact-main audit.",
+        )
 
     def test_main_audit_has_one_automatic_trigger_and_reuses_its_check(self) -> None:
         integration = _workflow("agent-integration.yml")
