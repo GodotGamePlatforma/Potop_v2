@@ -66,6 +66,7 @@ $requiredFunctions = @(
     "New-IsolatedTargetWorkspace",
     "Set-IsolatedGodotTargetConfiguration",
     "Copy-TestCaseForWorkspace",
+    "New-TestCase",
     "Set-NativeShardDummyAudio",
     "Set-TrustedChildEnvironment",
     "New-RunnerKillOnCloseJob",
@@ -102,6 +103,41 @@ foreach ($functionName in $requiredFunctions) {
     }
     . ([scriptblock]::Create($definition[0].Extent.Text))
 }
+
+$timeoutDefaultAssignments = @($runnerAst.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -ceq '$testSpecificDefaultTimeoutSeconds'
+}, $true))
+if ($timeoutDefaultAssignments.Count -ne 1) {
+    throw "Expected exactly one runner-specific timeout map, found $($timeoutDefaultAssignments.Count)."
+}
+. ([scriptblock]::Create($timeoutDefaultAssignments[0].Extent.Text))
+$testTimeoutWasExplicit = $false
+$TestTimeoutSeconds = 120
+$campaignDefaultTimeoutCase = New-TestCase `
+    -Name "campaign_format_test.gd" `
+    -Group "headless script" `
+    -Arguments @("--headless")
+Assert-RunnerInvariant `
+    ($campaignDefaultTimeoutCase.TimeoutSeconds -eq 300) `
+    "Campaign format test lost its measured runner-specific timeout."
+$ordinaryDefaultTimeoutCase = New-TestCase `
+    -Name "ordinary_test.gd" `
+    -Group "headless script" `
+    -Arguments @("--headless")
+Assert-RunnerInvariant `
+    ($ordinaryDefaultTimeoutCase.TimeoutSeconds -eq 120) `
+    "Runner-specific timeout changed the ordinary test default."
+$testTimeoutWasExplicit = $true
+$TestTimeoutSeconds = 17
+$campaignExplicitTimeoutCase = New-TestCase `
+    -Name "campaign_format_test.gd" `
+    -Group "headless script" `
+    -Arguments @("--headless")
+Assert-RunnerInvariant `
+    ($campaignExplicitTimeoutCase.TimeoutSeconds -eq 17) `
+    "Explicit -TestTimeoutSeconds did not override the campaign-specific default."
 
 $runnerText = [System.IO.File]::ReadAllText($runnerPath)
 Assert-RunnerInvariant `

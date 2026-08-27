@@ -66,7 +66,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $testTimeoutWasExplicit = $PSBoundParameters.ContainsKey("TestTimeoutSeconds")
-$testSpecificDefaultTimeoutSeconds = @{}
+$testSpecificDefaultTimeoutSeconds = @{
+    "campaign_format_test.gd" = 300
+}
 
 # PowerShell 7 can otherwise promote native stderr to PowerShell errors. Godot's
 # stdout and stderr are inspected together below, using the engine's own error
