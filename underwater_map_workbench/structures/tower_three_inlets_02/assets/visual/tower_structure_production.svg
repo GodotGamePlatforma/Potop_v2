@@ -2,23 +2,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2400" height="3840" viewBox="0 0 2400 3840">
   <defs>
     <linearGradient id="concreteBase" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#66777a"/>
-      <stop offset="0.22" stop-color="#35494c"/>
-      <stop offset="0.58" stop-color="#1c3035"/>
-      <stop offset="1" stop-color="#0b2028"/>
+      <stop offset="0" stop-color="#53605d"/>
+      <stop offset="0.2" stop-color="#36413f"/>
+      <stop offset="0.58" stop-color="#202b2b"/>
+      <stop offset="1" stop-color="#101a1d"/>
     </linearGradient>
     <linearGradient id="beamFace" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#819194"/>
-      <stop offset="0.12" stop-color="#4b6062"/>
-      <stop offset="0.62" stop-color="#25383b"/>
-      <stop offset="1" stop-color="#111f23"/>
+      <stop offset="0" stop-color="#9aa39d"/>
+      <stop offset="0.07" stop-color="#626c67"/>
+      <stop offset="0.2" stop-color="#3b4744"/>
+      <stop offset="0.68" stop-color="#283330"/>
+      <stop offset="1" stop-color="#151d1e"/>
     </linearGradient>
     <linearGradient id="steel" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#18282c"/>
-      <stop offset="0.24" stop-color="#647174"/>
-      <stop offset="0.48" stop-color="#202f32"/>
-      <stop offset="0.76" stop-color="#849093"/>
-      <stop offset="1" stop-color="#111f23"/>
+      <stop offset="0" stop-color="#111b1e"/>
+      <stop offset="0.12" stop-color="#293532"/>
+      <stop offset="0.2" stop-color="#69736d"/>
+      <stop offset="0.28" stop-color="#414c48"/>
+      <stop offset="0.72" stop-color="#293431"/>
+      <stop offset="0.84" stop-color="#707a74"/>
+      <stop offset="0.92" stop-color="#27322f"/>
+      <stop offset="1" stop-color="#101719"/>
+    </linearGradient>
+    <linearGradient id="foundationFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#66716b"/>
+      <stop offset="0.08" stop-color="#414d49"/>
+      <stop offset="0.52" stop-color="#2d3835"/>
+      <stop offset="0.82" stop-color="#202927"/>
+      <stop offset="1" stop-color="#0b1213"/>
     </linearGradient>
     <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#173a48"/>
@@ -45,10 +56,26 @@
       <path d="M42 219h158" stroke="#8a5a34" stroke-opacity=".38" stroke-width="5"/>
     </pattern>
     <pattern id="aggregate" width="96" height="96" patternUnits="userSpaceOnUse">
-      <circle cx="13" cy="21" r="3" fill="#a0aba9" opacity=".23"/>
-      <circle cx="72" cy="17" r="5" fill="#08161a" opacity=".32"/>
-      <circle cx="47" cy="69" r="4" fill="#b3aaa0" opacity=".18"/>
-      <path d="M8 78l24-10M57 38l28-14" stroke="#111d20" stroke-width="3" opacity=".34"/>
+      <circle cx="13" cy="21" r="3" fill="#c0c6bd" opacity=".24"/>
+      <circle cx="72" cy="17" r="5" fill="#060d0f" opacity=".42"/>
+      <circle cx="47" cy="69" r="4" fill="#b2a88f" opacity=".2"/>
+      <circle cx="88" cy="76" r="2" fill="#7f8d87" opacity=".36"/>
+      <path d="M8 78l24-10M57 38l28-14M22 43l13 7" stroke="#10191a" stroke-width="3" opacity=".42"/>
+    </pattern>
+    <pattern id="formwork" width="320" height="240" patternUnits="userSpaceOnUse">
+      <path d="M0 1h320M1 0v240" fill="none" stroke="#c0c7bf" stroke-width="3" opacity=".08"/>
+      <path d="M0 122h320M162 0v240" fill="none" stroke="#070d0e" stroke-width="5" opacity=".13"/>
+      <circle cx="28" cy="24" r="5" fill="#070c0d" opacity=".42"/>
+      <circle cx="292" cy="216" r="5" fill="#a9b2aa" opacity=".2"/>
+      <path d="M42 184c35-22 69-15 101-34M210 60c28 20 47 17 76 5" fill="none" stroke="#879088" stroke-width="3" opacity=".12"/>
+    </pattern>
+    <pattern id="mineralPitting" width="180" height="160" patternUnits="userSpaceOnUse">
+      <circle cx="18" cy="52" r="8" fill="#111a19" opacity=".22"/>
+      <circle cx="44" cy="36" r="3" fill="#a1a994" opacity=".2"/>
+      <circle cx="128" cy="28" r="5" fill="#7e8a80" opacity=".2"/>
+      <circle cx="152" cy="118" r="7" fill="#0b1213" opacity=".18"/>
+      <circle cx="92" cy="126" r="3" fill="#b3aa91" opacity=".2"/>
+      <path d="M2 88c30-12 58-9 82-2s52 5 94-7" fill="none" stroke="#8a6745" stroke-width="5" opacity=".11"/>
     </pattern>
     <pattern id="mottling" width="310" height="420" patternUnits="userSpaceOnUse">
       <path d="M20 0C66 86 34 162 87 246s28 128 4 174" fill="none" stroke="#796346" stroke-width="22" opacity=".12"/>
@@ -57,7 +84,7 @@
 
     <filter id="roughConcrete" x="-5%" y="-5%" width="110%" height="110%">
       <feTurbulence type="fractalNoise" baseFrequency=".014 .062" numOctaves="3" seed="17" result="noise"/>
-      <feColorMatrix in="noise" values=".12 .12 .12 0 .18  .12 .12 .12 0 .18  .12 .12 .12 0 .18  0 0 0 .16 0" result="grain"/>
+      <feColorMatrix in="noise" values=".13 .11 .09 0 .16  .11 .13 .11 0 .17  .1 .12 .13 0 .17  0 0 0 .22 0" result="grain"/>
       <feBlend in="SourceGraphic" in2="grain" mode="soft-light"/>
     </filter>
     <filter id="corrodedSteel" x="-8%" y="-8%" width="116%" height="116%">
@@ -75,6 +102,14 @@
     <filter id="maskLuminanceToAlpha" filterUnits="userSpaceOnUse" x="0" y="0" width="2400" height="3840" color-interpolation-filters="sRGB">
       <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  .2126 .7152 .0722 0 0"/>
     </filter>
+
+    <g id="barnacleCluster">
+      <circle cx="0" cy="0" r="14" fill="#6b756b" stroke="#202725" stroke-width="5"/>
+      <circle cx="24" cy="7" r="10" fill="#8b8f7d" stroke="#28302c" stroke-width="4"/>
+      <circle cx="-18" cy="11" r="8" fill="#536059" stroke="#1b2220" stroke-width="4"/>
+      <circle cx="3" cy="0" r="5" fill="#18201f"/>
+      <circle cx="26" cy="6" r="3" fill="#252b27"/>
+    </g>
 
     <!-- Exact 60x96 authoring topology expanded at 40 world units per pixel. -->
     <mask id="solidTopology" maskUnits="userSpaceOnUse" x="0" y="0" width="2400" height="3840" mask-type="luminance" color-interpolation="sRGB">
@@ -121,14 +156,39 @@
   <!-- No canvas background: every visible pixel belongs to the canonical solid partition. -->
   <g mask="url(#solidTopology)">
     <rect width="2400" height="3840" fill="url(#concreteBase)"/>
+    <rect width="2400" height="3840" fill="url(#formwork)" opacity=".68"/>
+    <rect width="2400" height="3840" fill="url(#aggregate)" opacity=".72"/>
+    <rect width="2400" height="3840" fill="url(#mineralPitting)" opacity=".5"/>
+    <rect width="2400" height="3840" fill="url(#mottling)" opacity=".34"/>
     <g filter="url(#softShadow)">
       <rect x="28" y="20" width="2344" height="3792" rx="20" fill="none" stroke="url(#beamFace)" stroke-width="56"/>
       <rect x="68" y="42" width="2264" height="3748" rx="14" fill="none" stroke="#09171c" stroke-width="13" opacity=".84"/>
     </g>
 
-    <g opacity=".88">
+    <g opacity=".7">
       <rect x="80" y="48" width="920" height="3600" fill="url(#windowGrid)"/>
       <rect x="1400" y="48" width="920" height="3600" fill="url(#windowGrid)"/>
+    </g>
+
+    <!-- Asymmetric sealed facade panels break the repeated grid without suggesting new openings. -->
+    <g fill="url(#concreteBase)" stroke="#111918" stroke-width="10" opacity=".96">
+      <path d="M80 2708h322v374l-44 46H80z"/>
+      <path d="M520 2888h480v292l-34 30H520z"/>
+      <path d="M80 3260h382v180H80z"/>
+      <path d="M1400 2718h424v258l-38 36h-386z"/>
+      <path d="M1940 2880h380v420l-46 32h-334z"/>
+      <path d="M1442 3168h334v272h-376v-232z"/>
+    </g>
+    <g fill="url(#mineralPitting)" opacity=".66">
+      <path d="M80 2708h322v374l-44 46H80z"/>
+      <path d="M520 2888h480v292l-34 30H520z"/>
+      <path d="M80 3260h382v180H80z"/>
+      <path d="M1400 2718h424v258l-38 36h-386z"/>
+      <path d="M1940 2880h380v420l-46 32h-334z"/>
+      <path d="M1442 3168h334v272h-376v-232z"/>
+    </g>
+    <g fill="none" stroke="#79837c" stroke-width="5" opacity=".28">
+      <path d="M92 2722h296v344M534 2902h452v260M94 3274h354M1414 2732h394v228M1954 2894h350v390M1456 3182h304v242"/>
     </g>
 
     <g fill="url(#beamFace)" stroke="#8a9899" stroke-opacity=".48" stroke-width="8" filter="url(#roughConcrete)">
@@ -145,11 +205,66 @@
       <rect x="0" y="3676" width="2400" height="164"/>
     </g>
 
+    <rect x="0" y="3676" width="2400" height="164" fill="url(#foundationFace)" filter="url(#roughConcrete)"/>
+    <rect x="0" y="3676" width="2400" height="164" fill="url(#mineralPitting)" opacity=".74"/>
+
+    <!-- Narrow highlights and deep undersides make the canonical slabs read as thick construction. -->
+    <g fill="none" stroke-linecap="square">
+      <path d="M4 7H2396M4 283H2396M4 563H2396M4 843H2396M4 1123H2396M4 1403H2396M4 1683H2396M4 1963H2396M4 2243H2396M4 2523H2396M4 3683H2396"
+            stroke="#aab4ad" stroke-width="7" stroke-dasharray="190 48 330 75 120 42" opacity=".34"/>
+      <path d="M0 79H2400M0 363H2400M0 643H2400M0 923H2400M0 1203H2400M0 1483H2400M0 1763H2400M0 2043H2400M0 2323H2400M0 2639H2400M0 3833H2400"
+            stroke="#050a0b" stroke-width="15" opacity=".76"/>
+      <path d="M0 69H2400M0 353H2400M0 633H2400M0 913H2400M0 1193H2400M0 1473H2400M0 1753H2400M0 2033H2400M0 2313H2400M0 2629H2400M0 3823H2400"
+            stroke="#6f7a73" stroke-width="5" opacity=".34"/>
+    </g>
+
+    <g fill="none" stroke="#111918" stroke-width="7" opacity=".38">
+      <path d="M318 0v84M638 0v84M958 0v84M1438 0v84M1758 0v84M2078 0v84"/>
+      <path d="M318 3676v164M638 3676v164M958 3676v164M1438 3676v164M1758 3676v164M2078 3676v164"/>
+      <path d="M216 276v92M702 276v92M1698 276v92M2184 276v92"/>
+      <path d="M216 2516v130M702 2516v130M1698 2516v130M2184 2516v130"/>
+    </g>
+
+    <g fill="#111a1a" opacity=".64">
+      <path d="M176 0h82l-15 24-32 12-27 31-27-13z"/>
+      <path d="M920 276h74l-18 22-28 7-17 31-34-12z"/>
+      <path d="M1460 836h86l-21 24-33 11-27 34-30-20z"/>
+      <path d="M2080 1676h92l-22 22-36 12-25 35-39-16z"/>
+      <path d="M590 2236h88l-25 24-30 8-19 34-42-18z"/>
+      <path d="M1780 3676h96l-28 31-34 9-24 42-43-24z"/>
+    </g>
+    <g fill="#a2aaa0" opacity=".24">
+      <path d="M178 7h72l-17 12-27 7-20 25-21-8z"/>
+      <path d="M1464 843h74l-19 11-29 8-19 26-25-11z"/>
+      <path d="M2085 1683h78l-19 11-31 8-18 26-31-11z"/>
+      <path d="M1785 3683h82l-22 17-29 7-17 30-35-18z"/>
+    </g>
+
+    <g opacity=".5">
+      <use href="#barnacleCluster" transform="translate(210 362) scale(.7)"/>
+      <use href="#barnacleCluster" transform="translate(942 920) scale(.58)"/>
+      <use href="#barnacleCluster" transform="translate(1492 1480) scale(.72)"/>
+      <use href="#barnacleCluster" transform="translate(2150 2320) scale(.62)"/>
+      <use href="#barnacleCluster" transform="translate(680 3678) scale(.78)"/>
+    </g>
+
     <g fill="url(#steel)" stroke="#788688" stroke-width="8" filter="url(#corrodedSteel)">
       <rect x="994" y="0" width="94" height="3840"/>
       <rect x="1312" y="0" width="96" height="3840"/>
       <rect x="0" y="0" width="82" height="3840"/>
       <rect x="2318" y="0" width="82" height="3840"/>
+    </g>
+    <g fill="none" stroke="#0b1213" stroke-width="9" opacity=".72">
+      <path d="M0 558h82M994 558h94M1312 558h96M2318 558h82"/>
+      <path d="M0 1398h82M994 1398h94M1312 1398h96M2318 1398h82"/>
+      <path d="M0 2238h82M994 2238h94M1312 2238h96M2318 2238h82"/>
+      <path d="M0 3442h82M994 3442h94M1312 3442h96M2318 3442h82"/>
+    </g>
+    <g fill="none" stroke="#a0aaa1" stroke-width="3" opacity=".3">
+      <path d="M2 551h78M996 551h90M1314 551h92M2320 551h78"/>
+      <path d="M2 1391h78M996 1391h90M1314 1391h92M2320 1391h78"/>
+      <path d="M2 2231h78M996 2231h90M1314 2231h92M2320 2231h78"/>
+      <path d="M2 3435h78M996 3435h90M1314 3435h92M2320 3435h78"/>
     </g>
 
     <g fill="none" stroke="#1a2729" stroke-width="18" stroke-linecap="round" opacity=".92">
@@ -166,7 +281,7 @@
       <path d="M72 2914l163-91 111 72-48 144"/>
     </g>
 
-    <g fill="#566467" stroke="#162326" stroke-width="9">
+    <g fill="#3b4644" stroke="#111918" stroke-width="12">
       <path d="M0 0h330l-34 98-74 52-82-29-65 87H0z"/>
       <path d="M2100 0h300v430l-84-48-39-124-112-73-85-41z"/>
       <path d="M0 2980l182-102 116 66-43 171-110 57L0 3250z"/>
@@ -179,10 +294,13 @@
       <path d="M148 3040l40 168M190 3015l81 155M2168 2700l-13 176M2201 2680l53 173"/>
     </g>
 
-    <g opacity=".34">
-      <rect x="0" y="250" width="2400" height="330" fill="url(#rust)"/>
-      <rect x="0" y="1090" width="2400" height="420" fill="url(#rust)" opacity=".32"/>
-      <rect x="0" y="2470" width="2400" height="520" fill="url(#rust)" opacity=".38"/>
+    <g opacity=".42">
+      <path d="M90 248c138-26 292-10 398 22l-34 304c-118-31-238-22-360 8z" fill="url(#rust)" opacity=".42"/>
+      <path d="M870 276c94-18 206-7 302 18l-18 264c-112-18-188-14-298 8z" fill="url(#rust)" opacity=".28"/>
+      <path d="M1510 1088c146-28 302-16 430 24l-28 394c-138-38-262-24-418 2z" fill="url(#rust)" opacity=".3"/>
+      <path d="M2020 1390c86-21 178-8 280 18l-12 300c-98-28-176-17-282 6z" fill="url(#rust)" opacity=".26"/>
+      <path d="M190 2468c164-36 336-18 472 22l-42 508c-148-46-282-34-456 0z" fill="url(#rust)" opacity=".36"/>
+      <path d="M1540 2510c176-28 342-9 520 42l-36 438c-176-48-316-28-504 7z" fill="url(#rust)" opacity=".34"/>
       <ellipse cx="260" cy="3480" rx="380" ry="460" fill="url(#sediment)"/>
       <ellipse cx="2180" cy="3180" rx="330" ry="520" fill="url(#sediment)"/>
       <ellipse cx="1130" cy="470" rx="240" ry="430" fill="url(#sediment)" opacity=".62"/>
