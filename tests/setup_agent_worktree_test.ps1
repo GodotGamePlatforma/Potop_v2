@@ -13,6 +13,8 @@ $parallelWorktree = Join-Path $testRoot 'parallel-worktree'
 $crossDestinationWorktree = Join-Path $testRoot 'cross-destination-worktree'
 $crossBranchWorktreeA = Join-Path $testRoot 'cross-branch-worktree-a'
 $crossBranchWorktreeB = Join-Path $testRoot 'cross-branch-worktree-b'
+$disjointWorktreeA = Join-Path $testRoot 'disjoint-worktree-a'
+$disjointWorktreeB = Join-Path $testRoot 'disjoint-worktree-b'
 $faultWorktree = Join-Path $testRoot 'fault-worktree'
 $overlapWorktree = Join-Path $testRoot 'overlap-worktree'
 $lkgRaceWorktree = Join-Path $testRoot 'lkg-race-worktree'
@@ -618,6 +620,7 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
                 $output = & $Helper @helperArguments 2>&1 | Out-String
                 return [pscustomobject]@{
                     Succeeded = $true
+                    ExitCode = 0
                     ProcessId = $PID
                     Output = $output
                     Destination = $Destination
@@ -628,6 +631,7 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
             catch {
                 return [pscustomobject]@{
                     Succeeded = $false
+                    ExitCode = 1
                     ProcessId = $PID
                     Output = (($_ | Out-String) + $_.Exception.Message)
                     Destination = $Destination
@@ -709,6 +713,127 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
                 ((Test-Path -LiteralPath $loser.Destination -PathType Container) -and
                     [string]$loser.Destination -ne [string]$winner.Destination)) {
                 throw "$CaseName loser damaged or bypassed the winning resource."
+            }
+        }
+        finally {
+            foreach ($job in @($jobs)) {
+                if ($job.State -notin @('Completed', 'Failed', 'Stopped')) {
+                    Stop-Job -Job $job -ErrorAction SilentlyContinue
+                }
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    function Invoke-DisjointSetupPair {
+        param(
+            [string]$DestinationA,
+            [string]$DestinationB,
+            [string]$TaskSlugA,
+            [string]$TaskSlugB,
+            [string]$BranchA,
+            [string]$BranchB
+        )
+
+        $readyA = Join-Path $testRoot 'disjoint-a.ready'
+        $readyB = Join-Path $testRoot 'disjoint-b.ready'
+        $startGate = Join-Path $testRoot 'disjoint.start'
+        $writeSetA = New-TestWriteSet -TaskSlug $TaskSlugA
+        $writeSetB = New-TestWriteSet -TaskSlug $TaskSlugB
+        $jobs = @()
+        try {
+            $jobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
+                $helper, $repository, $candidateReceipt, $runReceipt,
+                $DestinationA, $readyA, $startGate, $TaskSlugA, $BranchA,
+                $writeSetA
+            )
+            $jobs += Start-Job -ScriptBlock $parallelWorker -ArgumentList @(
+                $helper, $repository, $candidateReceipt, $runReceipt,
+                $DestinationB, $readyB, $startGate, $TaskSlugB, $BranchB,
+                $writeSetB
+            )
+            $readyDeadline = [System.DateTime]::UtcNow.AddSeconds(15)
+            while (-not (
+                (Test-Path -LiteralPath $readyA -PathType Leaf) -and
+                (Test-Path -LiteralPath $readyB -PathType Leaf)
+            )) {
+                if ([System.DateTime]::UtcNow -ge $readyDeadline) {
+                    throw 'Disjoint setup workers did not reach their shared start gate.'
+                }
+                Start-Sleep -Milliseconds 20
+            }
+            Write-Utf8NoBom -Path $startGate -Value "start`n"
+            Wait-Job -Job $jobs -Timeout 90 | Out-Null
+            if (@($jobs | Where-Object {
+                $_.State -notin @('Completed', 'Failed')
+            }).Count -gt 0) {
+                throw 'Disjoint setup workers did not finish within 90 seconds.'
+            }
+            $results = @(Receive-Job -Job $jobs -ErrorAction SilentlyContinue)
+            if ($results.Count -ne 2 -or @($results | Where-Object {
+                $_.Succeeded -ne $true -or $_.ExitCode -ne 0
+            }).Count -ne 0) {
+                throw (
+                    'Both disjoint setup processes must exit 0. ' +
+                    (($results | ForEach-Object { $_.Output }) -join "`n")
+                )
+            }
+
+            $expected = @(
+                [pscustomobject]@{
+                    Destination = $DestinationA
+                    TaskSlug = $TaskSlugA
+                    Branch = $BranchA
+                    WriteSet = $writeSetA
+                },
+                [pscustomobject]@{
+                    Destination = $DestinationB
+                    TaskSlug = $TaskSlugB
+                    Branch = $BranchB
+                    WriteSet = $writeSetB
+                }
+            )
+            foreach ($item in $expected) {
+                if (-not (Test-Path -LiteralPath $item.Destination -PathType Container) -or
+                    -not (Test-WorktreeRegistered -Repo $repository -Path $item.Destination) -or
+                    -not (Test-BranchExists -Repo $repository -Branch $item.Branch)) {
+                    throw "Disjoint setup did not preserve $($item.TaskSlug)."
+                }
+                $actualHead = Invoke-Git $item.Destination rev-parse HEAD
+                $actualTree = Invoke-Git $item.Destination rev-parse 'HEAD^{tree}'
+                $actualBranch = Invoke-Git $item.Destination branch --show-current
+                if ($actualHead -ne [string]$receiptData.head -or
+                    $actualTree -ne [string]$receiptData.tree -or
+                    $actualBranch -ne $item.Branch) {
+                    throw "Disjoint setup identity mismatch for $($item.TaskSlug)."
+                }
+
+                $taskId = "task/$($item.TaskSlug)"
+                $threadId = "thread/$($item.TaskSlug)"
+                $assignment = Get-TestAssignmentRecord -Repo $item.Destination `
+                    -TaskId $taskId
+                $statusOutput = & python -B $contract --repo $item.Destination `
+                    assignment status --task-id $taskId --json 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Cannot read disjoint assignment status: $statusOutput"
+                }
+                $status = $statusOutput | ConvertFrom-Json
+                if ([string]$status.state -ne 'WAITING_ACK') {
+                    throw "Disjoint assignment did not start in WAITING_ACK: $taskId"
+                }
+
+                $ackOutput = & python -B $contract --repo $item.Destination `
+                    assignment ack --task-id $taskId `
+                    --assignment-id ([string]$assignment.Record.assignment_id) `
+                    --thread-id $threadId --owner root `
+                    --write-set $item.WriteSet --json 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Disjoint assignment ACK failed: $ackOutput"
+                }
+                $ack = $ackOutput | ConvertFrom-Json
+                if ([string]$ack.state -ne 'RUNNING') {
+                    throw "Disjoint assignment did not reach RUNNING: $taskId"
+                }
             }
         }
         finally {
@@ -808,6 +933,10 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         -TaskSlugA 'cross-branch-a' -TaskSlugB 'cross-branch-b' `
         -BranchA 'codex/root/shared-cross-branch' `
         -BranchB 'codex/root/shared-cross-branch'
+    Invoke-DisjointSetupPair `
+        -DestinationA $disjointWorktreeA -DestinationB $disjointWorktreeB `
+        -TaskSlugA 'disjoint-a' -TaskSlugB 'disjoint-b' `
+        -BranchA 'codex/root/disjoint-a' -BranchB 'codex/root/disjoint-b'
 
     Push-Location $repository
     try {
@@ -884,7 +1013,7 @@ Write-Output "RUN RECEIPT VERIFIED: $head/$tree"
         throw 'Receipt with an unavailable commit object was accepted.'
     }
 
-    Write-Host 'PASS setup_agent_worktree candidate/full-run receipts/parallel reservation/dirty isolation/rollback contract'
+    Write-Host 'PASS setup_agent_worktree receipts/disjoint concurrency/reservations/ACK/dirty isolation/rollback contract'
 }
 finally {
     if ($null -ne $lkgRaceJob) {
@@ -903,7 +1032,8 @@ finally {
         foreach ($candidateWorktree in @(
             $worktreeA, $worktreeB, $parallelWorktree,
             $crossDestinationWorktree, $crossBranchWorktreeA,
-            $crossBranchWorktreeB, $faultWorktree, $overlapWorktree,
+            $crossBranchWorktreeB, $disjointWorktreeA, $disjointWorktreeB,
+            $faultWorktree, $overlapWorktree,
             $lkgRaceWorktree, $unavailableWorktree,
             $mismatchRunWorktree, $failedRunWorktree, $missingLkgWorktree,
             $legacyWorktree

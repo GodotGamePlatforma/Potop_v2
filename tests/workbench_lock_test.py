@@ -6,6 +6,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -31,6 +32,19 @@ try:
         pass
 except WorkspaceLockError:
     raise SystemExit(23)
+"""
+
+_CHILD_HOLD = """
+import os
+import sys
+import time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from workbench_lock import InterprocessWorkspaceLock
+lock = InterprocessWorkspaceLock(Path(sys.argv[2]), sys.argv[3])
+lock.acquire()
+Path(sys.argv[4]).write_text(str(os.getpid()), encoding="utf-8")
+time.sleep(60)
 """
 
 
@@ -75,6 +89,67 @@ class WorkbenchLockTest(unittest.TestCase):
             with InterprocessWorkspaceLock(workspace, "map-promotion"):
                 with InterprocessWorkspaceLock(workspace, "freeze-revision-a"):
                     pass
+
+    def test_process_death_releases_lock_without_deleting_stale_owner_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            ready = workspace / "holder.ready"
+            holder = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    _CHILD_HOLD,
+                    str(TOOLS_DIR),
+                    str(workspace),
+                    "map-promotion",
+                    str(ready),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                deadline = time.monotonic() + 5
+                while not ready.is_file() and holder.poll() is None:
+                    if time.monotonic() >= deadline:
+                        self.fail("Lock holder did not reach the ready marker.")
+                    time.sleep(0.01)
+                if holder.poll() is not None:
+                    stdout, stderr = holder.communicate(timeout=1)
+                    self.fail(
+                        "Lock holder exited before the ready marker: "
+                        f"stdout={stdout!r} stderr={stderr!r}"
+                    )
+                self.assertEqual(int(ready.read_text(encoding="utf-8")), holder.pid)
+                lock_path = InterprocessWorkspaceLock(
+                    workspace, "map-promotion"
+                ).path
+                self.assertTrue(lock_path.is_file())
+
+                holder.kill()
+                holder.communicate(timeout=5)
+                self.assertTrue(lock_path.is_file())
+                self.assertIn(str(holder.pid), lock_path.read_text(errors="replace"))
+
+                recovered = subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        _CHILD_PROBE,
+                        str(TOOLS_DIR),
+                        str(workspace),
+                        "map-promotion",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            finally:
+                if holder.poll() is None:
+                    holder.kill()
+                holder.communicate(timeout=5)
 
     def test_path_lock_names_are_stable_and_do_not_expose_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

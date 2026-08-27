@@ -525,6 +525,50 @@ class PublicationReceiptTest(unittest.TestCase):
             self.assertEqual(created["tree"], verified["tree"])
             self.assertEqual(created["status"], "PUBLICATION_READY")
 
+    def test_receipt_verification_is_lock_free_and_checks_stable_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = _publication_candidate(Path(temporary))
+            _create_receipt(candidate)
+            repository = candidate["repository"]
+
+            with mock.patch.object(
+                contract,
+                "publication_lock",
+                side_effect=AssertionError("read-only verification must not lock"),
+            ):
+                verified = contract.verify_publication_receipt(
+                    repository, candidate["receipt"]
+                )
+            self.assertEqual(verified["status"], contract.PUBLICATION_RECEIPT_STATUS)
+
+            original_records = contract._publication_records
+            call_count = 0
+
+            def mutate_receipt_after_second_snapshot(
+                root: Path, paths: object
+            ) -> tuple[contract.PublicationFileRecord, ...]:
+                nonlocal call_count
+                result = original_records(root, paths)
+                call_count += 1
+                if call_count == 4:
+                    candidate["receipt"].write_bytes(
+                        candidate["receipt"].read_bytes() + b" "
+                    )
+                return result
+
+            with mock.patch.object(
+                contract,
+                "_publication_records",
+                side_effect=mutate_receipt_after_second_snapshot,
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "receipt or file bytes changed",
+                ):
+                    contract.verify_publication_receipt(
+                        repository, candidate["receipt"]
+                    )
+
     def test_receipt_creation_rejects_clean_filter_crlf_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             candidate = _publication_candidate(Path(temporary))
@@ -844,6 +888,65 @@ class LastGreenRefTest(unittest.TestCase):
 
 
 class AgentAssignmentTest(unittest.TestCase):
+    def test_assignment_metadata_lock_retries_short_contention(self) -> None:
+        class FlakyLock:
+            def __init__(self) -> None:
+                self.attempts = 0
+                self.released = False
+
+            def acquire(self) -> "FlakyLock":
+                self.attempts += 1
+                if self.attempts < 3:
+                    raise contract.WorkspaceLockError("busy")
+                return self
+
+            def release(self) -> None:
+                self.released = True
+
+        lock = FlakyLock()
+        with mock.patch.object(contract, "assignment_lock", return_value=lock), \
+            mock.patch.object(contract.time, "sleep") as sleeper:
+            with contract.assignment_metadata_lock("ignored", wait_seconds=1.0):
+                self.assertEqual(lock.attempts, 3)
+
+        self.assertTrue(lock.released)
+        self.assertEqual(sleeper.call_count, 2)
+
+    def test_assignment_rejects_receipt_byte_drift_during_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary), task_id="receipt-drift")
+
+            def mutate_run_receipt(*_arguments: object) -> None:
+                run_receipt = Path(fixture["run_receipt"])
+                run_receipt.write_bytes(run_receipt.read_bytes() + b" ")
+
+            with mock.patch.object(
+                contract,
+                "_verify_full_run_receipt",
+                side_effect=mutate_run_receipt,
+            ):
+                with self.assertRaisesRegex(
+                    contract.ContractError,
+                    "receipt bytes changed",
+                ):
+                    contract.create_assignment(
+                        fixture["repository"],
+                        task_id=fixture["task_id"],
+                        thread_id=fixture["thread_id"],
+                        owner=fixture["owner"],
+                        brief=fixture["brief"],
+                        destination=fixture["destination"],
+                        common_git_dir=fixture["common_git_dir"],
+                        branch=fixture["branch"],
+                        head=fixture["head"],
+                        tree=fixture["tree"],
+                        write_set_path=fixture["write_set_path"],
+                        candidate_receipt=fixture["candidate_receipt"],
+                        run_receipt=fixture["run_receipt"],
+                        ack_deadline=fixture["ack_deadline"],
+                        now=fixture["now"],
+                    )
+
     def _create(self, fixture: dict[str, object]) -> dict[str, object]:
         with mock.patch.object(
             contract, "_verify_full_run_receipt", return_value=None
@@ -1245,7 +1348,14 @@ class AgentAssignmentTest(unittest.TestCase):
                 subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for _ in range(2)
             ]
-            create_results = [process.communicate(timeout=30) for process in creators]
+            create_results = []
+            for process in creators:
+                stdout, stderr = process.communicate(timeout=30)
+                create_results.append((process.returncode, stdout, stderr))
+            self.assertTrue(
+                all(return_code == 0 for return_code, _stdout, _stderr in create_results),
+                create_results,
+            )
             task_directory = (
                 contract.assignment_store(fixture["repository"])
                 / contract._assignment_task_hash(str(fixture["task_id"]))
@@ -1256,7 +1366,8 @@ class AgentAssignmentTest(unittest.TestCase):
                 (bundles[0] / "assignment.json").read_text(encoding="utf-8")
             )
             created_true = sum(
-                b'"created": true' in stdout for stdout, _stderr in create_results
+                b'"created": true' in stdout
+                for _return_code, stdout, _stderr in create_results
             )
             self.assertEqual(created_true, 1, create_results)
 
@@ -1284,10 +1395,18 @@ class AgentAssignmentTest(unittest.TestCase):
                 subprocess.Popen(ack_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for _ in range(2)
             ]
-            ack_results = [process.communicate(timeout=30) for process in acknowledgers]
+            ack_results = []
+            for process in acknowledgers:
+                stdout, stderr = process.communicate(timeout=30)
+                ack_results.append((process.returncode, stdout, stderr))
+            self.assertTrue(
+                all(return_code == 0 for return_code, _stdout, _stderr in ack_results),
+                ack_results,
+            )
             self.assertTrue((bundles[0] / "ack.json").is_file(), ack_results)
             ack_created_true = sum(
-                b'"created": true' in stdout for stdout, _stderr in ack_results
+                b'"created": true' in stdout
+                for _return_code, stdout, _stderr in ack_results
             )
             self.assertEqual(ack_created_true, 1, ack_results)
 
