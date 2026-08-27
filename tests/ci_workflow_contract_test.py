@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS_ROOT = PROJECT_ROOT / ".github" / "workflows"
 INTEGRATION_WORKFLOW = WORKFLOWS_ROOT / "agent-integration.yml"
 CONTROLLER_WORKFLOW = WORKFLOWS_ROOT / "agent-auto-integrator.yml"
+MAINTENANCE_WORKFLOW = WORKFLOWS_ROOT / "map-control-plane-maintenance.yml"
 ATTESTER_ACTION = (
     "actions/create-github-app-token@"
     "bcd2ba49218906704ab6c1aa796996da409d3eb1"
@@ -534,11 +535,16 @@ def _check_run_mutations(job: JobBlock) -> list[str]:
     )
 
 
-def audit_check_surface(integration_text: str, controller_text: str) -> list[str]:
+def audit_check_surface(
+    integration_text: str,
+    controller_text: str,
+    maintenance_text: str = "",
+) -> list[str]:
     integration_lines = _active_lines(integration_text)
     controller_lines = _active_lines(controller_text)
+    maintenance_lines = _active_lines(maintenance_text) if maintenance_text else []
     violations: list[str] = []
-    combined = integration_text + "\n" + controller_text
+    combined = integration_text + "\n" + controller_text + "\n" + maintenance_text
 
     assignments = set(
         re.findall(r'\$requiredCheck\s*=\s*"([^"\r\n]+)"', combined)
@@ -550,13 +556,14 @@ def audit_check_surface(integration_text: str, controller_text: str) -> list[str
     for obsolete in (
         "Trusted integration gate",
         "Trusted main audit",
-        "handoff-v1:",
         "candidate-v1:",
         "main-audit-v1:",
         "main-lkg-v1:",
     ):
         if obsolete in combined:
             violations.append(f"obsolete check contract remains: {obsolete}")
+    if re.search(r"(?<!control-plane-)handoff-v1:", combined):
+        violations.append("obsolete check contract remains: handoff-v1:")
 
     expected_mutations = {
         ("controller", "admit-handoff"): ["POST"],
@@ -564,10 +571,20 @@ def audit_check_surface(integration_text: str, controller_text: str) -> list[str
         ("integration", "publish-attestation"): ["PATCH", "PATCH", "POST"],
         ("integration", "dispatch-completion"): [],
     }
+    if maintenance_text:
+        expected_mutations.update(
+            {
+                ("maintenance", "inspect"): [],
+                ("maintenance", "authorize"): ["PATCH", "POST", "PATCH", "PATCH"],
+                ("maintenance", "audit-merged-main"): [],
+            }
+        )
     all_jobs = {
         "controller": _jobs(controller_lines),
         "integration": _jobs(integration_lines),
     }
+    if maintenance_text:
+        all_jobs["maintenance"] = _jobs(maintenance_lines)
     for role, jobs in all_jobs.items():
         for job in jobs:
             mutations = [method.upper() for method in _check_run_mutations(job)]
@@ -596,32 +613,44 @@ def audit_check_surface(integration_text: str, controller_text: str) -> list[str
         violations.append("publish-attestation job is missing")
     else:
         for required in (
-            "candidate-v2:",
-            "main-lkg-v2:",
+            "candidate-v3:",
+            "main-lkg-v3:",
             "$candidateReceiptSha",
             "$aggregateReceiptSha",
+            "$mapReceiptSha",
+            "$receiptSetSha",
         ):
             if required not in publisher.text:
-                violations.append(f"publisher is missing fresh v2 binding {required!r}")
+                violations.append(f"publisher is missing fresh v3 binding {required!r}")
 
     combined_actions = re.findall(
         r"(?mi)^\s*(?:-\s*)?uses\s*:\s*(\S+)", combined
     )
-    if combined_actions.count(ATTESTER_ACTION) != 2:
-        violations.append("exactly admission and publisher must mint scoped App tokens")
+    expected_attester_uses = 3 if maintenance_text else 2
+    if combined_actions.count(ATTESTER_ACTION) != expected_attester_uses:
+        violations.append(
+            "only admission, publisher and optional maintenance authorization "
+            "may mint scoped App tokens"
+        )
     if combined.count("environment: integration-attester") != 2:
         violations.append("exactly admission and publisher must use integration-attester")
-    if combined.count("INTEGRATION_ATTESTER_PRIVATE_KEY") != 2:
-        violations.append("the App private key must appear only in admission and publisher")
+    if combined.count("INTEGRATION_ATTESTER_PRIVATE_KEY") != expected_attester_uses:
+        violations.append(
+            "the App private key must appear only in admission, publisher and "
+            "optional maintenance authorization"
+        )
     if "permission-administration: write" in combined:
         violations.append("the Checks-only attester must never receive Administration:write")
-    if combined.count("permission-checks: write") != 2:
-        violations.append("exactly admission and publisher may request Checks:write")
+    if combined.count("permission-checks: write") != expected_attester_uses:
+        violations.append(
+            "only admission, publisher and optional maintenance authorization "
+            "may request Checks:write"
+        )
     if re.search(r"(?m)^\s+checks:\s*write\s*$", combined):
         violations.append("GITHUB_TOKEN must never receive checks: write")
     if re.search(r"(?m)^\s+(?:owner|repositories):\s*", combined):
         violations.append("attester tokens must remain scoped to the current repository")
-    if "github-actions" in combined:
+    if "github-actions" in integration_text + "\n" + controller_text:
         violations.append("generic GitHub Actions identity cannot attest integration-green")
 
     trusted_reader_jobs = (
@@ -677,6 +706,7 @@ class WorkflowAuditorNegativeFixtureTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.integration = INTEGRATION_WORKFLOW.read_text(encoding="utf-8")
         cls.controller = CONTROLLER_WORKFLOW.read_text(encoding="utf-8")
+        cls.maintenance = MAINTENANCE_WORKFLOW.read_text(encoding="utf-8")
 
     def test_current_pair_is_accepted_by_the_security_auditor(self) -> None:
         violations = audit_workflow(
@@ -685,7 +715,16 @@ class WorkflowAuditorNegativeFixtureTest(unittest.TestCase):
         violations.extend(
             audit_workflow(CONTROLLER_WORKFLOW, self.controller, role="controller")
         )
-        violations.extend(audit_check_surface(self.integration, self.controller))
+        violations.extend(
+            audit_workflow(MAINTENANCE_WORKFLOW, self.maintenance, role="generic")
+        )
+        violations.extend(
+            audit_check_surface(
+                self.integration,
+                self.controller,
+                self.maintenance,
+            )
+        )
         self.assertEqual([], violations, "\n" + "\n".join(violations))
 
     def test_unpinned_external_action_is_rejected(self) -> None:
@@ -834,6 +873,7 @@ class RepositoryWorkflowContractTest(unittest.TestCase):
             audit_check_surface(
                 INTEGRATION_WORKFLOW.read_text(encoding="utf-8"),
                 CONTROLLER_WORKFLOW.read_text(encoding="utf-8"),
+                MAINTENANCE_WORKFLOW.read_text(encoding="utf-8"),
             )
         )
         self.assertEqual([], violations, "\n" + "\n".join(violations))

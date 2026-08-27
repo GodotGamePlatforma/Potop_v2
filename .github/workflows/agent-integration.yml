@@ -4,6 +4,7 @@ on:
   repository_dispatch:
     types:
       - verify-agent-candidate
+      - verify-map-control-plane-candidate
       - verify-integrated-main
 
 permissions:
@@ -41,6 +42,11 @@ jobs:
       branch: ${{ steps.preflight.outputs.branch }}
       pr-number: ${{ steps.preflight.outputs.pr-number }}
       check-run-id: ${{ steps.preflight.outputs.check-run-id }}
+      authorization-sha256: ${{ steps.preflight.outputs.authorization-sha256 }}
+      builder-sha256: ${{ steps.preflight.outputs.builder-sha256 }}
+      portal-test-sha256: ${{ steps.preflight.outputs.portal-test-sha256 }}
+      smoke-test-sha256: ${{ steps.preflight.outputs.smoke-test-sha256 }}
+      evidence-sha256: ${{ steps.preflight.outputs.evidence-sha256 }}
     steps:
       - name: Check out trusted default-branch control files
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,6 +82,11 @@ jobs:
           REQUESTED_PR: ${{ github.event.client_payload.pr_number }}
           REQUESTED_CHECK_RUN_ID: ${{ github.event.client_payload.check_run_id }}
           REQUESTED_LABEL: ${{ github.event.client_payload.required_label }}
+          REQUESTED_AUTHORIZATION_SHA256: ${{ github.event.client_payload.authorization_sha256 }}
+          REQUESTED_BUILDER_SHA256: ${{ github.event.client_payload.builder_sha256 }}
+          REQUESTED_PORTAL_TEST_SHA256: ${{ github.event.client_payload.portal_test_sha256 }}
+          REQUESTED_SMOKE_TEST_SHA256: ${{ github.event.client_payload.smoke_test_sha256 }}
+          REQUESTED_EVIDENCE_SHA256: ${{ github.event.client_payload.evidence_sha256 }}
           EXPECTED_ATTESTER_APP_ID: ${{ vars.INTEGRATION_ATTESTER_APP_ID }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -89,6 +100,7 @@ jobs:
           $candidateRepository = Join-Path $env:GITHUB_WORKSPACE "candidate"
           $requiredCheck = "integration-green"
           $requiredLabel = "integration-ready"
+          $maintenanceLabel = "control-plane-reviewed"
           $headers = @{
             Accept = "application/vnd.github+json"
             Authorization = "Bearer $env:GITHUB_TOKEN"
@@ -107,9 +119,32 @@ jobs:
             }
           }
 
+          function Assert-Sha256 {
+            param([Parameter(Mandatory = $true)][string]$Name, [AllowEmptyString()][string]$Value)
+            if ($Value -cnotmatch '^[0-9a-f]{64}$') {
+              throw "$Name must be one lowercase SHA-256."
+            }
+          }
+
+          $gitCommand = Get-Command -Name git.exe -CommandType Application -ErrorAction Stop |
+            Select-Object -First 1
+          $trustedGit = [System.IO.Path]::GetFullPath($gitCommand.Source)
+          foreach ($untrustedRoot in @($env:GITHUB_WORKSPACE, $env:RUNNER_TEMP)) {
+            $prefix = [System.IO.Path]::GetFullPath($untrustedRoot).TrimEnd([char[]]"\/") + [System.IO.Path]::DirectorySeparatorChar
+            if ($trustedGit.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "Git executable resolved inside an untrusted workspace: $trustedGit"
+            }
+          }
+          $neutralCwd = Join-Path $env:RUNNER_TEMP "trusted-preflight-neutral-cwd"
+          New-Item -ItemType Directory -Path $neutralCwd -Force | Out-Null
+          if (@(Get-ChildItem -LiteralPath $neutralCwd -Force).Count -ne 0) {
+            throw "Trusted preflight neutral working directory is not empty."
+          }
+          $env:CI_TRUSTED_GIT = $trustedGit
+
           function Invoke-GitChecked {
             param([Parameter(Mandatory = $true)][string]$Repository, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
-            $value = (& git -c "safe.directory=$Repository" -C $Repository @Arguments 2>&1 | Out-String).Trim()
+            $value = (& $trustedGit -c "safe.directory=$Repository" -C $Repository @Arguments 2>&1 | Out-String).Trim()
             if ($LASTEXITCODE -ne 0) {
               throw "git $($Arguments -join ' ') failed: $value"
             }
@@ -122,14 +157,19 @@ jobs:
           $branch = "main"
           $pullNumber = 0
           $checkRunId = 0L
+          $authorizationSha = "none"
+          $builderSha = "none"
+          $portalTestSha = "none"
+          $smokeTestSha = "none"
+          $evidenceSha = "none"
           $attesterAppId = 0L
           if (-not [long]::TryParse($env:EXPECTED_ATTESTER_APP_ID, [ref]$attesterAppId) -or $attesterAppId -lt 1) {
             throw "INTEGRATION_ATTESTER_APP_ID must be a positive numeric GitHub App ID."
           }
 
           if ($env:GITHUB_EVENT_NAME -ceq "repository_dispatch") {
-            if ($env:EVENT_ACTION -ceq "verify-agent-candidate") {
-              $mode = "candidate"
+            if ($env:EVENT_ACTION -in @("verify-agent-candidate", "verify-map-control-plane-candidate")) {
+              $mode = if ($env:EVENT_ACTION -ceq "verify-agent-candidate") { "candidate" } else { "control-plane" }
               Assert-CommitSha -Name "base_sha" -Value $env:REQUESTED_BASE_SHA
               Assert-CommitSha -Name "candidate_sha" -Value $env:REQUESTED_CANDIDATE_SHA
               $baseSha = $env:REQUESTED_BASE_SHA
@@ -140,8 +180,21 @@ jobs:
               if (-not [long]::TryParse($env:REQUESTED_CHECK_RUN_ID, [ref]$checkRunId) -or $checkRunId -lt 1) {
                 throw "check_run_id must be a positive integer."
               }
-              if ($env:REQUESTED_LABEL -cne $requiredLabel) {
-                throw "The dispatch did not preserve the trusted integration label."
+              $expectedLabel = if ($mode -ceq "candidate") { $requiredLabel } else { $maintenanceLabel }
+              if ($env:REQUESTED_LABEL -cne $expectedLabel) {
+                throw "The dispatch did not preserve the trusted '$expectedLabel' label."
+              }
+              if ($mode -ceq "control-plane") {
+                Assert-Sha256 -Name "authorization_sha256" -Value $env:REQUESTED_AUTHORIZATION_SHA256
+                Assert-Sha256 -Name "builder_sha256" -Value $env:REQUESTED_BUILDER_SHA256
+                Assert-Sha256 -Name "portal_test_sha256" -Value $env:REQUESTED_PORTAL_TEST_SHA256
+                Assert-Sha256 -Name "smoke_test_sha256" -Value $env:REQUESTED_SMOKE_TEST_SHA256
+                Assert-Sha256 -Name "evidence_sha256" -Value $env:REQUESTED_EVIDENCE_SHA256
+                $authorizationSha = $env:REQUESTED_AUTHORIZATION_SHA256
+                $builderSha = $env:REQUESTED_BUILDER_SHA256
+                $portalTestSha = $env:REQUESTED_PORTAL_TEST_SHA256
+                $smokeTestSha = $env:REQUESTED_SMOKE_TEST_SHA256
+                $evidenceSha = $env:REQUESTED_EVIDENCE_SHA256
               }
             }
             elseif ($env:EVENT_ACTION -ceq "verify-integrated-main") {
@@ -172,7 +225,7 @@ jobs:
             throw "main moved before trusted execution."
           }
 
-          if ($mode -ceq "candidate") {
+          if ($mode -in @("candidate", "control-plane")) {
             $pullRequest = Invoke-GitHubGet -Path "/repos/$repository/pulls/$pullNumber"
             if ($pullRequest.state -cne "open" -or $pullRequest.draft) {
               throw "PR #$pullNumber must be open and non-draft."
@@ -189,13 +242,22 @@ jobs:
             if ($branch -cnotmatch '^codex/(root|map|diver|integration|structure-[a-z0-9][a-z0-9_-]*)/[a-z0-9][a-z0-9._-]*$') {
               throw "PR #$pullNumber does not use a strict owner branch name."
             }
+            if ($mode -ceq "control-plane" -and $branch -cnotmatch '^codex/map/[a-z0-9][a-z0-9._-]*$') {
+              throw "Control-plane maintenance requires a strict codex/map task branch."
+            }
             $labels = @($pullRequest.labels | ForEach-Object { [string]$_.name })
-            if ($requiredLabel -cnotin $labels) {
-              throw "PR #$pullNumber is missing the '$requiredLabel' label."
+            $expectedLabel = if ($mode -ceq "candidate") { $requiredLabel } else { $maintenanceLabel }
+            if ($expectedLabel -cnotin $labels) {
+              throw "PR #$pullNumber is missing the '$expectedLabel' label."
             }
 
             $check = Invoke-GitHubGet -Path "/repos/$repository/check-runs/$checkRunId"
-            $expectedExternalId = "handoff-v2:$pullNumber`:$baseSha`:$targetSha"
+            $expectedExternalId = if ($mode -ceq "candidate") {
+              "handoff-v2:$pullNumber`:$baseSha`:$targetSha"
+            }
+            else {
+              "control-plane-handoff-v1:$pullNumber`:$baseSha`:$targetSha`:$authorizationSha"
+            }
             if (
               $check.name -cne $requiredCheck -or
               $check.head_sha -cne $targetSha -or
@@ -206,11 +268,16 @@ jobs:
               throw "The requested check run is not bound to this exact handoff."
             }
 
-            python -I -B (Join-Path $trustedRepository "tools/ci_protected_paths.py") validate-diff `
+            $pathMode = if ($mode -ceq "candidate") { "validate-diff" } else { "validate-map-maintenance-diff" }
+            & python -I -B (Join-Path $trustedRepository "tools/ci_python_entry.py") `
+              --cwd $neutralCwd --path-executable $trustedGit `
+              --script (Join-Path $trustedRepository "tools/ci_protected_paths.py") -- $pathMode `
               --repo $candidateRepository --base $baseSha --head $targetSha
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-            python -I -B (Join-Path $trustedRepository "tools/ci_branch_owner.py") validate `
+            & python -I -B (Join-Path $trustedRepository "tools/ci_python_entry.py") `
+              --cwd $neutralCwd --path-executable $trustedGit `
+              --script (Join-Path $trustedRepository "tools/ci_branch_owner.py") -- validate `
               --repo $candidateRepository `
               --branch $branch `
               --base-ref $baseSha `
@@ -218,6 +285,28 @@ jobs:
               --expected-base $baseSha `
               --contract-tool (Join-Path $trustedRepository "tools/workbench_contract.py")
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            if ($mode -ceq "control-plane") {
+              $actualBuilderSha = (Get-FileHash -LiteralPath (Join-Path $candidateRepository "underwater_map_workbench/tools/build_underwater_map.py") -Algorithm SHA256).Hash.ToLowerInvariant()
+              $actualPortalSha = (Get-FileHash -LiteralPath (Join-Path $candidateRepository "underwater_map_workbench/tests/portal_backdrop_clearance_test.py") -Algorithm SHA256).Hash.ToLowerInvariant()
+              $actualSmokeSha = (Get-FileHash -LiteralPath (Join-Path $candidateRepository "underwater_map_workbench/tests/underwater_map_smoke_test.gd") -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($actualBuilderSha -cne $builderSha -or
+                  $actualPortalSha -cne $portalTestSha -or
+                  $actualSmokeSha -cne $smokeTestSha) {
+                throw "Authorized map verifier hashes differ from the exact candidate."
+              }
+              $authorizationPayload = "map-control-plane-authorization-v1`nrepo=$repository`npr=$pullNumber`nbase=$baseSha`nhead=$targetSha`nbuilder=$builderSha`nportal=$portalTestSha`nsmoke=$smokeTestSha`nevidence=$evidenceSha`n"
+              $authorizationHasher = [System.Security.Cryptography.SHA256]::Create()
+              try {
+                $actualAuthorizationSha = [Convert]::ToHexString(
+                  $authorizationHasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($authorizationPayload))
+                ).ToLowerInvariant()
+              }
+              finally { $authorizationHasher.Dispose() }
+              if ($actualAuthorizationSha -cne $authorizationSha) {
+                throw "Control-plane authorization commitment does not match the exact candidate."
+              }
+            }
           }
 
           "mode=$mode" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -226,6 +315,11 @@ jobs:
           "branch=$branch" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "pr-number=$pullNumber" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "check-run-id=$checkRunId" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "authorization-sha256=$authorizationSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "builder-sha256=$builderSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "portal-test-sha256=$portalTestSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "smoke-test-sha256=$smokeTestSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "evidence-sha256=$evidenceSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   infra-contracts:
     name: Infrastructure contracts
@@ -259,6 +353,8 @@ jobs:
 
       - name: Run infrastructure contracts
         shell: pwsh
+        env:
+          VERIFICATION_MODE: ${{ needs.trust-preflight.outputs.mode }}
         run: |
           $ErrorActionPreference = "Stop"
           if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
@@ -296,8 +392,14 @@ jobs:
           Invoke-LoggedCommand "workbench lock" "python" @("-I", "-B", (Join-Path $trustedRoot "tests/workbench_lock_test.py"))
           Invoke-LoggedCommand "freeze workbench revision" "python" @("-I", "-B", (Join-Path $trustedRoot "tests/freeze_workbench_revision_test.py"))
           Invoke-LoggedCommand "map atomic write" "python" @("-I", "-B", (Join-Path $trustedRoot "tests/map_atomic_write_test.py"))
+          $portalContractRoot = if ($env:VERIFICATION_MODE -ceq "control-plane") {
+            $candidateRoot
+          }
+          else {
+            $trustedRoot
+          }
           Invoke-LoggedCommand "portal backdrop clearance" "python" @(
-            "-I", "-B", (Join-Path $trustedRoot "underwater_map_workbench/tests/portal_backdrop_clearance_test.py")
+            "-I", "-B", (Join-Path $portalContractRoot "underwater_map_workbench/tests/portal_backdrop_clearance_test.py")
           )
           Invoke-LoggedCommand "setup agent worktree" "pwsh" @(
             "-NoLogo", "-NoProfile", "-File", (Join-Path $trustedRoot "tests/setup_agent_worktree_test.ps1")
@@ -503,57 +605,6 @@ jobs:
             throw "Hydrated candidate checkout is not clean."
           }
 
-      - name: Verify exact candidate map with trusted code
-        shell: pwsh
-        env:
-          EXPECTED_HEAD_SHA: ${{ needs.trust-preflight.outputs.target-sha }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
-            $PSNativeCommandUseErrorActionPreference = $false
-          }
-          $trustedRoot = Join-Path $env:GITHUB_WORKSPACE "trusted-control"
-          $candidateRoot = Join-Path $env:GITHUB_WORKSPACE "candidate"
-          $mapCheckLog = Join-Path $env:RUNNER_TEMP "ci-plan\map-check.log"
-          $trustedMapFiles = @(
-            "underwater_map_workbench/tools/build_underwater_map.py",
-            "tools/workbench_contract.py",
-            "tools/workbench_lock.py"
-          )
-          foreach ($relativePath in $trustedMapFiles) {
-            $trustedPath = Join-Path $trustedRoot $relativePath
-            $candidatePath = Join-Path $candidateRoot $relativePath
-            if (-not (Test-Path -LiteralPath $trustedPath -PathType Leaf) -or
-                -not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
-              throw "Trusted map verifier dependency is missing: $relativePath"
-            }
-            $trustedSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $trustedPath).Hash
-            $candidateSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidatePath).Hash
-            if ($candidateSha -cne $trustedSha) {
-              throw "Candidate map verifier dependency differs from trusted control: $relativePath"
-            }
-          }
-
-          $candidateHead = (git -C $candidateRoot rev-parse "HEAD^{commit}" | Out-String).Trim()
-          if ($candidateHead -cne $env:EXPECTED_HEAD_SHA) {
-            throw "Map check candidate HEAD moved before verification."
-          }
-          Push-Location (Join-Path $candidateRoot "underwater_map_workbench")
-          try {
-            & python -I -B (Join-Path $candidateRoot "underwater_map_workbench/tools/build_underwater_map.py") --check `
-              *>&1 | Tee-Object -FilePath $mapCheckLog
-            $mapCheckExitCode = $LASTEXITCODE
-          }
-          finally {
-            Pop-Location
-          }
-          if ($mapCheckExitCode -ne 0) {
-            throw "Trusted map authority check failed with exit code $mapCheckExitCode."
-          }
-          if (-not [string]::IsNullOrEmpty((git -C $candidateRoot status --porcelain=v1 --untracked-files=all))) {
-            throw "Trusted map authority check changed the exact candidate."
-          }
-
       - name: Create candidate receipt and immutable shard plan
         shell: pwsh
         run: |
@@ -606,6 +657,235 @@ jobs:
           path: ${{ runner.temp }}/ci-plan
           if-no-files-found: error
           retention-days: 14
+          compression-level: 6
+
+  map-authority-check:
+    name: Verify exact map authority
+    needs:
+      - trust-preflight
+      - prepare-lfs-plan
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.map-check-artifact.outputs.artifact-id }}
+      artifact-digest: ${{ steps.map-check-artifact.outputs.artifact-digest }}
+      map-receipt-sha256: ${{ steps.map-check-receipt.outputs.map-receipt-sha256 }}
+    steps:
+      - name: Check out trusted control files
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.trust-preflight.outputs.base-sha }}
+          path: trusted-control
+          fetch-depth: 0
+          lfs: false
+          persist-credentials: false
+
+      - name: Check out exact candidate without LFS payloads
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.trust-preflight.outputs.target-sha }}
+          path: candidate
+          fetch-depth: 0
+          lfs: false
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Download immutable plan outside the candidate workspace
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          artifact-ids: ${{ needs.prepare-lfs-plan.outputs.plan-artifact-id }}
+          path: ${{ runner.temp }}/ci-plan
+
+      - name: Verify immutable plan artifact identity and digest
+        shell: pwsh
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.prepare-lfs-plan.outputs.plan-artifact-id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.prepare-lfs-plan.outputs.plan-artifact-digest }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:EXPECTED_ARTIFACT_ID -notmatch '^[1-9][0-9]*$' -or
+              $env:EXPECTED_ARTIFACT_DIGEST -notmatch '^[0-9a-f]{64}$') {
+            throw "Plan artifact outputs are missing or malformed."
+          }
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $artifact = Invoke-RestMethod -Method GET `
+            -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:EXPECTED_ARTIFACT_ID" `
+            -Headers $headers
+          $serviceDigest = ([string]$artifact.digest).ToLowerInvariant()
+          if ($serviceDigest.StartsWith("sha256:")) { $serviceDigest = $serviceDigest.Substring(7) }
+          if ([string]$artifact.id -cne $env:EXPECTED_ARTIFACT_ID -or
+              [string]$artifact.name -cne "integration-plan-${{ github.run_id }}-${{ github.run_attempt }}" -or
+              [bool]$artifact.expired -or
+              [string]$artifact.workflow_run.id -cne "${{ github.run_id }}" -or
+              $serviceDigest -cne $env:EXPECTED_ARTIFACT_DIGEST) {
+            throw "Downloaded plan artifact does not match its immutable upload ID/digest."
+          }
+
+      - name: Restore exact LFS object cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ github.workspace }}/candidate/.git/lfs/objects
+          key: ${{ needs.prepare-lfs-plan.outputs.lfs-cache-key }}
+          fail-on-cache-miss: true
+
+      - name: Verify LFS cache and hydrate candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $trustedRoot = Join-Path $env:GITHUB_WORKSPACE "trusted-control"
+          $candidateRoot = Join-Path $env:GITHUB_WORKSPACE "candidate"
+          $manifestPath = Join-Path $env:RUNNER_TEMP "ci-plan\lfs-manifest.json"
+          python -I -B (Join-Path $trustedRoot "tools/ci_lfs.py") verify-cache --repo $candidateRoot --manifest $manifestPath --reject-extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $candidateRoot lfs checkout
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $candidateRoot lfs fsck --objects --pointers --dry-run HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -I -B (Join-Path $trustedRoot "tools/ci_lfs.py") verify-worktree --repo $candidateRoot --manifest $manifestPath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not [string]::IsNullOrEmpty((git -C $candidateRoot status --porcelain=v1 --untracked-files=all))) {
+            throw "Hydrated map-check candidate is not clean."
+          }
+
+      - name: Run trusted map check and create exact receipt
+        id: map-check-receipt
+        shell: pwsh
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.trust-preflight.outputs.target-sha }}
+          VERIFICATION_MODE: ${{ needs.trust-preflight.outputs.mode }}
+          AUTHORIZATION_SHA256: ${{ needs.trust-preflight.outputs.authorization-sha256 }}
+          AUTHORIZED_BUILDER_SHA256: ${{ needs.trust-preflight.outputs.builder-sha256 }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+          $trustedRoot = Join-Path $env:GITHUB_WORKSPACE "trusted-control"
+          $candidateRoot = Join-Path $env:GITHUB_WORKSPACE "candidate"
+          $evidenceRoot = Join-Path $env:RUNNER_TEMP "map-authority-check"
+          New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
+          $mapCheckLog = Join-Path $evidenceRoot "map-authority-check.log"
+          $mapCheckReceipt = Join-Path $evidenceRoot "map-authority-check.receipt"
+          $planPath = Join-Path $env:RUNNER_TEMP "ci-plan\shard-plan.receipt"
+          $trustedMapFiles = @(
+            "tools/workbench_contract.py",
+            "tools/workbench_lock.py"
+          )
+          foreach ($relativePath in $trustedMapFiles) {
+            $trustedPath = Join-Path $trustedRoot $relativePath
+            $candidatePath = Join-Path $candidateRoot $relativePath
+            if (-not (Test-Path -LiteralPath $trustedPath -PathType Leaf) -or
+                -not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+              throw "Trusted map verifier dependency is missing: $relativePath"
+            }
+            $trustedSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $trustedPath).Hash
+            $candidateSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidatePath).Hash
+            if ($candidateSha -cne $trustedSha) {
+              throw "Candidate map verifier dependency differs from trusted control: $relativePath"
+            }
+          }
+
+          $candidateBuilder = Join-Path $candidateRoot "underwater_map_workbench/tools/build_underwater_map.py"
+          $trustedBuilder = Join-Path $trustedRoot "underwater_map_workbench/tools/build_underwater_map.py"
+          if (-not (Test-Path -LiteralPath $candidateBuilder -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $trustedBuilder -PathType Leaf)) {
+            throw "Map builder dependency is missing."
+          }
+          $candidateBuilderSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidateBuilder).Hash.ToLowerInvariant()
+          if ($env:VERIFICATION_MODE -ceq "control-plane") {
+            if ($env:AUTHORIZATION_SHA256 -cnotmatch '^[0-9a-f]{64}$' -or
+                $env:AUTHORIZED_BUILDER_SHA256 -cnotmatch '^[0-9a-f]{64}$' -or
+                $candidateBuilderSha -cne $env:AUTHORIZED_BUILDER_SHA256) {
+              throw "Control-plane map builder does not match its exact authorization."
+            }
+          }
+          else {
+            $trustedBuilderSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $trustedBuilder).Hash.ToLowerInvariant()
+            if ($candidateBuilderSha -cne $trustedBuilderSha -or $env:AUTHORIZATION_SHA256 -cne "none") {
+              throw "Ordinary candidate map builder differs from trusted control."
+            }
+          }
+
+          $candidateHead = (git -C $candidateRoot rev-parse "HEAD^{commit}" | Out-String).Trim()
+          if ($candidateHead -cne $env:EXPECTED_HEAD_SHA) {
+            throw "Map check candidate HEAD moved before verification."
+          }
+          $gitCommand = Get-Command -Name git.exe -CommandType Application -ErrorAction Stop |
+            Select-Object -First 1
+          $trustedGit = [System.IO.Path]::GetFullPath($gitCommand.Source)
+          foreach ($untrustedRoot in @($env:GITHUB_WORKSPACE, $env:RUNNER_TEMP)) {
+            $prefix = [System.IO.Path]::GetFullPath($untrustedRoot).TrimEnd([char[]]"\/") + [System.IO.Path]::DirectorySeparatorChar
+            if ($trustedGit.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "Git executable resolved inside an untrusted workspace: $trustedGit"
+            }
+          }
+          $neutralCwd = Join-Path $env:RUNNER_TEMP "map-authority-neutral-cwd"
+          New-Item -ItemType Directory -Path $neutralCwd -Force | Out-Null
+          if (@(Get-ChildItem -LiteralPath $neutralCwd -Force).Count -ne 0) {
+            throw "Map-check neutral working directory is not empty."
+          }
+          $env:CI_TRUSTED_GIT = $trustedGit
+          & python -I -B (Join-Path $trustedRoot "tools/ci_python_entry.py") `
+            --cwd $neutralCwd --path-executable $trustedGit `
+            --preload ("workbench_lock=" + (Join-Path $trustedRoot "tools/workbench_lock.py")) `
+            --preload ("workbench_contract=" + (Join-Path $trustedRoot "tools/workbench_contract.py")) `
+            --script $candidateBuilder `
+            -- --check *>&1 | Tee-Object -FilePath $mapCheckLog
+          $mapCheckExitCode = $LASTEXITCODE
+          if ($mapCheckExitCode -ne 0) {
+            throw "Trusted map authority check failed with exit code $mapCheckExitCode."
+          }
+          if (-not [string]::IsNullOrEmpty((git -C $candidateRoot status --porcelain=v1 --untracked-files=all))) {
+            throw "Trusted map authority check changed the exact candidate."
+          }
+          python -I -B (Join-Path $trustedRoot "tools/ci_python_entry.py") `
+            --cwd $neutralCwd --path-executable $trustedGit `
+            --script (Join-Path $trustedRoot "tools/ci_map_check_receipt.py") -- create `
+            --repo $candidateRoot --plan $planPath --log $mapCheckLog --receipt $mapCheckReceipt `
+            --authorization-sha256 $env:AUTHORIZATION_SHA256
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -I -B (Join-Path $trustedRoot "tools/ci_python_entry.py") `
+            --cwd $neutralCwd --path-executable $trustedGit `
+            --script (Join-Path $trustedRoot "tools/ci_map_check_receipt.py") -- verify `
+            --repo $candidateRoot --plan $planPath --log $mapCheckLog --receipt $mapCheckReceipt `
+            --authorization-sha256 $env:AUTHORIZATION_SHA256
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $mapReceiptSha = (Get-FileHash -LiteralPath $mapCheckReceipt -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($mapReceiptSha -cnotmatch '^[0-9a-f]{64}$') {
+            throw "Map-authority receipt SHA-256 is malformed."
+          }
+          "map-receipt-sha256=$mapReceiptSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload immutable map-check evidence
+        id: map-check-artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: map-authority-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/map-authority-check
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+
+      - name: Upload failed map-check diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: map-authority-check-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/map-authority-check
+          if-no-files-found: warn
+          retention-days: 7
           compression-level: 6
 
   shard:
@@ -784,6 +1064,7 @@ jobs:
       - infra-contracts
       - prepare-godot
       - prepare-lfs-plan
+      - map-authority-check
       - shard
     runs-on: windows-latest
     timeout-minutes: 20
@@ -793,6 +1074,8 @@ jobs:
     outputs:
       candidate-receipt-sha256: ${{ steps.receipt-hashes.outputs.candidate-receipt-sha256 }}
       aggregate-receipt-sha256: ${{ steps.receipt-hashes.outputs.aggregate-receipt-sha256 }}
+      map-receipt-sha256: ${{ steps.receipt-hashes.outputs.map-receipt-sha256 }}
+      receipt-set-sha256: ${{ steps.receipt-hashes.outputs.receipt-set-sha256 }}
       aggregate-canonical-sha256: ${{ steps.receipt-hashes.outputs.aggregate-canonical-sha256 }}
       artifact-digest: ${{ steps.attestation-artifact.outputs.artifact-digest }}
     steps:
@@ -833,7 +1116,7 @@ jobs:
           [IO.File]::WriteAllText($needsPath, $env:CI_NEEDS_JSON, $utf8NoBom)
           python -I -B (Join-Path $trustedRoot "tools/ci_job_gate.py") verify-needs `
             --input $needsPath `
-            --required trust-preflight infra-contracts prepare-godot prepare-lfs-plan shard
+            --required trust-preflight infra-contracts prepare-godot prepare-lfs-plan map-authority-check shard
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Download immutable plan outside the candidate workspace
@@ -841,6 +1124,59 @@ jobs:
         with:
           artifact-ids: ${{ needs.prepare-lfs-plan.outputs.plan-artifact-id }}
           path: ${{ runner.temp }}/ci-plan
+
+      - name: Download immutable map-check receipt by exact artifact ID
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          artifact-ids: ${{ needs.map-authority-check.outputs.artifact-id }}
+          path: ${{ runner.temp }}/ci-map-check
+
+      - name: Verify immutable map-check artifact identity and digest
+        shell: pwsh
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.map-authority-check.outputs.artifact-id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.map-authority-check.outputs.artifact-digest }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:EXPECTED_ARTIFACT_ID -notmatch '^[1-9][0-9]*$' -or
+              $env:EXPECTED_ARTIFACT_DIGEST -notmatch '^[0-9a-f]{64}$') {
+            throw "Map-check artifact outputs are missing or malformed."
+          }
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $artifact = Invoke-RestMethod -Method GET `
+            -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:EXPECTED_ARTIFACT_ID" `
+            -Headers $headers
+          $serviceDigest = ([string]$artifact.digest).ToLowerInvariant()
+          if ($serviceDigest.StartsWith("sha256:")) { $serviceDigest = $serviceDigest.Substring(7) }
+          if ([string]$artifact.id -cne $env:EXPECTED_ARTIFACT_ID -or
+              [string]$artifact.name -cne "map-authority-check-${{ github.run_id }}-${{ github.run_attempt }}" -or
+              [bool]$artifact.expired -or
+              [string]$artifact.workflow_run.id -cne "${{ github.run_id }}" -or
+              $serviceDigest -cne $env:EXPECTED_ARTIFACT_DIGEST) {
+            throw "Downloaded map-check artifact does not match its immutable upload ID/digest."
+          }
+          $runArtifacts = Invoke-RestMethod -Method GET `
+            -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/runs/${{ github.run_id }}/artifacts?per_page=100" `
+            -Headers $headers
+          if ([int]$runArtifacts.total_count -gt 100) {
+            throw "Run has too many artifacts to prove unique map-check evidence."
+          }
+          $expectedName = "map-authority-check-${{ github.run_id }}-${{ github.run_attempt }}"
+          $nameMatches = @($runArtifacts.artifacts | Where-Object { [string]$_.name -ceq $expectedName })
+          if ($nameMatches.Count -ne 1) {
+            throw "Expected exactly one map-check artifact named '$expectedName'; found $($nameMatches.Count)."
+          }
+          $namedDigest = ([string]$nameMatches[0].digest).ToLowerInvariant()
+          if ($namedDigest.StartsWith("sha256:")) { $namedDigest = $namedDigest.Substring(7) }
+          if ([string]$nameMatches[0].id -cne $env:EXPECTED_ARTIFACT_ID -or
+              $namedDigest -cne $env:EXPECTED_ARTIFACT_DIGEST) {
+            throw "Unique map-check artifact name does not resolve to the expected ID/digest."
+          }
 
       - name: Resolve the exact immutable shard artifact IDs and digests
         id: shard-artifacts
@@ -938,6 +1274,43 @@ jobs:
           python -I -B (Join-Path $trustedRoot "tools/ci_lfs.py") verify-worktree --repo $candidateRoot --manifest $manifestPath
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify map-check receipt against exact candidate and plan
+        shell: pwsh
+        env:
+          AUTHORIZATION_SHA256: ${{ needs.trust-preflight.outputs.authorization-sha256 }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $trustedRoot = Join-Path $env:GITHUB_WORKSPACE "trusted-control"
+          $candidateRoot = Join-Path $env:GITHUB_WORKSPACE "candidate"
+          $planPath = Join-Path $env:RUNNER_TEMP "ci-plan\shard-plan.receipt"
+          $evidenceFiles = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP "ci-map-check") -Recurse -File)
+          $receipts = @($evidenceFiles | Where-Object Name -ceq "map-authority-check.receipt")
+          $logs = @($evidenceFiles | Where-Object Name -ceq "map-authority-check.log")
+          if ($receipts.Count -ne 1 -or $logs.Count -ne 1 -or $evidenceFiles.Count -ne 2) {
+            throw "Map-check evidence must contain exactly one receipt and one log."
+          }
+          $gitCommand = Get-Command -Name git.exe -CommandType Application -ErrorAction Stop |
+            Select-Object -First 1
+          $trustedGit = [System.IO.Path]::GetFullPath($gitCommand.Source)
+          foreach ($untrustedRoot in @($env:GITHUB_WORKSPACE, $env:RUNNER_TEMP)) {
+            $prefix = [System.IO.Path]::GetFullPath($untrustedRoot).TrimEnd([char[]]"\/") + [System.IO.Path]::DirectorySeparatorChar
+            if ($trustedGit.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "Git executable resolved inside an untrusted workspace: $trustedGit"
+            }
+          }
+          $neutralCwd = Join-Path $env:RUNNER_TEMP "aggregate-map-check-neutral-cwd"
+          New-Item -ItemType Directory -Path $neutralCwd -Force | Out-Null
+          if (@(Get-ChildItem -LiteralPath $neutralCwd -Force).Count -ne 0) {
+            throw "Aggregate map-check neutral working directory is not empty."
+          }
+          $env:CI_TRUSTED_GIT = $trustedGit
+          python -I -B (Join-Path $trustedRoot "tools/ci_python_entry.py") `
+            --cwd $neutralCwd --path-executable $trustedGit `
+            --script (Join-Path $trustedRoot "tools/ci_map_check_receipt.py") -- verify `
+            --repo $candidateRoot --plan $planPath --log $logs[0].FullName --receipt $receipts[0].FullName `
+            --authorization-sha256 $env:AUTHORIZATION_SHA256
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Aggregate the exact full candidate
         shell: pwsh
         run: |
@@ -987,27 +1360,59 @@ jobs:
             Tee-Object -FilePath $aggregateLog -Append
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Hash the fresh verified receipt pair
+      - name: Hash the fresh verified receipt set
         id: receipt-hashes
         shell: pwsh
+        env:
+          EXPECTED_MAP_RECEIPT_SHA256: ${{ needs.map-authority-check.outputs.map-receipt-sha256 }}
         run: |
           $ErrorActionPreference = "Stop"
           $candidateReceipt = Join-Path $env:RUNNER_TEMP "ci-plan\candidate-receipt.json"
           $aggregateReceipt = Join-Path $env:RUNNER_TEMP "integration-aggregate\full-sharded.receipt"
-          foreach ($path in @($candidateReceipt, $aggregateReceipt)) {
+          $mapReceiptMatches = @(
+            Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP "ci-map-check") `
+              -Recurse -File -Filter "map-authority-check.receipt"
+          )
+          if ($mapReceiptMatches.Count -ne 1) {
+            throw "Expected exactly one verified map-authority receipt; found $($mapReceiptMatches.Count)."
+          }
+          $mapReceipt = $mapReceiptMatches[0].FullName
+          foreach ($path in @($candidateReceipt, $aggregateReceipt, $mapReceipt)) {
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
               throw "Verified receipt is missing: $path"
             }
           }
           $candidateSha = (Get-FileHash -LiteralPath $candidateReceipt -Algorithm SHA256).Hash.ToLowerInvariant()
           $aggregateSha = (Get-FileHash -LiteralPath $aggregateReceipt -Algorithm SHA256).Hash.ToLowerInvariant()
+          $mapSha = (Get-FileHash -LiteralPath $mapReceipt -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($env:EXPECTED_MAP_RECEIPT_SHA256 -cnotmatch '^[0-9a-f]{64}$' -or
+              $mapSha -cne $env:EXPECTED_MAP_RECEIPT_SHA256) {
+            throw "Verified map-authority receipt differs from the producer's exact SHA-256."
+          }
           $canonicalLine = Get-Content -LiteralPath $aggregateReceipt -TotalCount 1
           if ($canonicalLine -cnotmatch '^canonical_sha256=([0-9a-f]{64})$') {
             throw "Aggregate receipt has no canonical SHA-256 header."
           }
+          $aggregateCanonicalSha = $Matches[1]
+          $mapCanonicalLine = Get-Content -LiteralPath $mapReceipt -TotalCount 1
+          if ($mapCanonicalLine -cnotmatch '^canonical_sha256=[0-9a-f]{64}$') {
+            throw "Map-authority receipt has no canonical SHA-256 header."
+          }
+          $receiptSetPayload = "integration-receipt-set-v1`ncandidate=$candidateSha`naggregate=$aggregateSha`nmap=$mapSha`n"
+          $receiptSetHasher = [System.Security.Cryptography.SHA256]::Create()
+          try {
+            $receiptSetSha = [Convert]::ToHexString(
+              $receiptSetHasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($receiptSetPayload))
+            ).ToLowerInvariant()
+          }
+          finally {
+            $receiptSetHasher.Dispose()
+          }
           "candidate-receipt-sha256=$candidateSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "aggregate-receipt-sha256=$aggregateSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "aggregate-canonical-sha256=$($Matches[1])" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "map-receipt-sha256=$mapSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "receipt-set-sha256=$receiptSetSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "aggregate-canonical-sha256=$aggregateCanonicalSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload the verified attestation pair
         id: attestation-artifact
@@ -1017,6 +1422,8 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-plan/candidate-receipt.json
             ${{ runner.temp }}/ci-plan/shard-plan.receipt
+            ${{ runner.temp }}/ci-map-check/map-authority-check.receipt
+            ${{ runner.temp }}/ci-map-check/map-authority-check.log
             ${{ runner.temp }}/integration-aggregate/full-sharded.receipt
             ${{ runner.temp }}/integration-aggregate/aggregate.log
           if-no-files-found: error
@@ -1041,6 +1448,7 @@ jobs:
       - infra-contracts
       - prepare-godot
       - prepare-lfs-plan
+      - map-authority-check
       - shard
       - aggregate-attestation
     runs-on: ubuntu-latest
@@ -1055,6 +1463,8 @@ jobs:
       check-run-id: ${{ steps.publish.outputs.check-run-id }}
       candidate-receipt-sha256: ${{ steps.publish.outputs.candidate-receipt-sha256 }}
       aggregate-receipt-sha256: ${{ steps.publish.outputs.aggregate-receipt-sha256 }}
+      map-receipt-sha256: ${{ steps.publish.outputs.map-receipt-sha256 }}
+      receipt-set-sha256: ${{ steps.publish.outputs.receipt-set-sha256 }}
       external-id: ${{ steps.publish.outputs.external-id }}
     steps:
       - name: Mint repository-scoped attester token
@@ -1074,14 +1484,18 @@ jobs:
           REQUESTED_INTEGRATED_SHA: ${{ github.event.client_payload.integrated_sha }}
           REQUESTED_PR: ${{ github.event.client_payload.pr_number }}
           REQUESTED_CHECK_RUN_ID: ${{ github.event.client_payload.check_run_id }}
+          REQUESTED_AUTHORIZATION_SHA256: ${{ github.event.client_payload.authorization_sha256 }}
           PREFLIGHT_RESULT: ${{ needs.trust-preflight.result }}
           INFRA_RESULT: ${{ needs.infra-contracts.result }}
           GODOT_RESULT: ${{ needs.prepare-godot.result }}
           PLAN_RESULT: ${{ needs.prepare-lfs-plan.result }}
+          MAP_CHECK_RESULT: ${{ needs.map-authority-check.result }}
           SHARD_RESULT: ${{ needs.shard.result }}
           AGGREGATE_RESULT: ${{ needs.aggregate-attestation.result }}
           ATTESTED_CANDIDATE_RECEIPT_SHA256: ${{ needs.aggregate-attestation.outputs.candidate-receipt-sha256 }}
           ATTESTED_AGGREGATE_RECEIPT_SHA256: ${{ needs.aggregate-attestation.outputs.aggregate-receipt-sha256 }}
+          ATTESTED_MAP_RECEIPT_SHA256: ${{ needs.aggregate-attestation.outputs.map-receipt-sha256 }}
+          ATTESTED_RECEIPT_SET_SHA256: ${{ needs.aggregate-attestation.outputs.receipt-set-sha256 }}
           ATTESTED_AGGREGATE_CANONICAL_SHA256: ${{ needs.aggregate-attestation.outputs.aggregate-canonical-sha256 }}
           ATTESTED_ARTIFACT_DIGEST: ${{ needs.aggregate-attestation.outputs.artifact-digest }}
           EXPECTED_ATTESTER_APP_ID: ${{ vars.INTEGRATION_ATTESTER_APP_ID }}
@@ -1127,6 +1541,7 @@ jobs:
             infrastructure = $env:INFRA_RESULT
             godot_archive = $env:GODOT_RESULT
             plan = $env:PLAN_RESULT
+            map_authority = $env:MAP_CHECK_RESULT
             shards = $env:SHARD_RESULT
             aggregate = $env:AGGREGATE_RESULT
           }
@@ -1142,8 +1557,9 @@ jobs:
           if (-not [long]::TryParse($env:EXPECTED_ATTESTER_APP_ID, [ref]$attesterAppId) -or $attesterAppId -lt 1) {
             throw "INTEGRATION_ATTESTER_APP_ID must be a positive numeric GitHub App ID."
           }
-          if ($env:GITHUB_EVENT_NAME -ceq "repository_dispatch" -and $env:EVENT_ACTION -ceq "verify-agent-candidate") {
-            $mode = "candidate"
+          if ($env:GITHUB_EVENT_NAME -ceq "repository_dispatch" -and
+              $env:EVENT_ACTION -in @("verify-agent-candidate", "verify-map-control-plane-candidate")) {
+            $mode = if ($env:EVENT_ACTION -ceq "verify-agent-candidate") { "candidate" } else { "control-plane" }
             Assert-CommitSha -Name "base_sha" -Value $env:REQUESTED_BASE_SHA
             Assert-CommitSha -Name "candidate_sha" -Value $env:REQUESTED_CANDIDATE_SHA
             $baseSha = $env:REQUESTED_BASE_SHA
@@ -1153,6 +1569,9 @@ jobs:
             }
             if (-not [long]::TryParse($env:REQUESTED_CHECK_RUN_ID, [ref]$checkRunId) -or $checkRunId -lt 1) {
               throw "check_run_id must be a positive integer."
+            }
+            if ($mode -ceq "control-plane" -and $env:REQUESTED_AUTHORIZATION_SHA256 -cnotmatch '^[0-9a-f]{64}$') {
+              throw "authorization_sha256 must be one lowercase SHA-256."
             }
           }
           elseif ($env:GITHUB_EVENT_NAME -ceq "repository_dispatch" -and $env:EVENT_ACTION -ceq "verify-integrated-main") {
@@ -1167,12 +1586,16 @@ jobs:
 
           $candidateReceiptSha = $env:ATTESTED_CANDIDATE_RECEIPT_SHA256
           $aggregateReceiptSha = $env:ATTESTED_AGGREGATE_RECEIPT_SHA256
+          $mapReceiptSha = $env:ATTESTED_MAP_RECEIPT_SHA256
+          $receiptSetSha = $env:ATTESTED_RECEIPT_SET_SHA256
           $aggregateCanonicalSha = $env:ATTESTED_AGGREGATE_CANONICAL_SHA256
           $artifactDigest = $env:ATTESTED_ARTIFACT_DIGEST
           if ($allSucceeded) {
             foreach ($entry in ([ordered]@{
               candidate_receipt = $candidateReceiptSha
               aggregate_receipt = $aggregateReceiptSha
+              map_receipt = $mapReceiptSha
+              receipt_set = $receiptSetSha
               aggregate_canonical = $aggregateCanonicalSha
               artifact = $artifactDigest
             }).GetEnumerator()) {
@@ -1180,11 +1603,29 @@ jobs:
                 throw "$($entry.Key) digest is missing or malformed after a green aggregate."
               }
             }
+            $receiptSetPayload = "integration-receipt-set-v1`ncandidate=$candidateReceiptSha`naggregate=$aggregateReceiptSha`nmap=$mapReceiptSha`n"
+            $receiptSetHasher = [System.Security.Cryptography.SHA256]::Create()
+            try {
+              $recomputedReceiptSetSha = [Convert]::ToHexString(
+                $receiptSetHasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($receiptSetPayload))
+              ).ToLowerInvariant()
+            }
+            finally {
+              $receiptSetHasher.Dispose()
+            }
+            if ($receiptSetSha -cne $recomputedReceiptSetSha) {
+              throw "Receipt-set commitment does not match the three verified receipt hashes."
+            }
           }
 
-          if ($mode -ceq "candidate") {
+          if ($mode -in @("candidate", "control-plane")) {
             $check = Invoke-GitHubApi -Method GET -Path "/repos/$repository/check-runs/$checkRunId"
-            $handoffExternalId = "handoff-v2:$pullNumber`:$baseSha`:$targetSha"
+            $handoffExternalId = if ($mode -ceq "candidate") {
+              "handoff-v2:$pullNumber`:$baseSha`:$targetSha"
+            }
+            else {
+              "control-plane-handoff-v1:$pullNumber`:$baseSha`:$targetSha`:$($env:REQUESTED_AUTHORIZATION_SHA256)"
+            }
             if (
               $check.name -cne $requiredCheck -or
               $check.head_sha -cne $targetSha -or
@@ -1195,15 +1636,34 @@ jobs:
               throw "Publisher refused a check that is not bound to the exact queued handoff."
             }
 
-            $externalId = if ($allSucceeded) {
-              "candidate-v2:$repository`:$pullNumber`:$baseSha`:$targetSha`:$candidateReceiptSha`:$aggregateReceiptSha"
+            $controlSetSha = "none"
+            if ($allSucceeded -and $mode -ceq "control-plane") {
+              $controlSetPayload = "control-plane-receipt-set-v1`nauthorization=$($env:REQUESTED_AUTHORIZATION_SHA256)`nreceipts=$receiptSetSha`n"
+              $controlSetHasher = [System.Security.Cryptography.SHA256]::Create()
+              try {
+                $controlSetSha = [Convert]::ToHexString(
+                  $controlSetHasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($controlSetPayload))
+                ).ToLowerInvariant()
+              }
+              finally { $controlSetHasher.Dispose() }
             }
-            else {
+            $externalId = if (-not $allSucceeded) {
               $handoffExternalId
             }
+            elseif ($mode -ceq "candidate") {
+              "candidate-v3:$repository`:$pullNumber`:$baseSha`:$targetSha`:$receiptSetSha"
+            }
+            else {
+              "control-plane-v2:$pullNumber`:$baseSha`:$targetSha`:$($env:REQUESTED_AUTHORIZATION_SHA256)`:$controlSetSha"
+            }
+            if ($externalId.Length -gt 255) { throw "Candidate/control-plane external_id exceeds the GitHub Checks limit." }
             $conclusion = if ($allSucceeded) { "success" } else { "failure" }
-            $title = if ($allSucceeded) { "Exact candidate is fully verified" } else { "Exact candidate verification failed" }
-            $summary = "$resultText. exact_head=$targetSha; candidate_receipt=$candidateReceiptSha; aggregate_receipt=$aggregateReceiptSha; aggregate_canonical=$aggregateCanonicalSha; artifact=$artifactDigest."
+            $title = if ($allSucceeded -and $mode -ceq "control-plane") {
+              "Exact map verifier update is certified for human merge"
+            }
+            elseif ($allSucceeded) { "Exact candidate is fully verified" }
+            else { "Exact candidate verification failed" }
+            $summary = "$resultText. mode=$mode; exact_head=$targetSha; authorization=$($env:REQUESTED_AUTHORIZATION_SHA256); candidate_receipt=$candidateReceiptSha; aggregate_receipt=$aggregateReceiptSha; map_receipt=$mapReceiptSha; receipt_set=$receiptSetSha; control_set=$controlSetSha; aggregate_canonical=$aggregateCanonicalSha; artifact=$artifactDigest."
             Invoke-GitHubApi -Method PATCH -Path "/repos/$repository/check-runs/$checkRunId" -Body @{
               external_id = $externalId
               details_url = $detailsUrl
@@ -1215,17 +1675,18 @@ jobs:
           }
           else {
             $externalId = if ($allSucceeded) {
-              "main-lkg-v2:$targetSha`:$candidateReceiptSha`:$aggregateReceiptSha"
+              "main-lkg-v3:$targetSha`:$receiptSetSha"
             }
             else {
-              "main-lkg-v2:$targetSha`:failed`:$env:GITHUB_RUN_ID"
+              "main-lkg-v3:$targetSha`:failed`:$env:GITHUB_RUN_ID"
             }
+            if ($externalId.Length -gt 255) { throw "Main external_id exceeds the GitHub Checks limit." }
             $conclusion = if ($allSucceeded) { "success" } else { "failure" }
             $title = if ($allSucceeded) { "Exact main LKG is fully verified" } else { "Exact main verification failed" }
-            $summary = "$resultText. exact_main=$targetSha; candidate_receipt=$candidateReceiptSha; aggregate_receipt=$aggregateReceiptSha; aggregate_canonical=$aggregateCanonicalSha; artifact=$artifactDigest."
+            $summary = "$resultText. exact_main=$targetSha; candidate_receipt=$candidateReceiptSha; aggregate_receipt=$aggregateReceiptSha; map_receipt=$mapReceiptSha; receipt_set=$receiptSetSha; aggregate_canonical=$aggregateCanonicalSha; artifact=$artifactDigest."
             $encoded = [Uri]::EscapeDataString($requiredCheck)
             $existingResponse = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$targetSha/check-runs?check_name=$encoded&filter=all&per_page=100"
-            $mainPattern = "^main-lkg-v2:$($targetSha):(?:[0-9a-f]{64}:[0-9a-f]{64}|failed:[0-9]+)$"
+            $mainPattern = "^main-lkg-v3:$($targetSha):(?:[0-9a-f]{64}|failed:[0-9]+)$"
             $existing = @(
               $existingResponse.check_runs |
                 Where-Object {
@@ -1275,6 +1736,8 @@ jobs:
           "check-run-id=$checkRunId" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "candidate-receipt-sha256=$candidateReceiptSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "aggregate-receipt-sha256=$aggregateReceiptSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "map-receipt-sha256=$mapReceiptSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "receipt-set-sha256=$receiptSetSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "external-id=$externalId" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   dispatch-completion:
@@ -1296,8 +1759,7 @@ jobs:
           BASE_SHA: ${{ needs.publish-attestation.outputs.base-sha }}
           PR_NUMBER: ${{ needs.publish-attestation.outputs.pr-number }}
           CHECK_RUN_ID: ${{ needs.publish-attestation.outputs.check-run-id }}
-          CANDIDATE_RECEIPT_SHA256: ${{ needs.publish-attestation.outputs.candidate-receipt-sha256 }}
-          AGGREGATE_RECEIPT_SHA256: ${{ needs.publish-attestation.outputs.aggregate-receipt-sha256 }}
+          RECEIPT_SET_SHA256: ${{ needs.publish-attestation.outputs.receipt-set-sha256 }}
           EXTERNAL_ID: ${{ needs.publish-attestation.outputs.external-id }}
           EXPECTED_ATTESTER_APP_ID: ${{ vars.INTEGRATION_ATTESTER_APP_ID }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -1307,7 +1769,7 @@ jobs:
           if ($env:TARGET_SHA -cnotmatch '^[0-9a-f]{40}$' -or $env:BASE_SHA -cnotmatch '^[0-9a-f]{40}$') {
             throw "Completion dispatch received a malformed exact SHA."
           }
-          if ($env:CANDIDATE_RECEIPT_SHA256 -cnotmatch '^[0-9a-f]{64}$' -or $env:AGGREGATE_RECEIPT_SHA256 -cnotmatch '^[0-9a-f]{64}$') {
+          if ($env:RECEIPT_SET_SHA256 -cnotmatch '^[0-9a-f]{64}$') {
             throw "Completion dispatch received a malformed attested receipt digest."
           }
           $pullNumber = 0
@@ -1342,8 +1804,7 @@ jobs:
               base_sha = $env:BASE_SHA
               candidate_sha = $env:TARGET_SHA
               check_run_id = $checkRunId
-              candidate_receipt_sha256 = $env:CANDIDATE_RECEIPT_SHA256
-              aggregate_receipt_sha256 = $env:AGGREGATE_RECEIPT_SHA256
+              receipt_set_sha256 = $env:RECEIPT_SET_SHA256
             }
           } | ConvertTo-Json -Depth 8 -Compress
           Invoke-RestMethod -Method POST -Uri "https://api.github.com/repos/$repository/dispatches" -Headers $headers -ContentType "application/json" -Body $body | Out-Null

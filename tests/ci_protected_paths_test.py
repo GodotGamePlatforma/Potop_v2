@@ -278,6 +278,61 @@ class DiffAdmissionTest(unittest.TestCase):
             ),
         )
 
+    def test_map_maintenance_accepts_only_the_three_exact_verifier_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repository = Path(temporary_directory) / "candidate"
+            repository.mkdir()
+            self._git(repository, "init")
+            self._git(repository, "config", "core.autocrlf", "false")
+            for relative_path in sorted(CI_PROTECTED_PATHS.MAP_MAINTENANCE_EXACT_PATHS):
+                target = repository / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"base {relative_path}\n", encoding="utf-8")
+            base = self._commit(repository, "base")
+
+            builder = repository / "underwater_map_workbench" / "tools" / "build_underwater_map.py"
+            builder.write_text("print('authorized')\n", encoding="utf-8")
+            authorized_head = self._commit(repository, "authorized maintenance")
+            result = CI_PROTECTED_PATHS.validate_map_maintenance_diff(
+                repository, base, authorized_head
+            )
+            self.assertEqual(result["protected_path_count"], 1)
+            self.assertEqual(result["path_count"], 1)
+
+            runtime = repository / "underwater_map_workbench" / "runtime" / "host.gd"
+            runtime.parent.mkdir(parents=True, exist_ok=True)
+            runtime.write_text("extends Node\n", encoding="utf-8")
+            runtime_head = self._commit(repository, "forbidden runtime payload")
+            with self.assertRaisesRegex(
+                CI_PROTECTED_PATHS.ProtectedPathError,
+                "outside its exact verifier-only lane",
+            ):
+                CI_PROTECTED_PATHS.validate_map_maintenance_diff(
+                    repository, base, runtime_head
+                )
+
+            workflow = repository / ".github" / "workflows" / "evil.yml"
+            workflow.parent.mkdir(parents=True, exist_ok=True)
+            workflow.write_text("name: forbidden\n", encoding="utf-8")
+            forbidden_head = self._commit(repository, "forbidden maintenance")
+            with self.assertRaisesRegex(
+                CI_PROTECTED_PATHS.ProtectedPathError,
+                "outside its exact verifier-only lane",
+            ):
+                CI_PROTECTED_PATHS.validate_map_maintenance_diff(
+                    repository, runtime_head, forbidden_head
+                )
+
+            runtime.write_text("extends Node\n# no protected change\n", encoding="utf-8")
+            no_protected_head = self._commit(repository, "unprotected only")
+            with self.assertRaisesRegex(
+                CI_PROTECTED_PATHS.ProtectedPathError,
+                "at least one protected",
+            ):
+                CI_PROTECTED_PATHS.validate_map_maintenance_diff(
+                    repository, forbidden_head, no_protected_head
+                )
+
 
 class CommandLineTest(unittest.TestCase):
     def test_explicit_path_and_name_status_file_commands(self) -> None:

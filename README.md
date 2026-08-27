@@ -140,11 +140,25 @@ git rev-parse HEAD
 
 Handoff podaje exact SHA i receipty. Po jego przekazaniu nie wykonuj rebase ani force-pusha tej rewizji; poprawka jest nowym commitem i nowym receiptem. Cudzą zależność pobieraj po `fetch` z exact SHA albo stacked PR, nigdy z live worktree i nigdy z ruchomego tipa gałęzi.
 
-GitHub Actions rozdziela szybką informację zwrotną od pełnej bramki. `.github/workflows/agent-validation.yml` uruchamia lekki, read-only kontrakt po pushu `codex/*`; cel 30 sekund dotyczy tej warstwy, nie pełnego przebiegu Godota. `.github/workflows/agent-integration.yml` przyjmuje immutable base/head, tworzy centralny plan Git LFS i uruchamia równolegle cztery osobne Windows VM headless oraz jedną natywną. Każdy target powstaje w świeżej kopii importowanego seedu, ma prywatne `.godot`, `user://`, TEMP/TMP i porty, a wynik wraca jako receipt v2. Agregator pobiera plan i dokładnie pięć rezultatów po artifact ID oraz sprawdza digest i run ID; dopiero komplet terminalnych PASS może opublikować jedyny check `integration-green`.
+GitHub Actions rozdziela szybką informację zwrotną od pełnej bramki. `.github/workflows/agent-validation.yml` uruchamia lekki, read-only kontrakt po pushu `codex/*`; cel 30 sekund dotyczy tej warstwy, nie pełnego przebiegu Godota. `.github/workflows/agent-integration.yml` przyjmuje immutable base/head, tworzy centralny plan Git LFS i uruchamia równolegle cztery osobne Windows VM headless, jedną natywną oraz zaufany, niedestrukcyjny check authority Mapy. Każdy target powstaje w świeżej kopii importowanego seedu, ma prywatne `.godot`, `user://`, TEMP/TMP i porty, a wynik wraca jako receipt v2. Agregator pobiera plan, dokładnie pięć receiptów shardów oraz osobny mapowy receipt z logiem po exact artifact ID, a następnie sprawdza digest, run ID i zgodność z tym samym kandydatem oraz planem. Dopiero komplet terminalnych PASS może opublikować jedyny check `integration-green`; jego external ID v3 zawiera digest kanonicznego receipt-setu, który hashuje w ustalonej kolejności SHA-256 candidate receipt, pełnego agregatu Godota i mapowego receiptu.
 
 Shardy nie mają sekretów ani prawa zapisu repozytorium. Proces Godota dostaje oczyszczone środowisko, a zaufany rodzic przechwytuje stdout/stderr, domyślnie oznacza wynik jako FAIL i wymaga pojedynczego completion record. To skutecznie rozdziela współpracujących agentów i przypadkowe zapisy, ale nie jest sandboxem na złośliwy kod działający jako konto runnera; taki model wymaga restricted SID/DACL albo dodatkowej guest VM.
 
 Publiczne repo ma aktywny GitHub ruleset wymagający PR do `main`, rozwiązania wątków review oraz blokujący deletion i non-fast-forward bez bypassu. `AUTO_INTEGRATOR_ENABLED` pozostaje wyłączone. Włącz je dopiero po opublikowaniu workflow na `main`, pierwszym zielonym exact-main runie, konfiguracji GitHub App/environment oraz strict rulesetu wymagającego dokładnie jednego `integration-green`. Do tego czasu jeden integrator kolejkuje i scala kandydatów sekwencyjnie; lokalne assignment/candidate/run digesty nie są dowodem zdalnego status checku.
+
+GitHub App attestera instaluj wyłącznie w tym repozytorium z uprawnieniami Checks R/W i Commit statuses R/W; token workflow jest dodatkowo zawężany do `checks:write`. Repozytorium wymaga variables `INTEGRATION_ATTESTER_CLIENT_ID` i `INTEGRATION_ATTESTER_APP_ID`. Ten sam sekret `INTEGRATION_ATTESTER_PRIVATE_KEY` zapisz osobno w environments `integration-attester` i `control-plane-maintenance`; nie zapisuj go jako sekret shardów. Environment maintenance ma dokładnie jednego reviewera — właściciela repo — z jawnym dopuszczeniem self-review, ponieważ repo ma jednego maintainera, oraz wyłączony administracyjny bypass. To jest świadomy jednoosobowy trust, nie dwuosobowy review.
+
+Zwykły PR nie może zmieniać chronionego buildera Mapy ani jego dwóch testów wykonywalnych. Taka rzadka zmiana jest dwufazowa: pierwszy PR zawiera od jednego do trzech plików wyłącznie z listy `underwater_map_workbench/{tools/build_underwater_map.py,tests/portal_backdrop_clearance_test.py,tests/underwater_map_smoke_test.gd}`, ma label `control-plane-reviewed` i zewnętrzny bundle przeglądu. Uruchom z exact `main`:
+
+```powershell
+gh workflow run "Map control-plane maintenance authorization" --ref main `
+  -f pr_number=<PR> `
+  -f base_sha=<exact-main-SHA> `
+  -f candidate_sha=<exact-PR-head-SHA> `
+  -f evidence_sha256=<SHA-256-bundle-przegladu>
+```
+
+Po ręcznej akceptacji environment workflow certyfikuje kandydata tym samym `integration-green`, lecz nigdy go nie scala. Właściciel scala PR ręcznie; handler `pull_request: closed` sprawdza najnowszą exact rodzinę `PR/base/head/authorization`, zamkniętą listę ścieżek i ancestry, po czym automatycznie uruchamia `verify-integrated-main`. Dopiero zielony exact-main audyt pozwala utworzyć osobny zwykły PR z runtime, manifestem, sceną, generated albo dokumentacją Mapy. Pozostawiony `queued` jest redispatchowany, a nieudany dispatch kończy ten sam check jako failure.
 
 ## Mapa podwodna
 

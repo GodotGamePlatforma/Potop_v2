@@ -157,7 +157,7 @@ jobs:
             param([string]$BaseSha)
             $encoded = [Uri]::EscapeDataString($requiredCheck)
             $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$BaseSha/check-runs?check_name=$encoded&filter=all&per_page=100"
-            $pattern = "^main-lkg-v2:$($BaseSha):[0-9a-f]{64}:[0-9a-f]{64}$"
+            $pattern = "^main-lkg-v3:$($BaseSha):[0-9a-f]{64}$"
             $matching = @(
               $response.check_runs |
                 Where-Object {
@@ -256,7 +256,7 @@ jobs:
           }
 
           function Send-CompletionDispatch {
-            param([long]$CheckRunId, [string]$CandidateReceiptSha, [string]$AggregateReceiptSha)
+            param([long]$CheckRunId, [string]$ReceiptSetSha)
             Invoke-GitHubApi -Method POST -Path "/repos/$repository/dispatches" -Body @{
               event_type = "complete-agent-handoff"
               client_payload = @{
@@ -264,8 +264,7 @@ jobs:
                 base_sha = $env:BASE_SHA
                 candidate_sha = $env:CANDIDATE_SHA
                 check_run_id = $CheckRunId
-                candidate_receipt_sha256 = $CandidateReceiptSha
-                aggregate_receipt_sha256 = $AggregateReceiptSha
+                receipt_set_sha256 = $ReceiptSetSha
               }
             } | Out-Null
           }
@@ -318,7 +317,7 @@ jobs:
 
           $encoded = [Uri]::EscapeDataString($requiredCheck)
           $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$($env:CANDIDATE_SHA)/check-runs?check_name=$encoded&filter=all&per_page=100"
-          $pattern = "^candidate-v2:$([regex]::Escape($repository)):$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA):([0-9a-f]{64}):([0-9a-f]{64})$"
+          $pattern = "^candidate-v3:$([regex]::Escape($repository)):$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA):([0-9a-f]{64})$"
           $handoffId = "handoff-v2:$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA)"
           $decision = Get-CandidateFamilyDecision `
             -CheckRuns @($response.check_runs) `
@@ -328,7 +327,7 @@ jobs:
             -ExpectedAppId $attesterAppId
           if ($decision.action -ceq "complete") {
             [void]($decision.check.external_id -cmatch $pattern)
-            Send-CompletionDispatch -CheckRunId ([long]$decision.check.id) -CandidateReceiptSha $Matches[1] -AggregateReceiptSha $Matches[2]
+            Send-CompletionDispatch -CheckRunId ([long]$decision.check.id) -ReceiptSetSha $Matches[1]
             Write-Output "Re-dispatched completion for the newest exact attestation."
             exit 0
           }
@@ -383,8 +382,7 @@ jobs:
           BASE_SHA: ${{ github.event.client_payload.base_sha }}
           CANDIDATE_SHA: ${{ github.event.client_payload.candidate_sha }}
           CHECK_RUN_ID: ${{ github.event.client_payload.check_run_id }}
-          CANDIDATE_RECEIPT_SHA256: ${{ github.event.client_payload.candidate_receipt_sha256 }}
-          AGGREGATE_RECEIPT_SHA256: ${{ github.event.client_payload.aggregate_receipt_sha256 }}
+          RECEIPT_SET_SHA256: ${{ github.event.client_payload.receipt_set_sha256 }}
           EXPECTED_ATTESTER_APP_ID: ${{ vars.INTEGRATION_ATTESTER_APP_ID }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -471,7 +469,7 @@ jobs:
             param([string]$BaseSha)
             $encoded = [Uri]::EscapeDataString($requiredCheck)
             $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$BaseSha/check-runs?check_name=$encoded&filter=all&per_page=100"
-            $pattern = "^main-lkg-v2:$($BaseSha):[0-9a-f]{64}:[0-9a-f]{64}$"
+            $pattern = "^main-lkg-v3:$($BaseSha):[0-9a-f]{64}$"
             $matching = @(
               $response.check_runs |
                 Where-Object {
@@ -554,12 +552,13 @@ jobs:
           }
           Assert-CommitSha -Name "base_sha" -Value $env:BASE_SHA
           Assert-CommitSha -Name "candidate_sha" -Value $env:CANDIDATE_SHA
-          if ($env:CANDIDATE_RECEIPT_SHA256 -cnotmatch '^[0-9a-f]{64}$' -or $env:AGGREGATE_RECEIPT_SHA256 -cnotmatch '^[0-9a-f]{64}$') {
+          if ($env:RECEIPT_SET_SHA256 -cnotmatch '^[0-9a-f]{64}$') {
             throw "Completion contains malformed fresh receipt hashes."
           }
 
-          $externalId = "candidate-v2:$($repository):$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA):$($env:CANDIDATE_RECEIPT_SHA256):$($env:AGGREGATE_RECEIPT_SHA256)"
-          $candidatePattern = "^candidate-v2:$([regex]::Escape($repository)):$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA):[0-9a-f]{64}:[0-9a-f]{64}$"
+          $externalId = "candidate-v3:$($repository):$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA):$($env:RECEIPT_SET_SHA256)"
+          $candidatePattern = "^candidate-v3:$([regex]::Escape($repository)):$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA):[0-9a-f]{64}$"
+          if ($externalId.Length -gt 255) { throw "Candidate external_id exceeds the GitHub Checks limit." }
           $handoffId = "handoff-v2:$($pullNumber):$($env:BASE_SHA):$($env:CANDIDATE_SHA)"
           $encoded = [Uri]::EscapeDataString($requiredCheck)
           $response = Invoke-GitHubApi -Method GET -Path "/repos/$repository/commits/$($env:CANDIDATE_SHA)/check-runs?check_name=$encoded&filter=all&per_page=100"

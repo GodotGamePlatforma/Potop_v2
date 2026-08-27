@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -45,10 +46,34 @@ PROTECTED_EXACT_PATHS = frozenset(
         "underwater_map_workbench/tools/build_underwater_map.py",
     )
 )
+MAP_MAINTENANCE_EXACT_PATHS = frozenset(
+    (
+        "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+        "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
+        "underwater_map_workbench/tools/build_underwater_map.py",
+    )
+)
+# A maintenance PR is the verifier-only half of a two-phase trust transition.
+# It must not smuggle map source, runtime, authority outputs, or generated data
+# alongside the three verifier changes.
+MAP_MAINTENANCE_ALLOWED_PATHS = MAP_MAINTENANCE_EXACT_PATHS
 
 
 class ProtectedPathError(RuntimeError):
     """Raised when path input or a candidate diff cannot be trusted."""
+
+
+def _git_executable() -> str:
+    requested = os.environ.get("CI_TRUSTED_GIT", "")
+    if not requested:
+        return "git"
+    path = Path(requested)
+    if not path.is_absolute() or path.is_symlink():
+        raise ProtectedPathError("CI_TRUSTED_GIT must name one absolute non-symlink file.")
+    resolved = path.resolve(strict=True)
+    if not resolved.is_file():
+        raise ProtectedPathError("CI_TRUSTED_GIT must name one regular file.")
+    return str(resolved)
 
 
 def normalize_repo_path(path: str | Path) -> str:
@@ -170,7 +195,7 @@ def _git_bytes(repository: Path, *arguments: str) -> bytes:
     try:
         process = subprocess.run(
             [
-                "git",
+                _git_executable(),
                 "-c",
                 f"safe.directory={repository}",
                 "-c",
@@ -268,6 +293,48 @@ def validate_diff(
     }
 
 
+def validate_map_maintenance_diff(
+    repository: str | Path,
+    base: str,
+    head: str,
+) -> dict[str, object]:
+    root = _repository_root(repository)
+    base_commit = _resolve_exact_commit(root, base, "Base")
+    head_commit = _resolve_exact_commit(root, head, "Head")
+    payload = _git_bytes(
+        root,
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        base_commit,
+        head_commit,
+        "--",
+    )
+    paths = parse_name_only_z(payload)
+    protected = tuple(sorted({path for path in paths if is_protected_path(path)}))
+    if not protected:
+        raise ProtectedPathError(
+            "Map maintenance requires at least one protected map verifier path."
+        )
+    unauthorized = tuple(
+        path for path in paths if path.lower() not in MAP_MAINTENANCE_ALLOWED_PATHS
+    )
+    if unauthorized:
+        raise ProtectedPathError(
+            "Map maintenance cannot authorize paths outside its exact verifier-only lane: "
+            + ", ".join(unauthorized)
+        )
+    return {
+        "status": "PASS",
+        "path_count": len(paths),
+        "protected_path_count": len(protected),
+        "protected_paths": protected,
+        "base": base_commit,
+        "head": head_commit,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Reject automatic integration of CI control-plane changes."
@@ -278,6 +345,11 @@ def _parser() -> argparse.ArgumentParser:
     validate_diff_parser.add_argument("--repo", required=True)
     validate_diff_parser.add_argument("--base", required=True)
     validate_diff_parser.add_argument("--head", required=True)
+
+    validate_map_parser = commands.add_parser("validate-map-maintenance-diff")
+    validate_map_parser.add_argument("--repo", required=True)
+    validate_map_parser.add_argument("--base", required=True)
+    validate_map_parser.add_argument("--head", required=True)
 
     validate_status_parser = commands.add_parser(
         "validate-name-status",
@@ -295,6 +367,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if arguments.command == "validate-diff":
             result = validate_diff(arguments.repo, arguments.base, arguments.head)
+        elif arguments.command == "validate-map-maintenance-diff":
+            result = validate_map_maintenance_diff(
+                arguments.repo,
+                arguments.base,
+                arguments.head,
+            )
         elif arguments.command in {"validate-name-status", "validate-name-status-file"}:
             source = Path(arguments.input).expanduser().resolve()
             try:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -26,6 +27,19 @@ GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 class BranchOwnerError(RuntimeError):
     """Raised when branch ownership or its baseline cannot be proven."""
+
+
+def _git_executable() -> str:
+    requested = os.environ.get("CI_TRUSTED_GIT", "")
+    if not requested:
+        return "git"
+    path = Path(requested)
+    if not path.is_absolute() or path.is_symlink():
+        raise BranchOwnerError("CI_TRUSTED_GIT must name one absolute non-symlink file.")
+    resolved = path.resolve(strict=True)
+    if not resolved.is_file():
+        raise BranchOwnerError("CI_TRUSTED_GIT must name one regular file.")
+    return str(resolved)
 
 
 def resolve_owner(branch: str) -> str:
@@ -45,7 +59,7 @@ def _git(repository: Path, *arguments: str) -> str:
     try:
         process = subprocess.run(
             [
-                "git",
+                _git_executable(),
                 "-c",
                 f"safe.directory={repository}",
                 "-C",

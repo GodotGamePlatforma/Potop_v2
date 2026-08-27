@@ -111,8 +111,20 @@ def _run_git(
     input_data: bytes | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     boundary = _find_git_boundary(repository)
+    requested_git = os.environ.get("CI_TRUSTED_GIT", "")
+    git_executable = "git"
+    if requested_git:
+        requested_path = Path(requested_git)
+        if not requested_path.is_absolute() or requested_path.is_symlink():
+            raise ContractError(
+                "CI_TRUSTED_GIT must name one absolute non-symlink file."
+            )
+        resolved_git = requested_path.resolve(strict=True)
+        if not resolved_git.is_file():
+            raise ContractError("CI_TRUSTED_GIT must name one regular file.")
+        git_executable = str(resolved_git)
     command = [
-        "git",
+        git_executable,
         "-c",
         f"safe.directory={boundary}",
         "-C",

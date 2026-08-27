@@ -197,6 +197,7 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
             "infra-contracts",
             "prepare-godot",
             "prepare-lfs-plan",
+            "map-authority-check",
             "shard",
             "aggregate-attestation",
         ):
@@ -205,9 +206,10 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
     def test_only_one_custom_check_context_is_exposed(self) -> None:
         integration = _workflow("agent-integration.yml")
         controller = _workflow("agent-auto-integrator.yml")
-        combined = integration + "\n" + controller
+        maintenance = _workflow("map-control-plane-maintenance.yml")
+        combined = integration + "\n" + controller + "\n" + maintenance
 
-        for workflow in (integration, controller):
+        for workflow in (integration, controller, maintenance):
             for job_id in _job_ids(workflow):
                 self.assertNotEqual("integration-green", job_id)
                 self.assertNotEqual("integration-green", _job_name(_job(workflow, job_id)))
@@ -220,10 +222,12 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         self.assertNotIn("Trusted main audit", combined)
 
         admit = _job(controller, "admit-handoff")
+        authorize = _job(maintenance, "authorize")
         publisher = _job(integration, "publish-attestation")
         dispatcher = _job(integration, "dispatch-completion")
         merge = _job(controller, "merge-handoff")
         self.assertEqual(1, admit.count("New-AttesterCheckRun -Body"))
+        self.assertEqual(1, authorize.count('-Uri "https://api.github.com/repos/$repository/check-runs"'))
         self.assertEqual(
             1,
             len(re.findall(r'-Method POST -Path "[^"\n]*/check-runs"', publisher)),
@@ -242,6 +246,98 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         self.assertIn("$checkRunId", publisher)
         self.assertIn("$checkRunId", dispatcher)
         self.assertIn("[long]$check.app.id -ne $attesterAppId", dispatcher)
+
+    def test_map_control_plane_maintenance_is_manual_narrow_and_never_automerge(self) -> None:
+        workflow = _workflow("map-control-plane-maintenance.yml")
+        integration = _workflow("agent-integration.yml")
+        controller = _workflow("agent-auto-integrator.yml")
+        inspect = _job(workflow, "inspect")
+        authorize = _job(workflow, "authorize")
+        post_merge = _job(workflow, "audit-merged-main")
+
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("pull_request:", workflow)
+        self.assertIn("- closed", workflow)
+        self.assertNotIn("authorize-map-control-plane-maintenance", workflow)
+        self.assertRegex(workflow, r"(?m)^permissions:\s*\{\}\s*$")
+        self.assertNotIn("\n  request:\n", workflow)
+        self.assertIn("ref: ${{ inputs.base_sha }}", inspect)
+        self.assertIn("ref: ${{ inputs.candidate_sha }}", inspect)
+        self.assertGreaterEqual(inspect.count("persist-credentials: false"), 2)
+        self.assertNotIn('GITHUB_ACTOR -cne "github-actions[bot]"', inspect)
+        self.assertIn("validate-map-maintenance-diff", inspect)
+        self.assertIn("tools/ci_branch_owner.py", inspect)
+        self.assertIn("tools/ci_python_entry.py", inspect)
+        self.assertIn("--cwd $neutralCwd", inspect)
+        self.assertIn("--path-executable $trustedGit", inspect)
+        self.assertIn("CI_TRUSTED_GIT", inspect)
+        self.assertIn("control-plane-reviewed", inspect)
+        self.assertIn("map-control-plane-authorization-v1", inspect)
+
+        self.assertIn("environment: control-plane-maintenance", authorize)
+        self.assertIn("actions: read", authorize)
+        self.assertIn(self.ATTESTER_ACTION, authorize)
+        self.assertIn("permission-checks: write", authorize)
+        self.assertIn("required_reviewers", authorize)
+        self.assertIn("prevent_self_review", authorize)
+        self.assertIn("repositoryOwner", authorize)
+        self.assertIn("permit an explicit self-review", authorize)
+        self.assertIn('event_type = "verify-map-control-plane-candidate"', authorize)
+        self.assertIn('name = $requiredCheck', authorize)
+        self.assertIn('$family[0].status -ceq "queued"', authorize)
+        self.assertIn('status = "in_progress"', authorize)
+        self.assertLess(
+            authorize.index('event_type = "verify-map-control-plane-candidate"'),
+            authorize.index('status = "in_progress"'),
+        )
+        self.assertNotIn("actions/checkout", authorize)
+        self.assertNotIn("git ", authorize)
+        self.assertNotRegex(authorize, r"/pulls/[^\r\n]*/merge")
+        self.assertNotIn("-Method PUT", authorize)
+        self.assertNotIn("merge_method", authorize)
+        self.assertNotIn("AUTO_INTEGRATOR_ENABLED", workflow)
+        self.assertNotIn("complete-agent-handoff", workflow)
+        self.assertNotIn("verify-map-control-plane-candidate", controller)
+        self.assertIn("github.event.pull_request.merged == true", post_merge)
+        self.assertIn("control-plane-v2:", post_merge)
+        self.assertIn("control-plane-handoff-v1:", post_merge)
+        self.assertIn("one to three unique, non-renamed files", post_merge)
+        self.assertIn("Sort-Object -Property @{ Expression = { [long]$_.id } } -Descending", post_merge)
+        self.assertIn('$family[0].status -cne "completed"', post_merge)
+        self.assertIn('event_type = "verify-integrated-main"', post_merge)
+        self.assertIn("merge_base_commit.sha", post_merge)
+        self.assertNotRegex(post_merge, r"/pulls/[^\r\n]*/merge")
+        self.assertNotIn("merge_method", post_merge)
+
+        preflight = _job(integration, "trust-preflight")
+        map_check = _job(integration, "map-authority-check")
+        aggregate = _job(integration, "aggregate-attestation")
+        publisher = _job(integration, "publish-attestation")
+        dispatcher = _job(integration, "dispatch-completion")
+        self.assertIn("- verify-map-control-plane-candidate", integration)
+        self.assertIn("validate-map-maintenance-diff", preflight)
+        self.assertIn("control-plane-handoff-v1", preflight)
+        self.assertIn("map-control-plane-authorization-v1", preflight)
+        self.assertIn("Authorized map verifier hashes differ", preflight)
+        self.assertIn("authorization-sha256=$authorizationSha", preflight)
+        self.assertIn("AUTHORIZED_BUILDER_SHA256", map_check)
+        self.assertIn("--authorization-sha256 $env:AUTHORIZATION_SHA256", map_check)
+        self.assertIn("--authorization-sha256 $env:AUTHORIZATION_SHA256", aggregate)
+        self.assertIn("control-plane-receipt-set-v1", publisher)
+        self.assertIn("control-plane-v2:$pullNumber", publisher)
+        self.assertIn('needs.publish-attestation.outputs.mode == \'candidate\'', dispatcher)
+
+        exact_paths = _literal_collection(
+            PROTECTED_PATH_HELPER, "MAP_MAINTENANCE_EXACT_PATHS"
+        )
+        self.assertEqual(
+            {
+                "underwater_map_workbench/tools/build_underwater_map.py",
+                "underwater_map_workbench/tests/portal_backdrop_clearance_test.py",
+                "underwater_map_workbench/tests/underwater_map_smoke_test.gd",
+            },
+            exact_paths,
+        )
 
     def test_main_audit_has_one_automatic_trigger_and_reuses_its_check(self) -> None:
         integration = _workflow("agent-integration.yml")
@@ -276,8 +372,8 @@ class AgentIntegrationWorkflowTest(unittest.TestCase):
         powershell = shutil.which("pwsh") or shutil.which("powershell")
         self.assertIsNotNone(powershell, "PowerShell is required for workflow policy tests")
         base_sha = "1" * 40
-        success_external = f"main-lkg-v2:{base_sha}:{'2' * 64}:{'3' * 64}"
-        failed_external = f"main-lkg-v2:{base_sha}:failed:11"
+        success_external = f"main-lkg-v3:{base_sha}:{'2' * 64}"
+        failed_external = f"main-lkg-v3:{base_sha}:failed:11"
 
         for function in functions:
             script = f'''\
@@ -322,12 +418,12 @@ if (-not $rejected) {{ throw "Older success was accepted over a newer failure." 
         base_sha = "1" * 40
         candidate_sha = "2" * 40
         pattern = (
-            f"^candidate-v2:owner/repository:7:{base_sha}:{candidate_sha}:"
-            "([0-9a-f]{64}):([0-9a-f]{64})$"
+            f"^candidate-v3:owner/repository:7:{base_sha}:{candidate_sha}:"
+            "([0-9a-f]{64})$"
         )
         success_external = (
-            f"candidate-v2:owner/repository:7:{base_sha}:{candidate_sha}:"
-            f"{'3' * 64}:{'4' * 64}"
+            f"candidate-v3:owner/repository:7:{base_sha}:{candidate_sha}:"
+            f"{'3' * 64}"
         )
         handoff_external = f"handoff-v2:7:{base_sha}:{candidate_sha}"
         script = f'''\
@@ -365,12 +461,12 @@ if ($decision.action -cne "queue" -or [long]$decision.check.id -ne 11L) {{
         base_sha = "1" * 40
         candidate_sha = "2" * 40
         pattern = (
-            f"^candidate-v2:owner/repository:7:{base_sha}:{candidate_sha}:"
-            "[0-9a-f]{64}:[0-9a-f]{64}$"
+            f"^candidate-v3:owner/repository:7:{base_sha}:{candidate_sha}:"
+            "[0-9a-f]{64}$"
         )
         success_external = (
-            f"candidate-v2:owner/repository:7:{base_sha}:{candidate_sha}:"
-            f"{'3' * 64}:{'4' * 64}"
+            f"candidate-v3:owner/repository:7:{base_sha}:{candidate_sha}:"
+            f"{'3' * 64}"
         )
         handoff_external = f"handoff-v2:7:{base_sha}:{candidate_sha}"
         script = f'''\
@@ -395,7 +491,7 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_v2_external_ids_use_only_fresh_ci_receipt_hashes(self) -> None:
+    def test_v3_external_ids_bind_candidate_aggregate_and_map_receipts(self) -> None:
         integration = _workflow("agent-integration.yml")
         controller = _workflow("agent-auto-integrator.yml")
         combined = integration + "\n" + controller
@@ -412,9 +508,17 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         self.assertNotIn("FULL_RUN_RECEIPT_SHA256", admit)
         self.assertIn("Fresh receipt hashes are created only by CI", admit)
 
-        self.assertIn("Hash the fresh verified receipt pair", aggregate)
+        self.assertIn("Hash the fresh verified receipt set", aggregate)
         self.assertIn("candidate-receipt-sha256=$candidateSha", aggregate)
         self.assertIn("aggregate-receipt-sha256=$aggregateSha", aggregate)
+        self.assertIn("map-receipt-sha256=$mapSha", aggregate)
+        self.assertIn("integration-receipt-set-v1", aggregate)
+        self.assertIn("candidate=$candidateSha", aggregate)
+        self.assertIn("aggregate=$aggregateSha", aggregate)
+        self.assertIn("map=$mapSha", aggregate)
+        self.assertIn("receipt-set-sha256=$receiptSetSha", aggregate)
+        self.assertIn("$aggregateCanonicalSha = $Matches[1]", aggregate)
+        self.assertIn("aggregate-canonical-sha256=$aggregateCanonicalSha", aggregate)
         self.assertIn(
             "needs.aggregate-attestation.outputs.candidate-receipt-sha256",
             publisher,
@@ -423,24 +527,55 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
             "needs.aggregate-attestation.outputs.aggregate-receipt-sha256",
             publisher,
         )
+        self.assertIn(
+            "needs.aggregate-attestation.outputs.map-receipt-sha256",
+            publisher,
+        )
+        self.assertIn(
+            "needs.aggregate-attestation.outputs.receipt-set-sha256",
+            publisher,
+        )
+        self.assertIn("$recomputedReceiptSetSha", publisher)
+        self.assertIn("Receipt-set commitment does not match", publisher)
         self.assertRegex(
             publisher,
-            r"candidate-v2:[^\"\r\n]*\$candidateReceiptSha[^\"\r\n]*\$aggregateReceiptSha",
+            r"candidate-v3:[^\"\r\n]*\$receiptSetSha",
         )
         self.assertRegex(
             publisher,
-            r"main-lkg-v2:[^\"\r\n]*\$candidateReceiptSha[^\"\r\n]*\$aggregateReceiptSha",
+            r"main-lkg-v3:[^\"\r\n]*\$receiptSetSha",
         )
         self.assertRegex(
             admit,
-            r"candidate-v2:[^\"\r\n]*\(\[0-9a-f\]\{64\}\):"
-            r"\(\[0-9a-f\]\{64\}\)\$",
+            r"candidate-v3:[^\"\r\n]*\(\[0-9a-f\]\{64\}\)\$",
         )
+        real_max_pr_external_id = (
+            "candidate-v3:Siwy55p/Potop_v2:999999:"
+            + "a" * 40
+            + ":"
+            + "b" * 40
+            + ":"
+            + "c" * 64
+        )
+        self.assertLessEqual(len(real_max_pr_external_id), 255)
+        control_plane_external_id = (
+            "control-plane-v2:999999:"
+            + "a" * 40
+            + ":"
+            + "b" * 40
+            + ":"
+            + "c" * 64
+            + ":"
+            + "d" * 64
+        )
+        self.assertLessEqual(len(control_plane_external_id), 255)
+        self.assertNotRegex(combined, r"(?<!control-plane-)handoff-v1:")
         for obsolete in (
-            "handoff-v1:",
             "candidate-v1:",
             "main-audit-v1:",
             "main-lkg-v1:",
+            "candidate-v2:",
+            "main-lkg-v2:",
         ):
             self.assertNotIn(obsolete, combined)
 
@@ -495,44 +630,72 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         workflow = _workflow("agent-integration.yml")
         infra = _job(workflow, "infra-contracts")
         plan = _job(workflow, "prepare-lfs-plan")
+        map_check = _job(workflow, "map-authority-check")
+        shard = _job(workflow, "shard")
+        aggregate = _job(workflow, "aggregate-attestation")
 
         portal_contract = (
             "underwater_map_workbench/tests/portal_backdrop_clearance_test.py"
         )
         self.assertEqual(1, infra.count(portal_contract))
-        self.assertIn(
-            f'(Join-Path $trustedRoot "{portal_contract}")',
-            infra,
-        )
+        self.assertIn('$portalContractRoot = if ($env:VERIFICATION_MODE -ceq "control-plane")', infra)
+        self.assertIn(f'(Join-Path $portalContractRoot "{portal_contract}")', infra)
 
         trusted_dependencies = (
-            "underwater_map_workbench/tools/build_underwater_map.py",
             "tools/workbench_contract.py",
             "tools/workbench_lock.py",
         )
         dependency_match = re.search(
-            r"(?ms)\$trustedMapFiles\s*=\s*@\((.*?)^\s*\)", plan
+            r"(?ms)\$trustedMapFiles\s*=\s*@\((.*?)^\s*\)", map_check
         )
         self.assertIsNotNone(dependency_match)
         self.assertEqual(
             set(trusted_dependencies),
             set(re.findall(r'"([^"\r\n]+)"', dependency_match.group(1))),
         )
-        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $trustedPath", plan)
-        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $candidatePath", plan)
-        self.assertIn("$candidateSha -cne $trustedSha", plan)
-        self.assertIn("$candidateHead -cne $env:EXPECTED_HEAD_SHA", plan)
-        self.assertEqual(1, len(re.findall(r"build_underwater_map\.py\"\) --check", plan)))
-        self.assertNotRegex(plan, r"build_underwater_map\.py\"\) --build")
-        self.assertIn("Trusted map authority check changed the exact candidate", plan)
-        self.assertLess(
-            plan.index("Verify cache bytes and hydrate exact candidate"),
-            plan.index("Verify exact candidate map with trusted code"),
+        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $trustedPath", map_check)
+        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $candidatePath", map_check)
+        self.assertIn("$candidateSha -cne $trustedSha", map_check)
+        self.assertIn("$candidateBuilderSha -cne $env:AUTHORIZED_BUILDER_SHA256", map_check)
+        self.assertIn('$env:VERIFICATION_MODE -ceq "control-plane"', map_check)
+        self.assertIn("--authorization-sha256 $env:AUTHORIZATION_SHA256", map_check)
+        self.assertIn("$candidateHead -cne $env:EXPECTED_HEAD_SHA", map_check)
+        self.assertIn('(Join-Path $trustedRoot "tools/ci_python_entry.py")', map_check)
+        self.assertIn(
+            '--preload ("workbench_lock=" + (Join-Path $trustedRoot "tools/workbench_lock.py"))',
+            map_check,
         )
-        self.assertLess(
-            plan.index("Verify exact candidate map with trusted code"),
-            plan.index("Create candidate receipt and immutable shard plan"),
+        self.assertIn(
+            '--preload ("workbench_contract=" + (Join-Path $trustedRoot "tools/workbench_contract.py"))',
+            map_check,
         )
+        self.assertIn(
+            '--script $candidateBuilder',
+            map_check,
+        )
+        self.assertIn("-- --check", map_check)
+        self.assertNotRegex(
+            map_check,
+            r"&\s+python\s+-I\s+-B\s+\(Join-Path \$candidateRoot [^\n]*build_underwater_map\.py",
+        )
+        self.assertNotIn("-- --build", map_check)
+        self.assertIn("Trusted map authority check changed the exact candidate", map_check)
+        self.assertIn("tools/ci_map_check_receipt.py", map_check)
+        self.assertIn("map-authority-check.receipt", map_check)
+        self.assertIn("map-check-artifact.outputs.artifact-id", map_check)
+        self.assertIn("map-check-receipt.outputs.map-receipt-sha256", map_check)
+
+        self.assertNotIn("build_underwater_map.py", plan)
+        self.assertIn("- prepare-lfs-plan", map_check)
+        self.assertNotIn("- shard", map_check)
+        self.assertNotIn("- map-authority-check", shard)
+        self.assertIn("- map-authority-check", aggregate)
+        self.assertIn("needs.map-authority-check.outputs.artifact-id", aggregate)
+        self.assertIn("needs.map-authority-check.outputs.artifact-digest", aggregate)
+        self.assertIn("needs.map-authority-check.outputs.map-receipt-sha256", aggregate)
+        self.assertIn("$mapSha -cne $env:EXPECTED_MAP_RECEIPT_SHA256", aggregate)
+        self.assertIn("map-receipt-sha256=$mapSha", aggregate)
+        self.assertIn("tools/ci_map_check_receipt.py", aggregate)
 
     def test_artifacts_are_bound_by_exact_id_digest_and_run(self) -> None:
         workflow = _workflow("agent-integration.yml")
@@ -540,8 +703,8 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         shard = _job(workflow, "shard")
         aggregate = _job(workflow, "aggregate-attestation")
 
-        self.assertEqual(3, workflow.count("actions/download-artifact@"))
-        self.assertEqual(3, workflow.count("artifact-ids:"))
+        self.assertEqual(5, workflow.count("actions/download-artifact@"))
+        self.assertEqual(5, workflow.count("artifact-ids:"))
         self.assertNotRegex(workflow, r"(?m)^\s+(?:pattern|merge-multiple):")
         self.assertIn("plan-artifact-id: ${{ steps.plan-artifact.outputs.artifact-id }}", plan)
         self.assertIn(
@@ -557,6 +720,12 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         self.assertIn("EXPECTED_ARTIFACT_DIGEST", shard)
         self.assertIn("EXPECTED_PLAN_ARTIFACT_ID", aggregate)
         self.assertIn("EXPECTED_PLAN_ARTIFACT_DIGEST", aggregate)
+        self.assertIn("EXPECTED_ARTIFACT_ID", _job(workflow, "map-authority-check"))
+        self.assertIn("EXPECTED_ARTIFACT_DIGEST", _job(workflow, "map-authority-check"))
+        self.assertIn("needs.map-authority-check.outputs.artifact-id", aggregate)
+        self.assertIn("needs.map-authority-check.outputs.artifact-digest", aggregate)
+        self.assertIn("$nameMatches.Count -ne 1", aggregate)
+        self.assertIn("Unique map-check artifact name", aggregate)
         self.assertIn("$expectedNames", aggregate)
         self.assertIn("$matches.Count -ne 1", aggregate)
         self.assertIn("artifact-ids=$([string]::Join(',',", aggregate)
@@ -572,6 +741,7 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
             "infra-contracts",
             "prepare-godot",
             "prepare-lfs-plan",
+            "map-authority-check",
             "shard",
         ):
             self.assertIn(f"- {dependency}", aggregate)
@@ -583,6 +753,7 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
         self.assertIn("canonical_sha256=([0-9a-f]{64})", aggregate)
         self.assertIn("candidate-receipt-sha256", aggregate)
         self.assertIn("aggregate-receipt-sha256", aggregate)
+        self.assertIn("map-receipt-sha256", aggregate)
         self.assertIn("actions/cache/restore@", aggregate)
         self.assertNotIn("git lfs fetch", aggregate)
 
@@ -597,6 +768,7 @@ if ([long]$latest.id -ne 11L) {{ throw "Newest candidate-family check was not se
 
         for job_id in (
             "infra-contracts",
+            "map-authority-check",
             "prepare-lfs-plan",
             "shard",
             "aggregate-attestation",
