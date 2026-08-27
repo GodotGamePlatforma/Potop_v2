@@ -9,8 +9,10 @@ const ActiveSpriteFrames := preload("res://diver_workbench/assets/animation/dive
 const APPROVED_ENVELOPE := Vector2(105.0, 60.0)
 const APPROVED_SPRITE_SCALE := Vector2(0.239, 0.239)
 const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
-const GAMEPLAY_CAMERA_ZOOM := 1.2
-const MINIMUM_READABLE_SCREEN_SIZE := Vector2(100.0, 35.0)
+const MINIMUM_LOCOMOTION_FIT_RATIO := 0.985
+const MAXIMUM_LOCOMOTION_GUARD_OFFSET := 1.75
+const MINIMUM_CUE_FIT_RATIO := 0.95
+const MINIMUM_AUTHORED_FRAME_WORLD_SIZE := Vector2(85.0, 29.5)
 const ANIMATION_SOURCES := {
 	&"idle": "res://diver_workbench/assets/animation/diver_idle_16f.png",
 	&"swim": "res://diver_workbench/assets/animation/diver_swim_16f.png",
@@ -62,7 +64,7 @@ func _test_frame_envelope_contract() -> void:
 	var measured_union := Rect2()
 	var has_union := false
 	var measured_count := 0
-	var minimum_screen_size := Vector2(INF, INF)
+	var minimum_world_size := Vector2(INF, INF)
 	for animation_name: StringName in ANIMATION_SOURCES:
 		var image := Image.new()
 		var image_error := image.load(ProjectSettings.globalize_path(ANIMATION_SOURCES[animation_name]))
@@ -83,8 +85,7 @@ func _test_frame_envelope_contract() -> void:
 			)
 			var expected: Rect2 = DiverFrameEnvelopeScript.bounds_for(animation_name, frame)
 			_check(measured == expected, "%s frame %d alpha bounds should match the validated runtime profile: %s != %s." % [animation_name, frame, measured, expected])
-			var screen_size := measured.size * EnvelopeProfile.authored_sprite_scale * GAMEPLAY_CAMERA_ZOOM
-			minimum_screen_size = minimum_screen_size.min(screen_size)
+			minimum_world_size = minimum_world_size.min(measured.size * EnvelopeProfile.authored_sprite_scale)
 			measured_union = measured if not has_union else measured_union.merge(measured)
 			has_union = true
 			measured_count += 1
@@ -95,8 +96,9 @@ func _test_frame_envelope_contract() -> void:
 	_check(EnvelopeProfile.authored_sprite_scale.is_equal_approx(APPROVED_SPRITE_SCALE), "The active presentation profile should publish the reviewed 0.239 visual scale.")
 	_check(base_world_size.is_equal_approx(Vector2(102.77, 46.605)), "The authored alpha union should retarget to 102.77 x 46.605 world units.")
 	_check(base_world_size.x <= EnvelopeProfile.target_size.x and base_world_size.y <= EnvelopeProfile.target_size.y, "Every authored frame must fit the 105 x 60 visual target before presentation motion.")
-	_check(minimum_screen_size.x >= MINIMUM_READABLE_SCREEN_SIZE.x, "Every locomotion frame should remain at least 100 screen pixels wide at the gameplay camera zoom: %.2f." % minimum_screen_size.x)
-	_check(minimum_screen_size.y >= MINIMUM_READABLE_SCREEN_SIZE.y, "Every locomotion frame should remain at least 35 screen pixels tall at the gameplay camera zoom: %.2f." % minimum_screen_size.y)
+	_check(minimum_world_size.x >= MINIMUM_AUTHORED_FRAME_WORLD_SIZE.x and minimum_world_size.y >= MINIMUM_AUTHORED_FRAME_WORLD_SIZE.y, "Every authored frame must preserve the approved minimum world-space silhouette; measured minimum is %s." % minimum_world_size)
+	var guarded_world_size: Vector2 = measured_union.grow(DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING).size * EnvelopeProfile.authored_sprite_scale
+	_check(guarded_world_size.x <= EnvelopeProfile.target_size.x and guarded_world_size.y <= EnvelopeProfile.target_size.y, "The authored alpha union plus readability-rim padding must fit the 105 x 60 world envelope.")
 
 
 func _test_animation_timing_contract() -> void:
@@ -123,8 +125,8 @@ func _test_animation_timing_contract() -> void:
 			var separation := absf(lower[frame].y - upper[frame].y)
 			minimum_separation = minf(minimum_separation, separation)
 			maximum_separation = maxf(maximum_separation, separation)
-		_check(minimum_separation >= 10.0, "%s must keep both fins visually distinct in every frame." % animation_name)
-		_check(maximum_separation - minimum_separation >= 20.0, "%s must visibly open and close its scissor-kick silhouette." % animation_name)
+		_check(minimum_separation >= 10.0, "%s upper/lower fin sockets must remain separated in every frame." % animation_name)
+		_check(maximum_separation - minimum_separation >= 20.0, "%s upper/lower fin socket separation must vary across the cycle." % animation_name)
 
 
 func _test_pre_ready_quality_bridge() -> void:
@@ -321,8 +323,12 @@ func _test_runtime_visual_envelope(diver: DiverController, sprite: AnimatedSprit
 				var visual_bounds: Rect2 = diver._current_visual_alpha_bounds()
 				var intended_scale: Vector2 = diver._visual_base_scale * diver._visual_pose_scale
 				var intended_position: Vector2 = diver._authored_visual_position(sprite) + diver._visual_pose_offset
-				_check(sprite.scale.is_equal_approx(intended_scale), "%s frame %d should not require dynamic scale correction during ordinary locomotion." % [animation_name, frame])
-				_check(sprite.position.distance_to(intended_position) <= 0.75, "%s frame %d envelope correction should remain a sub-unit positional guard." % [animation_name, frame])
+				var locomotion_fit_ratio := minf(
+					sprite.scale.x / maxf(intended_scale.x, 0.001),
+					sprite.scale.y / maxf(intended_scale.y, 0.001)
+				)
+				_check(locomotion_fit_ratio >= MINIMUM_LOCOMOTION_FIT_RATIO, "%s frame %d rendered-alpha guard must preserve at least %.1f%% of the intended locomotion scale (ratio %.4f)." % [animation_name, frame, MINIMUM_LOCOMOTION_FIT_RATIO * 100.0, locomotion_fit_ratio])
+				_check(sprite.position.distance_to(intended_position) <= MAXIMUM_LOCOMOTION_GUARD_OFFSET, "%s frame %d rendered-alpha guard must remain within %.2f world units of the intended position." % [animation_name, frame, MAXIMUM_LOCOMOTION_GUARD_OFFSET])
 				_check(visual_bounds.position.x >= -half_target.x - 0.01, "%s frame %d should stay behind the rear collider plane when facing %s." % [animation_name, frame, "left" if flip_h else "right"])
 				_check(visual_bounds.end.x <= half_target.x + 0.01, "%s frame %d should stay behind the front collider plane when facing %s." % [animation_name, frame, "left" if flip_h else "right"])
 				_check(visual_bounds.position.y >= -half_target.y - 0.01 and visual_bounds.end.y <= half_target.y + 0.01, "%s frame %d should remain inside the vertical collider envelope." % [animation_name, frame])
@@ -342,7 +348,7 @@ func _test_runtime_visual_envelope(diver: DiverController, sprite: AnimatedSprit
 				sprite.scale.x / maxf(cue_intended_scale.x, 0.001),
 				sprite.scale.y / maxf(cue_intended_scale.y, 0.001)
 			)
-			_check(cue_fit_ratio >= 0.968, "%s cue envelope correction must not shrink the sprite by more than 3.2 percent (ratio %.4f)." % [cue, cue_fit_ratio])
+			_check(cue_fit_ratio >= MINIMUM_CUE_FIT_RATIO, "%s cue rendered-alpha guard must preserve at least %.1f%% of the intended scale (ratio %.4f)." % [cue, MINIMUM_CUE_FIT_RATIO * 100.0, cue_fit_ratio])
 			_check(cue_bounds.position.x >= -half_target.x - 0.01 and cue_bounds.end.x <= half_target.x + 0.01, "%s cue should keep visible alpha inside the horizontal envelope." % cue)
 			_check(cue_bounds.position.y >= -half_target.y - 0.01 and cue_bounds.end.y <= half_target.y + 0.01, "%s cue should keep visible alpha inside the vertical envelope." % cue)
 			diver._clear_visual_cue()

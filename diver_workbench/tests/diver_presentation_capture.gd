@@ -111,7 +111,8 @@ func _draw_envelope_qa_overlay() -> void:
 	var center := _diver.global_position
 	var root_rotation := _diver.global_rotation
 	var body_shape := (_diver.get_node("CollisionShape2D") as CollisionShape2D).shape as CapsuleShape2D
-	var half_target := Vector2(body_shape.height * 0.5, body_shape.radius)
+	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
+	var half_target := target_size * 0.5
 	var half_segment := body_shape.height * 0.5 - body_shape.radius
 	var target_corners := PackedVector2Array([
 		center + Vector2(-half_target.x, -half_target.y).rotated(root_rotation),
@@ -387,7 +388,7 @@ func _capture_envelope_matrix() -> bool:
 				_diver._update_presentation_pose(0.0)
 				_diver._update_socket_markers()
 				queue_redraw()
-				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA  •  ZŁOTO: AABB" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
+				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL AABB" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
 				await get_tree().process_frame
 				await RenderingServer.frame_post_draw
 				var side := "left" if flip_h else "right"
@@ -456,7 +457,7 @@ func _capture_contact_case(
 		return false
 	_diver._update_presentation_pose(0.0)
 	_diver._update_socket_markers()
-	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA  •  ZŁOTO: %s" % [label, _physical_envelope_label()]
+	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL %s" % [label, _physical_envelope_label()]
 	queue_redraw()
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
@@ -468,10 +469,10 @@ func _capture_contact_case(
 
 
 func _physical_envelope_label() -> String:
-	if _diver == null:
+	if _diver == null or _diver.frame_envelope_profile == null:
 		return "? × ?"
-	var body_shape := (_diver.get_node("CollisionShape2D") as CollisionShape2D).shape as CapsuleShape2D
-	return "%d × %d" % [roundi(body_shape.height), roundi(body_shape.radius * 2.0)]
+	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
+	return "%d × %d" % [roundi(target_size.x), roundi(target_size.y)]
 
 
 func _capture_lantern_matrix() -> bool:

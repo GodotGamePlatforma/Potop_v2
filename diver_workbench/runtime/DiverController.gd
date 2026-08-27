@@ -512,6 +512,7 @@ func _transformed_alpha_bounds(
 	var source_bounds: Rect2 = DiverFrameEnvelopeScript.bounds_for(sprite.animation, sprite.frame)
 	if source_bounds.size.is_zero_approx():
 		return Rect2()
+	source_bounds = source_bounds.grow(DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING)
 	var source_corners := PackedVector2Array([
 		source_bounds.position,
 		Vector2(source_bounds.end.x, source_bounds.position.y),
