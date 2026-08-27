@@ -8,8 +8,6 @@ const VIEWPORT_SIZE := Vector2i(1280, 720)
 const STRUCTURE_SIZE := Vector2(2400.0, 3840.0)
 const OUTPUT_DIR := "user://test_tower_three_inlets_02_proxy_capture"
 const MAX_MOTION_FRAMES := 720
-const EGRESS_CAPTURE_ZOOM := Vector2(2.25, 2.25)
-const OPEN_WATER_COLOR := Color(0.027451, 0.101961, 0.145098, 1.0)
 const CAPTURE_STEMS := [
 	"01_s0_full",
 	"02_s0_panel_a_and_b",
@@ -18,9 +16,6 @@ const CAPTURE_STEMS := [
 	"05_d_inlet_exposed",
 	"06_s3_full",
 	"07_s3_facade_egress",
-	"08_egress_closed",
-	"09_egress_mid",
-	"10_egress_open",
 ]
 
 var _package_manifest: Dictionary = {}
@@ -30,13 +25,10 @@ var _structure_root: Node2D
 var _controller
 var _title_label: Label
 var _state_label: Label
-var _hud_layer: CanvasLayer
-var _socket_diagnostic_overlay: Node2D
 var _central_current_overlay: Node2D
 var _b_current_overlays: Array[Node2D] = []
 var _failed := false
 var _written_capture_stems := {}
-var _egress_aperture_ratios := {}
 
 
 func _initialize() -> void:
@@ -56,7 +48,6 @@ func _run() -> void:
 
 	await _capture("01_s0_full", "S0 — wejście przez uszkodzony balkon, A tylko informuje", STRUCTURE_SIZE * 0.5, _fit_zoom())
 	await _capture("02_s0_panel_a_and_b", "S0 — panel A (read-only), osłona i wlot B", _focus_center(["panel_a", "inlet_b"]), Vector2(0.58, 0.58))
-	await _capture_egress_state("08_egress_closed", "CLOSED", 0.0)
 
 	var b_result: Dictionary = _controller.control("inlet_b").complete_dive_interaction()
 	_assert(bool(b_result.get("success", false)), "Capture wymaga poprawnego przejścia B: %s." % b_result)
@@ -84,13 +75,10 @@ func _run() -> void:
 	var d_result: Dictionary = _controller.control("inlet_d").complete_dive_interaction()
 	_assert(bool(d_result.get("success", false)), "Capture wymaga poprawnego zamknięcia D: %s." % d_result)
 	_assert(str(_controller.state_snapshot().get("sequence_state", "")) == "S3", "Capture D musi osiągnąć S3 przed podpisaniem kadru.")
-	var facade_mid_progress := await _await_barrier_progress_at_least("facade", 0.45)
-	await _capture_egress_state("09_egress_mid", "MID", facade_mid_progress)
 	await _await_barrier_target("h3")
 	await _await_barrier_target("facade")
 	await _capture("06_s3_full", "S3 — B/C/D ukończone, prąd centralny wyłączony", STRUCTURE_SIZE * 0.5, _fit_zoom())
 	await _capture("07_s3_facade_egress", "S3 — H3 i fasada otwarte; wyjście opuszcza budynek, nie kończy wyprawy", _focus_center(["h3", "facade"]), Vector2(0.56, 0.56))
-	await _capture_egress_state("10_egress_open", "OPEN", 1.0)
 	_verify_capture_set()
 	_finish()
 
@@ -159,14 +147,14 @@ func _build_capture_scene() -> bool:
 
 
 func _build_hud() -> void:
-	_hud_layer = CanvasLayer.new()
-	_hud_layer.layer = 100
-	_viewport.add_child(_hud_layer)
+	var hud := CanvasLayer.new()
+	hud.layer = 100
+	_viewport.add_child(hud)
 	var top_panel := ColorRect.new()
 	top_panel.position = Vector2(16.0, 14.0)
 	top_panel.size = Vector2(1248.0, 92.0)
 	top_panel.color = Color(0.01, 0.04, 0.06, 0.91)
-	_hud_layer.add_child(top_panel)
+	hud.add_child(top_panel)
 	_title_label = Label.new()
 	_title_label.position = Vector2(26.0, 20.0)
 	_title_label.size = Vector2(1228.0, 34.0)
@@ -190,14 +178,14 @@ func _build_hud() -> void:
 	legend.add_theme_color_override("font_color", Color("d7edf2"))
 	legend.add_theme_color_override("font_outline_color", Color("001018"))
 	legend.add_theme_constant_override("outline_size", 5)
-	_hud_layer.add_child(legend)
+	hud.add_child(legend)
 
 
 func _add_socket_overlay() -> void:
-	_socket_diagnostic_overlay = Node2D.new()
-	_socket_diagnostic_overlay.name = "SocketDiagnosticOverlay"
-	_socket_diagnostic_overlay.z_index = 90
-	_structure_root.add_child(_socket_diagnostic_overlay)
+	var overlay := Node2D.new()
+	overlay.name = "SocketDiagnosticOverlay"
+	overlay.z_index = 90
+	_structure_root.add_child(overlay)
 	for socket_value: Variant in _package_manifest.get("sockets", []) as Array:
 		var socket := socket_value as Dictionary
 		var rect := _rect2(socket.get("local_rect", []))
@@ -213,7 +201,7 @@ func _add_socket_overlay() -> void:
 			Vector2(rect.position.x, rect.end.y),
 		])
 		polygon.color = Color(color.r, color.g, color.b, 0.18)
-		_socket_diagnostic_overlay.add_child(polygon)
+		overlay.add_child(polygon)
 		var border := Line2D.new()
 		border.points = PackedVector2Array([
 			rect.position,
@@ -224,7 +212,7 @@ func _add_socket_overlay() -> void:
 		])
 		border.width = 8.0
 		border.default_color = color
-		_socket_diagnostic_overlay.add_child(border)
+		overlay.add_child(border)
 		var label := Label.new()
 		label.position = rect.position + Vector2(8.0, 4.0)
 		label.text = str(socket.get("id", "?"))
@@ -232,7 +220,7 @@ func _add_socket_overlay() -> void:
 		label.add_theme_color_override("font_color", color.lightened(0.25))
 		label.add_theme_color_override("font_outline_color", Color("001018"))
 		label.add_theme_constant_override("outline_size", 6)
-		_socket_diagnostic_overlay.add_child(label)
+		overlay.add_child(label)
 
 
 func _add_current_overlay() -> void:
@@ -303,63 +291,6 @@ func _capture(file_stem: String, title: String, camera_position: Vector2, camera
 	if error == OK:
 		_written_capture_stems[file_stem] = true
 		print("W02 capture: %s" % ProjectSettings.globalize_path(output_path))
-
-
-func _capture_egress_state(file_stem: String, state_name: String, expected_progress: float) -> void:
-	var egress_rect := _rect2(_socket_by_id(str((_package_manifest.get("runtime", {}) as Dictionary).get("egress_socket_id", ""))).get("local_rect", []))
-	_assert(egress_rect.size.is_equal_approx(Vector2(80.0, 160.0)), "Capture kraty wymaga niezmienionego socketu egress 80x160.")
-	_camera.position = egress_rect.get_center()
-	_camera.zoom = EGRESS_CAPTURE_ZOOM
-	if _socket_diagnostic_overlay != null:
-		_socket_diagnostic_overlay.visible = false
-	if _hud_layer != null:
-		_hud_layer.visible = false
-	if _central_current_overlay != null:
-		_central_current_overlay.visible = false
-	for overlay: Node2D in _b_current_overlays:
-		overlay.visible = false
-	await process_frame
-	await RenderingServer.frame_post_draw
-	var actual_progress: float = _controller.barrier_open_progress("facade")
-	_assert(absf(actual_progress - expected_progress) <= 0.08, "Capture %s ma nieoczekiwany postęp fasady %.3f zamiast %.3f." % [state_name, actual_progress, expected_progress])
-	var image := _viewport.get_texture().get_image()
-	_assert(not image.is_empty(), "Capture %s nie może zwrócić pustego obrazu." % file_stem)
-	var screen_rect := _centered_screen_rect(egress_rect.size, EGRESS_CAPTURE_ZOOM)
-	var aperture_ratio := _open_water_ratio(image, screen_rect)
-	_egress_aperture_ratios[state_name] = aperture_ratio
-	var output_path := "%s/%s.png" % [OUTPUT_DIR, file_stem]
-	var error := image.save_png(output_path)
-	_assert(error == OK, "Nie można zapisać capture %s (error=%s)." % [output_path, error])
-	if error == OK:
-		_written_capture_stems[file_stem] = true
-		print("W02 egress %s: progress=%.3f open_water_ratio=%.4f capture=%s" % [state_name, actual_progress, aperture_ratio, ProjectSettings.globalize_path(output_path)])
-	if _socket_diagnostic_overlay != null:
-		_socket_diagnostic_overlay.visible = true
-	if _hud_layer != null:
-		_hud_layer.visible = true
-	_refresh_current_overlays(_controller.state_snapshot())
-
-
-func _centered_screen_rect(world_size: Vector2, zoom: Vector2) -> Rect2i:
-	var pixel_size := Vector2i(
-		int(round(world_size.x * zoom.x)),
-		int(round(world_size.y * zoom.y))
-	)
-	return Rect2i((VIEWPORT_SIZE - pixel_size) / 2, pixel_size)
-
-
-func _open_water_ratio(image: Image, sample_rect: Rect2i) -> float:
-	var open_water_pixels := 0
-	var sample_pixels := 0
-	var clipped_rect := sample_rect.intersection(Rect2i(Vector2i.ZERO, Vector2i(image.get_width(), image.get_height())))
-	for y: int in range(clipped_rect.position.y, clipped_rect.end.y):
-		for x: int in range(clipped_rect.position.x, clipped_rect.end.x):
-			var pixel := image.get_pixel(x, y)
-			var rgb_distance := absf(pixel.r - OPEN_WATER_COLOR.r) + absf(pixel.g - OPEN_WATER_COLOR.g) + absf(pixel.b - OPEN_WATER_COLOR.b)
-			if rgb_distance <= 0.045:
-				open_water_pixels += 1
-			sample_pixels += 1
-	return float(open_water_pixels) / float(maxi(sample_pixels, 1))
 
 
 func _refresh_current_overlays(snapshot: Dictionary) -> void:
@@ -455,16 +386,6 @@ func _await_barrier_target(barrier_id: String) -> void:
 	_assert(false, "Capture timeout bariery %s." % barrier_id)
 
 
-func _await_barrier_progress_at_least(barrier_id: String, target_progress: float) -> float:
-	for _frame: int in range(MAX_MOTION_FRAMES):
-		var progress: float = _controller.barrier_open_progress(barrier_id)
-		if progress >= target_progress:
-			return progress
-		await physics_frame
-	_assert(false, "Capture timeout stanu MID bariery %s." % barrier_id)
-	return _controller.barrier_open_progress(barrier_id)
-
-
 func _await_cabinet_target() -> void:
 	for _frame: int in range(MAX_MOTION_FRAMES):
 		if _controller.cabinet_reached_target():
@@ -507,38 +428,16 @@ func _prepare_output_dir() -> bool:
 		if FileAccess.file_exists(old_path):
 			var remove_error := DirAccess.remove_absolute(old_path)
 			_assert(remove_error == OK, "Nie można usunąć starego capture przed nowym przebiegiem: %s." % old_path)
-	var old_metrics_path := ProjectSettings.globalize_path("%s/egress_aperture_metrics.json" % OUTPUT_DIR)
-	if FileAccess.file_exists(old_metrics_path):
-		var metrics_remove_error := DirAccess.remove_absolute(old_metrics_path)
-		_assert(metrics_remove_error == OK, "Nie można usunąć starych metryk apertury.")
 	_written_capture_stems.clear()
-	_egress_aperture_ratios.clear()
 	return not _failed
 
 
 func _verify_capture_set() -> void:
-	_assert(_written_capture_stems.size() == CAPTURE_STEMS.size(), "Bieżący przebieg musi zapisać dokładnie %d nowych kadrów." % CAPTURE_STEMS.size())
+	_assert(_written_capture_stems.size() == CAPTURE_STEMS.size(), "Bieżący przebieg musi zapisać dokładnie siedem nowych kadrów.")
 	for file_stem: String in CAPTURE_STEMS:
 		var output_path := "%s/%s.png" % [OUTPUT_DIR, file_stem]
 		_assert(_written_capture_stems.has(file_stem), "Bieżący przebieg nie zapisał kadru %s." % file_stem)
 		_assert(FileAccess.file_exists(output_path), "Brakuje świeżego pliku capture %s." % output_path)
-	var closed_ratio := float(_egress_aperture_ratios.get("CLOSED", -1.0))
-	var mid_ratio := float(_egress_aperture_ratios.get("MID", -1.0))
-	var open_ratio := float(_egress_aperture_ratios.get("OPEN", -1.0))
-	_assert(closed_ratio >= 0.30 and closed_ratio <= 0.80, "CLOSED ma pokazywać przepuszczalną kratę, nie pełny panel ani pusty otwór: %.4f." % closed_ratio)
-	_assert(mid_ratio >= closed_ratio + 0.08, "MID musi odsłaniać więcej otwartej wody niż CLOSED: %.4f -> %.4f." % [closed_ratio, mid_ratio])
-	_assert(open_ratio >= mid_ratio + 0.03 and open_ratio >= 0.95, "OPEN musi odsłaniać prawie cały otwór: %.4f -> %.4f." % [mid_ratio, open_ratio])
-	var metrics_path := "%s/egress_aperture_metrics.json" % OUTPUT_DIR
-	var metrics_file := FileAccess.open(metrics_path, FileAccess.WRITE)
-	_assert(metrics_file != null, "Nie można zapisać metryk apertury wyjścia.")
-	if metrics_file != null:
-		metrics_file.store_string(JSON.stringify({
-			"visual_role": "egress_grille",
-			"ratios": {"CLOSED": closed_ratio, "MID": mid_ratio, "OPEN": open_ratio},
-			"monotonic": closed_ratio < mid_ratio and mid_ratio < open_ratio,
-		}, "  "))
-		metrics_file.close()
-		print("W02 egress metrics: %s" % ProjectSettings.globalize_path(metrics_path))
 
 
 func _load_json(path: String) -> Dictionary:

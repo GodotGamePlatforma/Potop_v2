@@ -2,9 +2,6 @@ extends AnimatableBody2D
 
 const DIVE_PLAYER_GROUP := &"dive_player"
 const TARGET_EPSILON := 0.5
-const VISUAL_ROLE_SOLID_PANEL := "solid_panel"
-const VISUAL_ROLE_EGRESS_GRILLE := "egress_grille"
-const SUPPORTED_VISUAL_ROLES := [VISUAL_ROLE_SOLID_PANEL, VISUAL_ROLE_EGRESS_GRILLE]
 
 var body_id: String = ""
 
@@ -15,7 +12,6 @@ var _visual_size := Vector2(80.0, 80.0)
 var _safety_margin := 40.0
 var _symbol := ""
 var _label := ""
-var _visual_role := ""
 var _safety_envelope: Area2D
 
 
@@ -36,12 +32,6 @@ func configure(
 	_safety_margin = float(definition.get("safety_margin", 40.0))
 	if _safety_margin < 0.0:
 		errors.append("Ruchome ciało %s ma ujemny safety_margin." % body_id)
-	_visual_role = str(definition.get("visual_role", ""))
-	if not _visual_role in SUPPORTED_VISUAL_ROLES:
-		errors.append(
-			"Ruchome ciało %s ma nieobsługiwany visual_role: %s."
-			% [body_id, _visual_role]
-		)
 	if not errors.is_empty():
 		return errors
 
@@ -62,7 +52,6 @@ func configure(
 	set_meta(&"safety_group_filter", String(DIVE_PLAYER_GROUP))
 	set_meta(&"label", _label)
 	set_meta(&"symbol", _symbol)
-	set_meta(&"visual_role", _visual_role)
 
 	_build_solid_shape()
 	_build_safety_envelope()
@@ -172,10 +161,6 @@ func safety_envelope() -> Area2D:
 	return _safety_envelope
 
 
-func visual_role() -> String:
-	return _visual_role
-
-
 func _build_solid_shape() -> void:
 	var collision := CollisionShape2D.new()
 	collision.name = "CollisionShape2D"
@@ -204,13 +189,6 @@ func _build_safety_envelope() -> void:
 
 
 func _draw() -> void:
-	if _visual_role == VISUAL_ROLE_EGRESS_GRILLE:
-		_draw_egress_grille()
-		return
-	_draw_solid_panel()
-
-
-func _draw_solid_panel() -> void:
 	var half_size := _visual_size * 0.5
 	var body_rect := Rect2(-half_size, _visual_size)
 	draw_rect(body_rect, Color(0.13, 0.25, 0.28, 0.98), true)
@@ -239,28 +217,8 @@ func _draw_solid_panel() -> void:
 		_draw_triangle_symbol()
 	elif _symbol.contains("■"):
 		_draw_square_symbol()
-
-
-func _draw_egress_grille() -> void:
-	var half_size := _visual_size * 0.5
-	var body_rect := Rect2(-half_size, _visual_size)
-	var frame_color := Color(0.58, 0.86, 0.82, 1.0)
-	var slat_color := Color(0.32, 0.64, 0.62, 0.96)
-	draw_rect(body_rect, frame_color, false, 6.0)
-	var slat_y := -half_size.y + 18.0
-	while slat_y < half_size.y - 10.0:
-		draw_line(
-			Vector2(-half_size.x + 8.0, slat_y),
-			Vector2(half_size.x - 8.0, slat_y),
-			slat_color,
-			8.0
-		)
-		slat_y += 28.0
-	_draw_arrow(
-		Vector2.ZERO,
-		Vector2.RIGHT,
-		minf(_visual_size.x, _visual_size.y) * 0.42
-	)
+	elif _symbol.contains("WYJ"):
+		_draw_arrow(Vector2.ZERO, Vector2.RIGHT, minf(_visual_size.x, _visual_size.y) * 0.28)
 
 
 func _draw_arrow(center: Vector2, direction: Vector2, length: float) -> void:
