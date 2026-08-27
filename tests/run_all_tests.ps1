@@ -1036,6 +1036,108 @@ function Get-DirectoryOverlayFingerprint {
     }
 }
 
+function New-IsolatedTrackedEolProof {
+    param(
+        [string]$SourceProjectRoot,
+        [string]$IsolatedProjectRoot,
+        [string]$StructureId,
+        [string]$SourceSnapshotDigest,
+        [int]$TimeoutSeconds = 120
+    )
+
+    if ($StructureId -notmatch '^[a-z][a-z0-9_]*$' -or
+        $SourceSnapshotDigest -notmatch '^[0-9a-f]{64}$') {
+        throw "Cannot create an isolated EOL proof for invalid structure/snapshot metadata."
+    }
+    $sourceRoot = [System.IO.Path]::GetFullPath($SourceProjectRoot).TrimEnd([char[]]"\/")
+    $isolatedRoot = [System.IO.Path]::GetFullPath($IsolatedProjectRoot).TrimEnd([char[]]"\/")
+    if ([string]::Equals($sourceRoot, $isolatedRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to attest an in-place source checkout as an isolated snapshot."
+    }
+    if (Test-Path -LiteralPath (Join-Path $isolatedRoot ".git")) {
+        throw "Isolated EOL proof must not rely on copied Git metadata."
+    }
+    $contractTool = Join-Path $isolatedRoot "tools/workbench_contract.py"
+    if (-not (Test-Path -LiteralPath $contractTool -PathType Leaf)) {
+        throw "Isolated workbench contract tool is missing: '$contractTool'."
+    }
+    $pythonCommand = Get-Command -Name "python" -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($null -eq $pythonCommand) {
+        throw "Python is required to create an isolated EOL proof."
+    }
+
+    $proofDirectory = Join-Path $isolatedRoot ".godot/isolated_eol_proofs"
+    [void](New-Item -ItemType Directory -Path $proofDirectory -Force)
+    $proofPath = Join-Path $proofDirectory ("{0}-{1}.json" -f $StructureId, [Guid]::NewGuid().ToString("N"))
+    $keyBytes = New-Object byte[] 32
+    $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $random.GetBytes($keyBytes)
+    }
+    finally {
+        $random.Dispose()
+    }
+    $proofKey = [System.BitConverter]::ToString($keyBytes).Replace("-", "").ToLowerInvariant()
+
+    $process = $null
+    try {
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = $pythonCommand.Source
+        $arguments = @(
+            "-B", $contractTool,
+            "--repo", $sourceRoot,
+            "eol-proof", "create",
+            "--snapshot-root", $isolatedRoot,
+            "--snapshot-digest", $SourceSnapshotDigest,
+            "--structure-id", $StructureId,
+            "--proof", $proofPath
+        )
+        $startInfo.Arguments = (@($arguments) | ForEach-Object {
+            ConvertTo-ProcessArgument -Argument ([string]$_)
+        }) -join " "
+        $startInfo.WorkingDirectory = $sourceRoot
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+        $startInfo.EnvironmentVariables["OSTATNI_POMOST_ISOLATED_EOL_PROOF_KEY"] = $proofKey
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw "Isolated EOL proof process could not be started."
+        }
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+        $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            try { $process.Kill($true) } catch { $process.Kill() }
+            $process.WaitForExit()
+            throw "Isolated EOL proof timed out after $TimeoutSeconds seconds."
+        }
+        $standardOutput = $standardOutputTask.GetAwaiter().GetResult().Trim()
+        $standardError = $standardErrorTask.GetAwaiter().GetResult().Trim()
+        if ($process.ExitCode -ne 0) {
+            throw "Isolated EOL proof failed with exit code $($process.ExitCode): $standardOutput $standardError"
+        }
+    }
+    finally {
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+    }
+    if (-not (Test-Path -LiteralPath $proofPath -PathType Leaf)) {
+        throw "Isolated EOL proof process did not publish its proof file."
+    }
+    return [pscustomobject]@{
+        Version = "isolated-git-eol-proof-v1"
+        Path = [System.IO.Path]::GetFullPath($proofPath)
+        Key = $proofKey
+        Sha256 = (Get-FileHash -LiteralPath $proofPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        SourceSnapshotDigest = $SourceSnapshotDigest
+        StructureId = $StructureId
+    }
+}
+
 function Invoke-IsolatedStructureTargetOverlay {
     param(
         [string]$SourceProjectRoot,
@@ -1071,6 +1173,13 @@ function Invoke-IsolatedStructureTargetOverlay {
         throw "Python is required for an explicit structure target overlay."
     }
 
+    $eolProof = New-IsolatedTrackedEolProof `
+        -SourceProjectRoot $sourceRoot `
+        -IsolatedProjectRoot $isolatedRoot `
+        -StructureId $StructureId `
+        -SourceSnapshotDigest $SourceSnapshotDigest `
+        -TimeoutSeconds ([Math]::Min($TimeoutSeconds, 120))
+
     $process = $null
     try {
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -1084,6 +1193,8 @@ function Invoke-IsolatedStructureTargetOverlay {
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
         $startInfo.CreateNoWindow = $true
+        $startInfo.EnvironmentVariables["OSTATNI_POMOST_ISOLATED_EOL_PROOF_PATH"] = $eolProof.Path
+        $startInfo.EnvironmentVariables["OSTATNI_POMOST_ISOLATED_EOL_PROOF_KEY"] = $eolProof.Key
         $process = [System.Diagnostics.Process]::new()
         $process.StartInfo = $startInfo
         if (-not $process.Start()) {
@@ -1098,6 +1209,15 @@ function Invoke-IsolatedStructureTargetOverlay {
         }
         $standardOutput = $standardOutputTask.GetAwaiter().GetResult().Trim()
         $standardError = $standardErrorTask.GetAwaiter().GetResult().Trim()
+        $proofHashAfter = if (Test-Path -LiteralPath $eolProof.Path -PathType Leaf) {
+            (Get-FileHash -LiteralPath $eolProof.Path -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        else {
+            "missing"
+        }
+        if ($proofHashAfter -ne $eolProof.Sha256) {
+            throw "Isolated structure target builder changed its EOL proof."
+        }
         if ($process.ExitCode -ne 0) {
             throw "Isolated structure target build failed with exit code $($process.ExitCode): $standardOutput $standardError"
         }
@@ -1156,6 +1276,8 @@ function Invoke-IsolatedStructureTargetOverlay {
         ContentDigest = $authorityAfter.Digest
         CanonicalFileManifest = $authorityAfter.CanonicalManifest
         CanonicalReceipt = $canonicalReceipt
+        EolProofVersion = $eolProof.Version
+        EolProofSha256 = $eolProof.Sha256
     }
 }
 

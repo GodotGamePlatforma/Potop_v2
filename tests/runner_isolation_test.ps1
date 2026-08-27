@@ -43,6 +43,7 @@ $requiredFunctions = @(
     "New-IsolatedTestWorkspace",
     "Get-ExplicitStructureTestPackageId",
     "Get-DirectoryOverlayFingerprint",
+    "New-IsolatedTrackedEolProof",
     "Invoke-IsolatedStructureTargetOverlay",
     "Get-AvailableIsolatedTestPort",
     "Get-IsolatedTestUserDirectoryRoot",
@@ -114,6 +115,10 @@ try {
     $workspaceRoot = Join-Path $fixtureRoot "isolated workspaces"
     [void](New-Item -ItemType Directory -Path $sourceRoot -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tests") -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tools") -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/tools") -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/structures/tower_local/generated") -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/structures/unrelated_stale/generated") -Force)
 
     [System.IO.File]::WriteAllText(
         (Join-Path $sourceRoot "project.godot"),
@@ -121,9 +126,41 @@ try {
         [System.Text.UTF8Encoding]::new($false)
     )
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot ".gitignore"), "ignored/`n", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText((Join-Path $sourceRoot ".gitattributes"), "* text=auto eol=lf`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "tracked.txt"), "tracked before`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "deleted.txt"), "staged then deleted`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "tests/explicit_target.gd"), "extends SceneTree`n", [System.Text.UTF8Encoding]::new($false))
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../tools/workbench_contract.py") -Destination (Join-Path $sourceRoot "tools/workbench_contract.py")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../tools/workbench_lock.py") -Destination (Join-Path $sourceRoot "tools/workbench_lock.py")
+    $fakeBuilder = @'
+from pathlib import Path
+import os
+import sys
+
+if len(sys.argv) != 3 or sys.argv[1] != "--build-structure" or sys.argv[2] != "tower_local":
+    raise SystemExit(7)
+root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(root / "tools"))
+from workbench_contract import verify_isolated_eol_proof
+
+verify_isolated_eol_proof(
+    root,
+    proof_path=os.environ["OSTATNI_POMOST_ISOLATED_EOL_PROOF_PATH"],
+    structure_id=sys.argv[2],
+    secret_hex=os.environ["OSTATNI_POMOST_ISOLATED_EOL_PROOF_KEY"],
+)
+generated = root / ".godot" / "underwater_map_structure_builds" / sys.argv[2] / "generated"
+generated.mkdir(parents=True, exist_ok=True)
+(generated / "structure.tscn").write_text("[gd_scene]\n", encoding="utf-8", newline="\n")
+(generated / "structure_truth.json").write_text('{"package":"tower_local"}\n', encoding="utf-8", newline="\n")
+'@
+    [System.IO.File]::WriteAllText(
+        (Join-Path $sourceRoot "underwater_map_workbench/tools/build_underwater_map.py"),
+        $fakeBuilder,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    [System.IO.File]::WriteAllText((Join-Path $sourceRoot "underwater_map_workbench/structures/tower_local/generated/stale.txt"), "stale target", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText((Join-Path $sourceRoot "underwater_map_workbench/structures/unrelated_stale/generated/must_remain.txt"), "unrelated stale package", [System.Text.UTF8Encoding]::new($false))
 
     & git -C $sourceRoot init -q
     if ($LASTEXITCODE -ne 0) { throw "git init failed for runner fixture." }
@@ -213,58 +250,34 @@ try {
         ($null -eq (Get-ExplicitStructureTestPackageId -ResolvedTarget "diver_workbench/tests/DiverPresentationTest.tscn")) `
         "Non-structure target incorrectly entered the structure overlay lane."
 
-    $structureOverlayProject = Join-Path $fixtureRoot "structure overlay project"
-    $fakeBuilderDirectory = Join-Path $structureOverlayProject "underwater_map_workbench/tools"
-    $targetAuthority = Join-Path $structureOverlayProject "underwater_map_workbench/structures/tower_local/generated"
-    $unrelatedAuthority = Join-Path $structureOverlayProject "underwater_map_workbench/structures/unrelated_stale/generated"
-    [void](New-Item -ItemType Directory -Path $fakeBuilderDirectory -Force)
-    [void](New-Item -ItemType Directory -Path $targetAuthority -Force)
-    [void](New-Item -ItemType Directory -Path $unrelatedAuthority -Force)
-    [System.IO.File]::WriteAllText((Join-Path $targetAuthority "stale.txt"), "stale target", [System.Text.UTF8Encoding]::new($false))
-    [System.IO.File]::WriteAllText((Join-Path $unrelatedAuthority "must_remain.txt"), "unrelated stale package", [System.Text.UTF8Encoding]::new($false))
-    $fakeBuilder = @'
-from pathlib import Path
-import sys
-
-if len(sys.argv) != 3 or sys.argv[1] != "--build-structure" or sys.argv[2] != "tower_local":
-    raise SystemExit(7)
-root = Path(__file__).resolve().parents[2]
-generated = root / ".godot" / "underwater_map_structure_builds" / sys.argv[2] / "generated"
-generated.mkdir(parents=True, exist_ok=True)
-(generated / "structure.tscn").write_text("[gd_scene]\n", encoding="utf-8", newline="\n")
-(generated / "structure_truth.json").write_text('{"package":"tower_local"}\n', encoding="utf-8", newline="\n")
-'@
-    [System.IO.File]::WriteAllText(
-        (Join-Path $fakeBuilderDirectory "build_underwater_map.py"),
-        $fakeBuilder,
-        [System.Text.UTF8Encoding]::new($false)
-    )
+    $workspacePath = [string]$sourceSnapshotReceipt.WorkspacePath
+    Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "diver_workbench/required_untracked.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Diver source."
+    Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "underwater_map_workbench/structures/inflight_package/runtime.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Map source."
+    Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath "ignored/ignored.tmp"))) "Isolated copy included ignored content."
+    Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath ".git"))) "Isolated copy included Git metadata."
+    $copyFingerprint = Get-ProjectSnapshotFingerprint -ProjectRoot $workspacePath -ProjectPaths $sourceFingerprint.ProjectPaths
+    Assert-RunnerInvariant ($sourceFingerprint.Digest -eq $copyFingerprint.Digest) "Isolated copy fingerprint differs from the stable source fingerprint."
+    Assert-RunnerInvariant ($sourceFingerprint.Digest -eq $sourceSnapshotReceipt.SourceSnapshot.Digest) "Source snapshot receipt differs from the pre-copy source fingerprint."
+    $targetAuthority = Join-Path $workspacePath "underwater_map_workbench/structures/tower_local/generated"
+    $unrelatedAuthority = Join-Path $workspacePath "underwater_map_workbench/structures/unrelated_stale/generated"
     $structureOverlay = Invoke-IsolatedStructureTargetOverlay `
         -SourceProjectRoot $sourceRoot `
-        -IsolatedProjectRoot $structureOverlayProject `
+        -IsolatedProjectRoot $workspacePath `
         -StructureId "tower_local" `
         -SourceSnapshotDigest $sourceSnapshotReceipt.SourceSnapshot.Digest `
         -TimeoutSeconds 30
     Assert-RunnerInvariant ($structureOverlay.Version -eq "godot-structure-target-overlay-v1") "Structure target overlay did not publish its schema."
+    Assert-RunnerInvariant ($structureOverlay.EolProofVersion -eq "isolated-git-eol-proof-v1") "Structure target overlay did not use the isolated EOL proof."
+    Assert-RunnerInvariant ($structureOverlay.EolProofSha256 -match '^[0-9a-f]{64}$') "Structure target overlay did not retain the EOL proof digest."
     Assert-RunnerInvariant ($structureOverlay.FileCount -eq 2) "Structure target overlay did not publish the exact generated file count."
     Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $targetAuthority "structure.tscn") -PathType Leaf) "Structure target overlay did not replace target authority."
     Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $targetAuthority "stale.txt"))) "Structure target overlay retained stale target authority content."
     Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $unrelatedAuthority "must_remain.txt") -PathType Leaf) "Structure target overlay changed an unrelated stale package."
     Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $sourceRoot ".godot/underwater_map_structure_builds/tower_local/generated"))) "Structure target overlay wrote into the live/source checkout."
-    $workspacePath = [string]$sourceSnapshotReceipt.WorkspacePath
     $contextA = $null
     $contextB = $null
     $oldRetainedPath = $null
     try {
-        Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "diver_workbench/required_untracked.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Diver source."
-        Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "underwater_map_workbench/structures/inflight_package/runtime.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Map source."
-        Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath "ignored/ignored.tmp"))) "Isolated copy included ignored content."
-        Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath ".git"))) "Isolated copy included Git metadata."
-
-        $copyFingerprint = Get-ProjectSnapshotFingerprint -ProjectRoot $workspacePath -ProjectPaths $sourceFingerprint.ProjectPaths
-        Assert-RunnerInvariant ($sourceFingerprint.Digest -eq $copyFingerprint.Digest) "Isolated copy fingerprint differs from the stable source fingerprint."
-        Assert-RunnerInvariant ($sourceFingerprint.Digest -eq $sourceSnapshotReceipt.SourceSnapshot.Digest) "Source snapshot receipt differs from the pre-copy source fingerprint."
-
         $sourceProjectHashBefore = (Get-FileHash -LiteralPath (Join-Path $sourceRoot "project.godot") -Algorithm SHA256).Hash
         $testUserDirectoryRoot = Join-Path $fixtureRoot "user_data"
         $contextA = New-IsolatedTestRunContext -UserDirectoryRootOverride $testUserDirectoryRoot

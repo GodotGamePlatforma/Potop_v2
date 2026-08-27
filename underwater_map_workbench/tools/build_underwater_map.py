@@ -33,7 +33,11 @@ from workbench_lock import (  # noqa: E402
 )
 from workbench_contract import (  # noqa: E402
     ContractError,
+    ISOLATED_EOL_PROOF_KEY_ENV,
+    ISOLATED_EOL_PROOF_PATH_ENV,
     assert_tracked_lf_eol,
+    repository_root,
+    verify_isolated_eol_proof,
 )
 
 MANIFEST_PATH = WORKBENCH_DIR / "map_manifest.json"
@@ -6480,13 +6484,47 @@ def _run_render_mode(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assert_builder_eol_preflight(args: argparse.Namespace) -> None:
+    project_root = WORKBENCH_DIR.parent.resolve()
+    try:
+        git_root = repository_root(project_root)
+    except ContractError as git_error:
+        structure_id = args.build_structure or args.check_structure
+        proof_path = os.environ.get(ISOLATED_EOL_PROOF_PATH_ENV, "")
+        proof_key = os.environ.get(ISOLATED_EOL_PROOF_KEY_ENV, "")
+        if not structure_id or not proof_path or not proof_key:
+            raise ManifestError(f"tracked EOL preflight failed: {git_error}") from git_error
+        try:
+            proof = verify_isolated_eol_proof(
+                project_root,
+                proof_path=proof_path,
+                structure_id=structure_id,
+                secret_hex=proof_key,
+            )
+        except ContractError as proof_error:
+            raise ManifestError(
+                f"isolated tracked EOL proof failed: {proof_error}"
+            ) from proof_error
+        print(
+            "Verified isolated tracked EOL proof "
+            f"({proof['source_snapshot_sha256']}, {structure_id})"
+        )
+        return
+    if git_root.resolve() != project_root:
+        raise ManifestError(
+            "tracked EOL preflight failed: builder project root is nested inside "
+            f"a different Git worktree ({git_root})"
+        )
+    try:
+        assert_tracked_lf_eol(git_root)
+    except ContractError as error:
+        raise ManifestError(f"tracked EOL preflight failed: {error}") from error
+
+
 def main() -> int:
     args = _parse_args()
     try:
-        try:
-            assert_tracked_lf_eol(WORKBENCH_DIR.parent)
-        except ContractError as error:
-            raise ManifestError(f"tracked EOL preflight failed: {error}") from error
+        _assert_builder_eol_preflight(args)
         if args.seal_structure_package:
             _seal_structure_package(args.seal_structure_package)
             return 0

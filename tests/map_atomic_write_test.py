@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -993,6 +995,82 @@ class MapAtomicWriteTest(unittest.TestCase):
                 "build inputs changed before publication",
             ):
                 builder._assert_input_fingerprint(expected)
+
+    def test_ordinary_non_git_builder_fails_without_isolated_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            root_tools = project / "tools"
+            map_tools = project / "underwater_map_workbench" / "tools"
+            root_tools.mkdir(parents=True)
+            map_tools.mkdir(parents=True)
+            shutil.copyfile(
+                PROJECT_ROOT / "tools" / "workbench_contract.py",
+                root_tools / "workbench_contract.py",
+            )
+            shutil.copyfile(
+                PROJECT_ROOT / "tools" / "workbench_lock.py",
+                root_tools / "workbench_lock.py",
+            )
+            copied_builder = map_tools / "build_underwater_map.py"
+            shutil.copyfile(
+                PROJECT_ROOT
+                / "underwater_map_workbench"
+                / "tools"
+                / "build_underwater_map.py",
+                copied_builder,
+            )
+            environment = builder.os.environ.copy()
+            environment.pop(builder.ISOLATED_EOL_PROOF_PATH_ENV, None)
+            environment.pop(builder.ISOLATED_EOL_PROOF_KEY_ENV, None)
+
+            result = subprocess.run(
+                [sys.executable, "-B", str(copied_builder), "--build-structure", "tower_local"],
+                cwd=project / "underwater_map_workbench",
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tracked EOL preflight failed", result.stderr)
+            self.assertIn("No Git worktree found", result.stderr)
+
+    def test_non_git_structure_builder_accepts_only_verified_proof(self) -> None:
+        args = argparse.Namespace(
+            build=False,
+            check=False,
+            build_structure="tower_local",
+            check_structure=None,
+        )
+        with (
+            mock.patch.object(
+                builder,
+                "repository_root",
+                side_effect=builder.ContractError("No Git worktree found"),
+            ),
+            mock.patch.dict(
+                builder.os.environ,
+                {
+                    builder.ISOLATED_EOL_PROOF_PATH_ENV: "proof.json",
+                    builder.ISOLATED_EOL_PROOF_KEY_ENV: "ab" * 32,
+                },
+                clear=False,
+            ),
+            mock.patch.object(
+                builder,
+                "verify_isolated_eol_proof",
+                return_value={"source_snapshot_sha256": "c" * 64},
+            ) as verifier,
+        ):
+            builder._assert_builder_eol_preflight(args)
+
+        verifier.assert_called_once_with(
+            builder.WORKBENCH_DIR.parent.resolve(),
+            proof_path="proof.json",
+            structure_id="tower_local",
+            secret_hex="ab" * 32,
+        )
 
 
 if __name__ == "__main__":

@@ -85,7 +85,7 @@ python .\tools\build_underwater_map.py --build-structure <id>
 python .\tools\build_underwater_map.py --check-structure <id>
 ```
 
-Każdy tryb buildera wykonuje najpierw wspólny repozytoryjny preflight EOL. Tracked plik z atrybutem `eol=lf` w stanie `w/crlf` albo `w/mixed` zatrzymuje polecenie przed sealem, renderem lub publikacją; dirty zmiana zapisana LF pozostaje poprawnym wejściem authoringu. Sam `git status` nie certyfikuje późniejszego candidate receiptu, który porównuje także surowe bajty z exact HEAD/index.
+Każdy tryb buildera wykonuje najpierw wspólny repozytoryjny preflight EOL. Tracked plik z atrybutem `eol=lf` w stanie `w/crlf` albo `w/mixed` zatrzymuje polecenie przed sealem, renderem lub publikacją; dirty zmiana zapisana LF pozostaje poprawnym wejściem authoringu. Sam `git status` nie certyfikuje późniejszego candidate receiptu, który porównuje także surowe bajty z exact HEAD/index. Official isolated runner celowanego testu struktury nie kopiuje `.git`: po byte-identycznym snapshotcie sam wystawia jednorazowy, podpisany dowód EOL związany z pełnym manifestem bajtów i exact ID pakietu, a builder przed lokalnym renderem ponownie sprawdza podpis i wszystkie pliki. Nie jest to ręczna komenda ani obejście dla zwykłego buildera uruchomionego poza Git; brak, manipulacja albo drift dowodu zatrzymują przebieg.
 
 Następnie uruchom dwa cele wskazane w lokalnym `structures/<id>/README.md` i przekaż niezmienny commit albo zweryfikowaną rewizję FROZEN. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
 
