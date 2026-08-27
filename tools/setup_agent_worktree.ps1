@@ -656,8 +656,8 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
         }
 
         # The reservation covers verification as well as final creation. This
-        # prevents duplicate create processes from colliding in the verifier's
-        # own shared Git/publication locks before one request is selected.
+        # selects one owner of the same destination/branch before Git worktree
+        # materialization, while disjoint requests keep independent locks.
         Test-CandidateReceiptsAtCommit -Repository $repoRoot `
             -ReceiptPath $receiptPath `
             -RunReceiptPath $runReceiptPath -Commit $baseline
