@@ -149,8 +149,8 @@ def _jobs(lines: list[ActiveLine]) -> list[JobBlock]:
         return []
     job_indent = min(line.indent for line in mapping_lines)
     records: list[JobBlock] = []
-    for index, line in enumerate(lines):
-        if index <= jobs_index or line not in jobs_block or line.indent != job_indent:
+    for index, line in enumerate(jobs_block, start=jobs_index + 1):
+        if line.indent != job_indent:
             continue
         match = _YAML_KEY_RE.match(line.text)
         if match is None:
