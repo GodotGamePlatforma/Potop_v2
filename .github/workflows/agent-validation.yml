@@ -58,6 +58,26 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Validate the complete committed owner diff
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+          git fetch --no-tags origin `
+            +refs/heads/main:refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          python -B tools/ci_branch_owner.py validate `
+            --repo . `
+            --branch $env:GITHUB_REF_NAME `
+            --base-ref refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run fast CI contract tests
         shell: pwsh
         run: |
