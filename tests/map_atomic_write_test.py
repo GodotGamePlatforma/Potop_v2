@@ -915,12 +915,12 @@ class MapAtomicWriteTest(unittest.TestCase):
             mock.patch.object(builder, "_map_build_admission_lock") as admission,
             mock.patch.object(
                 builder,
-                "_run_render_mode_admitted",
+                "_run_render_mode",
                 return_value=0,
             ) as admitted,
         ):
             for args in modes:
-                self.assertEqual(builder._run_render_mode(args), 0)
+                self.assertEqual(builder._run_selected_render_mode(args), 0)
 
         admission.assert_not_called()
         self.assertEqual(admitted.call_count, len(modes))
@@ -976,7 +976,7 @@ class MapAtomicWriteTest(unittest.TestCase):
 
             def run_first() -> None:
                 try:
-                    first_results.append(builder._run_render_mode(args))
+                    first_results.append(builder._run_selected_render_mode(args))
                 except BaseException as error:
                     first_errors.append(error)
 
@@ -1019,7 +1019,7 @@ class MapAtomicWriteTest(unittest.TestCase):
                         builder.WorkspaceLockError,
                         r"thread=first-build, pid=123",
                     ):
-                        builder._run_render_mode(args)
+                        builder._run_selected_render_mode(args)
                 finally:
                     release_render.set()
                 first.join(timeout=10)
@@ -1056,14 +1056,14 @@ class MapAtomicWriteTest(unittest.TestCase):
             ),
             mock.patch.object(
                 builder,
-                "_run_render_mode_admitted",
+                "_run_render_mode",
                 side_effect=(builder.ManifestError("render failed"), 0),
             ),
         ):
             with self.assertRaisesRegex(builder.ManifestError, "render failed"):
-                builder._run_render_mode(args)
+                builder._run_selected_render_mode(args)
             self.assertFalse(active)
-            self.assertEqual(builder._run_render_mode(args), 0)
+            self.assertEqual(builder._run_selected_render_mode(args), 0)
 
         self.assertFalse(active)
         self.assertEqual(entered, 2)
@@ -1306,14 +1306,6 @@ class MapAtomicWriteTest(unittest.TestCase):
                 mock.patch.object(builder, "SCENE_PATH", scene_path),
                 mock.patch.object(
                     builder,
-                    "_map_build_admission_lock",
-                    side_effect=lambda: RecordingContext(
-                        "admission",
-                        "admission-release",
-                    ),
-                ),
-                mock.patch.object(
-                    builder,
                     "_capture_manifest_input_fingerprint",
                     return_value={},
                 ),
@@ -1345,13 +1337,11 @@ class MapAtomicWriteTest(unittest.TestCase):
             self.assertEqual(
                 events,
                 [
-                    "admission",
                     "lock",
                     "baseline",
                     "render",
                     "lock",
                     "publish",
-                    "admission-release",
                 ],
             )
 
@@ -1400,11 +1390,6 @@ class MapAtomicWriteTest(unittest.TestCase):
                 mock.patch.object(builder, "MANIFEST_PATH", manifest_path),
                 mock.patch.object(builder, "SCENE_PATH", scene_path),
                 mock.patch.object(builder, "L05_GENERATED_DIR", l05_generated_dir),
-                mock.patch.object(
-                    builder,
-                    "_map_build_admission_lock",
-                    side_effect=lambda: nullcontext(),
-                ),
                 mock.patch.object(
                     builder,
                     "_capture_manifest_input_fingerprint",

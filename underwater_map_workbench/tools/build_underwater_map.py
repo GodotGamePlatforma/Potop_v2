@@ -6835,14 +6835,14 @@ def _check_expected_outputs(
     return 0
 
 
-def _run_render_mode(args: argparse.Namespace) -> int:
-    if args.build:
+def _run_selected_render_mode(args: argparse.Namespace) -> int:
+    if getattr(args, "build", False):
         with _map_build_admission_lock():
-            return _run_render_mode_admitted(args)
-    return _run_render_mode_admitted(args)
+            return _run_render_mode(args)
+    return _run_render_mode(args)
 
 
-def _run_render_mode_admitted(args: argparse.Namespace) -> int:
+def _run_render_mode(args: argparse.Namespace) -> int:
     structure_mode_id = args.build_structure or args.check_structure
     manifest_raw = MANIFEST_PATH.read_bytes()
     inputs = _capture_manifest_input_fingerprint(
@@ -7026,7 +7026,7 @@ def main() -> int:
                 "--sealed-package-sha256 is valid only with "
                 "--refresh-structure-package"
             )
-        return _run_render_mode(args)
+        return _run_selected_render_mode(args)
     except WorkspaceLockError as error:
         print(f"underwater map publication is busy: {error}", file=sys.stderr)
         return 2
