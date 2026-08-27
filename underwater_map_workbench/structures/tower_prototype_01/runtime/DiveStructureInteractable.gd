@@ -39,7 +39,9 @@ func configure(definition: Dictionary, socket_rect: Rect2, activation_callback: 
 	)
 	_interaction_shape_size = socket_rect.size
 	_visual_role = StringName(str(definition.get("visual_role", definition.get("kind", "default"))))
-	z_index = 8
+	# Controls are mounted inside the cutaway: above the L04 interior (-20),
+	# but below the material L05 shell (0), so they cannot paint over walls.
+	z_index = -8
 	set_meta(&"structure_control_id", control_id)
 	set_meta(&"socket_rect", socket_rect)
 	set_meta(&"native_visual_size", _visual_size)
@@ -67,6 +69,9 @@ func configure_power_lever(
 	}, lever_rect, activation_callback)
 	_visual_kind = &"power_lever"
 	_visual_role = &"power_lever"
+	# Lever nodes are children of the distributor panel; keep them one local
+	# layer above its background while the complete assembly stays below L05.
+	z_index = 1
 	_interaction_shape_size = lever_rect.size
 	_visual_size = lever_rect.size
 	set_meta(&"power_lever_id", _power_lever_id)
@@ -370,15 +375,41 @@ func _draw_archive_access() -> void:
 	var half := _visual_size * 0.5
 	var panel := Rect2(-half, _visual_size).grow(-3.0)
 	var edge := _state_color(Color(0.58, 0.72, 0.68, 1.0))
+	var unlocked := _visual_state in ["completed", "open"]
 	draw_rect(panel, Color(0.07, 0.14, 0.16, 1.0), true)
 	draw_rect(panel, edge, false, 6.0)
-	var radius := minf(_visual_size.y * 0.32, 34.0)
-	draw_circle(Vector2.ZERO, radius, Color(0.10, 0.20, 0.22, 1.0))
-	draw_circle(Vector2.ZERO, radius, Color(0.62, 0.49, 0.31, 1.0), false, 6.0)
-	for spoke_index: int in range(6):
-		var angle := float(spoke_index) * TAU / 6.0
-		draw_line(Vector2.ZERO, Vector2(cos(angle), sin(angle)) * radius, Color(0.64, 0.50, 0.32, 1.0), 5.0)
-	draw_circle(Vector2.ZERO, 8.0, edge)
+	draw_rect(panel.grow(-9.0), Color(0.36, 0.45, 0.44, 1.0), false, 3.0)
+
+	# A keyed archive interlock is deliberately distinct from the nearby hatch
+	# wheel. The lever and bolt only depict the controller's resolved state.
+	var key_center := Vector2(-half.x + 42.0, 0.0)
+	draw_circle(key_center, 24.0, Color(0.045, 0.085, 0.095, 1.0))
+	draw_circle(key_center, 24.0, Color(0.54, 0.48, 0.35, 1.0), false, 5.0)
+	var key_angle := -0.72 if unlocked else 0.0
+	var key_axis := Vector2(cos(key_angle), sin(key_angle))
+	draw_line(key_center - key_axis * 12.0, key_center + key_axis * 12.0, edge, 6.0)
+	draw_circle(key_center, 5.0, Color(0.74, 0.58, 0.31, 1.0))
+
+	var lever_pivot := Vector2(12.0, 18.0)
+	var lever_angle := -0.88 if unlocked else 0.56
+	if not unlocked and (_available or _visual_state.begins_with("ready")):
+		lever_angle += sin(_animation_phase) * 0.035
+	draw_circle(lever_pivot, 13.0, Color(0.42, 0.35, 0.24, 1.0))
+	draw_circle(lever_pivot, 13.0, edge.darkened(0.18), false, 4.0)
+	var lever_end := lever_pivot + Vector2(cos(lever_angle), sin(lever_angle)) * 44.0
+	draw_line(lever_pivot, lever_end, Color(0.62, 0.66, 0.59, 1.0), 10.0)
+	draw_circle(lever_end, 11.0, edge)
+
+	var bolt_y := -21.0
+	var bolt_start_x := 45.0
+	var bolt_end_x := half.x - (26.0 if unlocked else 8.0)
+	draw_rect(Rect2(Vector2(42.0, bolt_y - 10.0), Vector2(maxf(half.x - 50.0, 26.0), 20.0)), Color(0.035, 0.07, 0.08, 1.0), true)
+	draw_line(Vector2(bolt_start_x, bolt_y), Vector2(bolt_end_x, bolt_y), edge.darkened(0.12), 10.0)
+	draw_rect(Rect2(Vector2(bolt_end_x - 5.0, bolt_y - 15.0), Vector2(12.0, 30.0)), Color(0.60, 0.42, 0.23, 1.0), true)
+	for marker_index: int in range(3):
+		var marker_x := 54.0 + float(marker_index) * 22.0
+		var marker_color := edge if unlocked or marker_index == 0 else Color(0.28, 0.35, 0.35, 1.0)
+		draw_circle(Vector2(marker_x, 28.0), 5.0, marker_color)
 	_draw_progress_bar(half)
 
 
