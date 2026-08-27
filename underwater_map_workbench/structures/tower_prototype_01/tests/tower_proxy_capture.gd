@@ -1,10 +1,9 @@
 extends SceneTree
 
-const MAP_SCENE_PATH := "res://underwater_map_workbench/UnderwaterMap.tscn"
-const MAP_MANIFEST_PATH := "res://underwater_map_workbench/map_manifest.json"
 const OUTPUT_ROOT := "user://test_tower_prototype_01_proxy_capture"
 const CAPTURE_RESOLUTION := Vector2i(1280, 720)
 const GAMEPLAY_ZOOM := 1.2
+const CAPTURE_CLEAR_COLOR := Color("071d2a")
 # Single authority for every generated output. Both cleanup and capture generation
 # resolve filenames through this collection, so adding a frame cannot leave a
 # stale, undeclared PNG behind.
@@ -53,6 +52,14 @@ const TOWER_PACKAGE_SCENE_PATH := "res://underwater_map_workbench/structures/tow
 const TOWER_STRUCTURE_TEXTURE_PATH := "res://underwater_map_workbench/structures/tower_prototype_01/assets/visual/tower_structure.png"
 const TOWER_INTERIOR_TEXTURE_PATH := "res://underwater_map_workbench/structures/tower_prototype_01/assets/visual/tower_interior.png"
 const TOWER_CAPTURE_MARGIN := Vector2(240.0, 240.0)
+const LOCAL_BACKDROP_SNAP := 80.0
+const LOCAL_BACKDROP_COLORS := [
+	Color("0b2837"),
+	Color("0c3040"),
+	Color("0d3545"),
+	Color("0b2f40"),
+	Color("092838"),
+]
 const VIEWPORT_READY_FRAME_LIMIT := 60
 const RENDER_SETTLE_FRAMES := 4
 const DOOR_MATERIAL_DISTANCE_THRESHOLD := 0.06
@@ -64,12 +71,10 @@ const DOOR_ADJACENT_MASK_DIFFERENCE_MIN := 0.10
 const DOOR_ENDPOINT_MASK_DIFFERENCE_MIN := 0.30
 
 var _capture_host: Node2D
-var _map: Node2D
+var _capture_backdrop: Node2D
 var _tower_root: Node2D
 var _camera: Camera2D
 var _package_manifest: Dictionary = {}
-var _background_map_package_sha256 := ""
-var _tower_origin := Vector2.ZERO
 var _tower_size := Vector2.ZERO
 var _tower_detail_positions: Dictionary = {}
 var _last_capture_image: Image
@@ -87,35 +92,21 @@ func _run() -> void:
 		return
 	if not await _configure_capture_viewport():
 		return
-	var map_manifest := _load_json_dictionary(MAP_MANIFEST_PATH, "map manifest")
 	_package_manifest = _load_json_dictionary(TOWER_PACKAGE_MANIFEST_PATH, "local tower package manifest")
-	if map_manifest.is_empty() or _package_manifest.is_empty():
+	if _package_manifest.is_empty():
 		return
-	if not _configure_tower_capture_targets(map_manifest, _package_manifest):
-		return
-
-	var map_resource := ResourceLoader.load(
-		MAP_SCENE_PATH,
-		"PackedScene",
-		ResourceLoader.CACHE_MODE_IGNORE,
-	)
-	if not map_resource is PackedScene:
-		_fail("Could not load the exact generated map scene: %s." % MAP_SCENE_PATH)
-		return
-	var map_instance := (map_resource as PackedScene).instantiate()
-	if not map_instance is Node2D:
-		if map_instance != null:
-			map_instance.free()
-		_fail("The generated map scene root must be Node2D.")
-		return
-	_map = map_instance as Node2D
-	if not _mount_local_tower_over_background(_map) or not _validate_map_instance(_map):
+	if not _configure_tower_capture_targets(_package_manifest):
 		return
 
 	_capture_host = Node2D.new()
-	_capture_host.name = "UnderwaterMapProxyCaptureHost"
+	_capture_host.name = "TowerPackageProxyCaptureHost"
 	root.add_child(_capture_host)
-	_capture_host.add_child(_map)
+	if (
+		not _mount_local_capture_backdrop(_capture_host)
+		or not _mount_local_tower_candidate(_capture_host)
+		or not _validate_local_tower_candidate()
+	):
+		return
 	_camera = Camera2D.new()
 	_camera.name = "ProxyCaptureCamera"
 	_camera.position_smoothing_enabled = false
@@ -135,10 +126,9 @@ func _run() -> void:
 	if not _prepare_output_directory():
 		return
 
-	var world_size: Vector2 = _map.get_meta("world_size")
 	var captures: Array[Dictionary] = []
 	var tower_capture_rect := Rect2(
-		_tower_origin - TOWER_CAPTURE_MARGIN,
+		-TOWER_CAPTURE_MARGIN,
 		_tower_size + TOWER_CAPTURE_MARGIN * 2.0,
 	)
 	var tower_zoom := minf(
@@ -155,9 +145,9 @@ func _run() -> void:
 		return
 	var tower_capture: Dictionary = captures[captures.size() - 1]
 	tower_capture["structure_id"] = TOWER_STRUCTURE_ID
-	tower_capture["target_world_rect"] = [
-		_tower_origin.x,
-		_tower_origin.y,
+	tower_capture["target_local_rect"] = [
+		0.0,
+		0.0,
 		_tower_size.x,
 		_tower_size.y,
 	]
@@ -185,7 +175,7 @@ func _run() -> void:
 	if not await _capture_runtime_tower_states(tower_capture_rect, captures):
 		return
 
-	if not _save_capture_manifest(world_size, captures):
+	if not _save_capture_manifest(captures):
 		return
 	print(
 		"Tower prototype capture saved: %s"
@@ -195,38 +185,10 @@ func _run() -> void:
 	quit(0)
 
 
-func _configure_tower_capture_targets(map_manifest: Dictionary, package_manifest: Dictionary) -> bool:
-	var structures_value = map_manifest.get("structures", null)
-	if not structures_value is Dictionary:
-		_fail("The read-only map manifest has no structures record for capture placement.")
-		return false
-	var instances_value = (structures_value as Dictionary).get("instances", null)
-	if not instances_value is Array:
-		_fail("The active manifest has no structures.instances array for capture framing.")
-		return false
-	var tower_instance: Dictionary = {}
-	for instance_value in instances_value as Array:
-		if instance_value is Dictionary and str((instance_value as Dictionary).get("id", "")) == TOWER_STRUCTURE_ID:
-			tower_instance = instance_value as Dictionary
-			break
-	if tower_instance.is_empty():
-		_fail("The read-only map manifest has no structure instance %s." % TOWER_STRUCTURE_ID)
-		return false
-	_tower_origin = _manifest_vector2(tower_instance.get("origin", null))
+func _configure_tower_capture_targets(package_manifest: Dictionary) -> bool:
 	_tower_size = _manifest_vector2(package_manifest.get("size", null))
-	if not _tower_origin.is_finite() or not _tower_size.is_finite() or _tower_size.x <= 0.0 or _tower_size.y <= 0.0:
-		_fail("Map placement and local package must publish finite tower origin and size.")
-		return false
-	if not bool(tower_instance.get("enabled", false)):
-		_fail("The read-only map placement for %s must remain enabled." % TOWER_STRUCTURE_ID)
-		return false
-	var package_pin := tower_instance.get("package", {}) as Dictionary
-	if str(package_pin.get("path", "")) != "structures/tower_prototype_01/structure_manifest.json":
-		_fail("The map placement points at an unexpected tower package path.")
-		return false
-	_background_map_package_sha256 = str(package_pin.get("sha256", ""))
-	if _background_map_package_sha256.is_empty():
-		_fail("The read-only map placement has no provenance pin for W01.")
+	if not _tower_size.is_finite() or _tower_size.x <= 0.0 or _tower_size.y <= 0.0:
+		_fail("The local package must publish a finite positive tower size.")
 		return false
 
 	var socket_rects := {}
@@ -258,7 +220,7 @@ func _configure_tower_capture_targets(map_manifest: Dictionary, package_manifest
 			_fail("The tower capture target is missing manifest socket %s." % socket_id)
 			return false
 		var socket_rect: Rect2 = socket_rects[socket_id]
-		_tower_detail_positions[detail_id] = _tower_origin + socket_rect.get_center()
+		_tower_detail_positions[detail_id] = socket_rect.get_center()
 
 	var basement_control_id := "control_basement_hatch"
 	var basement_hatch_id := "hatch_basement"
@@ -267,7 +229,7 @@ func _configure_tower_capture_targets(map_manifest: Dictionary, package_manifest
 		return false
 	var basement_control: Rect2 = socket_rects[basement_control_id]
 	var basement_hatch: Rect2 = socket_rects[basement_hatch_id]
-	_tower_detail_positions["tower_basement"] = _tower_origin + Vector2(
+	_tower_detail_positions["tower_basement"] = Vector2(
 		basement_control.get_center().x,
 		basement_hatch.get_center().y + basement_hatch.size.y,
 	)
@@ -275,7 +237,7 @@ func _configure_tower_capture_targets(map_manifest: Dictionary, package_manifest
 
 
 func _tower_detail_position(detail_id: String) -> Vector2:
-	var fallback := _tower_origin + _tower_size * 0.5
+	var fallback := _tower_size * 0.5
 	return Vector2(_tower_detail_positions.get(detail_id, fallback))
 
 
@@ -317,7 +279,7 @@ func _json_rect(value: Variant) -> Array:
 
 func _configure_capture_viewport() -> bool:
 	root.gui_disable_input = true
-	RenderingServer.set_default_clear_color(Color("071d2a"))
+	RenderingServer.set_default_clear_color(CAPTURE_CLEAR_COLOR)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
@@ -346,21 +308,79 @@ func _load_json_dictionary(path: String, label: String) -> Dictionary:
 	return parsed as Dictionary
 
 
-func _mount_local_tower_over_background(map_instance: Node2D) -> bool:
-	var structure_roots := map_instance.get_node_or_null("StructureRoots") as Node2D
-	if structure_roots == null:
-		_fail("The generated map background has no StructureRoots root.")
+func _mount_local_capture_backdrop(capture_host: Node2D) -> bool:
+	if capture_host == null:
+		_fail("The local capture host is unavailable for its diagnostic backdrop.")
 		return false
-	var background_tower := structure_roots.get_node_or_null(TOWER_STRUCTURE_ID) as Node2D
-	if background_tower == null:
-		_fail("The generated map background has no placement node for %s." % TOWER_STRUCTURE_ID)
+	var backdrop_rect := _local_capture_backdrop_rect()
+	if backdrop_rect.size.x <= 0.0 or backdrop_rect.size.y <= 0.0:
+		_fail("The local diagnostic backdrop has an invalid coverage rect.")
 		return false
-	if not background_tower.position.is_equal_approx(_tower_origin):
-		_fail("The generated map background placement disagrees with read-only map_manifest origin.")
+	_capture_backdrop = Node2D.new()
+	_capture_backdrop.name = "LocalDiagnosticBackdrop"
+	_capture_backdrop.position = Vector2.ZERO
+	_capture_backdrop.scale = Vector2.ONE
+	_capture_backdrop.rotation = 0.0
+	_capture_backdrop.skew = 0.0
+	_capture_backdrop.z_index = -1000
+	_capture_backdrop.set_meta(&"diagnostic_only", true)
+	_capture_backdrop.set_meta(&"coverage_rect", backdrop_rect)
+	for band_index: int in range(LOCAL_BACKDROP_COLORS.size()):
+		var band_start := float(band_index) / float(LOCAL_BACKDROP_COLORS.size())
+		var band_end := float(band_index + 1) / float(LOCAL_BACKDROP_COLORS.size())
+		var y_start := lerpf(backdrop_rect.position.y, backdrop_rect.end.y, band_start)
+		var y_end := lerpf(backdrop_rect.position.y, backdrop_rect.end.y, band_end)
+		var band := Polygon2D.new()
+		band.name = "WaterBand%02d" % band_index
+		band.polygon = PackedVector2Array([
+			Vector2(backdrop_rect.position.x, y_start),
+			Vector2(backdrop_rect.end.x, y_start),
+			Vector2(backdrop_rect.end.x, y_end),
+			Vector2(backdrop_rect.position.x, y_end),
+		])
+		band.color = LOCAL_BACKDROP_COLORS[band_index]
+		_capture_backdrop.add_child(band)
+	capture_host.add_child(_capture_backdrop)
+	return true
+
+
+func _local_capture_backdrop_rect() -> Rect2:
+	var tower_capture_rect := Rect2(
+		-TOWER_CAPTURE_MARGIN,
+		_tower_size + TOWER_CAPTURE_MARGIN * 2.0,
+	)
+	var overview_zoom := minf(
+		float(CAPTURE_RESOLUTION.x) / tower_capture_rect.size.x,
+		float(CAPTURE_RESOLUTION.y) / tower_capture_rect.size.y,
+	)
+	var overview_visible_size := Vector2(CAPTURE_RESOLUTION) / overview_zoom
+	var coverage := Rect2(
+		tower_capture_rect.get_center() - overview_visible_size * 0.5,
+		overview_visible_size,
+	)
+	var detail_visible_size := Vector2(CAPTURE_RESOLUTION) / GAMEPLAY_ZOOM
+	for detail_position_value: Variant in _tower_detail_positions.values():
+		var detail_position := Vector2(detail_position_value)
+		coverage = coverage.merge(Rect2(
+			detail_position - detail_visible_size * 0.5,
+			detail_visible_size,
+		))
+	coverage = coverage.grow(LOCAL_BACKDROP_SNAP)
+	var snapped_position := Vector2(
+		floorf(coverage.position.x / LOCAL_BACKDROP_SNAP) * LOCAL_BACKDROP_SNAP,
+		floorf(coverage.position.y / LOCAL_BACKDROP_SNAP) * LOCAL_BACKDROP_SNAP,
+	)
+	var snapped_end := Vector2(
+		ceilf(coverage.end.x / LOCAL_BACKDROP_SNAP) * LOCAL_BACKDROP_SNAP,
+		ceilf(coverage.end.y / LOCAL_BACKDROP_SNAP) * LOCAL_BACKDROP_SNAP,
+	)
+	return Rect2(snapped_position, snapped_end - snapped_position)
+
+
+func _mount_local_tower_candidate(capture_host: Node2D) -> bool:
+	if capture_host == null:
+		_fail("The local capture host is unavailable.")
 		return false
-	var child_index := background_tower.get_index()
-	var inherited_z_index := background_tower.z_index
-	background_tower.free()
 	var package_resource := ResourceLoader.load(
 		TOWER_PACKAGE_SCENE_PATH,
 		"PackedScene",
@@ -376,31 +396,40 @@ func _mount_local_tower_over_background(map_instance: Node2D) -> bool:
 		_fail("The sealed local package scene root must be Node2D.")
 		return false
 	_tower_root = package_instance as Node2D
-	_tower_root.name = TOWER_STRUCTURE_ID
-	_tower_root.position = _tower_origin
-	_tower_root.scale = Vector2.ONE
-	_tower_root.z_index = inherited_z_index
-	_tower_root.visible = true
-	structure_roots.add_child(_tower_root)
-	structure_roots.move_child(_tower_root, child_index)
+	capture_host.add_child(_tower_root)
 	return true
 
 
-func _validate_map_instance(map_instance: Node2D) -> bool:
-	if map_instance.scene_file_path != MAP_SCENE_PATH:
-		_fail(
-			"Instantiated scene path is %s instead of %s."
-			% [map_instance.scene_file_path, MAP_SCENE_PATH]
-		)
-		return false
-	if map_instance.get_node_or_null("VisualLayers") == null:
-		_fail("The generated map scene has no VisualLayers root.")
-		return false
+func _validate_local_tower_candidate() -> bool:
 	if _tower_root == null or _tower_root.scene_file_path != TOWER_PACKAGE_SCENE_PATH:
 		_fail("The visible W01 root is not an instance of the sealed local package scene.")
 		return false
-	if _tower_root.position != _tower_origin or _tower_root.scale != Vector2.ONE:
-		_fail("The local package root does not match map placement and identity scale.")
+	if _capture_backdrop == null or _capture_backdrop.get_parent() != _capture_host:
+		_fail("The local diagnostic backdrop must be mounted directly in the capture host.")
+		return false
+	if _capture_backdrop.get_index() >= _tower_root.get_index():
+		_fail("The local diagnostic backdrop must be mounted before the tower candidate.")
+		return false
+	if (
+		_capture_backdrop.position != Vector2.ZERO
+		or _capture_backdrop.scale != Vector2.ONE
+		or not is_zero_approx(_capture_backdrop.rotation)
+		or not is_zero_approx(_capture_backdrop.skew)
+		or _capture_backdrop.z_index != -1000
+	):
+		_fail("The local diagnostic backdrop must preserve its identity transform and backmost z-index.")
+		return false
+	if _tower_root.get_parent() != _capture_host:
+		_fail("The visible W01 root must be mounted directly in its local capture host.")
+		return false
+	if (
+		_tower_root.position != Vector2.ZERO
+		or _tower_root.scale != Vector2.ONE
+		or not is_zero_approx(_tower_root.rotation)
+		or not is_zero_approx(_tower_root.skew)
+		or not _tower_root.visible
+	):
+		_fail("The local package root must preserve an identity transform at structure-local origin.")
 		return false
 	if str(_tower_root.get_meta("structure_id", "")) != TOWER_STRUCTURE_ID or _tower_root.get_meta("size", Vector2.ZERO) != _tower_size:
 		_fail("The local package root does not publish the expected structure id and package size.")
@@ -409,21 +438,9 @@ func _validate_map_instance(map_instance: Node2D) -> bool:
 	if local_package_sha256.is_empty() or str(_tower_root.get_meta("package_manifest_sha256", "")) != local_package_sha256:
 		_fail("The local generated scene is not built from the currently sealed package manifest.")
 		return false
-	if not map_instance.has_meta("world_size"):
-		_fail("The generated map scene has no world_size metadata.")
-		return false
-	var world_size_value = map_instance.get_meta("world_size")
-	if not world_size_value is Vector2:
-		_fail("The generated map scene world_size metadata must be Vector2.")
-		return false
-	var world_size: Vector2 = world_size_value
-	if (
-		not is_finite(world_size.x)
-		or not is_finite(world_size.y)
-		or world_size.x <= 0.0
-		or world_size.y <= 0.0
-	):
-		_fail("The generated map scene world_size must be finite and positive.")
+	var local_topology_digest := str(_package_manifest.get("local_topology_digest", ""))
+	if local_topology_digest.is_empty() or str(_tower_root.get_meta("local_topology_digest", "")) != local_topology_digest:
+		_fail("The local generated scene does not publish the sealed package topology digest.")
 		return false
 	return true
 
@@ -925,7 +942,6 @@ func _effective_local_structure_record(controller_script_path: String) -> Dictio
 	return {
 		"id": TOWER_STRUCTURE_ID,
 		"template_id": str((_package_manifest.get("template", {}) as Dictionary).get("id", "")),
-		"origin": [_tower_origin.x, _tower_origin.y],
 		"size": (_package_manifest.get("size", []) as Array).duplicate(true),
 		"sockets": (_package_manifest.get("sockets", []) as Array).duplicate(true),
 		"runtime": (_package_manifest.get("runtime", {}) as Dictionary).duplicate(true),
@@ -1257,14 +1273,16 @@ func _capture_runtime_trolley_state(
 	if not local_position_value is Vector2 or not controller is Node2D:
 		_fail("Runtime trolley state %s has no physical position." % capture_id)
 		return false
-	var trolley_world_position := (controller as Node2D).to_global(local_position_value as Vector2)
+	var trolley_canvas_position := _capture_host.to_local(
+		(controller as Node2D).to_global(local_position_value as Vector2)
+	)
 	if not await _capture_runtime_detail(
 		controller,
 		file_name,
 		capture_id,
 		"tower_shaft",
 		captures,
-		trolley_world_position,
+		trolley_canvas_position,
 	):
 		return false
 	var capture: Dictionary = captures[captures.size() - 1]
@@ -1596,6 +1614,18 @@ func _capture_frame(
 	_camera.position = camera_position
 	_camera.zoom = Vector2.ONE * camera_zoom
 	_camera.force_update_scroll()
+	var visible_size := Vector2(CAPTURE_RESOLUTION) / camera_zoom
+	var visible_local_rect := Rect2(
+		camera_position - visible_size * 0.5,
+		visible_size,
+	)
+	var backdrop_coverage_value: Variant = _capture_backdrop.get_meta(&"coverage_rect", null)
+	if not backdrop_coverage_value is Rect2 or not (backdrop_coverage_value as Rect2).encloses(visible_local_rect):
+		_fail(
+			"Capture %s leaves the deterministic local backdrop: visible=%s coverage=%s."
+			% [file_name, str(visible_local_rect), str(backdrop_coverage_value)]
+		)
+		return false
 	for _frame in range(RENDER_SETTLE_FRAMES):
 		await process_frame
 	await RenderingServer.frame_post_draw
@@ -1611,7 +1641,7 @@ func _capture_frame(
 		)
 		return false
 	if not _image_has_multiple_sampled_colors(image):
-		_fail("Capture %s is a uniform image; the map did not render visibly." % file_name)
+		_fail("Capture %s is a uniform image; the local package candidate did not render visibly." % file_name)
 		return false
 	_last_capture_image = image
 	var output_path := OUTPUT_ROOT.path_join(file_name)
@@ -1620,18 +1650,12 @@ func _capture_frame(
 		_fail("Could not save %s (error %d)." % [output_path, save_error])
 		return false
 
-	var visible_size := Vector2(CAPTURE_RESOLUTION) / camera_zoom
 	captures.append({
 		"file": file_name,
 		"kind": kind,
 		"camera_position": [camera_position.x, camera_position.y],
 		"camera_zoom": [camera_zoom, camera_zoom],
-		"visible_world_rect": [
-			camera_position.x - visible_size.x * 0.5,
-			camera_position.y - visible_size.y * 0.5,
-			visible_size.x,
-			visible_size.y,
-		],
+		"visible_local_rect": _json_rect(visible_local_rect),
 	})
 	return true
 
@@ -1928,12 +1952,12 @@ func _trolley_open_aperture_capture_proof(controller: Node) -> Dictionary:
 	var opaque_fill_like_ratio := float(opaque_fill_like_count) / float(sample_count)
 	if background_match_ratio < 0.35 or opaque_fill_like_ratio > 0.35:
 		_fail(
-			"Trolley aperture must reveal the rendered world instead of an opaque dark plate: background_match=%.3f opaque_fill_like=%.3f samples=%d."
+			"Trolley aperture must reveal the rendered local scene instead of an opaque dark plate: background_match=%.3f opaque_fill_like=%.3f samples=%d."
 			% [background_match_ratio, opaque_fill_like_ratio, sample_count]
 		)
 		return {}
 	return {
-		"contract": "transparent_world_background_visible",
+		"contract": "transparent_local_scene_background_visible",
 		"sample_count": sample_count,
 		"background_match_ratio": background_match_ratio,
 		"opaque_fill_like_ratio": opaque_fill_like_ratio,
@@ -1964,7 +1988,7 @@ func _image_has_multiple_sampled_colors(image: Image) -> bool:
 	return false
 
 
-func _save_capture_manifest(world_size: Vector2, captures: Array[Dictionary]) -> bool:
+func _save_capture_manifest(captures: Array[Dictionary]) -> bool:
 	var expected_files := {}
 	for file_name_value: Variant in CAPTURE_FILES.values():
 		var file_name := str(file_name_value)
@@ -1984,21 +2008,38 @@ func _save_capture_manifest(world_size: Vector2, captures: Array[Dictionary]) ->
 			% [expected_files.keys(), captured_files.keys()]
 		)
 		return false
+	var backdrop_palette: Array = []
+	for backdrop_color: Color in LOCAL_BACKDROP_COLORS:
+		backdrop_palette.append([
+			backdrop_color.r,
+			backdrop_color.g,
+			backdrop_color.b,
+			backdrop_color.a,
+		])
 	var report := {
 		"resolution": [CAPTURE_RESOLUTION.x, CAPTURE_RESOLUTION.y],
-		"world_size": [world_size.x, world_size.y],
 		"gameplay_zoom": GAMEPLAY_ZOOM,
-		"mount_mode": "local_package_over_read_only_map_background",
-		"background_map": {
-			"scene_path": MAP_SCENE_PATH,
-			"scene_file_path": _map.scene_file_path,
-			"manifest_path": MAP_MANIFEST_PATH,
-			"manifest_sha256": FileAccess.get_sha256(MAP_MANIFEST_PATH),
-			"scene_manifest_sha256": str(_map.get_meta("manifest_sha256", "")),
-			"revision_id": str(_map.get_meta("revision_id", "")),
-			"topology_revision": str(_map.get_meta("topology_revision", "")),
-			"presentation_revision": str(_map.get_meta("presentation_revision", "")),
-			"tower_package_pin": _background_map_package_sha256,
+		"mount_mode": "sealed_local_package_candidate",
+		"capture_context": {
+			"authority": "local_structure_package",
+			"coordinate_space": "structure_local",
+			"origin": [0.0, 0.0],
+			"size": [_tower_size.x, _tower_size.y],
+			"diagnostic_backdrop": {
+				"fixture_version": "tower_local_diagnostic_backdrop_v1",
+				"node": _capture_backdrop.name,
+				"contract": "static_opaque_non_authority",
+				"coverage_rect": _json_rect(_capture_backdrop.get_meta(&"coverage_rect", Rect2())),
+				"z_index": _capture_backdrop.z_index,
+				"band_count": LOCAL_BACKDROP_COLORS.size(),
+				"palette_rgba": backdrop_palette,
+			},
+			"clear_color": [
+				CAPTURE_CLEAR_COLOR.r,
+				CAPTURE_CLEAR_COLOR.g,
+				CAPTURE_CLEAR_COLOR.b,
+				CAPTURE_CLEAR_COLOR.a,
+			],
 		},
 		"tower_package": {
 			"package_manifest_path": TOWER_PACKAGE_MANIFEST_PATH,
@@ -2007,7 +2048,7 @@ func _save_capture_manifest(world_size: Vector2, captures: Array[Dictionary]) ->
 			"structure_scene_path": TOWER_PACKAGE_SCENE_PATH,
 			"structure_scene_sha256": FileAccess.get_sha256(TOWER_PACKAGE_SCENE_PATH),
 			"controller_script": str(_tower_root.get_meta("controller_script", "")),
-			"placement_origin": [_tower_origin.x, _tower_origin.y],
+			"local_origin": [0.0, 0.0],
 			"size": [_tower_size.x, _tower_size.y],
 			"structure_texture_path": TOWER_STRUCTURE_TEXTURE_PATH,
 			"structure_texture_sha256": FileAccess.get_sha256(TOWER_STRUCTURE_TEXTURE_PATH),
@@ -2043,10 +2084,8 @@ func _capture_file(capture_id: StringName) -> String:
 func _cleanup_scene() -> void:
 	if _capture_host != null and is_instance_valid(_capture_host):
 		_capture_host.free()
-	elif _map != null and is_instance_valid(_map):
-		_map.free()
 	_capture_host = null
-	_map = null
+	_capture_backdrop = null
 	_tower_root = null
 	_camera = null
 
@@ -2055,6 +2094,6 @@ func _fail(message: String) -> void:
 	if _failed:
 		return
 	_failed = true
-	push_error("Underwater map proxy capture failed: " + message)
+	push_error("Tower package proxy capture failed: " + message)
 	_cleanup_scene()
 	quit(1)
