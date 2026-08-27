@@ -671,9 +671,9 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             -PlanDestinationPath $destinationPath `
             -PlanCommonDirectory $commonDir -PlanPublicationLock $lockPath
 
-        $worktreeAttemptStartedByInvocation = $false
+        $worktreeCreatedByInvocation = $false
+        $assignmentPublished = $false
         try {
-            $worktreeAttemptStartedByInvocation = $true
             $addResult = Invoke-NativeResult -FilePath 'git' -Arguments @(
                 '-C', $repoRoot, 'worktree', 'add', '-b', $Branch,
                 $destinationPath, $baseline
@@ -681,6 +681,11 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             if ($addResult.ExitCode -ne 0) {
                 throw "git worktree add failed: $($addResult.Output)"
             }
+            # Only a successful `git worktree add` proves this invocation owns
+            # the new path and branch. A failed Git command may have raced with
+            # an uncoordinated external creator, so cleanup must fail safe and
+            # never delete resources whose ownership cannot be proven.
+            $worktreeCreatedByInvocation = $true
             if ($FaultInjection -eq 'AfterGitWorktreeAdd') {
                 throw "Injected failure after git worktree add."
             }
@@ -753,6 +758,7 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             if ($assignmentResult.ExitCode -ne 0) {
                 throw "Durable assignment creation failed: $($assignmentResult.Output)"
             }
+            $assignmentPublished = $true
             Write-Output $assignmentResult.Output
             Write-Output (
                 "ASSIGNMENT CREATED: WAITING_ACK. Dispatch the exact destination, " +
@@ -762,9 +768,15 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
         }
         catch {
             $failure = $_.Exception.Message
-            if (-not $worktreeAttemptStartedByInvocation) {
+            if ($assignmentPublished) {
                 throw (
-                    "Worktree creation failed before this invocation established " +
+                    "Worktree setup reached its durable assignment marker; " +
+                    "the assigned worktree and branch were preserved: $failure"
+                )
+            }
+            if (-not $worktreeCreatedByInvocation) {
+                throw (
+                    "Worktree creation failed before this invocation proved " +
                     "ownership; no cleanup was attempted: $failure"
                 )
             }
