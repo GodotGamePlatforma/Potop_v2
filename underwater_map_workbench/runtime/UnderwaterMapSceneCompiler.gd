@@ -44,13 +44,14 @@ const OPEN_WATER_BACKDROP_AFFORDANCE_POLICY := "nonblocking_backdrop_may_overlap
 const NONBLOCKING_TEXTURE_LAYER_IDS := ["L01", "L02"]
 const GROUND_ANCHORED_BACKDROP_LAYER_IDS := ["L01", "L02"]
 const NONBLOCKING_BACKDROP_AFFORDANCE := "nonblocking_backdrop"
-const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v1"
+const PORTAL_BACKDROP_CLEARANCE_CONTRACT := "raster_boundary_opening_clearance_v2"
 const PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID := "L04"
 const PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS := ["L01", "L02"]
 const PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS := ["L03", "L04"]
-const PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS := 5
+const PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS := 3
 const PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS := 1
-const PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS := 2
+const PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS := 1
+const PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT := 0.82
 const L05_TOPOLOGY_MODE := "l05_mask_v1"
 const L05_SOURCE_FORMAT := "l05_owned_rect_ops_v2"
 const L05_PIXEL_SIZE := Vector2i(576, 324)
@@ -2496,6 +2497,11 @@ func _generated_portal_backdrop_clearance_errors(
 		!= PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS
 	):
 		errors.append("PortalBackdropClearances ma nieaktualne ograniczenia paddingu/feather.")
+	if not is_equal_approx(
+		float(clearance_root.get_meta("feather_outer_tint", -1.0)),
+		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+	):
+		errors.append("PortalBackdropClearances ma nieaktualny ciemny feather tint.")
 
 	var geometry_records: Array = []
 	var previous_digest := ""
@@ -2506,6 +2512,27 @@ func _generated_portal_backdrop_clearance_errors(
 		"#%s" % str(expected_visual.get("water_color", "")),
 		Color.TRANSPARENT,
 	)
+	var feather_shadow := Color(
+		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT,
+		1.0,
+	)
+	var expected_vertex_colors := {
+		"Core": PackedColorArray(),
+		"FeatherLeft": PackedColorArray([
+			feather_shadow, Color.WHITE, Color.WHITE, feather_shadow,
+		]),
+		"FeatherRight": PackedColorArray([
+			Color.WHITE, feather_shadow, feather_shadow, Color.WHITE,
+		]),
+		"FeatherTop": PackedColorArray([
+			feather_shadow, feather_shadow, Color.WHITE, Color.WHITE,
+		]),
+		"FeatherBottom": PackedColorArray([
+			Color.WHITE, Color.WHITE, feather_shadow, feather_shadow,
+		]),
+	}
 	for child: Node in clearance_root.get_children():
 		if not child is Node2D or child.get_class() != "Node2D":
 			errors.append("PortalBackdropClearances może zawierać wyłącznie dokładne Node2D.")
@@ -2604,6 +2631,19 @@ func _generated_portal_backdrop_clearance_errors(
 					errors.append("Portal clearance polygon musi mieć neutralny render state.")
 				if not polygon.color.is_equal_approx(expected_water_color):
 					errors.append("Portal clearance polygon musi używać visual.water_color.")
+				var expected_colors_value: Variant = expected_vertex_colors.get(
+					str(visual_child.name), null
+				)
+				if (
+					not expected_colors_value is PackedColorArray
+					or not _packed_color_array_is_equal_approx(
+						polygon.vertex_colors,
+						expected_colors_value as PackedColorArray,
+					)
+				):
+					errors.append(
+						"Portal clearance feather musi być nieprzezroczystym ciemnym przejściem."
+					)
 		if actual_visual_children != expected_visual_children:
 			errors.append("Portal clearance ma nieaktualny zestaw Core/Feather.")
 		var descendants: Array[Node] = [clearance]
@@ -2623,6 +2663,18 @@ func _generated_portal_backdrop_clearance_errors(
 	elif aggregate_digest != _canonical_sha256(geometry_records):
 		errors.append("PortalBackdropClearances aggregate digest nie odpowiada dzieciom.")
 	return errors
+
+
+func _packed_color_array_is_equal_approx(
+	actual: PackedColorArray,
+	expected: PackedColorArray,
+) -> bool:
+	if actual.size() != expected.size():
+		return false
+	for index: int in range(actual.size()):
+		if not actual[index].is_equal_approx(expected[index]):
+			return false
+	return true
 
 
 func _valid_portal_source_geometry(geometry: Dictionary) -> bool:

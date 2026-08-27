@@ -129,13 +129,14 @@ STRUCTURE_INTERIOR_TEXTURE_KIND = "structure_interior_texture"
 STRUCTURE_OWNER_MASKED_TEXTURE_KIND = "structure_owner_masked_texture"
 STRUCTURE_INTERIOR_AFFORDANCE = "open_water_clipped_interior"
 STRUCTURE_OWNER_AFFORDANCE = "exact_owner_solid_surface"
-PORTAL_BACKDROP_CLEARANCE_CONTRACT = "raster_boundary_opening_clearance_v1"
+PORTAL_BACKDROP_CLEARANCE_CONTRACT = "raster_boundary_opening_clearance_v2"
 PORTAL_BACKDROP_CLEARANCE_HOST_LAYER_ID = "L04"
 PORTAL_BACKDROP_CLEARANCE_OCCLUDED_LAYER_IDS = ("L01", "L02")
 PORTAL_BACKDROP_CLEARANCE_FOREGROUND_LAYER_IDS = ("L03", "L04")
-PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS = 5
+PORTAL_BACKDROP_CLEARANCE_NORMAL_CORE_CELLS = 3
 PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS = 1
-PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS = 2
+PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS = 1
+PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT = 0.82
 STRUCTURE_CLIP_SHADER_PATH = "assets/shaders/structure_clip_masked.gdshader"
 STRUCTURE_CLIP_SHADER_RESOURCE_PATH = (
     "res://underwater_map_workbench/assets/shaders/structure_clip_masked.gdshader"
@@ -5282,13 +5283,22 @@ def _append_portal_backdrop_clearances(
             f"{PORTAL_BACKDROP_CLEARANCE_TANGENT_PADDING_CELLS}",
             "metadata/feather_cells = "
             f"{PORTAL_BACKDROP_CLEARANCE_FEATHER_CELLS}",
+            "metadata/feather_outer_tint = "
+            f"{_gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT)}",
         )
     )
     water_color = _gd_color(
         manifest["visual"]["water_color"],
         "visual.water_color",
     )
-    transparent = "1, 1, 1, 0"
+    shadow = ", ".join(
+        (
+            _gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT),
+            _gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT),
+            _gd_number(PORTAL_BACKDROP_CLEARANCE_FEATHER_OUTER_TINT),
+            "1",
+        )
+    )
     opaque = "1, 1, 1, 1"
     for clearance in clearances:
         geometry_digest = str(clearance["geometry_digest"])
@@ -5315,7 +5325,7 @@ def _append_portal_backdrop_clearances(
                     (core_x, core_bottom),
                     (outer_x, core_bottom),
                 ),
-                (transparent, opaque, opaque, transparent),
+                (shadow, opaque, opaque, shadow),
             ),
             (
                 "FeatherRight",
@@ -5325,7 +5335,7 @@ def _append_portal_backdrop_clearances(
                     (outer_right, core_bottom),
                     (core_right, core_bottom),
                 ),
-                (opaque, transparent, transparent, opaque),
+                (opaque, shadow, shadow, opaque),
             ),
             (
                 "FeatherTop",
@@ -5335,7 +5345,7 @@ def _append_portal_backdrop_clearances(
                     (core_right, core_y),
                     (core_x, core_y),
                 ),
-                (transparent, transparent, opaque, opaque),
+                (shadow, shadow, opaque, opaque),
             ),
             (
                 "FeatherBottom",
@@ -5345,7 +5355,7 @@ def _append_portal_backdrop_clearances(
                     (core_right, outer_bottom),
                     (core_x, outer_bottom),
                 ),
-                (opaque, opaque, transparent, transparent),
+                (opaque, opaque, shadow, shadow),
             ),
         )
         lines.extend(
