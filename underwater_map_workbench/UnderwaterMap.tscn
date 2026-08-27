@@ -18,15 +18,15 @@ shader_parameter/texture_tiling = Vector2(18.373206, 10.334928)
 
 [node name="UnderwaterMap" type="Node2D"]
 metadata/manifest_path = "res://underwater_map_workbench/map_manifest.json"
-metadata/manifest_sha256 = "604c7d88a4a2f8f6dc075b484c479ba3be08fdd62f2e739ba5f3b285319f538f"
+metadata/manifest_sha256 = "0fbd7412b50086bb4963cd95f305a0912f6d2bc4b0d4603bd2c6d907f7561b51"
 metadata/schema_version = 6
 metadata/source_version = 5
-metadata/revision = {"presentation_revision": "center-station-right-city-two-tower-production-v16", "revision_id": "center-station-right-city-two-tower-runtime-v13", "topology_revision": "l05-owned-two-tower-route-v5"}
+metadata/revision = {"presentation_revision": "center-station-right-city-two-tower-production-v18", "revision_id": "center-station-right-city-two-tower-runtime-v13", "topology_revision": "l05-owned-two-tower-route-v5"}
 metadata/gameplay_signature = "manifest-v2:fbde2d70e22f93d46d32416bdc7d74b68c4bd44736b3fae0e888b221edb17325"
-metadata/presentation_fingerprint = "presentation-v2:e35628cbe16911a4175e3407f74f1629a501f781f52ca9ce9bc468b8e6a4d576"
+metadata/presentation_fingerprint = "presentation-v2:95a607d91491e5a2e8528883afd0ab4331b5f73ff1a93bcfe7691037b2742dfd"
 metadata/revision_id = "center-station-right-city-two-tower-runtime-v13"
 metadata/topology_revision = "l05-owned-two-tower-route-v5"
-metadata/presentation_revision = "center-station-right-city-two-tower-production-v16"
+metadata/presentation_revision = "center-station-right-city-two-tower-production-v18"
 metadata/grid_size = Vector2i(12, 12)
 metadata/cell_size = Vector2(1920, 1080)
 metadata/navigation_cell_size = Vector2(40, 40)
@@ -247,7 +247,7 @@ position = Vector2(0, 0)
 scale = Vector2(1, 1)
 z_as_relative = false
 z_index = -79
-metadata/contract = "raster_boundary_opening_clearance_v1"
+metadata/contract = "raster_boundary_opening_clearance_v3"
 metadata/role = "portal_backdrop_clearance"
 metadata/space = "world_locked"
 metadata/visual_only = true
@@ -255,9 +255,10 @@ metadata/occluded_layer_ids = PackedStringArray("L01", "L02")
 metadata/host_layer_id = "L04"
 metadata/geometry_digest = "1ce30275ea69de4f6a14ea3c48b120e98c9488e9da537aef8adfb7691ea78815"
 metadata/clearance_count = 3
-metadata/normal_core_cells = 5
+metadata/normal_core_cells = 3
 metadata/tangent_padding_cells = 1
-metadata/feather_cells = 2
+metadata/feather_cells = 1
+metadata/feather_outer_tint = 0.82
 
 [node name="Clearance_28d3bc6e1ff53765440c64d09dd6673c1c5e861576cf9b75a0a8df598c236fa7" type="Node2D" parent="VisualLayers/L04/PortalBackdropClearances"]
 position = Vector2(0, 0)
@@ -267,41 +268,41 @@ metadata/source_geometry = {"axis": "vertical", "boundary_cell": 330, "cell_size
 metadata/opening_center = Vector2(13200, 2960)
 metadata/outward = Vector2(-1, 0)
 metadata/span = 160
-metadata/core_rect = Rect2(13000, 2840, 400, 240)
-metadata/outer_rect = Rect2(12920, 2760, 560, 400)
+metadata/core_rect = Rect2(13080, 2840, 240, 240)
+metadata/outer_rect = Rect2(13040, 2800, 320, 320)
 metadata/visual_only = true
 
 [node name="Core" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_28d3bc6e1ff53765440c64d09dd6673c1c5e861576cf9b75a0a8df598c236fa7"]
-polygon = PackedVector2Array(13000, 2840, 13400, 2840, 13400, 3080, 13000, 3080)
+polygon = PackedVector2Array(13080, 2840, 13320, 2840, 13320, 3080, 13080, 3080)
 color = Color(0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_core"
 
 [node name="FeatherLeft" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_28d3bc6e1ff53765440c64d09dd6673c1c5e861576cf9b75a0a8df598c236fa7"]
-polygon = PackedVector2Array(12920, 2840, 13000, 2840, 13000, 3080, 12920, 3080)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+polygon = PackedVector2Array(13040, 2840, 13080, 2840, 13080, 3080, 13040, 3080)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherRight" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_28d3bc6e1ff53765440c64d09dd6673c1c5e861576cf9b75a0a8df598c236fa7"]
-polygon = PackedVector2Array(13400, 2840, 13480, 2840, 13480, 3080, 13400, 3080)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1)
+polygon = PackedVector2Array(13320, 2840, 13360, 2840, 13360, 3080, 13320, 3080)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherTop" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_28d3bc6e1ff53765440c64d09dd6673c1c5e861576cf9b75a0a8df598c236fa7"]
-polygon = PackedVector2Array(13000, 2760, 13400, 2760, 13400, 2840, 13000, 2840)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1)
+polygon = PackedVector2Array(13080, 2800, 13320, 2800, 13320, 2840, 13080, 2840)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherBottom" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_28d3bc6e1ff53765440c64d09dd6673c1c5e861576cf9b75a0a8df598c236fa7"]
-polygon = PackedVector2Array(13000, 3080, 13400, 3080, 13400, 3160, 13000, 3160)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0)
+polygon = PackedVector2Array(13080, 3080, 13320, 3080, 13320, 3120, 13080, 3120)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
@@ -313,41 +314,41 @@ metadata/source_geometry = {"axis": "vertical", "boundary_cell": 194, "cell_size
 metadata/opening_center = Vector2(7760, 3280)
 metadata/outward = Vector2(-1, 0)
 metadata/span = 160
-metadata/core_rect = Rect2(7560, 3160, 400, 240)
-metadata/outer_rect = Rect2(7480, 3080, 560, 400)
+metadata/core_rect = Rect2(7640, 3160, 240, 240)
+metadata/outer_rect = Rect2(7600, 3120, 320, 320)
 metadata/visual_only = true
 
 [node name="Core" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_29bc48e4142cc4336db93e974ebb632cdb33e89cc6f6ccdcfd8d8ac96bea1ddc"]
-polygon = PackedVector2Array(7560, 3160, 7960, 3160, 7960, 3400, 7560, 3400)
+polygon = PackedVector2Array(7640, 3160, 7880, 3160, 7880, 3400, 7640, 3400)
 color = Color(0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_core"
 
 [node name="FeatherLeft" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_29bc48e4142cc4336db93e974ebb632cdb33e89cc6f6ccdcfd8d8ac96bea1ddc"]
-polygon = PackedVector2Array(7480, 3160, 7560, 3160, 7560, 3400, 7480, 3400)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+polygon = PackedVector2Array(7600, 3160, 7640, 3160, 7640, 3400, 7600, 3400)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherRight" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_29bc48e4142cc4336db93e974ebb632cdb33e89cc6f6ccdcfd8d8ac96bea1ddc"]
-polygon = PackedVector2Array(7960, 3160, 8040, 3160, 8040, 3400, 7960, 3400)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1)
+polygon = PackedVector2Array(7880, 3160, 7920, 3160, 7920, 3400, 7880, 3400)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherTop" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_29bc48e4142cc4336db93e974ebb632cdb33e89cc6f6ccdcfd8d8ac96bea1ddc"]
-polygon = PackedVector2Array(7560, 3080, 7960, 3080, 7960, 3160, 7560, 3160)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1)
+polygon = PackedVector2Array(7640, 3120, 7880, 3120, 7880, 3160, 7640, 3160)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherBottom" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_29bc48e4142cc4336db93e974ebb632cdb33e89cc6f6ccdcfd8d8ac96bea1ddc"]
-polygon = PackedVector2Array(7560, 3400, 7960, 3400, 7960, 3480, 7560, 3480)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0)
+polygon = PackedVector2Array(7640, 3400, 7880, 3400, 7880, 3440, 7640, 3440)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
@@ -359,41 +360,41 @@ metadata/source_geometry = {"axis": "vertical", "boundary_cell": 390, "cell_size
 metadata/opening_center = Vector2(15600, 6360)
 metadata/outward = Vector2(1, 0)
 metadata/span = 160
-metadata/core_rect = Rect2(15400, 6240, 400, 240)
-metadata/outer_rect = Rect2(15320, 6160, 560, 400)
+metadata/core_rect = Rect2(15480, 6240, 240, 240)
+metadata/outer_rect = Rect2(15440, 6200, 320, 320)
 metadata/visual_only = true
 
 [node name="Core" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_7e07f20e16e90f1ab728dc22440248e675be580e58ea7958c7f7f8fd68e65749"]
-polygon = PackedVector2Array(15400, 6240, 15800, 6240, 15800, 6480, 15400, 6480)
+polygon = PackedVector2Array(15480, 6240, 15720, 6240, 15720, 6480, 15480, 6480)
 color = Color(0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_core"
 
 [node name="FeatherLeft" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_7e07f20e16e90f1ab728dc22440248e675be580e58ea7958c7f7f8fd68e65749"]
-polygon = PackedVector2Array(15320, 6240, 15400, 6240, 15400, 6480, 15320, 6480)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+polygon = PackedVector2Array(15440, 6240, 15480, 6240, 15480, 6480, 15440, 6480)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherRight" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_7e07f20e16e90f1ab728dc22440248e675be580e58ea7958c7f7f8fd68e65749"]
-polygon = PackedVector2Array(15800, 6240, 15880, 6240, 15880, 6480, 15800, 6480)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1)
+polygon = PackedVector2Array(15720, 6240, 15760, 6240, 15760, 6480, 15720, 6480)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherTop" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_7e07f20e16e90f1ab728dc22440248e675be580e58ea7958c7f7f8fd68e65749"]
-polygon = PackedVector2Array(15400, 6160, 15800, 6160, 15800, 6240, 15400, 6240)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1)
+polygon = PackedVector2Array(15480, 6200, 15720, 6200, 15720, 6240, 15480, 6240)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
 [node name="FeatherBottom" type="Polygon2D" parent="VisualLayers/L04/PortalBackdropClearances/Clearance_7e07f20e16e90f1ab728dc22440248e675be580e58ea7958c7f7f8fd68e65749"]
-polygon = PackedVector2Array(15400, 6480, 15800, 6480, 15800, 6560, 15400, 6560)
-color = Color(0.02745098, 0.11372549, 0.16470588, 1)
-vertex_colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0)
+polygon = PackedVector2Array(15480, 6480, 15720, 6480, 15720, 6520, 15480, 6520)
+color = Color(1, 1, 1, 1)
+vertex_colors = PackedColorArray(0.02745098, 0.11372549, 0.16470588, 1, 0.02745098, 0.11372549, 0.16470588, 1, 0.022509804, 0.093254902, 0.13505882, 1, 0.022509804, 0.093254902, 0.13505882, 1)
 antialiased = true
 metadata/role = "portal_backdrop_clearance_feather"
 
