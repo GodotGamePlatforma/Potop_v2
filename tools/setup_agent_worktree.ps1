@@ -28,6 +28,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $script:GitSafeDirectory = ''
+$script:LastGreenRef = 'refs/last-green/integration'
 
 function Invoke-NativeResult {
     param(
@@ -151,23 +152,51 @@ function Test-LocalBranch {
     return $result.ExitCode -eq 0
 }
 
+function Get-LastGreenHead {
+    param([string]$Repository)
+
+    $symbolic = Invoke-NativeResult -FilePath 'git' -Arguments @(
+        '-C', $Repository, 'symbolic-ref', '--quiet', $script:LastGreenRef
+    )
+    if ($symbolic.ExitCode -eq 0) {
+        throw (
+            "$($script:LastGreenRef) must be a direct ref, not a symbolic " +
+            "ref to $($symbolic.Output)."
+        )
+    }
+    if ($symbolic.ExitCode -notin @(1, 128)) {
+        throw "Cannot inspect $($script:LastGreenRef): $($symbolic.Output)"
+    }
+    $result = Invoke-NativeResult -FilePath 'git' -Arguments @(
+        '-C', $Repository, 'rev-parse', '--verify', '--quiet',
+        $script:LastGreenRef
+    )
+    if ($result.ExitCode -eq 1) {
+        throw "Authoritative last-green ref is missing: $($script:LastGreenRef)"
+    }
+    if ($result.ExitCode -ne 0) {
+        throw "Cannot read $($script:LastGreenRef): $($result.Output)"
+    }
+    $commit = Invoke-GitText -Arguments @(
+        '-C', $Repository, 'rev-parse', '--verify', "$($result.Output)^{commit}"
+    )
+    if ($commit -ne $result.Output) {
+        throw "$($script:LastGreenRef) must point directly to a commit."
+    }
+    return $commit
+}
+
 function Get-WorktreeReservationPath {
     param(
         [string]$CommonDirectory,
-        [string]$DestinationPath,
-        [string]$BranchName
+        [string]$ResourceKind,
+        [string]$ResourceIdentity
     )
 
     $reservationDirectory = Join-Path $CommonDirectory 'codex-worktree-reservations'
     [System.IO.Directory]::CreateDirectory($reservationDirectory) | Out-Null
 
-    # Windows paths are case-insensitive. Folding both target components keeps
-    # equivalent spellings on the same reservation while the SHA keeps path
-    # separators and ref punctuation out of the lock filename.
-    $reservationIdentity = (
-        (Get-NormalizedPath -Path $DestinationPath).ToLowerInvariant() +
-        "`n" + $BranchName.ToLowerInvariant()
-    )
+    $reservationIdentity = $ResourceKind + "`n" + $ResourceIdentity
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
         $digest = $sha256.ComputeHash(
@@ -178,7 +207,30 @@ function Get-WorktreeReservationPath {
         $sha256.Dispose()
     }
     $key = -join @($digest | ForEach-Object { $_.ToString('x2') })
-    return Join-Path $reservationDirectory "create-$key.lock"
+    return Join-Path $reservationDirectory "$ResourceKind-$key.lock"
+}
+
+function Get-WorktreeReservationPaths {
+    param(
+        [string]$CommonDirectory,
+        [string]$DestinationPath,
+        [string]$BranchName
+    )
+
+    # Destination and branch are independent Git resources. Locking their
+    # pair would let same-path/different-branch and same-branch/different-path
+    # requests race. A stable ordering prevents deadlocks while preserving
+    # parallel setup for requests whose two resources are both disjoint.
+    $destinationIdentity = (
+        Get-NormalizedPath -Path $DestinationPath
+    ).ToLowerInvariant()
+    $branchIdentity = $BranchName.ToLowerInvariant()
+    return @(
+        (Get-WorktreeReservationPath -CommonDirectory $CommonDirectory `
+            -ResourceKind 'destination' -ResourceIdentity $destinationIdentity),
+        (Get-WorktreeReservationPath -CommonDirectory $CommonDirectory `
+            -ResourceKind 'branch' -ResourceIdentity $branchIdentity)
+    ) | Sort-Object -Unique
 }
 
 function Enter-WorktreeReservation {
@@ -189,30 +241,35 @@ function Enter-WorktreeReservation {
         [int]$WaitSeconds = 30
     )
 
-    $reservationPath = Get-WorktreeReservationPath `
+    $reservationPaths = @(Get-WorktreeReservationPaths `
         -CommonDirectory $CommonDirectory `
         -DestinationPath $DestinationPath `
-        -BranchName $BranchName
+        -BranchName $BranchName)
     $deadline = [System.DateTime]::UtcNow.AddSeconds($WaitSeconds)
     $waitWasReported = $false
     $lastSharingError = ''
 
     while ($true) {
-        $stream = $null
+        $streams = @()
         try {
-            $stream = [System.IO.File]::Open(
-                $reservationPath,
-                [System.IO.FileMode]::OpenOrCreate,
-                [System.IO.FileAccess]::ReadWrite,
-                [System.IO.FileShare]::None
-            )
+            foreach ($reservationPath in $reservationPaths) {
+                $streams += [System.IO.File]::Open(
+                    $reservationPath,
+                    [System.IO.FileMode]::OpenOrCreate,
+                    [System.IO.FileAccess]::ReadWrite,
+                    [System.IO.FileShare]::None
+                )
+            }
         }
         catch [System.IO.IOException] {
+            foreach ($stream in @($streams)) {
+                $stream.Dispose()
+            }
             $lastSharingError = $_.Exception.Message
             if ([System.DateTime]::UtcNow -ge $deadline) {
                 throw (
-                    "Timed out waiting for shared worktree reservation " +
-                    "$reservationPath for destination $DestinationPath and " +
+                    "Timed out waiting for shared worktree reservations " +
+                    "$($reservationPaths -join ', ') for destination $DestinationPath and " +
                     "branch $BranchName. Last lock error: $lastSharingError"
                 )
             }
@@ -227,6 +284,12 @@ function Enter-WorktreeReservation {
             Start-Sleep -Milliseconds 100
             continue
         }
+        catch {
+            foreach ($stream in @($streams)) {
+                $stream.Dispose()
+            }
+            throw
+        }
 
         try {
             $token = [guid]::NewGuid().ToString('N')
@@ -237,17 +300,21 @@ function Enter-WorktreeReservation {
                 "branch=$BranchName`n"
             )
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($metadata)
-            $stream.SetLength(0)
-            $stream.Write($bytes, 0, $bytes.Length)
-            $stream.Flush()
+            foreach ($stream in @($streams)) {
+                $stream.SetLength(0)
+                $stream.Write($bytes, 0, $bytes.Length)
+                $stream.Flush()
+            }
             return [pscustomobject]@{
-                Path = $reservationPath
+                Paths = $reservationPaths
                 Token = $token
-                Stream = $stream
+                Streams = $streams
             }
         }
         catch {
-            $stream.Dispose()
+            foreach ($stream in @($streams)) {
+                $stream.Dispose()
+            }
             throw
         }
     }
@@ -256,8 +323,10 @@ function Enter-WorktreeReservation {
 function Exit-WorktreeReservation {
     param($Reservation)
 
-    if ($null -ne $Reservation -and $null -ne $Reservation.Stream) {
-        $Reservation.Stream.Dispose()
+    if ($null -ne $Reservation -and $null -ne $Reservation.Streams) {
+        foreach ($stream in @($Reservation.Streams)) {
+            $stream.Dispose()
+        }
     }
 }
 
@@ -300,6 +369,7 @@ function Write-AgentWorktreePlan {
         [string]$PlanRunReceiptPath,
         [string]$PlanBaseline,
         [string]$PlanTree,
+        [string]$PlanLastGreenRef,
         [string]$PlanBranch,
         [string]$PlanDestinationPath,
         [string]$PlanCommonDirectory,
@@ -313,6 +383,7 @@ function Write-AgentWorktreePlan {
     Write-Output "  run-receipt:       $PlanRunReceiptPath"
     Write-Output "  candidate:   $PlanBaseline"
     Write-Output "  tree:        $PlanTree"
+    Write-Output "  last-green:  $PlanLastGreenRef -> $PlanBaseline"
     Write-Output "  branch:      $PlanBranch"
     Write-Output "  destination: $PlanDestinationPath"
     Write-Output "  common-dir:  $PlanCommonDirectory"
@@ -379,7 +450,6 @@ function Remove-WorktreeAttempt {
 function Test-CandidateReceiptsAtCommit {
     param(
         [string]$Repository,
-        [string]$ContractTool,
         [string]$ReceiptPath,
         [string]$RunReceiptPath,
         [string]$Commit
@@ -396,27 +466,17 @@ function Test-CandidateReceiptsAtCommit {
         if ($addResult.ExitCode -ne 0) {
             throw "Cannot materialize immutable candidate commit: $($addResult.Output)"
         }
+        $candidateContract = Join-Path $verificationPath 'tools/workbench_contract.py'
+        if (-not (Test-Path -LiteralPath $candidateContract -PathType Leaf)) {
+            throw "Candidate commit has no workbench contract: $candidateContract"
+        }
         $verifyResult = Invoke-NativeResult -FilePath 'python' -Arguments @(
-            '-B', $ContractTool, '--repo', $verificationPath,
-            'publication', 'verify', '--receipt', $ReceiptPath
+            '-B', $candidateContract, '--repo', $verificationPath,
+            'lkg', 'resolve', '--candidate-receipt', $ReceiptPath,
+            '--run-receipt', $RunReceiptPath
         )
         if ($verifyResult.ExitCode -ne 0) {
-            throw "Candidate receipt verification failed: $($verifyResult.Output)"
-        }
-
-        $candidateRunner = Join-Path $verificationPath 'tests/run_all_tests.ps1'
-        if (-not (Test-Path -LiteralPath $candidateRunner -PathType Leaf)) {
-            throw "Candidate commit has no test runner verifier: $candidateRunner"
-        }
-        $powerShellExecutable = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-        $runVerifyResult = Invoke-NativeResult -FilePath $powerShellExecutable -Arguments @(
-            '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-            '-File', $candidateRunner,
-            '-VerifyRunReceipt', $RunReceiptPath,
-            '-CandidateReceipt', $ReceiptPath
-        )
-        if ($runVerifyResult.ExitCode -ne 0) {
-            throw "Candidate full run receipt verification failed: $($runVerifyResult.Output)"
+            throw "Last-green candidate resolution failed: $($verifyResult.Output)"
         }
     }
     finally {
@@ -459,6 +519,13 @@ $tree = Invoke-GitText -Arguments @(
 if ($baseline -ne [string]$receipt.head -or $tree -ne [string]$receipt.tree) {
     throw "Candidate receipt HEAD/tree differs from the available Git object."
 }
+$expectedLastGreen = Get-LastGreenHead -Repository $repoRoot
+if ($expectedLastGreen -ne $baseline) {
+    throw (
+        "Candidate receipt HEAD $baseline differs from authoritative " +
+        "$($script:LastGreenRef) $expectedLastGreen."
+    )
+}
 
 $safeOwner = $Owner.Replace(':', '-')
 if ([string]::IsNullOrWhiteSpace($Branch)) {
@@ -494,11 +561,12 @@ if (-not $Create) {
     # the receipt commit. The candidate's own runner verifies the full run
     # receipt. Dirty caller state does not participate in either proof.
     Test-CandidateReceiptsAtCommit -Repository $repoRoot `
-        -ContractTool $contractTool -ReceiptPath $receiptPath `
+        -ReceiptPath $receiptPath `
         -RunReceiptPath $runReceiptPath -Commit $baseline
     Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
         -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
-        -PlanBaseline $baseline -PlanTree $tree -PlanBranch $Branch `
+        -PlanBaseline $baseline -PlanTree $tree `
+        -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
         -PlanDestinationPath $destinationPath `
         -PlanCommonDirectory $commonDir -PlanPublicationLock $lockPath
     Write-Output "PLAN ONLY: pass -Create (or use -WhatIf with -Create) after reviewing the verified candidate and full run receipts."
@@ -507,11 +575,12 @@ if (-not $Create) {
 
 if ($WhatIfPreference) {
     Test-CandidateReceiptsAtCommit -Repository $repoRoot `
-        -ContractTool $contractTool -ReceiptPath $receiptPath `
+        -ReceiptPath $receiptPath `
         -RunReceiptPath $runReceiptPath -Commit $baseline
     Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
         -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
-        -PlanBaseline $baseline -PlanTree $tree -PlanBranch $Branch `
+        -PlanBaseline $baseline -PlanTree $tree `
+        -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
         -PlanDestinationPath $destinationPath `
         -PlanCommonDirectory $commonDir -PlanPublicationLock $lockPath
 }
@@ -525,28 +594,40 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
     try {
         $reservation = Enter-WorktreeReservation -CommonDirectory $commonDir `
             -DestinationPath $destinationPath -BranchName $Branch
-        Write-Output "Shared worktree reservation acquired: $($reservation.Path)"
+        Write-Output (
+            "Shared worktree reservations acquired: " +
+            ($reservation.Paths -join ', ')
+        )
 
         # The optimistic checks above keep common failures cheap. These checks
         # are authoritative: they run after acquiring the reservation shared by
         # every linked worktree and before this invocation owns any resource.
         Assert-WorktreeTargetAvailable -Repository $repoRoot `
             -DestinationPath $destinationPath -BranchName $Branch
+        $reservedLastGreen = Get-LastGreenHead -Repository $repoRoot
+        if ($reservedLastGreen -ne $expectedLastGreen) {
+            throw (
+                "$($script:LastGreenRef) moved before materialization: " +
+                "expected $expectedLastGreen, actual $reservedLastGreen."
+            )
+        }
 
         # The reservation covers verification as well as final creation. This
         # prevents duplicate create processes from colliding in the verifier's
         # own shared Git/publication locks before one request is selected.
         Test-CandidateReceiptsAtCommit -Repository $repoRoot `
-            -ContractTool $contractTool -ReceiptPath $receiptPath `
+            -ReceiptPath $receiptPath `
             -RunReceiptPath $runReceiptPath -Commit $baseline
         Write-AgentWorktreePlan -PlanOwner $Owner -PlanTaskSlug $TaskSlug `
             -PlanReceiptPath $receiptPath -PlanRunReceiptPath $runReceiptPath `
-            -PlanBaseline $baseline -PlanTree $tree -PlanBranch $Branch `
+            -PlanBaseline $baseline -PlanTree $tree `
+            -PlanLastGreenRef $script:LastGreenRef -PlanBranch $Branch `
             -PlanDestinationPath $destinationPath `
             -PlanCommonDirectory $commonDir -PlanPublicationLock $lockPath
 
-        $worktreeCreatedByInvocation = $false
+        $worktreeAttemptStartedByInvocation = $false
         try {
+            $worktreeAttemptStartedByInvocation = $true
             $addResult = Invoke-NativeResult -FilePath 'git' -Arguments @(
                 '-C', $repoRoot, 'worktree', 'add', '-b', $Branch,
                 $destinationPath, $baseline
@@ -554,23 +635,38 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
             if ($addResult.ExitCode -ne 0) {
                 throw "git worktree add failed: $($addResult.Output)"
             }
-            $worktreeCreatedByInvocation = $true
             if ($FaultInjection -eq 'AfterGitWorktreeAdd') {
                 throw "Injected failure after git worktree add."
             }
 
+            $newContract = Join-Path $destinationPath 'tools/workbench_contract.py'
             $newVerify = Invoke-NativeResult -FilePath 'python' -Arguments @(
-                '-B', $contractTool, '--repo', $destinationPath,
-                'publication', 'verify', '--receipt', $receiptPath
+                '-B', $newContract, '--repo', $destinationPath,
+                'lkg', 'resolve', '--candidate-receipt', $receiptPath,
+                '--run-receipt', $runReceiptPath
             )
             if ($newVerify.ExitCode -ne 0) {
-                throw "The new worktree does not match its candidate receipt."
+                throw "The new worktree no longer resolves to authoritative last-green."
+            }
+            $newHead = Invoke-GitText -Arguments @(
+                '-C', $destinationPath, 'rev-parse', 'HEAD'
+            )
+            $newTree = Invoke-GitText -Arguments @(
+                '-C', $destinationPath, 'rev-parse', 'HEAD^{tree}'
+            )
+            $postLastGreen = Get-LastGreenHead -Repository $repoRoot
+            if ($newHead -ne $baseline -or $newTree -ne $tree -or
+                $postLastGreen -ne $expectedLastGreen) {
+                throw (
+                    "Post-materialization identity mismatch: candidate=$baseline/$tree " +
+                    "worktree=$newHead/$newTree last-green=$postLastGreen."
+                )
             }
 
             $doctorOwner = if ($Owner -in @('integration', 'play')) { 'integration' } else { $Owner }
             $doctorIntent = if ($Owner -in @('integration', 'play')) { 'integration' } else { 'author' }
             $doctorArguments = @(
-                '-B', $contractTool, '--repo', $destinationPath,
+                '-B', $newContract, '--repo', $destinationPath,
                 'doctor', '--owner', $doctorOwner, '--intent', $doctorIntent
             )
             if ($Owner.StartsWith('structure:')) {
@@ -583,7 +679,7 @@ if ($PSCmdlet.ShouldProcess($repoRoot, $description)) {
         }
         catch {
             $failure = $_.Exception.Message
-            if (-not $worktreeCreatedByInvocation) {
+            if (-not $worktreeAttemptStartedByInvocation) {
                 throw (
                     "Worktree creation failed before this invocation established " +
                     "ownership; no cleanup was attempted: $failure"
