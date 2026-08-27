@@ -9,6 +9,10 @@ const STRUCTURE_SIZE := Vector2(2400.0, 3840.0)
 const OUTPUT_DIR := "user://test_tower_three_inlets_02_proxy_capture"
 const FACADE_PROOF_PATH := OUTPUT_DIR + "/facade_aperture_proof.json"
 const MAX_MOTION_FRAMES := 720
+const RENAMED_FACADE_SOCKET_ID := "capture_typed_door_socket"
+const RENAMED_EGRESS_SOCKET_ID := "capture_typed_ocean_socket"
+const RENAMED_FACADE_LABEL := "neutralny element testowy"
+const RENAMED_FACADE_SYMBOL := "?"
 const CAPTURE_STEMS := [
 	"01_s0_full",
 	"02_facade_closed_probe",
@@ -148,6 +152,13 @@ func _build_capture_scene() -> bool:
 	_assert(errors.is_empty(), "Capture nie może skonfigurować controller W02: %s." % errors)
 	if not errors.is_empty():
 		return false
+	var typed_facade := _facade_body() as AnimatableBody2D
+	_assert(typed_facade != null, "Capture wymaga bariery wytypowanej relacją dynamic_door→building_egress.")
+	if typed_facade != null:
+		_assert(str(typed_facade.get_meta(&"socket_id", "")) == RENAMED_FACADE_SOCKET_ID, "Capture musi renderować egress po zmianie nazwy socketu.")
+		_assert(str(typed_facade.get_meta(&"label", "")) == RENAMED_FACADE_LABEL, "Capture musi renderować egress po zmianie label.")
+		_assert(str(typed_facade.get_meta(&"symbol", "")) == RENAMED_FACADE_SYMBOL, "Capture musi renderować egress po zmianie symbolu.")
+		_assert(str(typed_facade.get_meta(&"visual_style", "")) == "egress_grille", "Typowana relacja musi nadal wybrać egress_grille po zmianie nazw.")
 
 	_add_socket_overlay()
 	_add_current_overlay()
@@ -573,8 +584,9 @@ func _verify_facade_proof() -> void:
 	var closed_probe := float(closed.get("probe_open_water_pixel_ratio", -1.0))
 	var mid_probe := float(mid.get("probe_open_water_pixel_ratio", -1.0))
 	var open_probe_ratio := float(open_probe.get("probe_open_water_pixel_ratio", -1.0))
+	_assert(closed_probe >= 0.05, "CLOSED egress_grille musi pozostać wizualnie przepuszczalną kratownicą także po zmianie ID/socket/label/symbol.")
 	_assert(closed_probe + 0.01 < mid_probe and mid_probe + 0.01 < open_probe_ratio, "Widoczny probe open-water musi rosnąć monotonicznie w renderze CLOSED→MID→OPEN.")
-	_assert(open_probe_ratio >= 0.90, "OPEN musi ujawnić co najmniej 90% próbek pustej apertury; jest %.3f." % open_probe_ratio)
+	_assert(open_probe_ratio >= 0.90, "OPEN musi ujawnić co najmniej 0,90 próbek pustej apertury; jest %.3f." % open_probe_ratio)
 	_assert(not bool(open_clean.get("probe_visible", true)), "Końcowy OPEN clean nie może zawierać probe ani diagnostycznego panelu.")
 
 
@@ -588,6 +600,13 @@ func _write_facade_proof() -> void:
 		"package_manifest_sha256": FileAccess.get_sha256(PACKAGE_MANIFEST_PATH),
 		"reads_map_manifest": false,
 		"reads_underwater_map_scene": false,
+		"typed_fixture": {
+			"facade_socket_id": RENAMED_FACADE_SOCKET_ID,
+			"egress_socket_id": RENAMED_EGRESS_SOCKET_ID,
+			"label": RENAMED_FACADE_LABEL,
+			"symbol": RENAMED_FACADE_SYMBOL,
+			"resolved_visual_style": "egress_grille",
+		},
 		"records": ordered_records,
 	}
 	var file := FileAccess.open(FACADE_PROOF_PATH, FileAccess.WRITE)
@@ -613,13 +632,53 @@ func _controller_script() -> Script:
 
 func _effective_structure_record() -> Dictionary:
 	var template := _package_manifest.get("template", {}) as Dictionary
+	var sockets := (_package_manifest.get("sockets", []) as Array).duplicate(true)
+	var runtime := (_package_manifest.get("runtime", {}) as Dictionary).duplicate(true)
+	var egress_socket_id := str(runtime.get("egress_socket_id", ""))
+	var egress_socket := _record_by_id(sockets, egress_socket_id)
+	var egress_rect := _rect_from_value(egress_socket.get("local_rect", []))
+	var barriers := runtime.get("barriers", []) as Array
+	var typed_barrier: Dictionary = {}
+	var typed_barrier_socket_id := ""
+	for barrier_value: Variant in barriers:
+		var barrier := barrier_value as Dictionary
+		var barrier_socket_id := str(barrier.get("socket_id", ""))
+		var barrier_socket := _record_by_id(sockets, barrier_socket_id)
+		if (
+			str(barrier_socket.get("kind", "")) == "dynamic_door"
+			and _rect_from_value(barrier_socket.get("local_rect", [])) == egress_rect
+		):
+			typed_barrier = barrier
+			typed_barrier_socket_id = barrier_socket_id
+			break
+	_assert(not typed_barrier.is_empty(), "Capture musi wyprowadzić egress_grille z relacji dynamic_door→building_egress.")
+	for socket_value: Variant in sockets:
+		var socket := socket_value as Dictionary
+		var socket_id := str(socket.get("id", ""))
+		if socket_id == typed_barrier_socket_id:
+			socket["id"] = RENAMED_FACADE_SOCKET_ID
+		elif socket_id == egress_socket_id:
+			socket["id"] = RENAMED_EGRESS_SOCKET_ID
+	if not typed_barrier.is_empty():
+		typed_barrier["socket_id"] = RENAMED_FACADE_SOCKET_ID
+		typed_barrier["label"] = RENAMED_FACADE_LABEL
+		typed_barrier["symbol"] = RENAMED_FACADE_SYMBOL
+	runtime["egress_socket_id"] = RENAMED_EGRESS_SOCKET_ID
 	return {
 		"id": STRUCTURE_ID,
 		"template_id": str(template.get("id", "")),
 		"size": (_package_manifest.get("size", []) as Array).duplicate(true),
-		"sockets": (_package_manifest.get("sockets", []) as Array).duplicate(true),
-		"runtime": (_package_manifest.get("runtime", {}) as Dictionary).duplicate(true),
+		"sockets": sockets,
+		"runtime": runtime,
 	}
+
+
+func _record_by_id(records: Array, record_id: String) -> Dictionary:
+	for record_value: Variant in records:
+		var record := record_value as Dictionary
+		if str(record.get("id", "")) == record_id:
+			return record
+	return {}
 
 
 func _prepare_output_dir() -> bool:

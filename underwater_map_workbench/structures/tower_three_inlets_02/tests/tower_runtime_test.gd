@@ -561,12 +561,11 @@ func _verify_typed_egress_visual_dispatch() -> void:
 		"socket_id": "renamed_socket_fixture",
 		"label": "dowolna nazwa bez słowa wyjście",
 		"symbol": "?",
-		"visual_style": "egress_grille",
 		"open_offset": [0, -240],
 		"travel_speed": 280,
 	}
 	var socket_rect := Rect2(120.0, 320.0, 80.0, 160.0)
-	var errors: PackedStringArray = body.configure(definition, socket_rect, STRUCTURE_ID)
+	var errors: PackedStringArray = body.configure(definition, socket_rect, STRUCTURE_ID, "egress_grille")
 	_assert(errors.is_empty(), "Typowany egress_grille musi konfigurować się niezależnie od ID/socket/label/symbol: %s." % errors)
 	_assert(str(body.call(&"visual_style")) == "egress_grille", "Dispatch prezentacji nie może zależeć od symbol.contains ani nazwy bariery.")
 	_assert(str(body.call(&"visual_state")) == "CLOSED", "Syntetyczny egress_grille musi zaczynać w CLOSED.")
