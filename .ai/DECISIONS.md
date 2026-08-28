@@ -1464,7 +1464,7 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 - Powod i skutek zastapienia: ochrona `main` ma wynikac z pelnego testu merge group przed scaleniem, a nie z wlasnego protokolu dowodowego i testu finalnego kodu dopiero po merge.
 - Odwolania: ARD-0113; docs/Ostatni_Pomost_architektura_Godot.txt - integracja i testy.
 
-Identyfikatory ARD-0111 i ARD-0112 sa zarezerwowane dla przyszlego podzialu `replace_guard`; nie maja jeszcze zatwierdzonego kontraktu i nie wolno ich cytowac jako obowiazujacych decyzji.
+Identyfikatory ARD-0111 i ARD-0112 sa zarezerwowane dla zatwierdzonego przyszlego podzialu `replace_guard`; formalne wpisy nie zostaly jeszcze opublikowane i do tego czasu nie wolno ich cytowac jako obowiazujacych ARD.
 
 ## ARD-0113 - Merge queue chroni main, a builder publikuje grywalne current
 
