@@ -41,7 +41,7 @@ Weryfikacja ma wskazac date, sprawdzony stan repozytorium, wersje Godot, uruchom
 
 ## Stan odniesienia
 
-- Data aktualizacji migawki: 2026-08-27.
+- Data aktualizacji migawki: 2026-08-28.
 - Stan podczas weryfikacji: czysty, opublikowany commit integracyjny zweryfikowany także w drugim świeżym detached worktree z uwodnionym Git LFS.
 - Silnik: projekt deklaruje Godot 4.7; biezaca pelna weryfikacja korzystala z Godot 4.7.1.
 - Glowna scena: `res://scenes/main/GameRoot.tscn`.
@@ -144,7 +144,7 @@ Pelna granica produktu aktywnego i docelowego nalezy do `docs/OgolnyZarys.txt`; 
 ## Ostatnia weryfikacja
 
 - `[AUDYT PROCESU]` 2026-08-28: inspekcja wdrożenia i canary potwierdziła lokalny fast-check, publikację exact commita, PR-owy `fast-check`, natywną sekwencyjną merge queue, pełny `integration-green` na merge group, bezpieczną synchronizację czystego `main` oraz finalny builder `by-sha/current`. Cała ścieżka agent -> PR -> queue -> `main` -> build -> `current` jest aktywna.
-- `[OSTATNI POTWIERDZONY RUNTIME]` 2026-08-27, Godot 4.7.1: pelny izolowany zestaw zakonczyl sie `55 PASS / 0 FAIL / 0 SKIP`. Pakiety obu struktur, lokalny test Nurka, mapowy build/check i smoke oraz rootowy replay koperty 105x60 przeszly bez `ERROR` i `SCRIPT ERROR`. Szczegolowe sygnatury i wyniki prezentacji pozostaja w lokalnych kontekstach Mapy oraz Nurka.
-- `[ZDALNY STAN CI]` Builder wszedł przez PR #26; jego merge-group run #33193462559 zakończył się pełnym `PASS`, a squash utworzył `main` `f73ec748b189b3040f52b5a889f7c1331ed80abc`. Poprawka atomowej podmiany `current` weszła przez PR #27; run #33195826950 zakończył się pełnym `PASS`, a aktualnym `main` jest `dff10066ac0040a013833edeaa1abe55c8b52360`.
-- `[LOKALNY ODBIÓR BUILDERA]` 2026-08-28: pierwszy przebieg z istniejącym `current` zakończył się bezpiecznym `FAIL` i nie przesunął wskaźnika. Po poprawce czysty mirror miał `HEAD == origin/main == dff10066ac0040a013833edeaa1abe55c8b52360`; LFS, export i smoke przeszły bez `ERROR` ani `SCRIPT ERROR`, `current` przesunął się atomowo z `f73ec748b189b3040f52b5a889f7c1331ed80abc` na `dff10066ac0040a013833edeaa1abe55c8b52360`, a artefakt zawierał EXE `109212160` B i PCK `230287676` B przy pustym stagingu (`0`). Watcher poprawnie zgłosił `CURRENT RECOVERED` dla `dff10066` i kontynuował pracę.
+- `[OSTATNI POTWIERDZONY RUNTIME]` 2026-08-28, Godot 4.7.1: merge-group run #33202814527 dla exact kandydata `cfe586c00a33b973cb8614cd0689b42d64ecedfb` zakończył się `54 headless PASS + 1 native PASS / 0 FAIL / 0 SKIP`; oba shardy, agregat `integration-green` i wymagany queue `fast-check` przeszły. Szczegółowe sygnatury i wyniki prezentacji pozostają w lokalnych kontekstach Mapy oraz Nurka.
+- `[ZDALNY STAN CI]` 2026-08-28: PR #31 na exact head `2ec539b7885d175361f7801cc692df9212b6df8d` przeszedł osobny GitHub `fast-check` w runie #33201877162, następnie pełny run merge group #33202814527 i został scalony przez squash jako `cfe586c00a33b973cb8614cd0689b42d64ecedfb`. Jest to datowany dowód wdrożenia, nie ruchoma deklaracja bieżącego tipa `main`.
+- `[LOKALNY ODBIÓR BUILDERA]` 2026-08-28: po merge PR #31 czysty mirror miał `HEAD == origin/main == cfe586c00a33b973cb8614cd0689b42d64ecedfb`; LFS, export i smoke przeszły bez `ERROR` ani `SCRIPT ERROR`. Watcher opublikował artefakt `builds/by-sha/cfe586c00a33b973cb8614cd0689b42d64ecedfb` i atomowo przesunął `builds/current` z `0dc5dd53e0a47c18f2f56f4fa8a297fcfed5ac3e` na `cfe586c00a33b973cb8614cd0689b42d64ecedfb`; EXE ma `109212160` B, PCK `230282204` B, a log błędów pozostał pusty.
 - `[PENDING ODBIOR RECZNY]` Automatyczny replay certyfikuje wskazane gardla i fizyczny kontakt koperty Nurka, ale nie certyfikuje subiektywnego odczucia sterowania, jakosci wszystkich tras ani grafiki. Szczegoly otwartych luk pozostaja u wlascicieli Mapy i Nurka.
