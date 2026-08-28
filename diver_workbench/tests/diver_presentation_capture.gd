@@ -4,10 +4,11 @@ const DiverScene := preload("res://diver_workbench/runtime/Diver.tscn")
 const LightSystemScript := preload("res://scripts/diving/LightSystem.gd")
 const LanternMk1 := preload("res://data/diving_gear/diving_lantern_mk1.tres")
 const LanternMk2 := preload("res://data/diving_gear/diving_lantern_mk2.tres")
-const CAPTURE_ROOT := "res://tmp/diver_presentation_qa/capture"
+const CAPTURE_ROOT := "user://diver_presentation_qa/capture"
 const CAPTURE_FPS := 24
 const DURATION_SECONDS := 8.0
 const CAPTURE_RESOLUTION := Vector2i(1280, 720)
+const APPROVED_ENVELOPE := Vector2(105.0, 60.0)
 
 var _diver: DiverController
 var _visual_effects: Node
@@ -111,8 +112,7 @@ func _draw_envelope_qa_overlay() -> void:
 	var center := _diver.global_position
 	var root_rotation := _diver.global_rotation
 	var body_shape := (_diver.get_node("CollisionShape2D") as CollisionShape2D).shape as CapsuleShape2D
-	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
-	var half_target := target_size * 0.5
+	var half_target := APPROVED_ENVELOPE * 0.5
 	var half_segment := body_shape.height * 0.5 - body_shape.radius
 	var target_corners := PackedVector2Array([
 		center + Vector2(-half_target.x, -half_target.y).rotated(root_rotation),
@@ -388,7 +388,7 @@ func _capture_envelope_matrix() -> bool:
 				_diver._update_presentation_pose(0.0)
 				_diver._update_socket_markers()
 				queue_redraw()
-				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL AABB" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
+				_status.text = "KOPERTA %s — %s  |  FRAME %02d  |  %s\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: NIEZALEŻNY TARGET" % [_physical_envelope_label(), animation_name.to_upper(), frame, "LEWO" if flip_h else "PRAWO"]
 				await get_tree().process_frame
 				await RenderingServer.frame_post_draw
 				var side := "left" if flip_h else "right"
@@ -457,7 +457,7 @@ func _capture_contact_case(
 		return false
 	_diver._update_presentation_pose(0.0)
 	_diver._update_socket_markers()
-	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: PROFIL %s" % [label, _physical_envelope_label()]
+	_status.text = "%s  |  RZECZYWISTE move_and_slide()\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: NIEZALEŻNY TARGET %s" % [label, _physical_envelope_label()]
 	queue_redraw()
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
@@ -469,10 +469,7 @@ func _capture_contact_case(
 
 
 func _physical_envelope_label() -> String:
-	if _diver == null or _diver.frame_envelope_profile == null:
-		return "? × ?"
-	var target_size: Vector2 = _diver.frame_envelope_profile.target_size
-	return "%d × %d" % [roundi(target_size.x), roundi(target_size.y)]
+	return "%d × %d" % [roundi(APPROVED_ENVELOPE.x), roundi(APPROVED_ENVELOPE.y)]
 
 
 func _capture_lantern_matrix() -> bool:

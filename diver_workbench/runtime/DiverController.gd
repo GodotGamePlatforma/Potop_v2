@@ -64,6 +64,7 @@ var _cue_direction_local := Vector2.RIGHT
 
 func _ready() -> void:
 	add_to_group(DIVE_PLAYER_GROUP)
+	_apply_frame_envelope_profile()
 	if animated_sprite != null:
 		animated_sprite.frame_changed.connect(_update_socket_markers)
 		animated_sprite.animation_changed.connect(_update_socket_markers)
@@ -72,6 +73,19 @@ func _ready() -> void:
 	_update_readability_material()
 	set_graphics_quality(_graphics_quality)
 	set_reduced_motion(_reduced_motion)
+
+
+func _apply_frame_envelope_profile() -> void:
+	if animated_sprite == null or frame_envelope_profile == null:
+		return
+	var configured_scale: Variant = frame_envelope_profile.get("authored_sprite_scale")
+	var configured_position: Variant = frame_envelope_profile.get("authored_sprite_position")
+	if configured_scale is Vector2:
+		_visual_base_scale = configured_scale
+	if configured_position is Vector2:
+		_visual_base_position = configured_position
+	_reset_presentation_pose(animated_sprite)
+
 
 func _physics_process(delta: float) -> void:
 	if _input_enabled:
@@ -261,7 +275,7 @@ func _update_visual(delta: float) -> void:
 	if animated_sprite.animation != target_animation:
 		_switch_animation_preserving_phase(target_animation, target_flip)
 	else:
-		animated_sprite.flip_h = target_flip
+		_set_visual_flip_preserving_heading(target_flip)
 	_update_presentation_pose(delta)
 	_update_socket_markers()
 	_update_light_mount()
@@ -276,10 +290,21 @@ func _update_visual(delta: float) -> void:
 
 func _switch_animation_preserving_phase(target_animation: StringName, target_flip: bool) -> void:
 	var normalized_phase := _animation_phase(animated_sprite)
-	animated_sprite.flip_h = target_flip
+	_set_visual_flip_preserving_heading(target_flip)
 	animated_sprite.play(target_animation)
 	_set_animation_phase(animated_sprite, normalized_phase)
 	animated_sprite.modulate = Color.WHITE
+
+
+## Horizontal mirroring changes the sprite's local forward vector by PI. Rebase
+## the CharacterBody2D angle at the same instant so the visible world heading is
+## continuous while steering crosses the vertical axis. The capsule is centrally
+## symmetric, therefore this representation-only rebase does not change contact.
+func _set_visual_flip_preserving_heading(target_flip: bool) -> void:
+	if animated_sprite == null or animated_sprite.flip_h == target_flip:
+		return
+	rotation = wrapf(rotation + PI, -PI, PI)
+	animated_sprite.flip_h = target_flip
 
 
 func set_reduced_motion(enabled: bool) -> void:
