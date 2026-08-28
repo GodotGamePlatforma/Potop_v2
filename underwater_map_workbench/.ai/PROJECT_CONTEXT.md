@@ -1,6 +1,6 @@
 # Project Context — mapa podwodna
 
-Rola pliku: krótka, datowana migawka bieżącego pakietu mapy, luk i ostatniej weryfikacji. Reguły trwałe należą do `.ai/DECISIONS.md`, a proces i komendy do `AGENTS.md` oraz `README.md`.
+Rola pliku: krótka, datowana migawka bieżącego pakietu mapy, luk i ostatniej weryfikacji. Rutynowy agent czyta tylko sekcję lub punkt związany ze swoim zadaniem. Reguły trwałe należą do `.ai/DECISIONS.md`, a proces i komendy do `AGENTS.md` oraz `README.md`.
 
 ## Stan odniesienia — 2026-08-27
 
@@ -19,11 +19,11 @@ Rola pliku: krótka, datowana migawka bieżącego pakietu mapy, luk i ostatniej 
 
 - Pakiety struktur, Mapa i Nurek mogą powstawać równolegle w osobnych worktrees i na osobnych gałęziach. Prywatne `--build-structure` i `--check-structure` pracują tylko na wskazanym ID i lokalnym `.godot`; nie zapisują authority Mapy ani innego pakietu.
 - Zmiana struktury wymagająca nowego seala i pinu jest jednym root-routed PR obejmującym źródła pakietu, mapowy pin oraz pochodne. Pozostałe zmiany `map_manifest.json`, `UnderwaterMap.tscn`, metadanych builda i `structures/*/generated/**` należą do zwykłego zakresu Mapy. Przy kilku nowych sealed manifestach builder może odświeżyć dokładne SHA-256 jednym batchem i musi pozostawić spójny zestaw.
-- Builder i runner odrzucają niezgodne EOL oraz izolują `.godot`, `user://`, logi i porty. Lokalny fast-check przed commitem, PR z włączonym GitHub `merge when ready`, osobny wymagany GitHub `fast-check PASS` oraz pełne testy złożenia w merge queue przed scaleniem są zatwierdzonym celem ARD-0113; autor kończy bez pollingu po publikacji PR, a bieżący stan wdrożenia opisuje globalny `.ai/PROJECT_CONTEXT.md`.
+- Builder i runner odrzucają niezgodne EOL oraz izolują `.godot`, `user://`, logi i porty. Zatwierdzona kolejność to `implementacja -> lokalne testy zadania -> lokalny fast-check`; po `PASS` następuje `commit -> push + PR -> KONIEC`. Osobny wymagany GitHub `fast-check PASS` oraz pełne testy złożenia w merge queue przed scaleniem działają zgodnie z ARD-0113; stan finalnego buildera opisuje globalny `.ai/PROJECT_CONTEXT.md`.
 
 ## Luki
 
-- `[PENDING_BUILDER_COPY]` Aktywne komunikaty help/error buildera nadal używają historycznego sformułowania `immutable/FROZEN hand-off`. Obowiązujący kontrakt dokumentacyjny wymaga jednego root-routed PR seal+pin; usunięcie starego tekstu z kodu należy do osobnego map-owned PR i nie jest częścią tego docs lane.
+- `[PENDING_BUILDER_COPY]` Aktywne komunikaty help/error buildera nadal używają historycznej terminologii osobnego hand-offu. Obowiązujący kontrakt wymaga jednego root-routed PR seal+pin; uproszczenie tekstu w kodzie należy do osobnego map-owned PR.
 - `[PENDING_USER_ACCEPTANCE]` Automatyczny capture nie zastępuje ręcznego przepłynięcia tras, odbioru skali, czytelności wejść, kolizji Nurka, atmosfery ani wydajności pełnego `DiveScene`.
 - `[PENDING_MAP_POLISH]` W true-map `target_0020/0021` pozostaje widoczna ograniczona, ciemna granica mapowego `PortalBackdropClearance` po lewej stronie wejścia W01. Jest to odziedziczony, visual-only artefakt compositingu Mapy, a nie część bitmap W01 N+2/N+3 ani regresja kolizji; wymaga osobnego polishu mapowego.
 - `[PENDING_PERFORMANCE_ACCEPTANCE]` Rezydencja L01/L02 przechodzi test skrajnych pozycji, stale requestów i budżetu, lecz końcowe hitching/VRAM należy jeszcze potwierdzić w ręcznym przebiegu pełnego `DiveScene`.

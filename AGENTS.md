@@ -6,36 +6,30 @@ Jesteś programistą Godot pracującym w tym repozytorium. Stosuj konwencje Godo
 
 ## Kontekst przed pracą
 
-Jeżeli główny zakres zadania dotyczy konkretnej mapy podwodnej albo jej worldowych grafik, niezależnie od początkowego katalogu roboczego najpierw przeczytaj `underwater_map_workbench/AGENTS.md`, ustaw katalog roboczy narzędzi na `underwater_map_workbench/` i zastosuj jego routing. Gdy zakres dotyczy prywatnej topologii, grafiki, assetów albo runtime jednej zarejestrowanej struktury, po mapowym punkcie wejścia przejdź także do `underwater_map_workbench/structures/<id>/AGENTS.md` i ustaw CWD na ten pakiet. Jeżeli zakres dotyczy avatara gracza — sceny nurka, jego fizycznej bryły, grafiki, animacji, socketów, światła lub VFX — analogicznie przejdź najpierw do `diver_workbench/AGENTS.md` i ustaw katalog roboczy na `diver_workbench/`. Mapa i Nurek pozostają dwoma zatwierdzonymi wyjątkami domenowymi od poniższego protokołu pełnego odczytu; pakiet struktury jest podrzędną granicą Mapy, nie trzecim warsztatem. Routing nie osłabia globalnej bramki rozbieżności, ochrony zapisu ani zasad testów.
+Zaczynaj od najmniejszego kontekstu potrzebnego do wykonania zadania. Dla zwykłej, lokalnej poprawki — na przykład collidera jednej wieży — przeczytaj najbliższy `AGENTS.md`, odpowiedni fragment krótkiego lokalnego `PROJECT_CONTEXT.md`, a następnie tylko zmieniany kod, dane i związane testy. Nie czytaj całego rejestru decyzji, dokumentu produktu ani całej architektury, jeśli zadanie nie zmienia ich kontraktu.
 
-Przed analizą repozytorium, planem zmian lub edycją przeczytaj w całości, w tej kolejności:
+Routing jest prosty:
 
-1. `.ai/PROJECT_CONTEXT.md`;
-2. `.ai/DECISIONS.md`.
+- Mapa lub grafika świata: `underwater_map_workbench/AGENTS.md` i CWD `underwater_map_workbench/`.
+- Jedna struktura: dodatkowo jej `underwater_map_workbench/structures/<id>/AGENTS.md` i CWD pakietu.
+- Avatar Nurka: `diver_workbench/AGENTS.md` i CWD `diver_workbench/`.
+- Systemy ogólne, kampania, UI, zapis albo integracja kilku właścicieli: ten plik i CWD root.
 
-Następnie, nadal przed pracą merytoryczną, przeczytaj w całości dokumenty wymagane przez zakres zadania:
+Pełny kontekst jest wyjątkiem. Przeczytaj właściwe `.ai/DECISIONS.md`, `docs/OgolnyZarys.txt` i `docs/Ostatni_Pomost_architektura_Godot.txt` w całości tylko wtedy, gdy zadanie:
 
-3. `docs/OgolnyZarys.txt` — zasady gry, balans, narracja, zakres funkcji i doświadczenie gracza;
-4. `docs/Ostatni_Pomost_architektura_Godot.txt` — kod, sceny, dane, zapis, migracje, kolejność systemów i testy;
-5. `README.md` — instalacja, uruchamianie, sterowanie, runner testów lub onboarding.
+- zmienia regułę produktu albo zatwierdzone zachowanie widoczne dla gracza, zamiast jedynie naprawiać lokalną implementację istniejącego kontraktu;
+- zmienia publiczny kontrakt, właściciela danych albo granicę modułu;
+- zmienia zapis, persistence, schema lub wymaga migracji;
+- obejmuje semantyczną zmianę u więcej niż jednego właściciela; samo atomowe odtworzenie pinu i deterministycznych pochodnych po prywatnej zmianie jednej struktury nie uruchamia pełnego odczytu;
+- jest zmianą samych decyzji albo przekrojowej architektury.
 
-Zadanie łączące produkt z implementacją wymaga obu dokumentów z punktów 3 i 4, zawsze w tej kolejności. Zadanie dotyczące samych dokumentów wymaga wszystkich pięciu dokumentów merytorycznych.
-
-Samo żądanie wskazania, które dokumenty będą lub nie będą aktualizowane, nie czyni zadania dokumentacyjnym; zakres odczytu wynika z głównej zmiany produktu lub implementacji. `README.md` czytaj tylko wtedy, gdy zadanie może wpłynąć na onboarding, wymagania, uruchamianie, runner testów albo podstawowe sterowanie, i przed jego treścią krótko podaj to uzasadnienie.
-
-„Przeczytaj w całości” oznacza przekazanie całej treści do kontekstu agenta. Wynik ucięty przez limit, wspólny odczyt kilku plików z uciętym wyjściem, wyszukiwanie słów kluczowych ani odczyt przekierowany do `Out-Null` nie spełniają tego warunku. Długie pliki czytaj w kolejnych, jawnych fragmentach. Przed i po odczycie porównaj SHA-256. Jeżeli hash jest niedostępny, użyj rozmiaru i czasu modyfikacji jako słabszego fallbacku i zaznacz to w podsumowaniu. Gdy plik zmienił się w trakcie, przeczytaj jego aktualną wersję ponownie w całości.
-
-Kolejność dotyczy pierwszego skutecznego, pełnego i widocznego dla modelu odczytu. Późniejszy ponowny odczyt nie naprawia wcześniejszego rozpoczęcia analizy. Do zakończenia wymaganych odczytów nie wykonuj inwentaryzacji repozytorium (`rg`, `rg --files`), nie czytaj kodu ani dokumentu z dalszego punktu — w tym README przed jego kolejnością. Jeżeli mechanizm odczytu lub metadanych jest blokowany, zmień go wyłącznie dla aktualnie wymaganego pliku; nie testuj dostępu przez inne źródło. Nie deklaruj spełnienia protokołu, jeśli nie potwierdziłeś kompletności i stabilności wersji.
-
-W podsumowaniu zadania wymień dokumenty przeczytane w całości. Nie deklaruj pełnego odczytu, jeżeli wyjście było ucięte lub treść nie trafiła do kontekstu.
-
-`README.md` jest punktem wejścia dla człowieka, ale nie zastępuje dokumentów wymaganych powyżej.
+`README.md` czytaj, gdy potrzebujesz komendy, konfiguracji, uruchomienia lub onboardingu. Kontrolę SHA-256 dokumentów stosuj wyłącznie w powyższym pełnym odczycie albo gdy stabilność wersji jest istotna dla audytu; rutynowa poprawka nie wymaga ceremonii hashy. Jeżeli wykryjesz konflikt runtime z aktywnym kontraktem, zastosuj bramkę rozbieżności poniżej.
 
 ### Routing mapy podwodnej i grafiki świata
 
 Jeżeli głównym zakresem zadania jest projektowanie `UnderwaterMap`, makroterenu, landmarków, trasy tutorialu, tła, grafiki, shaderów albo assetów konkretnego świata nurkowania, przejdź do `underwater_map_workbench/AGENTS.md`. Gdy zadanie rozpoczęto w korzeniu repozytorium, przeczytaj ten lokalny plik przed doborem dalszego kontekstu; gdy Codex uruchomiono bezpośrednio z katalogu warsztatu, jest on już właściwym punktem wejścia.
 
-Lokalny `AGENTS.md` dobiera następnie lokalną migawkę, decyzje, README oraz potrzebne sekcje dokumentów globalnych proporcjonalnie do ryzyka zadania. Do każdego wskazanego tam odczytu stosuj wymagania kompletności i SHA-256. Routing wynika z intencji zadania, nie z fizycznej ścieżki. `underwater_map_workbench/map_manifest.json` jest jedynym authority rejestracji i globalnego placementu mapy, a zarejestrowany `structures/<id>/structure_manifest.json` podrzędnym authority wyłącznie lokalnej zawartości jednego budynku. Lokalna `UnderwaterMap.tscn` pozostaje ich deterministyczną pochodną. Nie wolno utrzymywać kopii tych plików ani drugiego katalogu grafiki świata w root. Avatar gracza nie należy do pakietu mapy. Pełny checkout projektu musi pozostać dostępny w katalogu nadrzędnym dla integracji i testów.
+Lokalny `AGENTS.md` dobiera kontekst proporcjonalnie do ryzyka. Routing wynika z intencji zadania, nie z fizycznej ścieżki. `underwater_map_workbench/map_manifest.json` jest jedynym authority rejestracji i globalnego placementu mapy, a zarejestrowany `structures/<id>/structure_manifest.json` podrzędnym authority wyłącznie lokalnej zawartości jednego budynku. Lokalna `UnderwaterMap.tscn` pozostaje ich deterministyczną pochodną. Nie wolno utrzymywać kopii tych plików ani drugiego katalogu grafiki świata w root. Avatar gracza nie należy do pakietu mapy. Pełny checkout projektu musi pozostać dostępny w katalogu nadrzędnym dla integracji i testów.
 
 ### Routing pakietu struktury mapy
 
@@ -57,13 +51,13 @@ Położenie procesu ani możliwość technicznego zapisu nie rozszerzają zakres
 |---|---|---|---|
 | Root: kampania, systemy ogólne, dane, zapis, UI, integracja i wspólny runner | cały root z wyłączeniem `underwater_map_workbench/**` i `diver_workbench/**` | oba warsztaty jako zależności tylko do odczytu | każde źródło należące do Mapy albo Nurka |
 | Mapa: rejestr, globalne złożenie, wspólny builder/kompilator i grafika świata | `underwater_map_workbench/**` z wyłączeniem prywatnych źródeł istniejących `structures/<id>/`; builder może odtworzyć ich `generated/**` | pakiety struktur oraz publiczne kontrakty root i Nurka tylko do odczytu | prywatne źródło jednego pakietu, root oraz `diver_workbench/**` |
-| Struktura: prywatna topologia, grafika, runtime i testy jednego `structures/<id>/` | wyłącznie własne `underwater_map_workbench/structures/<id>/**`; `--seal-structure-package <id>` może zaktualizować tylko lokalny manifest | Mapa, inne pakiety, Root i Nurek tylko do odczytu | mapowy pin/rejestr, origin, wspólna Mapa, inny pakiet, root albo Nurek |
+| Struktura: prywatna topologia, grafika, runtime i testy jednego `structures/<id>/` | wyłącznie własne `underwater_map_workbench/structures/<id>/**`; kanoniczne uszczelnienie może zaktualizować tylko lokalny manifest | Mapa, inne pakiety, Root i Nurek tylko do odczytu | mapowy pin/rejestr, origin, wspólna Mapa, inny pakiet, root albo Nurek |
 | Nurek: scena i prezentacja avatara | wyłącznie `diver_workbench/**` | publiczne kontrakty root i Mapy tylko do odczytu | root oraz `underwater_map_workbench/**` |
 
-- Zadanie dotykające więcej niż jednego właściciela jest zakresem integracyjnym prowadzonym z root. Przed edycją trzeba wymienić planowane ścieżki zapisu, przypisać im właścicieli i przeczytać pełny kontekst każdej dotkniętej domeny. Sam lokalny agent nie rozszerza sobie allowlisty.
+- Zadanie semantycznie dotykające więcej niż jednego właściciela jest zakresem integracyjnym prowadzonym z root. Wtedy przed edycją ustal zamknięty zestaw zapisu i przeczytaj pełny kontekst dotkniętych domen. Rutynowa zmiana jednego właściciela nie wymaga deklarowania listy dokumentów ani pełnego write-setu przed pracą; nadal nie rozszerza samodzielnie allowlisty.
 - Lokalny warsztat może korzystać z publicznych scen, zasobów, typów i kontraktów projektu nadrzędnego, ale nie może ich kopiować ani poprawiać przy okazji lokalnego zadania. Potrzebna zmiana poza allowlistą wraca do root jako osobny albo jawnie mieszany zakres.
-- Prywatne zadanie jednej struktury ma węższą allowlistę `underwater_map_workbench/structures/<id>/**` tylko dopóki nie wymaga nowego sealed hasha i mapowego pinu. Gdy `--seal-structure-package <id>` zmienia manifest, obowiązuje wąski wyjątek integracyjny: jedno zadanie routowane przez root, jeden Codex, worktree, branch `codex/structure-<id>/<task-slug>` i PR obejmują atomowo źródła pakietu, sealed manifest, dokładny mapowy pin/refresh oraz deterministyczne pochodne Mapy. Nie wolno rozdzielać tego na PR struktury i późniejszy PR Mapy.
-- Root-routed zadanie seal+pin ma zamknięty write-set obu właścicieli. W jednym worktree wykonuje wymagany seal, refresh, build/check pochodnych, celowane testy oraz lokalny `fast-check`; `--seal-structure-package` nadal zapisuje tylko lokalny manifest, a `--refresh-structure-package` nigdy nie przepisuje prywatnych źródeł. Pełną certyfikację złożenia wykonuje dopiero merge queue.
+- Prywatne zadanie jednej struktury ma węższą allowlistę `underwater_map_workbench/structures/<id>/**`. Gdy publikacja źródła wymaga także aktualizacji mapowego pinu i deterministycznych pochodnych, obowiązuje wąski wyjątek: jedno proste zadanie routowane przez root, jeden Codex, worktree, branch `codex/structure-<id>/<task-slug>` i PR obejmujące pakiet oraz wymagany wynik publikacji Mapy. Nie wolno rozdzielać tego na PR struktury i późniejszy PR Mapy.
+- Ten mechaniczny wyjątek publikacyjny nie jest sam w sobie zmianą kontraktu wielu właścicieli i nie wymaga pełnego odczytu decyzji, produktu ani architektury. Agent wykonuje jeden gotowy przepis z najbliższego README pakietu, celowane testy oraz lokalny `fast-check`; pełną certyfikację złożenia wykonuje merge queue.
 - Test wnętrza jednej domeny należy do jej warsztatu. Test składający Root, Mapę i Nurka należy do root i sprawdza publiczne zachowanie, bez zamrażania prywatnej hierarchii węzłów, liczby klatek, współrzędnych manifestu ani innych lokalnych fixture'ów.
 - Plik fizycznie lokalny może publikować kontrakt globalny. Zmiana collidera avatara, zasięgu interakcji, parametrów ruchu, stable ID, schematu manifestu, `WorldDelta`, persistence albo publicznej granicy sceny wymaga routingu integracyjnego niezależnie od ścieżki pliku. Lokalna kolizja ścian lub urządzeń jednego budynku pozostaje authoringiem jego pakietu; przechodzi mapowy build i odtworzenie pochodnych, a do root wraca dopiero wtedy, gdy zmienia zachowanie widoczne dla gracza, publiczny kontrakt fizyki albo globalną partycję Mapy.
 - Dozwolony jest read-only audyt całego repozytorium po zakończeniu wymaganych odczytów. Powyższa macierz ogranicza zapisy, nie analizę zależności.
@@ -71,19 +65,19 @@ Położenie procesu ani możliwość technicznego zapisu nie rozszerzają zakres
 ### Współbieżność i droga zmiany
 
 - Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Każde zadanie ma osobny pełny Git worktree i gałąź `codex/<owner>/<task-slug>` utworzoną z aktualnego `origin/main`; zadanie seal+pin struktury używa `codex/structure-<id>/<task-slug>`. Sam osobny CWD we wspólnym checkoutcie nie daje izolacji.
-- Agent wdraża zmianę w swojej allowliście, uruchamia proporcjonalne testy i lokalny `fast-check` w worktree, a dopiero po jego `PASS` tworzy commit, pushuje własną gałąź, otwiera jeden logiczny PR i włącza dla niego GitHub `merge when ready` metodą squash. Na tym jego zwykła praca się kończy: `implementacja -> lokalny fast-check PASS -> commit -> push/PR + auto-merge -> KONIEC`. Nie pushuje bezpośrednio do `main`, nie polluje i nie babysituje kolejki.
+- Agent skupia się na zadaniu: `implementacja -> lokalne testy zadania -> lokalny fast-check`. Porażkę poprawia i powtarza właściwy etap. Dopiero po `PASS` wykonuje `commit -> push + PR -> KONIEC`. Lokalne testy zadania i fast-check są osobnymi krokami; fast-check może defensywnie powtórzyć część testów, ale ich nie zastępuje. `tools/publish_agent_pr.ps1` publikuje exact commit, tworzy lub aktualizuje jeden PR i dla zwykłej zmiany włącza squash auto-merge. Agent nie pushuje do `main`, nie polluje i nie babysituje kolejki.
 - Po utworzeniu PR osobny, wymagany GitHub `fast-check` sprawdza dokładny head PR. Nie jest to wynik lokalnego fast-checku. Tylko GitHub `fast-check PASS` pozwala dodać PR do merge queue; każdy inny wynik blokuje enqueue i merge, również dla rzadkiej zmiany control-plane. Pełny `integration-green` działa wyłącznie na merge group `aktualny main + dany PR`; dopiero jego `PASS` pozwala na squash do `main`.
 - Merge queue sama składa PR z aktualnym `main`. Jeżeli wystąpi prawdziwy konflikt albo `integration-green` wykryje nieaktualny seal, pin lub pochodne, koordynator jawnie zastępuje i zamyka stary PR oraz przydziela nowe zadanie naprawcze. Nowy agent zaczyna z aktualnego `main` w świeżym worktree, branchu i PR; nie wznawia się autora starego PR do codziennego rebase'u.
 - Każdy test Godota korzysta z osobnego workspace, `.godot`, `user://`, logów, katalogów tymczasowych i portów. Równoległy Godot jest dozwolony tylko w odseparowanych pełnych kopiach z jawnym `--path`; wspólny runner odrzuca `-InPlace`.
 - Pliki śledzone z atrybutem `eol=lf` pozostają LF. Runner i builder wykonują bramkę EOL automatycznie; agent naprawia wskazany plik zamiast tworzyć dodatkowe dowody procesu.
-- Docelowo workflowy, narzędzia CI, konfigurację `integration-green` i control-plane buildera chronią reguły GitHub. Zwykły PR nie może ich zmieniać; rzadka zmiana wymaga osobnego PR i ręcznego zatwierdzenia właściciela, które nie omija wymaganego GitHub `fast-check PASS` ani `integration-green PASS` merge group.
+- Automatyczna ścieżka publikacji klasyfikuje workflowy, narzędzia CI, konfigurację `integration-green` i control-plane buildera jako chronione. `publish_agent_pr.ps1` może opublikować taki PR, lecz nie włącza mu auto-merge ani automatycznego enqueue. Rzadka zmiana wymaga jawnej ręcznej decyzji właściciela i nadal musi przejść wymagany GitHub `fast-check` oraz pełny `integration-green` merge group. Bieżąca wspólna tożsamość GitHub nie daje twardego rozdzielenia autora od właściciela; pełna separacja wymagałaby osobnej GitHub App lub tożsamości i nie jest częścią tego wdrożenia.
 - Lokalny czysty mirror `main` synchronizuje się wyłącznie przez sprawdzenie czystości, `fetch`, fast-forward i Git LFS. Dirty katalog zatrzymuje synchronizację; nie wolno używać automatycznego `reset --hard` ani kasować zmian.
-- Po scaleniu builder bierze exact finalne SHA `main`, pobiera LFS, wykonuje build i smoke, zapisuje artefakt pod SHA i przesuwa `builds/current` tylko po `PASS`. Porażka pozostawia poprzednie `current` bez zmian.
-- Zwykłe przydzielenie przez root jednego zadania jednemu agentowi nie jest formalnym protokołem assignment. Bundle/store assignmentu, ACK, lokalne LKG, receipty, FROZEN hand-offy, osobni agenci-audytorzy i rozmowy między agentami nie należą do procesu. Root może koordynować wynik kolejki lub konflikt, ale autor kończy na PR. Do czasu wdrożenia merge queue, pełnej ochrony ścieżek i finalnego buildera nie odtwarza się usuniętych bramek ręcznie; bieżącą lukę implementacyjną opisuje `.ai/PROJECT_CONTEXT.md`.
+- Docelowy builder po scaleniu bierze exact finalne SHA `main`, pobiera LFS, wykonuje build i smoke, zapisuje artefakt pod SHA i przesuwa `builds/current` tylko po `PASS`. Porażka pozostawia poprzednie `current` bez zmian.
+- Root może koordynować wynik kolejki lub konflikt, ale zwykły autor kończy na PR. Historyczne protokoły koordynacji opisane w zastąpionych ARD-0108–0110 nie są częścią bieżącej pracy i nie należy ich ręcznie odtwarzać. Bieżący stan CI i buildera opisuje `.ai/PROJECT_CONTEXT.md`.
 
 ## Zasady pracy
 
-- Przed zmianą sprawdź aktualny kod, sceny, dane, testy oraz obowiązujące decyzje dotyczące zadania.
+- Przed zmianą sprawdź aktualny kod, sceny, dane i związane testy. Decyzje czytaj wtedy, gdy zadanie może zmienić ich kontrakt albo gdy lokalny kontekst wskazuje konkretną rozbieżność.
 - Runtime odpowiada na pytanie „co działa teraz”, a obowiązujące ARD — „jaki kontrakt ma obowiązywać”. Rozbieżność jest luką do jawnego rozstrzygnięcia, nie zgodą na cichą zmianę jednej ze stron.
 - Preferuj rozwiązania proste, czytelne i idiomatyczne dla Godot.
 - Logikę umieszczaj w najmniejszym właściwym systemie domenowym. Sceny, kontrolery i UI pozostawiaj warstwą wiążącą oraz prezentacyjną.
@@ -96,7 +90,7 @@ Położenie procesu ani możliwość technicznego zapisu nie rozszerzają zakres
 
 ## Bramka rozbieżności
 
-Przed pierwszą edycją porównaj żądaną zmianę z bieżącym runtime i obowiązującymi ARD oraz — zależnie od zakresu zadania — z dokumentem produktu, architekturą i kontraktem zapisu.
+Przed pierwszą edycją sprawdź bieżący runtime i bezpośredni kontrakt związany z zadaniem. W rutynowej poprawce wystarczą najbliższy kontekst, zmieniane źródła i testy. Właściwe ARD, produkt, architekturę i kontrakt zapisu otwórz dopiero wtedy, gdy zakres spełnia warunki pełnego kontekstu z początku tego pliku albo gdy lokalne źródła ujawniają konflikt.
 
 Rozbieżnością blokującą jest w szczególności zmiana istniejącej reguły produktu, aktywnego ARD, właściciela stanu, kolejności lub atomowości systemów, publicznej granicy danych albo semantyki zapisu, jak również budowanie nowej domeny na elemencie `[LEGACY]`, `[HISTORYCZNE]`, nieużywanym polu lub pustym hooku. Brak rozstrzygnięcia w źródłach także jest rozbieżnością blokującą, jeżeli warianty zmieniają produkt, architekturę albo zapis.
 
@@ -115,7 +109,7 @@ Polecenie „wdróż”, „nie pytaj” albo równoważne, zawarte w tej samej 
 - Traktuj `ERROR` i `SCRIPT ERROR` jako porażkę także wtedy, gdy proces zwrócił kod wyjścia 0.
 - Testy nie mogą używać prawdziwego autosave. Korzystaj z izolowanych ścieżek `user://test_*` albo wyłączonej persistence.
 - Bezwarunkowe wymagania produktu, takie jak „zawsze”, „nigdy”, „dokładnie raz” i „dla każdego”, zamień na jawne przypadki testowe obejmujące wartości graniczne, bezpośrednie skoki między przedziałami, reset i powtórzenie stanu oraz kolizje priorytetów UI. `[AKTYWNE]` nadaj dopiero po przejściu tych przypadków w runtime.
-- Zmiana `structures/<id>/` wymagająca nowego seala jest jednym root-routed zadaniem. W tym samym worktree i PR wykonaj `--seal-structure-package <id>`, `--build-structure <id>`, `--check-structure <id>`, celowane testy pakietu, `--refresh-structure-package <id>` dla dokładnego SHA-256 manifestu, mapowy `--build`/`--check` oraz lokalny `fast-check`. Pełne testy złożenia należą do merge group; konflikt lub nieaktualne pochodne wracają do root jako nowe zadanie z aktualnego `main`.
+- Najpierw uruchom testy właściwe dla zmienianego zachowania, potem osobny `tools/agent_fast_check.ps1`. Pełna regresja nie należy do zwykłego autora; wykonuje ją merge queue. Dodatkowe mechaniczne kroki wymagane przez generowane źródła struktury są opisane wyłącznie w najbliższym README pakietu.
 
 ## Dokumentacja
 
@@ -131,7 +125,7 @@ Projekt utrzymuje pięć globalnych dokumentów merytorycznych. Każdy rodzaj sz
 
 `underwater_map_workbench/` i `diver_workbench/` są jedynymi zatwierdzonymi wyjątkami domenowymi. Pierwszy posiada aktywny manifest mapy, generowaną scenę, builder, smoke test, shadery środowiska i worldowe assety podwodnego gameplayu; może zawierać podrzędne pakiety `structures/<id>/` zgodne z ARD-0106, ale nadal jest ich jednym właścicielem domenowym. Drugi posiada pojedynczą scenę avatara, jego adapter, fizyczną bryłę, grafikę, animację, sockety, shadery, VFX oraz lokalne testy i capture. Każdy warsztat ma własne `.ai/PROJECT_CONTEXT.md`, `.ai/DECISIONS.md`, `README.md` i `AGENTS.md`; struktura ma wyłącznie operacyjne `AGENTS.md` i `README.md`, bez własnego `.ai`. Nie wolno kopiować do nich globalnych reguł gry, właścicieli stanu ani persistence; root zachowuje przekrojowy kontrakt zgodnie z ARD-0102, ARD-0105 i ARD-0106.
 
-Przed pierwszą edycją przedstaw użytkownikowi w krótkiej wiadomości roboczej decyzję `aktualizuję / nie aktualizuję` z uzasadnieniem dla każdego z pięciu globalnych dokumentów merytorycznych; uwzględnij także `AGENTS.md`, jeżeli zmienia się proces pracy. Dla zadania routowanego do mapy albo avatara oceń w tym samym komunikacie trzy lokalne dokumenty merytoryczne właściwego warsztatu oraz jego lokalny `AGENTS.md`. Dla zadania jednej struktury oceń dodatkowo jej `AGENTS.md` i `README.md`, bez tworzenia lokalnego rejestru decyzji lub kontekstu. Nowy komunikat, podgląd, ostrzeżenie, informacja zwrotna albo prezentowana konsekwencja widoczna dla gracza jest zmianą produktu i wymaga oceny `OgolnyZarys.txt`, nawet gdy algorytm domenowy pozostaje bez zmian.
+Rutynowa zmiana kodu, danych albo grafiki nie wymaga przed edycją deklarowania aktualizacji wszystkich dokumentów. Aktualizuj tylko dokument, którego treść rzeczywiście się zmieniła, zgodnie z tabelą poniżej. Jeżeli zmiana wpływa na produkt, publiczny kontrakt, zapis lub wiele domen, ustal wymagane dokumenty w ramach pełnego kontekstu przed edycją. Nowy komunikat, podgląd, ostrzeżenie albo inna konsekwencja widoczna dla gracza wymaga oceny `OgolnyZarys.txt`.
 
 Pełny szczegół zapisuj tylko u właściciela. Inny dokument może podać jedną potrzebną konsekwencję i odwołanie, ale nie drugą specyfikację. Dokładna aktywna wartość strojalna należy do walidowanego `Resource`; dokument produktu może wyjaśniać jej znaczenie dla gracza, a architektura wskazywać pole i konsumenta.
 

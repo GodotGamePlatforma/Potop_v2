@@ -6,33 +6,27 @@ Ten katalog jest jedynym miejscem authoringu konkretnej mapy podwodnej. Ustaw CW
 
 ## Kontekst przed pracą
 
-Przed inwentaryzacją, analizą albo zmianą przeczytaj w całości, z kontrolą SHA-256 przed i po:
+Dla zwykłej zmiany Mapy przeczytaj ten plik, właściwy fragment `.ai/PROJECT_CONTEXT.md`, zmieniany rekord manifestu oraz związany kod i testy. `README.md` otwórz po potrzebną komendę. Nie czytaj całego `.ai/DECISIONS.md` ani dokumentów root, jeżeli zadanie zachowuje istniejące authority, schema i zachowanie gracza.
 
-1. `.ai/PROJECT_CONTEXT.md`;
-2. `.ai/DECISIONS.md`;
-3. `README.md`.
+Dla prywatnej zmiany jednej struktury przejdź od razu do `structures/<id>/AGENTS.md`, ustaw CWD na pakiet i zastosuj jego krótszy routing. Odczytaj tylko dokładny rekord tej struktury w `map_manifest.json`, jej `structure_manifest.json`, związane źródła i testy.
 
-Do pełnego odczytu, stabilności wersji i kolejności stosuj wymagania z `../AGENTS.md`. Dopiero po tych odczytach wolno użyć `rg`, czytać kod lub planować edycje.
-
-Jeżeli zadanie dotyczy prywatnej topologii, grafiki, assetów, runtime albo testu jednej zarejestrowanej struktury, po powyższych trzech pełnych odczytach przeczytaj jej `structures/<id>/AGENTS.md`, a następnie w całości lokalny `structures/<id>/README.md`, i ustaw CWD narzędzi na katalog pakietu. Dopiero wtedy przeczytaj `structure_manifest.json` oraz dokładny rekord instancji w mapowym `map_manifest.json`. Pakietowy routing dziedziczy kontrolę SHA-256 i bramkę rozbieżności z tego pliku oraz `../AGENTS.md`.
-
-Jeżeli zadanie zmienia ogólną regułę gracza, kampanię, gameplay poza rozmieszczeniem konkretnej mapy, integrację Root–Mapa, publiczny kontrakt danych, persistence albo zapis poza warsztatem, przejdź do `../AGENTS.md` i dobierz wymagane dokumenty globalne. Jeżeli głównym zakresem jest avatar gracza, przejdź do `../diver_workbench/AGENTS.md`.
+Pełny lokalny rejestr decyzji oraz właściwe dokumenty root są wymagane dopiero przy zmianie schema, globalnej reguły topologii lub placementu, publicznego kontraktu, produktu, persistence, zapisu albo przy semantycznej zmianie u więcej niż jednego właściciela. Mechaniczne opublikowanie źródła jednej struktury razem z wymaganym pinem i pochodnymi nie uruchamia tego pełnego odczytu. Zadanie avatara przechodzi do `../diver_workbench/AGENTS.md`.
 
 ## Granica odczytu i zapisu
 
 - Domyślna allowlista zapisu zadania mapowego obejmuje wyłącznie `underwater_map_workbench/**`.
-- Prywatne zadanie jednej struktury ma węższą allowlistę `underwater_map_workbench/structures/<id>/**` tylko dopóki nie wymaga nowego seala i mapowego pinu. Gdy `--seal-structure-package <id>` zmienia manifest, zadanie staje się integracyjne i wraca do root: jeden Codex, worktree, branch `codex/structure-<id>/<task-slug>` oraz PR obejmuje źródła pakietu, sealed manifest, dokładny mapowy pin/refresh i deterministyczne pochodne. Stable ID, origin, aktywność, landmark, globalny payload i kompozycja wielu struktur pozostają authority Mapy.
+- Prywatne zadanie jednej struktury ma węższą allowlistę `underwater_map_workbench/structures/<id>/**`. Gdy publikacja zmienia lokalny manifest i wymaga nowego mapowego pinu, obowiązuje wąski wyjątek root-routed: jeden Codex, worktree, branch `codex/structure-<id>/<task-slug>` oraz PR obejmuje źródła pakietu i wymagane pochodne Mapy. Stable ID, origin, aktywność, landmark, globalny payload i kompozycja wielu struktur pozostają authority Mapy.
 - W zadaniu Mapy prywatne źródła istniejącego pakietu — jego `structure_manifest.json`, `runtime/`, `assets/`, `references/` i `tests/` — są tylko do odczytu. Agent Mapy może edytować rejestrację, wspólny builder, kompilator i mapowe źródła oraz pozwolić builderowi deterministycznie odtworzyć pakietowe `generated/**`; zmiana prywatnego źródła wymaga osobnego zadania przekierowanego do `structures/<id>/`.
 - Root pod `../` i `../diver_workbench/**` są dla lokalnego agenta tylko do odczytu. Wolno korzystać z ich publicznych kontraktów oraz wspólnego projektu i runnera.
 - Zadanie wymagające zapisu poza warsztatem jest zakresem integracyjnym prowadzonym z root. Nie rozszerzaj samodzielnie allowlisty.
 - Lokalny test sprawdza wnętrze pakietu mapy. Test składający Mapę z Nurkiem albo z regułami kampanii należy do root i korzysta z publicznych granic.
-- Przed edycją wypisz planowane pliki i właścicieli. Po edycji porównaj pełny diff z tą listą; nieplanowany zapis poza allowlistą zatrzymuje pracę.
+- Rutynowa zmiana jednego właściciela nie wymaga predeklaracji dokumentów ani pełnego write-setu. Po edycji zawsze porównaj diff z allowlistą; nieplanowany zapis poza nią zatrzymuje pracę.
 - Wszystkie trwałe ścieżki względne licz od CWD warsztatu. `../` oznacza root projektu. Nie zapisuj absolutnej ścieżki konkretnego checkoutu.
 
 ### Współbieżna praca w warsztacie
 
 - Root lub koordynator przydziela jedno proste zadanie jednemu agentowi. Zadanie wyłącznie Mapy używa gałęzi `codex/map/<task-slug>`, a zmiana struktury wymagająca nowego seala i pinu jednego root-routed zadania na `codex/structure-<id>/<task-slug>`; oba rodzaje startują z aktualnego `origin/main` w osobnym pełnym worktree.
-- Root-routed autor zmiany struktury zapisuje w jednym branchu i PR właściwe źródła pakietu, sealed manifest, mapowy refresh/pin oraz wszystkie pochodne. Uruchamia wymagany seal/refresh/build/check, celowane testy i lokalny `fast-check`; po jego `PASS` tworzy commit, pushuje, otwiera PR i włącza GitHub `merge when ready` metodą squash, na czym kończy pracę bez pollingu. Nie powstaje drugi PR Mapy ani osobny agent-integrator.
+- Root-routed autor zmiany struktury zapisuje w jednym branchu i PR właściwe źródła pakietu, sealed manifest, mapowy refresh/pin oraz wszystkie pochodne. Kolejność autora jest stała: `implementacja -> lokalne testy zadania -> lokalny fast-check`; po `PASS` wykonuje `commit -> push + PR -> KONIEC`. Mechaniczne kroki seala i odtworzenia pochodnych pozostają w najbliższym README, ponieważ obecny fast-check ich nie wykonuje. Nie powstaje drugi PR Mapy ani osobny agent-integrator.
 - Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head. Native merge queue sama składa go z aktualnym `main` i uruchamia pełny `integration-green`. Prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w kolejce powoduje zamknięcie starego PR przez koordynatora i nowe zadanie naprawcze dla nowego agenta startującego z aktualnego `main`; autor starego PR nie babysituje kolejki.
 - `map_manifest.json`, `UnderwaterMap.tscn`, mapowe metadane builda i `structures/*/generated/**` pozostają jednym spójnym zestawem. Builder publikuje go dopiero po walidacji wszystkich wejść; CAS/rollback, jeżeli jest używany, jest wewnętrzną ochroną zapisu buildera, nie protokołem współpracy agentów.
 - Builder i runner automatycznie egzekwują LF dla tracked plików z `eol=lf`. Celowany build/check i test nie odkrywają innych struktur.
@@ -47,7 +41,7 @@ Jeżeli zadanie zmienia ogólną regułę gracza, kampanię, gameplay poza rozmi
 
 ## Bramka rozbieżności
 
-Przed pierwszą edycją porównaj żądanie z runtime, aktywnymi MAP-ARD i — dla zakresu integracyjnego — źródłami globalnymi. Konflikt właściciela, publicznej granicy, topologii, podpisu mapy, semantyki zapisu albo zatwierdzonego kontraktu jest rozbieżnością blokującą obsługiwaną według `../AGENTS.md`.
+Przed pierwszą edycją sprawdź bieżące lokalne źródła, manifest i test zadania. Aktywne MAP-ARD oraz źródła globalne otwórz dopiero dla zakresu spełniającego warunki pełnego kontekstu albo po wykryciu możliwego konfliktu. Konflikt właściciela, publicznej granicy, globalnej topologii, podpisu mapy, semantyki zapisu albo zatwierdzonego kontraktu jest rozbieżnością blokującą obsługiwaną według `../AGENTS.md`.
 
 Po wykryciu rozbieżności nie poprawiaj równolegle kodu, danych, testów ani dokumentacji. Zbierz minimalny dowód, opisz warianty i poczekaj na decyzję użytkownika.
 
@@ -64,7 +58,7 @@ Po wykryciu rozbieżności nie poprawiaj równolegle kodu, danych, testów ani d
 
 Nie kopiuj do lokalnych dokumentów globalnych reguł produktu, właścicieli stanu, persistence ani pełnej architektury. Zapisz najwyżej jedną konsekwencję integracyjną i odwołanie do właściciela w root. Poza czterema dokumentami warsztatu i dokładnie `structures/<id>/{AGENTS.md,README.md}` nie twórz innych plików dokumentacyjnych, niezależnie od rozszerzenia. Pakiet struktury nie posiada własnego `.ai`, MAP-ARD ani datowanej migawki; jawnie hash-pinned plik provenance wskazany w `references` jako `authority=false` jest dopuszczonym materiałem źródłowym, lecz nie kontraktem i nie może sterować implementacją.
 
-Przed edycją dokumentacji przedstaw użytkownikowi decyzję `aktualizuję / nie aktualizuję` dla czterech dokumentów lokalnych oraz wymaganych dokumentów globalnych. Dla zadania jednej struktury oceń dodatkowo jej `AGENTS.md` i `README.md`. Po zmianie bieżącego stanu aktualizuj kontekst dopiero po weryfikacji.
+Rutynowa zmiana nie wymaga deklarowania przed edycją, które dokumenty zostaną zaktualizowane. Zmień tylko dokument będący właścicielem faktycznie zmienionej treści. Kontekst aktualizuj dopiero po weryfikacji stanu.
 
 ## Wykonanie i weryfikacja
 
@@ -75,10 +69,10 @@ Przed edycją dokumentacji przedstaw użytkownikowi decyzję `aktualizuję / nie
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnie wygenerowanej sceny i obejrzyj wynik; techniczny `PASS` nie jest odbiorem artystycznym ani certyfikacją trasy.
 6. Po zmianie topologii zachowaj ręczny playtest rzeczywistej osiągalności. Nie zastępuj go blokującym BFS-em.
 
-Dla zmiany jednej struktury wymagającej nowego seala wykonaj w jednym root-routed worktree i PR: `--seal-structure-package <id>`, lokalne `--build-structure <id>` i `--check-structure <id>`, celowane testy pakietu, `--refresh-structure-package <id>` z dokładnym SHA-256 manifestu, mapowy `--build`/`--check` oraz lokalny `fast-check` przed commitem. Przy kilku zmienianych pakietach refresh może użyć jednego batcha. Rootowy test dodaj tylko dla publicznego montażu, resetu próby albo granicy persistence; nie powinien powtarzać lokalnych kombinacji, socketów czy originu. Pełny zestaw integracyjny uruchamia wyłącznie merge group. Zmiana package manifestu nie upoważnia do zmiany placementu niezwiązanej z zadaniem.
+Dla zmiany jednej struktury użyj jednego przepisu z jej lokalnego README. Obecny helper fast-check nie wykonuje seala, refreshu ani publikacji pochodnych, więc wymagane kroki buildera pozostają jawne tylko tam. Potem uruchom lokalne testy zadania, a następnie osobny fast-check. Rootowy test dodaj tylko dla publicznego montażu, resetu próby albo granicy persistence. Pełny zestaw integracyjny uruchamia merge group.
 
 Testy Godota uruchamiaj sekwencyjnie wspólnym runnerem w izolowanej pełnej kopii projektu. `ERROR` i `SCRIPT ERROR` oznaczają porażkę również przy kodzie wyjścia `0`.
 
 Przy grafice strukturalnej używaj wyłącznie aktualnego pakietu prawdy wygenerowanego z zarejestrowanego `structure_manifest.json` i mapowego placementu. Obraz, screenshot, DOCX provenance albo prompt nie definiuje położenia, fizyki ani gameplayu. Szczegółowe inwarianty warstw, masek, invalidacji i authoringu należą do aktywnych MAP-ARD, nie do procesu.
 
-W podsumowaniu podaj zmienione źródła i właścicieli, wykonane build/check/testy, dokumenty przeczytane w całości, ograniczenia ręcznej oceny oraz ewentualny następny krok.
+W podsumowaniu podaj zmienione źródła, wykonane testy i fast-check, ograniczenia ręcznej oceny oraz ewentualny następny krok.

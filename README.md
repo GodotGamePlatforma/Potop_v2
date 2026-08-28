@@ -26,7 +26,7 @@ git lfs pull
 
 ## Praca nad zmianą
 
-Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. To zwykłe przydzielenie pracy, nie bundle/store assignmentu, ACK, receipt, lokalne LKG ani osobny agent-audytor.
+Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. Agent ma skupić się na implementacji, nie na obsłudze systemu integracji.
 
 Przykładowy start z czystej kopii repozytorium:
 
@@ -39,31 +39,43 @@ git status --short --branch
 
 Następnie:
 
-1. przeczytaj kontekst wymagany przez najbliższy `AGENTS.md`;
+1. przeczytaj najbliższy `AGENTS.md`, krótki lokalny kontekst oraz związany kod i testy;
 2. wprowadź zmianę wyłącznie w dozwolonej domenie;
-3. uruchom proporcjonalne testy oraz lokalny `fast-check` w worktree;
-4. dopiero po lokalnym `fast-check PASS` sprawdź pełny diff i utwórz logiczny commit;
-5. wypchnij własną gałąź, otwórz jeden PR i włącz GitHub `merge when ready` metodą squash;
-6. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge.
+3. uruchom lokalne testy zadania;
+4. osobno uruchom lokalny `fast-check`; po `FAIL` popraw zmianę i powtórz;
+5. po `PASS` sprawdź pełny diff i utwórz logiczny commit;
+6. opublikuj commit jednym helperem, który pushuje exact SHA, tworzy PR i dla zwykłej zmiany włącza squash auto-merge;
+7. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge.
 
 ```powershell
+# Najpierw właściwy test zmienianego zachowania, na przykład:
+.\tests\run_all_tests.ps1 -Target <test-zadania>
+
+# Następnie osobna szybka bramka lokalna:
+.\tools\agent_fast_check.ps1 -TestTarget <test-zadania>
+
 git status --short
 git diff --check
-git push -u origin HEAD
+git add <jawne-zmienione-pliki>
+git commit -m "<typ>: <krótki opis>"
+
+# Rewaliduje clean exact commit, pushuje i tworzy PR:
+.\tools\publish_agent_pr.ps1 -Title "<tytuł PR>" -TestTarget <test-zadania>
 ```
 
-Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree innego autora; zależność pobieraj z Git po commicie albo przez zwykły PR.
+Jeżeli zadanie nie ma celu Godot, pomiń `-TestTarget`, ale nadal wykonaj adekwatny test przed fast-checkiem. Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree innego autora; zależność pobieraj z Git po commicie albo przez zwykły PR.
 
-## Docelowa ochrona `main`
+## Ochrona `main`
 
-Docelowy przepływ rozdziela trzy etapy weryfikacji:
+Przepływ rozdziela kolejne etapy weryfikacji:
 
-- lokalny `fast-check PASS` działa w worktree przed commitem i zapobiega publikacji oczywiście złej zmiany;
+- lokalne testy zadania sprawdzają zmieniane zachowanie;
+- osobny lokalny `fast-check PASS` działa w worktree przed commitem i zapobiega publikacji oczywiście złej zmiany;
 - po utworzeniu PR osobny, wymagany GitHub `fast-check` sprawdza dokładny head PR; tylko jego `PASS` pozwala wejść do merge queue, a każdy inny wynik blokuje enqueue i merge, także dla rzadkiej zmiany control-plane;
 - merge queue tworzy merge group `aktualny main + dany PR` i przed scaleniem uruchamia pełny `integration-green`;
 - tylko zielony wynik jest scalany metodą squash.
 
-Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Bieżący stan wdrożenia opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
+Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Pierwszy canary tej ścieżki jest zielony; bieżący stan buildera opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
 Merge queue sama używa aktualnego `main`; autor nie babysituje PR. Jeżeli wystąpi prawdziwy konflikt albo `integration-green` wykryje nieaktualny seal, pin lub pochodne, koordynator zamyka stary PR jako zastąpiony i przydziela nowe zadanie naprawcze. Nowy agent rozpoczyna od aktualnego `main` w świeżym worktree, branchu i PR.
 
@@ -115,16 +127,16 @@ exact final main SHA
 
 Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian. Oznacza to dwa stabilne poziomy: `main` jest pełnozielonym kodem, a `current` najnowszym pełnozielonym `main`, który dodatkowo poprawnie się zbudował. Bieżący stan opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
-## Chronione ścieżki
+## Rzadkie zmiany control-plane
 
-Zwykły PR nie może zmieniać:
+Automatyczna ścieżka publikacji rozpoznaje między innymi:
 
 - `.github/workflows/**`;
 - narzędzi odpowiedzialnych za CI;
 - konfiguracji `integration-green`;
 - control-plane finalnego buildera.
 
-Te ścieżki mają być chronione regułą GitHub. Rzadka zmiana wymaga osobnego PR i ręcznej zgody właściciela; zgoda nie omija wymaganego GitHub `fast-check PASS` ani `integration-green PASS` merge group. Nie uruchamia się drugiego Codexa do oceniania pierwszego.
+Jeżeli diff je zawiera, `publish_agent_pr.ps1` publikuje PR bez auto-merge i bez automatycznego enqueue. Właściciel podejmuje jawną ręczną decyzję; pozytywna decyzja nie omija GitHub `fast-check` ani pełnego `integration-green` merge group. Bieżący plan GitHub i wspólna tożsamość konta nie zapewniają twardego rozdzielenia autora od zatwierdzającego. Pełna separacja wymagałaby osobnej GitHub App lub tożsamości i nie jest wdrażana teraz.
 
 ## Mapa podwodna
 

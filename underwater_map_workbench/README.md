@@ -32,7 +32,7 @@ git -C .. fetch origin main
 git -C .. worktree add -b codex/map/<slug> <absolute-path> origin/main
 ```
 
-W nowym worktree sprawdź status, wypisz planowane ścieżki Mapy, wprowadź zmianę i uruchom właściwe lokalne build/check/testy. Na końcu sprawdź diff, wykonaj logiczny commit, wypchnij tylko własną gałąź i otwórz jeden PR. Nie pushuj bezpośrednio do `main`. Zmiana struktury wymagająca nowego seala i mapowego pinu używa opisanego niżej jednego root-routed brancha `codex/structure-<id>/<task-slug>`, nie drugiego PR Mapy.
+W nowym worktree sprawdź status, wprowadź zmianę i uruchom właściwe lokalne testy. Następnie osobno uruchom `..\tools\agent_fast_check.ps1`; dopiero po `PASS` utwórz commit i użyj `..\tools\publish_agent_pr.ps1`, który pushuje exact commit oraz tworzy PR. Nie pushuj bezpośrednio do `main`. Zmiana struktury wymagająca nowego seala i mapowego pinu używa opisanego niżej jednego root-routed brancha `codex/structure-<id>/<task-slug>`, nie drugiego PR Mapy.
 
 ## Szybki start
 
@@ -52,14 +52,7 @@ Pełna kontrola granic Root–Mapa–Struktury–Nurek:
 ..\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
 ```
 
-Szybka kontrola dowolnego prywatnego pakietu:
-
-```powershell
-python .\tools\build_underwater_map.py --build-structure <id>
-python .\tools\build_underwater_map.py --check-structure <id>
-```
-
-Dokładne nazwy dwóch lokalnych testów i komendy celowane publikuje wyłącznie `structures/<id>/README.md`. Wspólny szybki runner odkrywa kontraktowe testy wszystkich zarejestrowanych pakietów dynamicznie, a pełny runner także ich testy runtime.
+Dokładne komendy celowanego pakietu oraz nazwy jego dwóch lokalnych testów publikuje wyłącznie `structures/<id>/README.md`. Wspólny szybki runner odkrywa kontraktowe testy wszystkich zarejestrowanych pakietów dynamicznie, a pełny runner także ich testy runtime.
 
 Natywny capture mapy:
 
@@ -88,36 +81,25 @@ python .\tools\build_underwater_map.py --check
 ..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
 ```
 
-Zmiana źródła struktury wymagająca nowego seala i pinu jest jednym root-routed zadaniem, worktree, branchem i PR. Najpierw wykonaj lokalną część pakietu:
+Zmiana źródła jednej struktury wymagająca nowego seala i pinu pozostaje jednym root-routed zadaniem, worktree, branchem i PR. Wszystkie mechaniczne komendy seala, celowanego build/check, dokładnego pinu i odtworzenia pochodnych znajdują się wyłącznie w `structures/<id>/README.md`, ponieważ bieżący `agent_fast_check.ps1` ich jeszcze nie wykonuje. Agent korzysta z tego jednego przepisu; nie projektuje pipeline'u i nie tworzy drugiego PR Mapy.
+
+Dla zwykłego zadania Mapy po build/check uruchom lokalne testy zadania, a następnie osobny fast-check. Przykład dla mapowego smoke:
 
 ```powershell
-python .\tools\build_underwater_map.py --seal-structure-package <id>
-python .\tools\build_underwater_map.py --build-structure <id>
-python .\tools\build_underwater_map.py --check-structure <id>
+..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
+..\tools\agent_fast_check.ps1 -TestTarget underwater_map_workbench/tests/underwater_map_smoke_test.gd
 ```
 
-Każdy tryb buildera wykonuje repozytoryjny preflight EOL i odrzuca tracked pliki `w/crlf` albo `w/mixed` objęte `eol=lf`. Następnie uruchom oba testy pakietu wskazane w jego lokalnym `README.md`. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
-
-W tym samym worktree i branchu wykonaj refresh dokładnego SHA-256 sealed manifestu, odtwórz pochodne i uruchom lokalny fast-check przed commitem:
+Po `PASS` utwórz commit i opublikuj go helperem, po czym zakończ bez pollingu:
 
 ```powershell
-python .\tools\build_underwater_map.py --refresh-structure-package <id> --sealed-package-sha256 <SHA256>
-python .\tools\build_underwater_map.py --build
-python .\tools\build_underwater_map.py --check
-..\tests\run_all_tests.ps1
+git -C .. diff --check
+git -C .. add <jawne-zmienione-pliki>
+git -C .. commit -m "<typ>: <krótki opis>"
+..\tools\publish_agent_pr.ps1 -Title "<tytuł PR>" -TestTarget underwater_map_workbench/tests/underwater_map_smoke_test.gd
 ```
 
-Jeżeli zmieniło się kilka manifestów, można przekazać wszystkie pary w jednej komendzie, aby odtworzyć jeden spójny zestaw pochodnych:
-
-```powershell
-python .\tools\build_underwater_map.py `
-  --refresh-structure-package <id-a> --sealed-package-sha256 <SHA256-a> `
-  --refresh-structure-package <id-b> --sealed-package-sha256 <SHA256-b>
-```
-
-`--seal-structure-package <id>` zapisuje wyłącznie lokalne hashe i digesty prywatnego manifestu; `--refresh-structure-package` aktualizuje mapowy pin i pochodne deklaracje, nigdy prywatne źródło. Prywatne `--build-structure` i `--check-structure` rozwiązują tylko wskazany pakiet i używają rozłącznego outputu danego worktree pod `.godot/underwater_map_structure_builds/<id>/generated`. `--refresh-l05-source` służy wyłącznie zmianie złożonego źródła topologii. Granice komend pozostają rozdzielone, ale źródła struktury, seal, pin i pochodne trafiają atomowo w jednym root-routed PR. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera.
-
-Po lokalnym `fast-check PASS` utwórz commit, push i PR, włącz GitHub `merge when ready` metodą squash, a następnie zakończ pracę bez pollingu. Osobny wymagany GitHub `fast-check` sprawdza head PR; dopiero jego `PASS` pozwala merge queue złożyć `aktualny main + PR` i uruchomić pełny `integration-green`. Autor nie aktualizuje starego PR po każdym konkurencyjnym merge. Prawdziwy konflikt albo wykryty w kolejce nieaktualny seal, pin lub zestaw pochodnych wraca do root jako nowe zadanie dla nowego agenta w świeżym worktree i branchu z aktualnego `main`; koordynator zamyka stary PR jako zastąpiony. Po zmianie publicznej granicy uruchom także właściwy test root. Po zmianie widocznej prezentacji wykonaj i obejrzyj natywny capture. Po zmianie topologii ręcznie przepłyń wymagane trasy — builder i smoke nie certyfikują ich jakości. Każdy przebieg izoluje `.godot`, `user://`, logi i capture.
+Helper dla zwykłej zmiany włącza squash auto-merge. Osobny wymagany GitHub `fast-check` sprawdza exact head PR; `FAIL` pozostawia PR otwarty, a `PASS` pozwala merge queue złożyć `aktualny main + PR` i uruchomić pełny `integration-green`. Autor nie aktualizuje starego PR po każdym konkurencyjnym merge. Prawdziwy konflikt albo wykryty w kolejce nieaktualny seal, pin lub zestaw pochodnych wraca do root jako nowe zadanie dla nowego agenta w świeżym worktree i branchu z aktualnego `main`; koordynator zamyka stary PR jako zastąpiony. Po zmianie publicznej granicy uruchom także właściwy test root. Po zmianie widocznej prezentacji wykonaj i obejrzyj natywny capture. Po zmianie topologii ręcznie przepłyń wymagane trasy — builder i smoke nie certyfikują ich jakości. Każdy przebieg izoluje `.godot`, `user://`, logi i capture.
 
 Nigdy nie poprawiaj ręcznie `UnderwaterMap.tscn`, masek ani innych pochodnych. Nie twórz plików `candidate`, `final`, drugiego `map_manifest.json`, manifestu wariantu, alternatywnej sceny, dodatkowego projektu ani kopii avatara. `structure_manifest.json` jest dozwolonym źródłem podrzędnym: nie może zawierać globalnego placementu ani trwałego stanu, a cykl próby deklaruje jawnie przez `attempt_state.persistence=none` i `checkpoint=none`.
 
