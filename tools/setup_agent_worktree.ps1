@@ -90,6 +90,102 @@ function Normalize-Path {
     ).TrimEnd('\', '/')
 }
 
+function Get-LfsListing {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingRepository,
+        [string]$Revision
+    )
+
+    $arguments = @(
+        '-c', 'lfs.fetchinclude=',
+        '-c', 'lfs.fetchexclude=',
+        'lfs', 'ls-files', '--json'
+    )
+    if (-not [string]::IsNullOrWhiteSpace($Revision)) {
+        $arguments += $Revision
+    }
+    $json = Invoke-GitChecked $WorkingRepository $arguments
+    try {
+        $listing = $json | ConvertFrom-Json
+    }
+    catch {
+        throw "git lfs ls-files returned invalid JSON: $json"
+    }
+    if ($null -eq $listing -or @($listing.PSObject.Properties.Name) -notcontains 'files') {
+        throw 'git lfs ls-files JSON is missing the files collection.'
+    }
+    return $listing
+}
+
+function Assert-LfsObjectsDownloaded {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingRepository,
+        [Parameter(Mandatory = $true)][string]$Revision
+    )
+
+    $listing = Get-LfsListing -WorkingRepository $WorkingRepository -Revision $Revision
+    foreach ($entry in @($listing.files)) {
+        if ($null -eq $entry) { continue }
+        $nameProperty = $entry.PSObject.Properties['name']
+        $downloadedProperty = $entry.PSObject.Properties['downloaded']
+        $name = if ($null -eq $nameProperty) { '' } else { [string]$nameProperty.Value }
+        if ([string]::IsNullOrWhiteSpace($name) -or
+            $null -eq $downloadedProperty -or $downloadedProperty.Value -isnot [bool] -or
+            -not [bool]$downloadedProperty.Value) {
+            throw "Git LFS object is not downloaded for exact revision ${Revision}: '$name'."
+        }
+    }
+}
+
+function Assert-LfsWorktreeHydrated {
+    param([Parameter(Mandatory = $true)][string]$WorkingRepository)
+
+    $listing = Get-LfsListing -WorkingRepository $WorkingRepository
+    $pointerHeader = [System.Text.Encoding]::ASCII.GetBytes('version https://git-lfs.github.com/spec/v1')
+    $rootPrefix = $WorkingRepository.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($entry in @($listing.files)) {
+        if ($null -eq $entry) { continue }
+        $nameProperty = $entry.PSObject.Properties['name']
+        $checkoutProperty = $entry.PSObject.Properties['checkout']
+        $relative = if ($null -eq $nameProperty) { '' } else { [string]$nameProperty.Value }
+        if ([string]::IsNullOrWhiteSpace($relative) -or [System.IO.Path]::IsPathRooted($relative) -or
+            $null -eq $checkoutProperty -or $checkoutProperty.Value -isnot [bool] -or
+            -not [bool]$checkoutProperty.Value) {
+            throw "Git LFS worktree entry is not checked out: '$relative'."
+        }
+        $candidate = [System.IO.Path]::GetFullPath(
+            [System.IO.Path]::Combine(
+                $WorkingRepository,
+                $relative.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+            )
+        )
+        if (-not $candidate.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Git LFS worktree file is missing or outside the repository: '$relative'."
+        }
+        $stream = [System.IO.File]::OpenRead($candidate)
+        try {
+            $prefix = New-Object byte[] $pointerHeader.Length
+            $read = $stream.Read($prefix, 0, $prefix.Length)
+        }
+        finally {
+            $stream.Dispose()
+        }
+        $isPointer = $read -eq $pointerHeader.Length
+        if ($isPointer) {
+            for ($index = 0; $index -lt $pointerHeader.Length; $index++) {
+                if ($prefix[$index] -ne $pointerHeader[$index]) {
+                    $isPointer = $false
+                    break
+                }
+            }
+        }
+        if ($isPointer) {
+            throw "Tracked Git LFS pointer remains unhydrated: '$relative'."
+        }
+    }
+}
+
 $repositoryPath = Normalize-Path $Repository
 $destinationPath = Normalize-Path $Destination
 $repoTop = Normalize-Path (Invoke-GitChecked $repositoryPath @('rev-parse', '--show-toplevel'))
@@ -173,8 +269,20 @@ try {
     ) | Out-Null
     $created = $true
 
-    Invoke-GitChecked $destinationPath @('lfs', 'pull', 'origin', $baseSha) | Out-Null
-    Invoke-GitChecked $destinationPath @('lfs', 'fsck') | Out-Null
+    Invoke-GitChecked $destinationPath @(
+        '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
+        'lfs', 'fetch', 'origin', $baseSha
+    ) | Out-Null
+    Assert-LfsObjectsDownloaded -WorkingRepository $destinationPath -Revision $baseSha
+    Invoke-GitChecked $destinationPath @(
+        '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
+        'lfs', 'checkout'
+    ) | Out-Null
+    Invoke-GitChecked $destinationPath @(
+        '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
+        'lfs', 'fsck', $baseSha
+    ) | Out-Null
+    Assert-LfsWorktreeHydrated -WorkingRepository $destinationPath
 
     $actualHead = (Invoke-GitChecked $destinationPath @('rev-parse', 'HEAD')).Trim()
     $actualTree = (Invoke-GitChecked $destinationPath @('rev-parse', 'HEAD^{tree}')).Trim()

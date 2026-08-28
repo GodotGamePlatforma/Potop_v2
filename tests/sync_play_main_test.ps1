@@ -15,6 +15,7 @@ $hostPowerShell = if ($PSVersionTable.PSEdition -eq 'Desktop') {
 else {
     Join-Path $PSHOME 'pwsh.exe'
 }
+$realGitPath = @(Get-Command git.exe -CommandType Application)[0].Source
 
 function Git {
     param([string]$Repository, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
@@ -50,19 +51,32 @@ try {
     Git $tempRoot init -b main $seed | Out-Null
     Git $seed config user.email 'sync-test@example.invalid' | Out-Null
     Git $seed config user.name 'Sync Test' | Out-Null
+    Git $seed lfs install --local | Out-Null
+    Git $seed lfs track '*.bin' | Out-Null
     Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'one' -Encoding UTF8
-    Git $seed add game.txt | Out-Null
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $seed 'asset.bin'),
+        [System.Text.Encoding]::UTF8.GetBytes('sync-lfs-one')
+    )
+    Git $seed add game.txt asset.bin .gitattributes | Out-Null
     Git $seed commit -m one | Out-Null
     Git $seed remote add origin $remote | Out-Null
     Git $seed push -u origin main | Out-Null
+    Git $seed lfs push origin main | Out-Null
     Git $tempRoot clone $remote $play | Out-Null
     Git $play checkout main | Out-Null
 
     Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'two' -Encoding UTF8
-    Git $seed add game.txt | Out-Null
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $seed 'asset.bin'),
+        [System.Text.Encoding]::UTF8.GetBytes('sync-lfs-two')
+    )
+    Git $seed add game.txt asset.bin | Out-Null
     Git $seed commit -m two | Out-Null
     Git $seed push origin main | Out-Null
+    Git $seed lfs push origin main | Out-Null
     $expected = (Git $seed rev-parse HEAD).Trim()
+    Git $play config --local lfs.fetchexclude '*' | Out-Null
 
     $synced = Run-Sync $play
     if ($synced.ExitCode -ne 0 -or $synced.Output -notmatch 'SYNC PASS') {
@@ -71,6 +85,76 @@ try {
     if ((Git $play rev-parse HEAD).Trim() -cne $expected -or
         -not [string]::IsNullOrWhiteSpace((Git $play status --porcelain=v1 --untracked-files=all))) {
         throw 'Play checkout is not clean at exact fetched origin/main.'
+    }
+    if ([System.Text.Encoding]::UTF8.GetString(
+        [System.IO.File]::ReadAllBytes((Join-Path $play 'asset.bin'))
+    ) -cne 'sync-lfs-two' -or
+        (Git $play config --local --get lfs.fetchexclude).Trim() -cne '*') {
+        throw 'Source sync did not hydrate the exact LFS object while preserving fetchexclude=*.'
+    }
+
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $seed 'asset.bin'),
+        [System.Text.Encoding]::UTF8.GetBytes('sync-lfs-three')
+    )
+    Git $seed add asset.bin | Out-Null
+    Git $seed commit -m three | Out-Null
+    Git $seed push origin main | Out-Null
+    Git $seed lfs push origin main | Out-Null
+
+    $gitBin = Join-Path $tempRoot 'git-bin'
+    New-Item -ItemType Directory -Path $gitBin | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $gitBin 'git.ps1'),
+        @'
+if ($env:MOCK_SYNC_FAIL_LFS_CHECKOUT -eq '1' -and
+    ($args -join ' ') -match '(?:^| )lfs checkout(?: |$)') {
+    [Console]::Error.WriteLine('injected post-merge lfs checkout failure')
+    exit 23
+}
+& $env:MOCK_SYNC_REAL_GIT @args
+exit $LASTEXITCODE
+'@,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $beforeRollback = (Git $play rev-parse HEAD).Trim()
+    $oldPath = $env:PATH
+    try {
+        $env:MOCK_SYNC_REAL_GIT = $realGitPath
+        $env:MOCK_SYNC_FAIL_LFS_CHECKOUT = '1'
+        $env:PATH = "$gitBin;$oldPath"
+        $postMergeFailure = Run-Sync $play
+    }
+    finally {
+        $env:PATH = $oldPath
+        Remove-Item Env:MOCK_SYNC_REAL_GIT,Env:MOCK_SYNC_FAIL_LFS_CHECKOUT -ErrorAction SilentlyContinue
+    }
+    if ($postMergeFailure.ExitCode -eq 0 -or
+        $postMergeFailure.Output -notmatch 'injected post-merge lfs checkout failure' -or
+        (Git $play rev-parse HEAD).Trim() -cne $beforeRollback -or
+        -not [string]::IsNullOrWhiteSpace((Git $play status --porcelain=v1 --untracked-files=all)) -or
+        [System.Text.Encoding]::UTF8.GetString(
+            [System.IO.File]::ReadAllBytes((Join-Path $play 'asset.bin'))
+        ) -cne 'sync-lfs-two') {
+        throw "Post-merge failure did not restore exact original main: $($postMergeFailure.Output)"
+    }
+
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $seed 'asset.bin'),
+        [System.Text.Encoding]::UTF8.GetBytes('missing-remote-lfs-object')
+    )
+    Git $seed add asset.bin | Out-Null
+    Git $seed commit -m 'missing remote LFS object' | Out-Null
+    Git $seed push --no-verify origin main | Out-Null
+    $beforeMissingObject = (Git $play rev-parse HEAD).Trim()
+    $missingObject = Run-Sync $play
+    if ($missingObject.ExitCode -eq 0 -or
+        (Git $play rev-parse HEAD).Trim() -cne $beforeMissingObject -or
+        -not [string]::IsNullOrWhiteSpace((Git $play status --porcelain=v1 --untracked-files=all)) -or
+        [System.Text.Encoding]::UTF8.GetString(
+            [System.IO.File]::ReadAllBytes((Join-Path $play 'asset.bin'))
+        ) -cne 'sync-lfs-two') {
+        throw "Missing exact LFS object did not fail before changing current main: $($missingObject.Output)"
     }
     Set-Content -LiteralPath (Join-Path $play 'dirty.txt') -Value 'preserve' -Encoding UTF8
     $dirtyHead = (Git $play rev-parse HEAD).Trim()
@@ -88,13 +172,22 @@ try {
     }
 
     $source = Get-Content -LiteralPath $tool -Raw
-    if ($source -notmatch [regex]::Escape("@('lfs', 'pull', 'origin', `$targetSha)")) {
-        throw 'Source sync does not pin Git LFS pull to the exact fetched SHA.'
+    foreach ($required in @(
+        "'lfs', 'fetch', 'origin', `$targetSha",
+        "'lfs', 'checkout'",
+        "'lfs', 'ls-files', '--json'",
+        'lfs.fetchinclude=',
+        'lfs.fetchexclude=',
+        'version https://git-lfs.github.com/spec/v1'
+    )) {
+        if (-not $source.Contains($required)) {
+            throw "Source sync does not prove exact LFS hydration: '$required'."
+        }
     }
     foreach ($forbidden in @('reset --hard', 'builds/current', 'Godot', 'export', 'smoke')) {
         if ($source -match [regex]::Escape($forbidden)) { throw "Source sync contains builder/destructive token '$forbidden'." }
     }
-    Write-Host 'PASS sync_play_main clean-main/fetch/exact-pin/ff-only/LFS/dirty-preservation/source-only contract'
+    Write-Host 'PASS sync_play_main clean-main/fetch/exact-LFS/fetchexclude-override/fail-state-preservation/ff-only/source-only contract'
 }
 finally {
     $resolved = [System.IO.Path]::GetFullPath($tempRoot)

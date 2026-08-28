@@ -4,10 +4,6 @@
 param(
     [string]$RepositorySlug = 'GodotGamePlatforma/Potop_v2',
     [string]$RulesetName = 'Protect main - simple agent flow',
-    [ValidateRange(1, 2147483647)]
-    [int]$GitHubActionsAppId = 15368,
-    [ValidateRange(1, 1440)]
-    [int]$QueueTimeoutMinutes = 120,
     [string]$OutputPath
 )
 
@@ -56,7 +52,8 @@ $payload = [ordered]@{
                 required_status_checks = @(
                     [ordered]@{
                         context = 'fast-check'
-                        integration_id = $GitHubActionsAppId
+                        # GitHub Actions' fixed App identity. This is not a caller override.
+                        integration_id = 15368
                     }
                 )
             }
@@ -64,7 +61,8 @@ $payload = [ordered]@{
         [ordered]@{
             type = 'merge_queue'
             parameters = [ordered]@{
-                check_response_timeout_minutes = $QueueTimeoutMinutes
+                # Full integration has timeout-minutes: 120. The queue must wait longer.
+                check_response_timeout_minutes = 180
                 grouping_strategy = 'ALLGREEN'
                 # One candidate may build at once; this is queue concurrency,
                 # not a claim about how many PRs GitHub puts in a group.
@@ -83,7 +81,9 @@ $plan = [ordered]@{
     schema = 'potop-simple-ruleset-plan-v1'
     repository = $RepositorySlug
     mutation_performed = $false
-    required_check_owner = 'GitHub Actions'
+    required_check_owner = 'GitHub Actions App 15368'
+    full_integration_timeout_minutes = 120
+    queue_check_timeout_minutes = 180
     payload = $payload
 }
 $json = $plan | ConvertTo-Json -Depth 20

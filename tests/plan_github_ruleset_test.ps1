@@ -4,7 +4,26 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $tool = Join-Path $projectRoot 'tools/plan_github_ruleset.ps1'
+$integrationWorkflow = Join-Path $projectRoot '.github/workflows/agent-integration.yml'
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("potop-ruleset-plan-test-" + [guid]::NewGuid().ToString('N'))
+$hostPowerShell = if ($PSVersionTable.PSEdition -eq 'Desktop') {
+    Join-Path $PSHOME 'powershell.exe'
+}
+else {
+    Join-Path $PSHOME 'pwsh.exe'
+}
+
+function Run-Plan {
+    param([string[]]$Arguments)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& $hostPowerShell -NoLogo -NoProfile -File $tool @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previous }
+    return [pscustomobject]@{ ExitCode = $exitCode; Output = ($output | Out-String).Trim() }
+}
 
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
@@ -50,6 +69,21 @@ try {
         [int]$queue.max_entries_to_build -ne 1 -or [int]$queue.min_entries_to_merge_wait_minutes -ne 0) {
         throw 'Native merge queue is not SQUASH/ALLGREEN with one concurrent build and one sequential merge.'
     }
+    $workflowSource = Get-Content -LiteralPath $integrationWorkflow -Raw
+    $timeoutMatch = [regex]::Match(
+        $workflowSource,
+        '(?ms)^  integration-green:\r?\n.*?^    timeout-minutes:\s*(\d+)\s*$'
+    )
+    if (-not $timeoutMatch.Success) {
+        throw 'Cannot bind ruleset timeout to integration-green timeout-minutes.'
+    }
+    $integrationTimeout = [int]$timeoutMatch.Groups[1].Value
+    if ($integrationTimeout -ne 120 -or [int]$queue.check_response_timeout_minutes -ne 180 -or
+        [int]$queue.check_response_timeout_minutes -le $integrationTimeout -or
+        [int]$plan.full_integration_timeout_minutes -ne $integrationTimeout -or
+        [int]$plan.queue_check_timeout_minutes -ne [int]$queue.check_response_timeout_minutes) {
+        throw 'Queue timeout is not pinned to 180 minutes and strictly greater than the 120-minute full integration job.'
+    }
 
     $output = Join-Path $tempRoot 'plan.json'
     & $tool -OutputPath $output
@@ -58,11 +92,25 @@ try {
         throw 'Written plan differs from the stdout plan.'
     }
 
+    foreach ($override in @(
+        @('-GitHubActionsAppId', '1'),
+        @('-QueueTimeoutMinutes', '1')
+    )) {
+        $overrideOutput = Join-Path $tempRoot ((($override[0] -replace '^-', '') + '.json'))
+        $rejected = Run-Plan (@($override) + @('-OutputPath', $overrideOutput))
+        if ($rejected.ExitCode -eq 0 -or (Test-Path -LiteralPath $overrideOutput)) {
+            throw "Unsafe ruleset override generated a plan: $($override -join ' ') output=$($rejected.Output)"
+        }
+    }
+
     $source = Get-Content -LiteralPath $tool -Raw
     foreach ($forbidden in @('Invoke-RestMethod', 'Invoke-WebRequest', 'gh api', 'Method PUT', 'Authorization =', 'GITHUB_TOKEN')) {
         if ($source -match [regex]::Escape($forbidden)) { throw "Plan tool can mutate live GitHub: '$forbidden'." }
     }
-    Write-Host 'PASS plan_github_ruleset native-queue/squash/single-build/single-sequential-merge/one-Actions-fast-check/no-bypass/no-live-mutation contract'
+    if ($source -match '\$GitHubActionsAppId|\$QueueTimeoutMinutes') {
+        throw 'Ruleset tool still exposes an identity or timeout override.'
+    }
+    Write-Host 'PASS plan_github_ruleset native-queue/squash/Actions-App-15368/180min>120min/no-bypass/no-live-mutation contract'
 }
 finally {
     $resolved = [System.IO.Path]::GetFullPath($tempRoot)

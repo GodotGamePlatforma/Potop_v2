@@ -58,16 +58,24 @@ try {
     Git $tempRoot init -b main $seed | Out-Null
     Git $seed config user.email 'agent-test@example.invalid' | Out-Null
     Git $seed config user.name 'Agent Test' | Out-Null
+    Git $seed lfs install --local | Out-Null
+    Git $seed lfs track '*.bin' | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $seed 'tools'),(Join-Path $seed '.githooks') | Out-Null
     Copy-Item -LiteralPath (Join-Path $projectRoot 'tools/install_agent_git_hooks.ps1') -Destination (Join-Path $seed 'tools/install_agent_git_hooks.ps1')
     Copy-Item -LiteralPath (Join-Path $projectRoot '.githooks/pre-push') -Destination (Join-Path $seed '.githooks/pre-push')
     Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'one' -Encoding UTF8
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $seed 'asset.bin'),
+        [System.Text.Encoding]::UTF8.GetBytes('first-lfs-payload')
+    )
     Git $seed add . | Out-Null
     Git $seed commit -m initial | Out-Null
     Git $seed remote add origin $remote | Out-Null
     Git $seed push -u origin main | Out-Null
+    Git $seed lfs push origin main | Out-Null
     Git $tempRoot clone $remote $primary | Out-Null
     Git $primary checkout main | Out-Null
+    Git $primary config --local lfs.fetchexclude '*' | Out-Null
     Set-Content -LiteralPath (Join-Path $primary 'local-untracked.txt') -Value 'preserve me' -Encoding UTF8
 
     $firstDestination = Join-Path $tempRoot 'worktrees/first'
@@ -97,6 +105,11 @@ try {
         -not [string]::IsNullOrWhiteSpace((Git $firstDestination status --porcelain=v1 --untracked-files=all))) {
         throw 'First worktree is not exact origin/main, on the expected branch, and clean.'
     }
+    if ([System.Text.Encoding]::UTF8.GetString(
+        [System.IO.File]::ReadAllBytes((Join-Path $firstDestination 'asset.bin'))
+    ) -cne 'first-lfs-payload') {
+        throw 'First worktree retained an LFS pointer under lfs.fetchexclude=*.'
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $primary 'local-untracked.txt'))) {
         throw 'Dirty source checkout content was modified by setup.'
     }
@@ -116,9 +129,14 @@ try {
     }
 
     Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'two' -Encoding UTF8
-    Git $seed add game.txt | Out-Null
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $seed 'asset.bin'),
+        [System.Text.Encoding]::UTF8.GetBytes('second-lfs-payload')
+    )
+    Git $seed add game.txt asset.bin | Out-Null
     Git $seed commit -m second | Out-Null
     Git $seed push origin main | Out-Null
+    Git $seed lfs push origin main | Out-Null
     $secondDestination = Join-Path $tempRoot 'worktrees/second'
     $second = Run-Helper @(
         '-Repository', $primary,
@@ -134,6 +152,12 @@ try {
     }
     if ((Git $secondDestination branch --show-current).Trim() -cne 'codex/map/second-task') {
         throw 'Owner segment did not route to the expected codex/* branch.'
+    }
+    if ([System.Text.Encoding]::UTF8.GetString(
+        [System.IO.File]::ReadAllBytes((Join-Path $secondDestination 'asset.bin'))
+    ) -cne 'second-lfs-payload' -or
+        (Git $primary config --local --get lfs.fetchexclude).Trim() -cne '*') {
+        throw 'Exact second-revision LFS hydration did not override fetchexclude only for its commands.'
     }
 
     Git $seed rm tools/install_agent_git_hooks.ps1 | Out-Null
@@ -183,7 +207,19 @@ try {
     if ($source -match "@\('branch', '-D'" -or -not $source.Contains($atomicDelete)) {
         throw 'Setup cleanup is not an exact expected-old update-ref deletion.'
     }
-    Write-Host 'PASS setup_agent_worktree fresh-origin-main/clean-worktree/codex-branch/dirty-source-isolation/atomic-cleanup contract'
+    foreach ($required in @(
+        "'lfs', 'fetch', 'origin', `$baseSha",
+        "'lfs', 'checkout'",
+        "'lfs', 'ls-files', '--json'",
+        'lfs.fetchinclude=',
+        'lfs.fetchexclude=',
+        'version https://git-lfs.github.com/spec/v1'
+    )) {
+        if (-not $source.Contains($required)) {
+            throw "Setup does not prove exact LFS hydration: '$required'."
+        }
+    }
+    Write-Host 'PASS setup_agent_worktree fresh-origin-main/clean-worktree/codex-branch/exact-LFS/fetchexclude-override/dirty-source-isolation/atomic-cleanup contract'
 }
 finally {
     $resolvedTemp = [System.IO.Path]::GetFullPath($tempRoot)

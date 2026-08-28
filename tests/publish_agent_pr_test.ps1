@@ -16,6 +16,7 @@ $hostPowerShell = if ($PSVersionTable.PSEdition -eq 'Desktop') {
 else {
     Join-Path $PSHOME 'pwsh.exe'
 }
+$realGitPath = @(Get-Command git.exe -CommandType Application)[0].Source
 
 function Git-Result {
     param([string]$Repository, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
@@ -82,11 +83,10 @@ Write-Host 'FAST-CHECK PASS fixture'
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
 
-    $githubUrl = "https://github.com/$expectedSlug.git"
-    $remoteUri = 'file:///' + ($remote.Replace('\', '/'))
-    Git $repo config "url.$remoteUri.insteadOf" $githubUrl | Out-Null
-    Git $repo remote add origin $githubUrl | Out-Null
+    Git $repo remote add origin $remote | Out-Null
     Git $repo push -u origin main | Out-Null
+    $githubUrl = "https://github.com/$expectedSlug.git"
+    Git $repo remote set-url origin $githubUrl | Out-Null
     $branch = "codex/root/$Name"
     Git $repo checkout -b $branch | Out-Null
     if ($ControlPlane) {
@@ -108,7 +108,13 @@ Write-Host 'FAST-CHECK PASS fixture'
 }
 
 function Initialize-GhState {
-    param([object]$Fixture, [bool]$Existing, [bool]$AutoEnabled)
+    param(
+        [object]$Fixture,
+        [bool]$Existing,
+        [bool]$AutoEnabled,
+        [bool]$Foreign,
+        [bool]$MissingMergeMethod
+    )
     $statePath = Join-Path $Fixture.Root 'gh-state.json'
     $auto = $null
     if ($AutoEnabled) { $auto = [ordered]@{ mergeMethod = 'SQUASH' } }
@@ -116,6 +122,8 @@ function Initialize-GhState {
         exists = $Existing
         auto = $auto
         head = $Fixture.Head
+        foreign = $Foreign
+        missingMergeMethod = $MissingMergeMethod
     }
     Write-Utf8Fixture $statePath ($state | ConvertTo-Json -Depth 5 -Compress)
     return $statePath
@@ -130,12 +138,21 @@ function Run-Publish {
         [switch]$AutoEnabled,
         [ValidateSet('', 'fail', 'dirty')][string]$FastMode = '',
         [switch]$HeadRaceOnMerge,
+        [switch]$ForeignPr,
+        [switch]$MissingMergeMethod,
+        [switch]$AdvanceBranchOnPush,
         [string]$PowerShellCommand = 'pwsh'
     )
-    $statePath = Initialize-GhState $Fixture $ExistingPr.IsPresent $AutoEnabled.IsPresent
+    $statePath = Initialize-GhState `
+        $Fixture `
+        $ExistingPr.IsPresent `
+        $AutoEnabled.IsPresent `
+        $ForeignPr.IsPresent `
+        $MissingMergeMethod.IsPresent
     $logPath = Join-Path $Fixture.Root 'gh.log'
     $fastLog = Join-Path $Fixture.Root 'fast.log'
-    Remove-Item -LiteralPath $logPath,$fastLog -Force -ErrorAction SilentlyContinue
+    $transportLog = Join-Path $Fixture.Root 'git-transport.log'
+    Remove-Item -LiteralPath $logPath,$fastLog,$transportLog -Force -ErrorAction SilentlyContinue
     $env:MOCK_HEAD = $Fixture.Head
     $env:MOCK_BRANCH = $Fixture.Branch
     $env:MOCK_BASE = 'main'
@@ -143,8 +160,27 @@ function Run-Publish {
     $env:MOCK_GH_STATE = $statePath
     $env:MOCK_FAST_LOG = $fastLog
     $env:MOCK_FAST_MODE = $FastMode
+    $env:MOCK_REAL_GIT = $realGitPath
+    $env:MOCK_GIT_REMOTE = $Fixture.Remote
+    $env:MOCK_GIT_TRANSPORT_LOG = $transportLog
     if ($HeadRaceOnMerge) { $env:MOCK_HEAD_RACE = '1' }
     else { Remove-Item Env:MOCK_HEAD_RACE -ErrorAction SilentlyContinue }
+    $raceHead = ''
+    if ($AdvanceBranchOnPush) {
+        $tree = (Git $Fixture.Repo rev-parse 'HEAD^{tree}').Trim()
+        $raceHead = (Git -Repository $Fixture.Repo -Arguments @(
+            '-c', 'user.name=Push Race',
+            '-c', 'user.email=push-race@example.invalid',
+            'commit-tree', $tree,
+            '-p', $Fixture.Head,
+            '-m', 'advance before push spawn'
+        )).Trim()
+        $env:MOCK_ADVANCE_ON_PUSH = '1'
+        $env:MOCK_RACE_HEAD = $raceHead
+    }
+    else {
+        Remove-Item Env:MOCK_ADVANCE_ON_PUSH,Env:MOCK_RACE_HEAD -ErrorAction SilentlyContinue
+    }
 
     $arguments = @(
         '-NoLogo', '-NoProfile', '-File', $helper,
@@ -163,10 +199,12 @@ function Run-Publish {
     finally { $ErrorActionPreference = $previous }
     $log = if (Test-Path -LiteralPath $logPath) { Get-Content -LiteralPath $logPath -Raw } else { '' }
     $fast = if (Test-Path -LiteralPath $fastLog) { Get-Content -LiteralPath $fastLog -Raw } else { '' }
+    $transport = if (Test-Path -LiteralPath $transportLog) { Get-Content -LiteralPath $transportLog -Raw } else { '' }
     $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
     foreach ($name in @(
         'MOCK_HEAD','MOCK_BRANCH','MOCK_BASE','MOCK_GH_LOG','MOCK_GH_STATE',
-        'MOCK_FAST_LOG','MOCK_FAST_MODE','MOCK_HEAD_RACE'
+        'MOCK_FAST_LOG','MOCK_FAST_MODE','MOCK_HEAD_RACE','MOCK_REAL_GIT',
+        'MOCK_GIT_REMOTE','MOCK_GIT_TRANSPORT_LOG','MOCK_ADVANCE_ON_PUSH','MOCK_RACE_HEAD'
     )) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }
@@ -175,17 +213,20 @@ function Run-Publish {
         Output = ($output | Out-String).Trim()
         Log = $log
         FastLog = $fast
+        TransportLog = $transport
         State = $state
+        RaceHead = $raceHead
     }
 }
 
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
-    $mockBin = Join-Path $tempRoot 'bin'
-    New-Item -ItemType Directory -Path $mockBin | Out-Null
-    Set-Content -LiteralPath (Join-Path $mockBin 'gh.cmd') -Encoding ASCII -Value '@echo off
+    $ghBin = Join-Path $tempRoot 'gh-bin'
+    $gitBin = Join-Path $tempRoot 'git-bin'
+    New-Item -ItemType Directory -Path $ghBin,$gitBin | Out-Null
+    Set-Content -LiteralPath (Join-Path $ghBin 'gh.cmd') -Encoding ASCII -Value '@echo off
 python "%~dp0gh_mock.py" %*'
-    Write-Utf8Fixture (Join-Path $mockBin 'gh_mock.py') @'
+    Write-Utf8Fixture (Join-Path $ghBin 'gh_mock.py') @'
 import json
 import os
 import sys
@@ -218,6 +259,17 @@ elif args[:2] == ["pr", "view"]:
         "headRefOid": state["head"],
         "baseRefName": os.environ["MOCK_BASE"],
         "autoMergeRequest": state["auto"],
+        "isCrossRepository": state["foreign"],
+        "headRepository": {
+            "name": "Potop_v2",
+            "nameWithOwner": (
+                "ForeignOwner/Potop_v2" if state["foreign"]
+                else "GodotGamePlatforma/Potop_v2"
+            ),
+        },
+        "headRepositoryOwner": {
+            "login": "ForeignOwner" if state["foreign"] else "GodotGamePlatforma"
+        },
     }))
 elif args[:2] == ["pr", "merge"] and "--disable-auto" in args:
     state["auto"] = None
@@ -228,12 +280,65 @@ elif args[:2] == ["pr", "merge"] and "--auto" in args:
         save()
         print("head changed before auto-merge", file=sys.stderr)
         raise SystemExit(1)
-    state["auto"] = {"mergeMethod": "SQUASH"}
+    state["auto"] = {} if state["missingMergeMethod"] else {"mergeMethod": "SQUASH"}
     save()
 raise SystemExit(0)
 '@
+    Write-Utf8Fixture (Join-Path $gitBin 'git.ps1') @'
+& python (Join-Path $PSScriptRoot 'git_mock.py') @args
+exit $LASTEXITCODE
+'@
+    Write-Utf8Fixture (Join-Path $gitBin 'git_mock.py') @'
+import os
+import subprocess
+import sys
+
+args = sys.argv[1:]
+real_git = os.environ["MOCK_REAL_GIT"]
+
+index = 0
+repository = os.getcwd()
+while index < len(args):
+    if args[index] == "-C" and index + 1 < len(args):
+        repository = args[index + 1]
+        index += 2
+        continue
+    if args[index] == "-c" and index + 1 < len(args):
+        index += 2
+        continue
+    if args[index].startswith("-"):
+        index += 1
+        continue
+    break
+
+command = args[index] if index < len(args) else ""
+if command in {"fetch", "push", "ls-remote"}:
+    with open(os.environ["MOCK_GIT_TRANSPORT_LOG"], "a", encoding="utf-8") as handle:
+        handle.write(" ".join(args[index:]) + "\n")
+    if command == "push" and os.environ.get("MOCK_ADVANCE_ON_PUSH") == "1":
+        subprocess.run(
+            [
+                real_git,
+                "-C",
+                repository,
+                "update-ref",
+                "refs/heads/" + os.environ["MOCK_BRANCH"],
+                os.environ["MOCK_RACE_HEAD"],
+                os.environ["MOCK_HEAD"],
+            ],
+            check=True,
+        )
+    rewritten = list(args)
+    for position in range(index + 1, len(rewritten)):
+        if rewritten[position] == "origin":
+            rewritten[position] = os.environ["MOCK_GIT_REMOTE"]
+            break
+    raise SystemExit(subprocess.run([real_git, *rewritten]).returncode)
+
+raise SystemExit(subprocess.run([real_git, *args]).returncode)
+'@
     $oldPath = $env:PATH
-    $env:PATH = "$mockBin;$oldPath"
+    $env:PATH = "$gitBin;$ghBin;$oldPath"
 
     $ordinary = New-Fixture 'ordinary'
     $ordinaryResult = Run-Publish $ordinary -OmitSlug
@@ -268,6 +373,26 @@ raise SystemExit(0)
         throw 'Control-plane stale auto-merge was not disabled.'
     }
 
+    $foreign = New-Fixture 'foreign-reuse'
+    $foreignResult = Run-Publish $foreign -ExistingPr -AutoEnabled -ForeignPr
+    if ($foreignResult.ExitCode -eq 0 -or
+        $foreignResult.Output -notmatch 'different repository' -or
+        $foreignResult.Log -match '(?m)^pr (?:edit|merge) ') {
+        throw "Foreign same-branch/SHA PR was edited or accepted: $($foreignResult.Output) log=$($foreignResult.Log)"
+    }
+    if ($null -eq $foreignResult.State.auto -or
+        [string]$foreignResult.State.auto.mergeMethod -cne 'SQUASH') {
+        throw 'Foreign PR auto-merge state was mutated before repository identity passed.'
+    }
+
+    $missingMergeMethod = New-Fixture 'missing-merge-method'
+    $missingMergeMethodResult = Run-Publish $missingMergeMethod -MissingMergeMethod
+    if ($missingMergeMethodResult.ExitCode -eq 0 -or
+        $missingMergeMethodResult.Output -notmatch 'auto-merge method is not SQUASH' -or
+        $missingMergeMethodResult.Log -notmatch '--auto --squash --match-head-commit') {
+        throw "Missing nested auto mergeMethod was accepted: $($missingMergeMethodResult.Output)"
+    }
+
     $red = New-Fixture 'red-fast-check'
     $redResult = Run-Publish $red -FastMode fail
     if ($redResult.ExitCode -eq 0 -or $redResult.Output -notmatch 'agent_fast_check failed') {
@@ -290,7 +415,7 @@ raise SystemExit(0)
 
     $mismatch = New-Fixture 'slug-mismatch'
     $mismatchResult = Run-Publish $mismatch -Slug 'DifferentOwner/DifferentRepo'
-    if ($mismatchResult.ExitCode -eq 0 -or $mismatchResult.Output -notmatch 'does not match origin') {
+    if ($mismatchResult.ExitCode -eq 0 -or $mismatchResult.Output -notmatch 'does not match effective origin') {
         throw "Repository slug mismatch was accepted: $($mismatchResult.Output)"
     }
     if (-not [string]::IsNullOrWhiteSpace($mismatchResult.Log) -or
@@ -302,9 +427,34 @@ raise SystemExit(0)
     Git $pushUrlMismatch.Repo config remote.origin.pushurl 'https://github.com/DifferentOwner/DifferentRepo.git' | Out-Null
     $pushUrlMismatchResult = Run-Publish $pushUrlMismatch
     if ($pushUrlMismatchResult.ExitCode -eq 0 -or
-        $pushUrlMismatchResult.Output -notmatch 'pushurl does not identify the same' -or
+        $pushUrlMismatchResult.Output -notmatch 'Effective origin fetch' -or
         -not [string]::IsNullOrWhiteSpace($pushUrlMismatchResult.Log)) {
         throw "Mismatched origin push URL was accepted: $($pushUrlMismatchResult.Output)"
+    }
+
+    foreach ($rewriteKind in @('fetch', 'push')) {
+        $rewritten = New-Fixture "effective-$rewriteKind-rewrite"
+        $differentRemote = Join-Path $rewritten.Root 'different.git'
+        Git $rewritten.Root init --bare $differentRemote | Out-Null
+        $differentUri = 'file:///' + ($differentRemote.Replace('\', '/'))
+        $githubUrl = "https://github.com/$expectedSlug.git"
+        if ($rewriteKind -ceq 'fetch') {
+            Git $rewritten.Repo config "url.$differentUri.insteadOf" $githubUrl | Out-Null
+        }
+        else {
+            Git $rewritten.Repo config "url.$differentUri.pushInsteadOf" $githubUrl | Out-Null
+        }
+        if ((Git $rewritten.Repo config --get remote.origin.url).Trim() -cne $githubUrl) {
+            throw 'Rewrite fixture no longer has an apparently canonical raw origin URL.'
+        }
+        $rewrittenResult = Run-Publish $rewritten
+        if ($rewrittenResult.ExitCode -eq 0 -or
+            $rewrittenResult.Output -notmatch 'not one unambiguous GitHub repository URL|Effective origin fetch' -or
+            -not [string]::IsNullOrWhiteSpace($rewrittenResult.TransportLog) -or
+            -not [string]::IsNullOrWhiteSpace($rewrittenResult.Log) -or
+            (Git-Result $rewritten.Remote show-ref --verify --quiet "refs/heads/$($rewritten.Branch)").ExitCode -eq 0) {
+            throw "Effective $rewriteKind URL rewrite was not rejected before fetch/push/GitHub: $($rewrittenResult.Output) transport=$($rewrittenResult.TransportLog)"
+        }
     }
 
     $selfModify = New-Fixture 'classifier-self-modification' -ControlPlane
@@ -362,6 +512,21 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
         throw 'Head race enabled auto-merge for the wrong revision.'
     }
 
+    $pushRace = New-Fixture 'exact-object-push-race'
+    $pushRaceResult = Run-Publish $pushRace -AdvanceBranchOnPush
+    $remoteRaceProbe = Git-Result $pushRace.Remote rev-parse "refs/heads/$($pushRace.Branch)"
+    $remoteRaceHead = if ($remoteRaceProbe.ExitCode -eq 0) { $remoteRaceProbe.Output.Trim() } else { '' }
+    if ($pushRaceResult.ExitCode -eq 0 -or
+        $pushRaceResult.Output -notmatch 'branch ref or clean state changed' -or
+        $remoteRaceProbe.ExitCode -ne 0 -or
+        $remoteRaceHead -cne $pushRace.Head -or
+        $remoteRaceHead -ceq $pushRaceResult.RaceHead -or
+        (Git $pushRace.Repo rev-parse "refs/heads/$($pushRace.Branch)").Trim() -cne $pushRaceResult.RaceHead -or
+        -not [string]::IsNullOrWhiteSpace($pushRaceResult.Log) -or
+        $pushRaceResult.TransportLog -notmatch [regex]::Escape("push origin $($pushRace.Head):refs/heads/$($pushRace.Branch)")) {
+        throw "Exact-object push race was not fail-closed at A: $($pushRaceResult.Output) transport=$($pushRaceResult.TransportLog) remote=$remoteRaceHead remote_error=$($remoteRaceProbe.Output) B=$($pushRaceResult.RaceHead)"
+    }
+
     $dirtyAfterFast = New-Fixture 'dirty-after-fast'
     $dirtyAfterFastResult = Run-Publish $dirtyAfterFast -FastMode dirty
     if ($dirtyAfterFastResult.ExitCode -eq 0 -or $dirtyAfterFastResult.Output -notmatch 'changed during canonical fast-check') {
@@ -373,10 +538,10 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
     }
 
     $toolDirectory = @{
-        git = Split-Path -Parent (@(Get-Command git.exe -CommandType Application)[0].Source)
+        git = $gitBin
         python = Split-Path -Parent (@(Get-Command python.exe -CommandType Application)[0].Source)
         pwsh = Split-Path -Parent (@(Get-Command pwsh.exe -CommandType Application)[0].Source)
-        gh = $mockBin
+        gh = $ghBin
     }
     foreach ($missingToolName in @('git', 'python', 'pwsh', 'gh')) {
         $missingToolFixture = New-Fixture "missing-$missingToolName"
@@ -398,7 +563,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
             $missingToolResult = Run-Publish $missingToolFixture -PowerShellCommand $selectedPowerShell
         }
         finally {
-            $env:PATH = "$mockBin;$oldPath"
+            $env:PATH = "$gitBin;$ghBin;$oldPath"
         }
         if ($missingToolResult.ExitCode -eq 0 -or
             $missingToolResult.Output -notmatch "external command '$missingToolName'") {
@@ -413,13 +578,27 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
     foreach ($forbidden in @('Start-Sleep', 'check-runs', 'repository_dispatch', 'CandidateReceipt', 'integration-green')) {
         if ($source -match [regex]::Escape($forbidden)) { throw "publish-pr contains forbidden legacy token '$forbidden'." }
     }
-    Write-Host 'PASS publish_agent_pr preflight-fast-check/trusted-union/derived-repo/exact-push/single-PR/native-auto/manual-control-plane/race contract'
+    foreach ($required in @(
+        "'remote', 'get-url', '--all', 'origin'",
+        "'remote', 'get-url', '--push', '--all', 'origin'",
+        'isCrossRepository,headRepository,headRepositoryOwner',
+        '"${head}:refs/heads/$branch"'
+    )) {
+        if (-not $source.Contains($required)) {
+            throw "publish-pr is missing required exact identity/push binding '$required'."
+        }
+    }
+    if ($source -match [regex]::Escape('--set-upstream')) {
+        throw 'publish-pr still pushes a moving branch through --set-upstream.'
+    }
+    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/SQUASH/native-auto/manual-control-plane/race contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
     foreach ($name in @(
         'MOCK_HEAD','MOCK_BRANCH','MOCK_BASE','MOCK_GH_LOG','MOCK_GH_STATE',
-        'MOCK_FAST_LOG','MOCK_FAST_MODE','MOCK_HEAD_RACE'
+        'MOCK_FAST_LOG','MOCK_FAST_MODE','MOCK_HEAD_RACE','MOCK_REAL_GIT',
+        'MOCK_GIT_REMOTE','MOCK_GIT_TRANSPORT_LOG','MOCK_ADVANCE_ON_PUSH','MOCK_RACE_HEAD'
     )) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }

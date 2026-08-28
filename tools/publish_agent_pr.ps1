@@ -129,6 +129,39 @@ function Convert-OriginUrlToSlug {
     return "$owner/$name"
 }
 
+function Get-EffectiveOriginSlug {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryPath,
+        [string]$ExplicitSlug
+    )
+
+    $fetchUrls = @(
+        (Invoke-Checked git @('remote', 'get-url', '--all', 'origin') $RepositoryPath) -split "`r?`n" |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    $pushUrls = @(
+        (Invoke-Checked git @('remote', 'get-url', '--push', '--all', 'origin') $RepositoryPath) -split "`r?`n" |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    if ($fetchUrls.Count -ne 1) {
+        throw "Expected exactly one effective origin fetch URL; found $($fetchUrls.Count)."
+    }
+    if ($pushUrls.Count -ne 1) {
+        throw "Expected exactly one effective origin push URL; found $($pushUrls.Count)."
+    }
+
+    $fetchSlug = Convert-OriginUrlToSlug $fetchUrls[0]
+    $pushSlug = Convert-OriginUrlToSlug $pushUrls[0]
+    if (-not [string]::Equals($fetchSlug, $pushSlug, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Effective origin fetch '$fetchSlug' and push '$pushSlug' target different repositories."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitSlug) -and
+        -not [string]::Equals($ExplicitSlug.Trim(), $fetchSlug, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "RepositorySlug '$ExplicitSlug' does not match effective origin '$fetchSlug'."
+    }
+    return $fetchSlug
+}
+
 function Get-ClassifierAssessment {
     param(
         [Parameter(Mandatory = $true)][string]$ClassifierPath,
@@ -174,7 +207,7 @@ function Read-Pr {
     )
     $json = Invoke-Checked gh @(
         'pr', 'view', [string]$Number, '--repo', $Slug,
-        '--json', 'number,url,state,headRefName,headRefOid,baseRefName,autoMergeRequest'
+        '--json', 'number,url,state,headRefName,headRefOid,baseRefName,autoMergeRequest,isCrossRepository,headRepository,headRepositoryOwner'
     ) $RepositoryPath
     try {
         $pr = $json | ConvertFrom-Json
@@ -182,7 +215,10 @@ function Read-Pr {
     catch {
         throw "GitHub returned invalid PR JSON for #${Number}: $json"
     }
-    $required = @('number', 'url', 'state', 'headRefName', 'headRefOid', 'baseRefName', 'autoMergeRequest')
+    $required = @(
+        'number', 'url', 'state', 'headRefName', 'headRefOid', 'baseRefName',
+        'autoMergeRequest', 'isCrossRepository', 'headRepository', 'headRepositoryOwner'
+    )
     $available = @($pr.PSObject.Properties.Name)
     foreach ($property in $required) {
         if ($available -notcontains $property) {
@@ -197,13 +233,39 @@ function Assert-PrIdentity {
         [Parameter(Mandatory = $true)][object]$PullRequest,
         [Parameter(Mandatory = $true)][string]$Branch,
         [Parameter(Mandatory = $true)][string]$HeadSha,
-        [Parameter(Mandatory = $true)][string]$BaseBranch
+        [Parameter(Mandatory = $true)][string]$BaseBranch,
+        [Parameter(Mandatory = $true)][string]$RepositorySlug
     )
     if ([string]$PullRequest.state -cne 'OPEN' -or
         [string]$PullRequest.headRefName -cne $Branch -or
         [string]$PullRequest.headRefOid -cne $HeadSha -or
         [string]$PullRequest.baseRefName -cne $BaseBranch) {
         throw 'Published PR does not match the exact open branch/base/HEAD.'
+    }
+
+    $crossRepositoryProperty = $PullRequest.PSObject.Properties['isCrossRepository']
+    if ($null -eq $crossRepositoryProperty -or $crossRepositoryProperty.Value -isnot [bool]) {
+        throw 'Published PR does not provide an unambiguous isCrossRepository binding.'
+    }
+    if ([bool]$crossRepositoryProperty.Value) {
+        throw 'Published PR head belongs to a different repository.'
+    }
+    if ($null -eq $PullRequest.headRepository -or $null -eq $PullRequest.headRepositoryOwner) {
+        throw 'Published PR does not provide head repository identity.'
+    }
+    $nameProperty = $PullRequest.headRepository.PSObject.Properties['name']
+    $nameWithOwnerProperty = $PullRequest.headRepository.PSObject.Properties['nameWithOwner']
+    $ownerProperty = $PullRequest.headRepositoryOwner.PSObject.Properties['login']
+    if ($null -eq $nameProperty -or $null -eq $nameWithOwnerProperty -or $null -eq $ownerProperty -or
+        [string]::IsNullOrWhiteSpace([string]$nameProperty.Value) -or
+        [string]::IsNullOrWhiteSpace([string]$nameWithOwnerProperty.Value) -or
+        [string]::IsNullOrWhiteSpace([string]$ownerProperty.Value)) {
+        throw 'Published PR head repository owner/name binding is incomplete.'
+    }
+    $headRepositorySlug = "$([string]$ownerProperty.Value)/$([string]$nameProperty.Value)"
+    if (-not [string]::Equals($headRepositorySlug, [string]$nameWithOwnerProperty.Value, [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not [string]::Equals($headRepositorySlug, $RepositorySlug, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Published PR head repository '$headRepositorySlug' does not match '$RepositorySlug'."
     }
 }
 
@@ -229,6 +291,10 @@ if (-not [string]::IsNullOrWhiteSpace($status)) {
 $head = (Invoke-Checked git @('rev-parse', 'HEAD') $repo).Trim()
 if ($head -cnotmatch '^[0-9a-f]{40}$') { throw 'HEAD is not an exact full SHA.' }
 
+# Resolve identity through Git before the first network operation. This includes
+# url.*.insteadOf and pushInsteadOf rewrites, unlike raw remote.origin.url.
+$slug = Get-EffectiveOriginSlug -RepositoryPath $repo -ExplicitSlug $RepositorySlug
+
 Invoke-Checked git @(
     'fetch', '--no-tags', 'origin',
     "+refs/heads/$BaseBranch`:refs/remotes/origin/$BaseBranch"
@@ -242,40 +308,6 @@ if ((Invoke-Checked git @('rev-parse', 'HEAD') $repo).Trim() -cne $head -or
     )) {
     throw 'HEAD or worktree changed while fetching the base.'
 }
-
-$originUrls = @(
-    (Invoke-Checked git @('config', '--local', '--get-all', 'remote.origin.url') $repo) -split "`r?`n" |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-)
-if ($originUrls.Count -ne 1) {
-    throw "Expected exactly one local remote.origin.url; found $($originUrls.Count)."
-}
-$derivedSlug = Convert-OriginUrlToSlug $originUrls[0]
-$pushUrlProbe = Invoke-CommandResult git @(
-    'config', '--local', '--get-all', 'remote.origin.pushurl'
-) $repo
-if ($pushUrlProbe.ExitCode -eq 0) {
-    $pushUrls = @(
-        $pushUrlProbe.Output -split "`r?`n" |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    )
-    if ($pushUrls.Count -ne 1 -or
-        -not [string]::Equals(
-            (Convert-OriginUrlToSlug $pushUrls[0]),
-            $derivedSlug,
-            [System.StringComparison]::OrdinalIgnoreCase
-        )) {
-        throw 'remote.origin.pushurl does not identify the same single GitHub repository as origin.'
-    }
-}
-elseif ($pushUrlProbe.ExitCode -ne 1 -or -not [string]::IsNullOrWhiteSpace($pushUrlProbe.Output)) {
-    throw "Cannot determine remote.origin.pushurl: $($pushUrlProbe.Output)"
-}
-if (-not [string]::IsNullOrWhiteSpace($RepositorySlug) -and
-    -not [string]::Equals($RepositorySlug.Trim(), $derivedSlug, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "RepositorySlug '$RepositorySlug' does not match origin '$derivedSlug'."
-}
-$slug = $derivedSlug
 
 $tempClassifierDirectory = Join-Path (
     [System.IO.Path]::GetTempPath()
@@ -352,8 +384,8 @@ if ($postCheckHead -cne $head -or $postCheckBranch -cne $branch -or
 }
 
 Invoke-Checked git @(
-    'push', '--set-upstream', 'origin',
-    "refs/heads/$branch`:refs/heads/$branch"
+    'push', 'origin',
+    "${head}:refs/heads/$branch"
 ) $repo | Out-Null
 $remoteLine = (Invoke-Checked git @('ls-remote', '--heads', 'origin', "refs/heads/$branch") $repo).Trim()
 $remoteFields = @($remoteLine -split '\s+')
@@ -361,11 +393,14 @@ if ($remoteFields.Count -ne 2 -or $remoteFields[0] -cne $head -or
     $remoteFields[1] -cne "refs/heads/$branch") {
     throw 'Remote branch does not resolve to the exact published HEAD.'
 }
+$postPushBranchRef = (Invoke-Checked git @('rev-parse', "refs/heads/$branch") $repo).Trim()
 if ((Invoke-Checked git @('rev-parse', 'HEAD') $repo).Trim() -cne $head -or
+    (Invoke-Checked git @('branch', '--show-current') $repo).Trim() -cne $branch -or
+    $postPushBranchRef -cne $head -or
     -not [string]::IsNullOrWhiteSpace(
         (Invoke-Checked git @('status', '--porcelain=v1', '--untracked-files=all') $repo)
     )) {
-    throw 'HEAD or clean state changed while publishing the branch.'
+    throw 'HEAD, branch ref or clean state changed while publishing the exact commit.'
 }
 
 $listArguments = @(
@@ -395,6 +430,13 @@ if ($open.Count -eq 0) {
     ) $repo | Out-Null
 }
 else {
+    $existingPr = Read-Pr -Number ([int]$open[0].number) -Slug $slug -RepositoryPath $repo
+    Assert-PrIdentity `
+        -PullRequest $existingPr `
+        -Branch $branch `
+        -HeadSha $head `
+        -BaseBranch $BaseBranch `
+        -RepositorySlug $slug
     Invoke-Checked gh @(
         'pr', 'edit', [string]$open[0].number, '--repo', $slug,
         '--title', $Title, '--body', $Body
@@ -418,7 +460,12 @@ if ($confirmedOpen.Count -ne 1) {
     throw "Expected exactly one open PR for '$branch' after create/reuse; found $($confirmedOpen.Count)."
 }
 $pr = Read-Pr -Number ([int]$confirmedOpen[0].number) -Slug $slug -RepositoryPath $repo
-Assert-PrIdentity -PullRequest $pr -Branch $branch -HeadSha $head -BaseBranch $BaseBranch
+Assert-PrIdentity `
+    -PullRequest $pr `
+    -Branch $branch `
+    -HeadSha $head `
+    -BaseBranch $BaseBranch `
+    -RepositorySlug $slug
 
 $mode = 'manual-control-plane'
 if ($controlPlane) {
@@ -437,7 +484,12 @@ else {
 }
 
 $postOperationPr = Read-Pr -Number ([int]$pr.number) -Slug $slug -RepositoryPath $repo
-Assert-PrIdentity -PullRequest $postOperationPr -Branch $branch -HeadSha $head -BaseBranch $BaseBranch
+Assert-PrIdentity `
+    -PullRequest $postOperationPr `
+    -Branch $branch `
+    -HeadSha $head `
+    -BaseBranch $BaseBranch `
+    -RepositorySlug $slug
 if ($controlPlane) {
     if ($null -ne $postOperationPr.autoMergeRequest) {
         throw 'Control-plane PR still has auto-merge enabled after publication.'
@@ -448,9 +500,22 @@ else {
         throw 'Ordinary PR does not have native auto-merge enabled.'
     }
     $mergeMethodProperty = $postOperationPr.autoMergeRequest.PSObject.Properties['mergeMethod']
-    if ($null -ne $mergeMethodProperty -and [string]$mergeMethodProperty.Value -cne 'SQUASH') {
+    if ($null -eq $mergeMethodProperty -or [string]$mergeMethodProperty.Value -cne 'SQUASH') {
         throw 'Ordinary PR auto-merge method is not SQUASH.'
     }
+}
+
+$finalRemoteLine = (Invoke-Checked git @('ls-remote', '--heads', 'origin', "refs/heads/$branch") $repo).Trim()
+$finalRemoteFields = @($finalRemoteLine -split '\s+')
+if ($finalRemoteFields.Count -ne 2 -or $finalRemoteFields[0] -cne $head -or
+    $finalRemoteFields[1] -cne "refs/heads/$branch" -or
+    (Invoke-Checked git @('rev-parse', 'HEAD') $repo).Trim() -cne $head -or
+    (Invoke-Checked git @('rev-parse', "refs/heads/$branch") $repo).Trim() -cne $head -or
+    (Invoke-Checked git @('branch', '--show-current') $repo).Trim() -cne $branch -or
+    -not [string]::IsNullOrWhiteSpace(
+        (Invoke-Checked git @('status', '--porcelain=v1', '--untracked-files=all') $repo)
+    )) {
+    throw 'Repository state drifted after PR publication.'
 }
 
 [pscustomobject]@{
