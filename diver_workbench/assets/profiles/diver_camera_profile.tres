@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DiverCameraProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://diver_workbench/definitions/DiverCameraProfile.gd" id="1_camera_profile"]
+
+[resource]
+script = ExtResource("1_camera_profile")
+movement_dead_zone = 12.0
+minimum_intent_alignment = 0.8
+swim_lead_distance = 72.0
+sprint_lead_distance = 112.0
+swim_response = 5.0
+sprint_response = 8.0
+recenter_response = 6.0

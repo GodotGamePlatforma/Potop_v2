@@ -1245,11 +1245,11 @@ func _build_ui() -> void:
 func _build_tutorial_direction_indicator(canvas: CanvasLayer) -> void:
 	_tutorial_direction_indicator = TutorialDirectionIndicatorScript.new()
 	_tutorial_direction_indicator.name = "TutorialDirectionIndicator"
-	_tutorial_direction_indicator.set_anchors_preset(Control.PRESET_CENTER)
-	_tutorial_direction_indicator.offset_left = -TutorialDirectionIndicatorScript.INDICATOR_SIZE.x * 0.5
-	_tutorial_direction_indicator.offset_top = -TutorialDirectionIndicatorScript.INDICATOR_SIZE.y * 0.5
-	_tutorial_direction_indicator.offset_right = TutorialDirectionIndicatorScript.INDICATOR_SIZE.x * 0.5
-	_tutorial_direction_indicator.offset_bottom = TutorialDirectionIndicatorScript.INDICATOR_SIZE.y * 0.5
+	_tutorial_direction_indicator.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_tutorial_direction_indicator.size = TutorialDirectionIndicatorScript.INDICATOR_SIZE
+	_tutorial_direction_indicator.position = (
+		get_viewport_rect().size - TutorialDirectionIndicatorScript.INDICATOR_SIZE
+	) * 0.5
 	_tutorial_direction_indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tutorial_direction_indicator.visible = false
 	canvas.add_child(_tutorial_direction_indicator)
@@ -1611,11 +1611,12 @@ func _update_tutorial_panel() -> void:
 func _update_tutorial_direction_indicator() -> void:
 	if _tutorial_direction_indicator == null:
 		return
-	if not is_inside_tree():
+	if not is_inside_tree() or diver == null or not diver.is_inside_tree():
 		_tutorial_direction_indicator.clear()
 		return
+	_position_tutorial_direction_indicator_on_diver()
 	var target := _tutorial_navigation_target()
-	if target.is_empty() or diver == null:
+	if target.is_empty():
 		_tutorial_direction_indicator.clear()
 		return
 	var target_position: Vector2 = target.get("position", diver.global_position)
@@ -1624,6 +1625,13 @@ func _update_tutorial_direction_indicator() -> void:
 		str(target.get("label", "CEL")),
 		diver.global_position.distance_to(target_position)
 	)
+
+
+func _position_tutorial_direction_indicator_on_diver() -> void:
+	var screen_position := diver.get_global_transform_with_canvas().origin
+	if not screen_position.is_finite():
+		return
+	_tutorial_direction_indicator.position = screen_position - _tutorial_direction_indicator.size * 0.5
 
 
 func _tutorial_navigation_target() -> Dictionary:
