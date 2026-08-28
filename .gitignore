@@ -25,3 +25,4 @@ tools/audio/__pycache__/
 
 # Build output (if you compile modules)
 bin/
+/builds/
