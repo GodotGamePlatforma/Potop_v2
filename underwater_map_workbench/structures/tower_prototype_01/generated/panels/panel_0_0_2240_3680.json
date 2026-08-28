@@ -60,7 +60,7 @@
   ],
   "neighbor_panel_ids": [],
   "package_manifest_path": "structures/tower_prototype_01/structure_manifest.json",
-  "package_manifest_sha256": "934cb6810a073d72e3b1ab0d09b9c3ec90dd0fdc8176f05ae7043f57ce02ac84",
+  "package_manifest_sha256": "9cc1c6067882c43be312040673eff16c8a80ee8081f6155ba13303739ac863a7",
   "panel_id": "panel_0_0_2240_3680",
   "schema_version": 1,
   "socket_ids": [
