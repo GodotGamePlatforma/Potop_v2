@@ -28,9 +28,21 @@ git lfs pull
 
 Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Zadanie implementacyjne uruchamia od razu jako **Worktree**, nigdy jako Local. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. Agent ma skupić się na implementacji, nie na obsłudze systemu integracji.
 
-Jeżeli rozmowa rozpoczęła się jako „tylko analiza”, a później ma przejść do wdrożenia, najpierw użyj **Hand off do Worktree**. W przeniesionym worktree utwórz gałąź `codex/*` i dopiero wtedy rozpocznij edycję. Sam branch w głównym checkoutcie nie zastępuje osobnego worktree.
+Jeżeli rozmowa rozpoczęła się jako „tylko analiza”, a później ma przejść do wdrożenia, najpierw użyj **Hand off do Worktree**. Sam branch w głównym checkoutcie nie zastępuje osobnego worktree.
 
-Przykładowy start z czystej kopii repozytorium:
+Codzienna ścieżka ma dwa polecenia:
+
+```powershell
+# Uruchom z dowolnego worktree repo. Powstanie unikalny branch i katalog.
+.\tools\start_agent_task.ps1 -OwnerSegment root -TaskSlug <krótka-nazwa>
+
+# Po zmianie i właściwych testach uruchom we własnym nowym worktree:
+.\tools\finish_agent_task.ps1 -Title "<tytuł PR>" -CommitMessage "<typ>: <opis>" -TestTarget <test-zadania>
+```
+
+Pierwsze polecenie korzysta z exact `origin/main` i przy okazji próbuje bezpiecznie usunąć wyłącznie stare, czyste worktree exact scalonych PR-ów. Drugie zbiera zmiany zadania do jednego commita, uruchamia kanoniczny fast-check, pushuje exact SHA, tworzy jeden PR i dla zwykłej zmiany włącza merge queue. Dirty, otwarte, niescalone i przesunięte worktree są zawsze zachowywane.
+
+Niższy poziom, używany tylko do diagnostyki albo jawnego wskazania katalogu:
 
 ```powershell
 git fetch origin main
@@ -45,8 +57,8 @@ Następnie:
 2. wprowadź zmianę wyłącznie w dozwolonej domenie;
 3. uruchom lokalne testy zadania;
 4. osobno uruchom lokalny `fast-check`; po `FAIL` popraw zmianę i powtórz;
-5. po `PASS` sprawdź pełny diff i utwórz logiczny commit;
-6. opublikuj commit jednym helperem, który pushuje exact SHA, tworzy PR i dla zwykłej zmiany włącza squash auto-merge;
+5. po `PASS` sprawdź pełny diff;
+6. uruchom `finish_agent_task.ps1`, który tworzy logiczny commit i publikuje go jednym helperem;
 7. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge; może powiedzieć „gotowe” dopiero po potwierdzeniu `LocalHead = RemoteHead = PullRequestHead` dla jedynego otwartego PR.
 
 ```powershell
@@ -56,14 +68,9 @@ Następnie:
 # Następnie osobna szybka bramka lokalna:
 .\tools\agent_fast_check.ps1 -TestTarget <test-zadania>
 
-git status --short
-git diff --check
-git add <jawne-zmienione-pliki>
-git commit -m "<typ>: <krótki opis>"
-
-# Rewaliduje clean exact commit, pushuje i tworzy PR. Udany wynik wypisuje
+# Tworzy commit, rewaliduje clean exact commit, pushuje i tworzy PR. Wynik wypisuje
 # LocalHead, RemoteHead i PullRequestHead; wszystkie trzy muszą być identyczne:
-.\tools\publish_agent_pr.ps1 -Title "<tytuł PR>" -TestTarget <test-zadania>
+.\tools\finish_agent_task.ps1 -Title "<tytuł PR>" -CommitMessage "<typ>: <krótki opis>" -TestTarget <test-zadania>
 ```
 
 Jeżeli zadanie nie ma celu Godot, pomiń `-TestTarget`, ale nadal wykonaj adekwatny test przed fast-checkiem. Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree innego autora; zależność pobieraj z Git po commicie albo przez zwykły PR.
@@ -134,6 +141,17 @@ pwsh -NoProfile -File .\tools\build_playable_main.ps1 -Repository .
 ```
 
 Dodanie `-Watch` uruchamia ciągłe oczekiwanie na kolejne SHA `main`. Builder sam wykonuje bezpieczną synchronizację, LFS, export i smoke; nie jest zadaniem autora PR. Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian. Oznacza to dwa stabilne poziomy: `main` jest pełnozielonym kodem, a `current` najnowszym pełnozielonym `main`, który dodatkowo poprawnie się zbudował. Bieżące wyniki odbioru opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
+
+Na komputerze do grania watcher instaluje się jednorazowo i później sam wraca po zalogowaniu:
+
+```powershell
+.\tools\install_playable_builder.ps1 `
+  -Repository D:\Dev\Game\play-main `
+  -GodotConsolePath <pełna-ścieżka-do-Godot_console.exe> `
+  -StartNow
+```
+
+Task Scheduler gwarantuje jedną instancję, wznowienie po awarii i start po logowaniu. Dla niezmienionego SHA kompletny artefakt jest tylko raportowany jako oczekujący — LFS, export i zapis `current` nie są ponawiane co 30 sekund.
 
 ## Rzadkie zmiany control-plane
 

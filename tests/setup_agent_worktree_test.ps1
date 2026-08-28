@@ -128,6 +128,18 @@ try {
         throw 'Duplicate branch was not rejected.'
     }
 
+    Git $primary push origin "${expectedFirst}:refs/heads/codex/root/remote-only" | Out-Null
+    $remoteOnly = Run-Helper @(
+        '-Repository', $primary,
+        '-TaskSlug', 'remote-only',
+        '-OwnerSegment', 'root',
+        '-Destination', (Join-Path $tempRoot 'worktrees/remote-only'),
+        '-Create'
+    )
+    if ($remoteOnly.ExitCode -eq 0 -or $remoteOnly.Output -notmatch 'Remote branch already exists') {
+        throw 'A remote-only branch collision was not rejected.'
+    }
+
     Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'two' -Encoding UTF8
     [System.IO.File]::WriteAllBytes(
         (Join-Path $seed 'asset.bin'),

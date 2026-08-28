@@ -270,6 +270,33 @@ function Sync-Main {
     return $sha
 }
 
+function Get-RemoteMainSha {
+    $line = (Invoke-Git -Arguments @(
+        'ls-remote', '--exit-code', 'origin', 'refs/heads/main'
+    )).Trim()
+    $fields = @($line -split '\s+')
+    if ($fields.Count -ne 2 -or $fields[0] -cnotmatch '^[0-9a-f]{40}$' -or
+        $fields[1] -cne 'refs/heads/main') {
+        throw "origin/main did not resolve to one exact remote SHA: '$line'."
+    }
+    return $fields[0]
+}
+
+function Test-AlreadyPublishedCurrent {
+    param([Parameter(Mandatory = $true)][string]$Sha)
+    $localSha = (Invoke-Git -Arguments @('rev-parse', 'HEAD')).Trim()
+    $branch = (Invoke-Git -Arguments @('branch', '--show-current')).Trim()
+    $status = Invoke-Git -Arguments @('status', '--porcelain=v1', '--untracked-files=all')
+    if ($localSha -cne $Sha -or $branch -cne 'main' -or
+        -not [string]::IsNullOrWhiteSpace($status)) {
+        return $false
+    }
+    $currentPath = Join-Path $script:BuildRootPath 'current'
+    if (-not (Test-Path -LiteralPath $currentPath -PathType Leaf)) { return $false }
+    if ((Get-Content -LiteralPath $currentPath -Raw).Trim() -cne $Sha) { return $false }
+    return Test-CompleteArtifact -Directory (Join-Path $script:ByShaRoot $Sha) -Sha $Sha
+}
+
 function Publish-LastFailure {
     param(
         [Parameter(Mandatory = $true)][string]$Staging,
@@ -310,6 +337,15 @@ function Build-OneSha {
     if (Test-Path -LiteralPath $finalDirectory) {
         if (-not (Test-CompleteArtifact -Directory $finalDirectory -Sha $Sha)) {
             throw "Existing by-SHA directory is incomplete and will not be overwritten: $finalDirectory"
+        }
+        $currentPath = Join-Path $script:BuildRootPath 'current'
+        $currentSha = if (Test-Path -LiteralPath $currentPath -PathType Leaf) {
+            (Get-Content -LiteralPath $currentPath -Raw).Trim()
+        }
+        else { '' }
+        if ($currentSha -ceq $Sha) {
+            Write-Output "PLAYABLE BUILD WAITING: current SHA is unchanged $Sha"
+            return
         }
         Set-CurrentPointer -Sha $Sha
         Write-Output "CURRENT RECOVERED: $Sha"
@@ -476,6 +512,14 @@ try {
     do {
         $sha = ''
         try {
+            if ($Watch) {
+                $remoteSha = Get-RemoteMainSha
+                if (Test-AlreadyPublishedCurrent -Sha $remoteSha) {
+                    Write-Output "PLAYABLE BUILD WAITING: current SHA is unchanged $remoteSha"
+                    Start-Sleep -Seconds $PollSeconds
+                    continue
+                }
+            }
             $sha = Sync-Main
             if ($Watch -and $sha -ceq $lastFailedSha) {
                 Write-Output "PLAYABLE BUILD WAITING: unchanged failed SHA $sha"
