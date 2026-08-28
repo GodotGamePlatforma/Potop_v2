@@ -320,7 +320,7 @@ const REQUIRED_DELIVERY_GUARD_FRAGMENTS := {
 	],
 	"res://tests/publish_agent_pr_test.ps1": [
 		"exact-object-push",
-		"native-auto",
+		"SQUASH-native-queue",
 		"manual-control-plane",
 		"--match-head-commit",
 	],
