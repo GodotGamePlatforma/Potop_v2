@@ -30,7 +30,7 @@ Pełny lokalny rejestr decyzji oraz właściwe dokumenty root są wymagane dopie
 - Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head. Native merge queue sama składa go z aktualnym `main` i uruchamia pełny `integration-green`. Prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w kolejce powoduje zamknięcie starego PR przez koordynatora i nowe zadanie naprawcze dla nowego agenta startującego z aktualnego `main`; autor starego PR nie babysituje kolejki.
 - `map_manifest.json`, `UnderwaterMap.tscn`, mapowe metadane builda i `structures/*/generated/**` pozostają jednym spójnym zestawem. Builder publikuje go dopiero po walidacji wszystkich wejść; CAS/rollback, jeżeli jest używany, jest wewnętrzną ochroną zapisu buildera, nie protokołem współpracy agentów.
 - Builder i runner automatycznie egzekwują LF dla tracked plików z `eol=lf`. Celowany build/check i test nie odkrywają innych struktur.
-- Każdy przebieg Godota używa izolowanej pełnej kopii z prywatnym `.godot`, `user://`, logami, temp, portami i capture. `-InPlace` pozostaje odrzucane. Lokalny fast-check przed commitem i wymagany GitHub `fast-check` po PR są osobnymi przebiegami; dopiero GitHub `fast-check PASS` pozwala enqueue, a pełna integracja złożenia należy docelowo do merge queue zgodnie z rootowym ARD-0113.
+- Każdy przebieg Godota używa izolowanej pełnej kopii z prywatnym `.godot`, `user://`, logami, temp, portami i capture. `-InPlace` pozostaje odrzucane. Lokalny fast-check przed commitem i wymagany GitHub `fast-check` po PR są osobnymi przebiegami; dopiero GitHub `fast-check PASS` pozwala enqueue, a pełna integracja złożenia należy do aktywnej merge queue zgodnie z rootowym ARD-0113.
 
 ## Authority i pliki generowane
 

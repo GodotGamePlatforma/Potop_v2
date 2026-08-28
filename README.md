@@ -74,7 +74,7 @@ Przepływ rozdziela kolejne etapy weryfikacji:
 - po utworzeniu PR osobny, wymagany GitHub `fast-check` sprawdza dokładny head PR; `FAIL` pozostawia PR otwarty, a tylko `PASS` pozwala wejść do merge queue, także dla rzadkiej zmiany control-plane;
 - merge queue tworzy merge group `aktualny main + dany PR` i uruchamia pełny `integration-green`; `FAIL` oznacza brak merge, a `PASS` pozwala na squash do `main`.
 
-Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Pierwszy canary tej ścieżki jest zielony; bieżący stan buildera opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
+Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Ścieżka PR i merge queue jest aktywna; bieżące dowody weryfikacji opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
 Merge queue sama używa aktualnego `main`; autor nie babysituje PR. Jeżeli wystąpi prawdziwy konflikt albo `integration-green` wykryje nieaktualny seal, pin lub pochodne, koordynator zamyka stary PR jako zastąpiony i przydziela nowe zadanie naprawcze. Nowy agent rozpoczyna od aktualnego `main` w świeżym worktree, branchu i PR.
 
@@ -113,7 +113,7 @@ Nie używaj automatycznego `reset --hard`. Dirty katalog wymaga świadomego upor
 
 ## Finalny builder gry
 
-Po wdrożeniu docelowego procesu lokalny builder będzie działał wyłącznie po scaleniu:
+Aktywny lokalny builder działa wyłącznie po scaleniu:
 
 ```text
 exact final main SHA
@@ -124,7 +124,13 @@ exact final main SHA
   -> builds/current tylko po PASS
 ```
 
-Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian. Oznacza to dwa stabilne poziomy: `main` jest pełnozielonym kodem, a `current` najnowszym pełnozielonym `main`, który dodatkowo poprawnie się zbudował. Bieżący stan opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
+Jednorazowy przebieg z katalogu czystego lokalnego mirroru `main`:
+
+```powershell
+pwsh -NoProfile -File .\tools\build_playable_main.ps1 -Repository .
+```
+
+Dodanie `-Watch` uruchamia ciągłe oczekiwanie na kolejne SHA `main`. Builder sam wykonuje bezpieczną synchronizację, LFS, export i smoke; nie jest zadaniem autora PR. Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian. Oznacza to dwa stabilne poziomy: `main` jest pełnozielonym kodem, a `current` najnowszym pełnozielonym `main`, który dodatkowo poprawnie się zbudował. Bieżące wyniki odbioru opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
 ## Rzadkie zmiany control-plane
 
