@@ -44,7 +44,7 @@
     }
   },
   "package_manifest_path": "structures/tower_prototype_01/structure_manifest.json",
-  "package_manifest_sha256": "934cb6810a073d72e3b1ab0d09b9c3ec90dd0fdc8176f05ae7043f57ce02ac84",
+  "package_manifest_sha256": "9cc1c6067882c43be312040673eff16c8a80ee8081f6155ba13303739ac863a7",
   "panels": [
     {
       "id": "panel_0_0_2240_3680",
@@ -55,7 +55,7 @@
         3680
       ],
       "path": "structures/tower_prototype_01/generated/panels/panel_0_0_2240_3680.json",
-      "sha256": "0a11fba4d9d1e19c64abf3d4d26905191f861a4894e3580e580db530df23ec35"
+      "sha256": "2800cd3160d65d6776945b9061810ecf289a99dbe29496e460acf81ee95f8269"
     }
   ],
   "runtime": {
@@ -426,133 +426,133 @@
       "id": "entry_floor_12_broken_window",
       "kind": "entry_opening",
       "path": "structures/tower_prototype_01/generated/socket_cards/entry_floor_12_broken_window.json",
-      "sha256": "930b230502f19ce317e747891d081d216bd7bb7bbe11c5f27bdd817b957b4b83"
+      "sha256": "e0c1b405f1cd33048c9931e13ae3829268b5ba80f1a421549543858aa31f1887"
     },
     {
       "id": "elevator_upper_travel",
       "kind": "moving_elevator",
       "path": "structures/tower_prototype_01/generated/socket_cards/elevator_upper_travel.json",
-      "sha256": "31320b7c7809f22373fcdac3a42cfe855814bfb80cf46acd807fd0633a117e23"
+      "sha256": "1884877f6a4440121e56471dd025b0f7d921b02532a9d037dedfb1136036292b"
     },
     {
       "id": "gate_red_west",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_west.json",
-      "sha256": "869fc3c70fec14696cff72b51c0b1a2a33b76d52b4b58a7f5f545fe01fec9209"
+      "sha256": "5bbe6a4e86161a4f5ac40998bed080c06c0793f168d6ecdd59b5b323897b6511"
     },
     {
       "id": "gate_red_east",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_east.json",
-      "sha256": "d8e65fc8a848345fb1c94babee9d095fd9202006b0c22ad1770c2a07eba97a39"
+      "sha256": "60f9b0f0f57e698bb460363be2449e66183e4bd7e74688bb23ad103cd68212f8"
     },
     {
       "id": "gate_blue_upper",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_upper.json",
-      "sha256": "5b2a6ee35571dea2eb89e85b6e62fa386b6ccc2cfdeafa14897d6afc4146eeca"
+      "sha256": "54b19111b8dcf8e0d343b6a0878d4c74b61821ab3d3208890eebcac0bd340139"
     },
     {
       "id": "gate_blue_lower",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_lower.json",
-      "sha256": "f53cef202751333c882612d910cec8fb6cf53793a59d853b26e59e004896a503"
+      "sha256": "6472133402de04ce2cddb0d561701dad727cd93cc4306d629a5d9b32824e50cc"
     },
     {
       "id": "gate_yellow",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/gate_yellow.json",
-      "sha256": "9261ef4554060504e891f57185dfc1e5b8968eb692014f2af244fb6afbcce306"
+      "sha256": "a1244426d55b134d04ed8fe3c633508adb90766ec06198ff320e23a6973fde79"
     },
     {
       "id": "hatch_d",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/hatch_d.json",
-      "sha256": "fc586d447f6701524c520bfd0f3bb7c899a1657ec299944d2173986f17d0d1c4"
+      "sha256": "faf897747084405760946e4a24a2d69fa3c56bd361e19534c6f9a9565df511ca"
     },
     {
       "id": "shortcut_b_upper",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_upper.json",
-      "sha256": "199ece1746d5300c0711f1706d2bb234c0b4a09280bbad3b16264dc1f410d274"
+      "sha256": "aacaa23f7e73bd097c76d02ef091670cd70c32e6eb77f04b29419a05bf5a97e8"
     },
     {
       "id": "shortcut_b_lower",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_lower.json",
-      "sha256": "b95e05269719def6de883278dc2eb3dd7f1c49f9bbbec87294ef3f58ec3f1934"
+      "sha256": "7a6e8d93ab0b212562187cc7aa29139b03b6efeec92aec5ae819e280d376698e"
     },
     {
       "id": "shortcut_c_upper",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_upper.json",
-      "sha256": "1266058256d1becaadae044f0b80f642b70562ad953af4aec096d4b4f46aa9c8"
+      "sha256": "8e539b0059d99b4712231e8dc6f65da5eeadfea0b30d3e43e9130b78b13ea56c"
     },
     {
       "id": "shortcut_c_middle",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_middle.json",
-      "sha256": "b02ac0bb0643a14680d0943013737a2d35a32c5e1e76a98b64ed52647efb10c8"
+      "sha256": "52307e597661df110feb618e634a2a1e8e3ce72f8485eab68a4b4487d084b139"
     },
     {
       "id": "shortcut_c_lower",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_lower.json",
-      "sha256": "21f73c59f4dfbb4c8a1581d3491718d7bc6945c747229948a270e8f54dcc0e72"
+      "sha256": "5bb12b8ad22b4772a4d1e24a63f715bb52873c0c5c915bf794e356c3da8880dd"
     },
     {
       "id": "hatch_basement",
       "kind": "dynamic_door",
       "path": "structures/tower_prototype_01/generated/socket_cards/hatch_basement.json",
-      "sha256": "07b087e0654dbdd59bb0b016a5d7727af6330ff1abb3e055d7f2cae5f00a8cce"
+      "sha256": "5a47cfa0eeafef80ecda10f2594beedf95acce8b67a4dc8d90ddb50071fa72f8"
     },
     {
       "id": "control_a_distributor",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_a_distributor.json",
-      "sha256": "a633e5802774e50da1b8e34238a05f9c6954e7ea87bb783dbae5444b08bdd97f"
+      "sha256": "7c505bfaecea814a9f21b67736378b7a2db973798f09a9a677a89da5e712863e"
     },
     {
       "id": "control_b_red_relay",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_b_red_relay.json",
-      "sha256": "da17edcd08b065a682d9778ae4f841ae1d51a3522b395750bcbd546062488028"
+      "sha256": "f58c93c2f996536a813920e6344e9a7a85c94e269eb55117b21c23c1cbd7f8ca"
     },
     {
       "id": "control_c_blue_lock",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_c_blue_lock.json",
-      "sha256": "c888703b5ae1c9b0c0d46166d6363fbe0497c455bd8d67d2ca12e5c438db403c"
+      "sha256": "3709caefdef4867c4c921170780bf58f91ff9806c824735bbb4289505a2900e0"
     },
     {
       "id": "control_d_valve_v1",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v1.json",
-      "sha256": "1352386899f59000eb926b7151e4eca1f5c2d4ebe40c2329a3d1b2d57d474493"
+      "sha256": "c7338fcf39e9b9aef91ba0e11e446162ce16782b18edc4ae4493dc062fae7bf8"
     },
     {
       "id": "control_d_valve_v2",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v2.json",
-      "sha256": "dfd019354de3ce46e392a5537c9ba7b00e814769fb709d2bd2c858f0b76f4ccb"
+      "sha256": "e90f808ad9d31dbbf4e1e1674a9560636abb857d5c80af47bb6c6acf4c59b423"
     },
     {
       "id": "control_d_valve_v3",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v3.json",
-      "sha256": "105022f8d06fd4cb66cfa8edba9af87fc48a4e899994c2eb69f0c1d12314c534"
+      "sha256": "485545aad4f3371d054d395b8d8cdff136b5c63c66a85bf202333ef93bed3b4f"
     },
     {
       "id": "control_d_reset",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_d_reset.json",
-      "sha256": "5c31075c9cf09011280d3691f06492780f66eeca93909d05cac64b7abd0e5664"
+      "sha256": "873a9e5fdf2af12b550980a980ca453b693ae1a9b45da2f4ade3caea53c1d5cd"
     },
     {
       "id": "control_basement_hatch",
       "kind": "fixed_interactable",
       "path": "structures/tower_prototype_01/generated/socket_cards/control_basement_hatch.json",
-      "sha256": "13f9815d94e208bc45d5d4b0598de9ddd53795709b4250e072b5b9a6b8b205c6"
+      "sha256": "157ecd4702944b56dfc242b2e42893f2020126098af7a409ea4eb67739a5391a"
     }
   ],
   "sockets": [
