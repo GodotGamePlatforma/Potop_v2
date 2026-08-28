@@ -207,8 +207,18 @@ function Resolve-GodotPath {
         return $resolved
     }
     foreach ($name in @('godot4', 'godot')) {
-        $command = @(Get-Command $name -ErrorAction SilentlyContinue)[0]
-        if ($null -ne $command) { return $command.Source }
+        $command = @(
+            Get-Command -Name $name -CommandType Application,ExternalScript `
+                -ErrorAction SilentlyContinue
+        ) | Select-Object -First 1
+        if ($null -eq $command) { continue }
+        $resolved = if (-not [string]::IsNullOrWhiteSpace([string]$command.Path)) {
+            [string]$command.Path
+        }
+        else {
+            [string]$command.Source
+        }
+        if (-not [string]::IsNullOrWhiteSpace($resolved)) { return $resolved }
     }
     throw 'Godot is required for changed Godot files or targeted tests. Pass -GodotConsolePath.'
 }

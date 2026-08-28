@@ -34,9 +34,12 @@ function Run-FastCheck {
     $arguments = @(
         '-NoLogo', '-NoProfile', '-File', $helper,
         '-Repository', $Repository,
-        '-BaseRef', 'refs/heads/main',
-        '-GodotConsolePath', $Godot
-    ) + $Extra
+        '-BaseRef', 'refs/heads/main'
+    )
+    if (-not [string]::IsNullOrWhiteSpace($Godot)) {
+        $arguments += @('-GodotConsolePath', $Godot)
+    }
+    $arguments += $Extra
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
@@ -70,8 +73,10 @@ raise SystemExit(0)
 '@
     $successGodot = Join-Path $mockBin 'godot-success.cmd'
     $errorGodot = Join-Path $mockBin 'godot-error.cmd'
+    $autoGodot = Join-Path $mockBin 'godot.cmd'
     Set-Content -LiteralPath $successGodot -Encoding ascii -Value "@echo off`necho Godot Engine test`nexit /b 0"
     Set-Content -LiteralPath $errorGodot -Encoding ascii -Value "@echo off`necho SCRIPT ERROR: parser failure`nexit /b 0"
+    Set-Content -LiteralPath $autoGodot -Encoding ascii -Value "@echo off`necho Godot fallback test`nexit /b 0"
     $oldPath = $env:PATH
     $env:PATH = "$mockBin;$oldPath"
     $env:FAST_TARGET_LOG = $targetLog
@@ -85,7 +90,7 @@ raise SystemExit(0)
     Set-Content -LiteralPath (Join-Path $repo 'tests/run_all_tests.ps1') -Encoding UTF8 -Value @'
 param([string]$GodotConsolePath,[string]$SourceRepositoryPath,[string]$Target)
 if ($GodotConsolePath -like '*error*') { throw 'SCRIPT ERROR: parser failure' }
-Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value $Target
+Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value "GODOT=$GodotConsolePath TARGET=$Target"
 Write-Host "TARGET PASS $Target"
 '@
     Set-Content -LiteralPath (Join-Path $repo 'tests/game_test.gd') -Encoding UTF8 -Value 'extends Node'
@@ -101,6 +106,46 @@ Write-Host "TARGET PASS $Target"
     }
     if ((Get-Content -LiteralPath $targetLog -Raw) -notmatch 'tests/game_test.gd') {
         throw 'Targeted test runner was not invoked.'
+    }
+
+    $toolOnlyPath = @(
+        $mockBin,
+        (Split-Path -Parent (@(Get-Command git.exe -CommandType Application)[0].Source)),
+        (Split-Path -Parent (@(Get-Command python.exe -CommandType Application)[0].Source)),
+        (Split-Path -Parent (@(Get-Command pwsh.exe -CommandType Application)[0].Source))
+    ) | Select-Object -Unique
+    $toolOnlyPath = $toolOnlyPath -join [System.IO.Path]::PathSeparator
+    Clear-Content -LiteralPath $targetLog
+    $pathBeforeFallback = $env:PATH
+    try {
+        $env:PATH = $toolOnlyPath
+        $fallback = Run-FastCheck $repo $null @(
+            '-TestTarget', 'tests/game_test.gd', '-AllowedPath', 'game.gd'
+        )
+    }
+    finally { $env:PATH = $pathBeforeFallback }
+    $fallbackLog = Get-Content -LiteralPath $targetLog -Raw
+    if ($fallback.ExitCode -ne 0 -or $fallback.Output -notmatch 'FAST-CHECK PASS' -or
+        $fallbackLog -notmatch 'godot\.cmd') {
+        throw "Missing godot4 did not fall back to godot: $($fallback.Output) log=$fallbackLog"
+    }
+
+    $hiddenGodot = Join-Path $tempRoot 'godot.hidden'
+    Move-Item -LiteralPath $autoGodot -Destination $hiddenGodot
+    try {
+        $env:PATH = $toolOnlyPath
+        $missingGodot = Run-FastCheck $repo $null @(
+            '-TestTarget', 'tests/game_test.gd', '-AllowedPath', 'game.gd'
+        )
+    }
+    finally {
+        $env:PATH = $pathBeforeFallback
+        Move-Item -LiteralPath $hiddenGodot -Destination $autoGodot
+    }
+    if ($missingGodot.ExitCode -eq 0 -or
+        $missingGodot.Output -notmatch 'Pass -GodotConsolePath' -or
+        $missingGodot.Output -match 'Index was outside the bounds') {
+        throw "Missing Godot aliases did not produce the explicit-path guidance: $($missingGodot.Output)"
     }
 
     $godotError = Run-FastCheck $repo $errorGodot @('-TestTarget', 'tests/game_test.gd', '-AllowControlPlane')
@@ -183,7 +228,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check local-branch/detached-exact-SHA/diff-scope/protected-path/LFS/Godot-error/missing-tool contract'
+    Write-Host 'PASS agent_fast_check Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
