@@ -42,6 +42,7 @@ LAST_GREEN_REF = "refs/last-green/integration"
 PUBLICATION_RECEIPT_SCHEMA_VERSION = 1
 PUBLICATION_RECEIPT_STATUS = "PUBLICATION_READY"
 ASSIGNMENT_SCHEMA_VERSION = 1
+MAIN_ASSIGNMENT_SCHEMA_VERSION = 2
 ASSIGNMENT_STORE_RELATIVE = Path("codex-agent-assignments") / "v1"
 ASSIGNMENT_LOCK_NAME = "agent-assignments"
 ASSIGNMENT_ID_PATTERN = re.compile(r"[0-9a-f]{32}\Z")
@@ -1124,7 +1125,7 @@ def _write_json_file(path: Path, value: object) -> None:
 
 def _assignment_record(bundle: Path) -> dict[str, object]:
     record = _read_json_object(bundle / "assignment.json", "record")
-    required = {
+    common_required = {
         "schema_version",
         "assignment_id",
         "assignment_digest",
@@ -1140,12 +1141,28 @@ def _assignment_record(bundle: Path) -> dict[str, object]:
         "tree",
         "write_set",
         "write_set_digest",
-        "candidate_receipt_sha256",
-        "run_receipt_sha256",
         "created_at",
         "ack_deadline",
     }
-    if set(record) != required or record.get("schema_version") != ASSIGNMENT_SCHEMA_VERSION:
+    schema_version = record.get("schema_version")
+    # JSON booleans and integral floats compare equal to Python integers. The
+    # durable version discriminator must remain exact during rolling upgrades.
+    if type(schema_version) is not int:
+        raise ContractError("Assignment record schema_version must be an exact integer.")
+    if schema_version == ASSIGNMENT_SCHEMA_VERSION:
+        required = common_required | {
+            "candidate_receipt_sha256",
+            "run_receipt_sha256",
+        }
+    elif schema_version == MAIN_ASSIGNMENT_SCHEMA_VERSION:
+        required = common_required | {
+            "baseline_kind",
+            "baseline_ref",
+            "origin_url_sha256",
+        }
+    else:
+        required = set()
+    if set(record) != required:
         raise ContractError("Assignment record has an invalid exact schema.")
     assignment_id = str(record["assignment_id"])
     assignment_digest = str(record["assignment_digest"])
@@ -1183,11 +1200,16 @@ def _assignment_record(bundle: Path) -> dict[str, object]:
         raise ContractError("Assignment record write_set digest is invalid.")
     if validate_paths(normalized_owner, write_set):
         raise ContractError("Assignment record write_set crosses its owner boundary.")
-    for field in (
-        "candidate_receipt_sha256",
-        "run_receipt_sha256",
-        "task_id_sha256",
-    ):
+    digest_fields = ["task_id_sha256"]
+    if schema_version == ASSIGNMENT_SCHEMA_VERSION:
+        digest_fields.extend(("candidate_receipt_sha256", "run_receipt_sha256"))
+    else:
+        if record["baseline_kind"] != "origin-main":
+            raise ContractError("Assignment record baseline_kind is invalid.")
+        if record["baseline_ref"] != "refs/remotes/origin/main":
+            raise ContractError("Assignment record baseline_ref is invalid.")
+        digest_fields.append("origin_url_sha256")
+    for field in digest_fields:
         if ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(record[field])) is None:
             raise ContractError(f"Assignment record {field} is invalid.")
     for field in ("head", "tree"):
@@ -1212,8 +1234,10 @@ def _event_record(
     event = _read_json_object(path, event_type.lower())
     if set(event) != required_fields or event.get("event") != event_type:
         raise ContractError(f"Assignment {event_type} event has an invalid exact schema.")
+    event_schema_version = event.get("schema_version")
     if (
-        event.get("schema_version") != ASSIGNMENT_SCHEMA_VERSION
+        type(event_schema_version) is not int
+        or event_schema_version != assignment.get("schema_version")
         or event.get("assignment_id") != assignment["assignment_id"]
         or event.get("assignment_digest") != assignment["assignment_digest"]
         or ASSIGNMENT_DIGEST_PATTERN.fullmatch(str(event.get(digest_field, ""))) is None
@@ -1341,20 +1365,67 @@ def _assignment_redispatches(
     return tuple(events)
 
 
+def _validate_assignment_bundle_layout(bundle: Path) -> None:
+    """Reject unrecognised mutable surfaces in an assignment bundle."""
+    allowed = {"assignment.json", "ack.json", "close.json", "redispatch"}
+    try:
+        entries = tuple(bundle.iterdir())
+    except OSError as error:
+        raise ContractError(
+            f"Assignment bundle cannot be enumerated: {bundle}: {error}"
+        ) from error
+    unexpected = sorted(entry.name for entry in entries if entry.name not in allowed)
+    if unexpected:
+        raise ContractError(
+            "Assignment bundle contains an unknown event or file: "
+            + ", ".join(unexpected)
+        )
+    assignment_path = bundle / "assignment.json"
+    if (
+        not assignment_path.is_file()
+        or assignment_path.is_symlink()
+        or any(
+            entry.name in {"ack.json", "close.json"}
+            and (not entry.is_file() or entry.is_symlink())
+            for entry in entries
+        )
+    ):
+        raise ContractError("Assignment bundle has an invalid immutable file layout.")
+    redispatch = bundle / "redispatch"
+    if redispatch.exists():
+        if not redispatch.is_dir() or redispatch.is_symlink():
+            raise ContractError("Assignment redispatch surface is not a real directory.")
+        for event in redispatch.iterdir():
+            if (
+                not event.is_file()
+                or event.is_symlink()
+                or re.fullmatch(r"[0-9]{6}\.json", event.name) is None
+            ):
+                raise ContractError(
+                    f"Assignment redispatch contains an unknown event: {event.name}"
+                )
+
+
 def _all_assignment_bundles(repository: str | Path) -> tuple[Path, ...]:
     store = assignment_store(repository)
     if not store.exists():
         return ()
+    if not store.is_dir() or store.is_symlink():
+        raise ContractError(f"Assignment store is not a real directory: {store}")
     bundles: list[Path] = []
     for task_directory in sorted(store.iterdir()):
-        if not task_directory.is_dir() or task_directory.name.startswith("."):
-            continue
-        if ASSIGNMENT_DIGEST_PATTERN.fullmatch(task_directory.name) is None:
+        if (
+            not task_directory.is_dir()
+            or task_directory.is_symlink()
+            or ASSIGNMENT_DIGEST_PATTERN.fullmatch(task_directory.name) is None
+        ):
             raise ContractError(f"Unexpected assignment task directory: {task_directory}")
         for bundle in sorted(task_directory.iterdir()):
-            if not bundle.is_dir() or bundle.name.startswith("."):
-                continue
-            if ASSIGNMENT_ID_PATTERN.fullmatch(bundle.name) is None:
+            if (
+                not bundle.is_dir()
+                or bundle.is_symlink()
+                or ASSIGNMENT_ID_PATTERN.fullmatch(bundle.name) is None
+            ):
                 raise ContractError(f"Unexpected assignment bundle: {bundle}")
             bundles.append(bundle)
     return tuple(bundles)
@@ -1405,6 +1476,7 @@ def _assignment_status_unlocked(
     *,
     now: datetime,
 ) -> dict[str, object]:
+    _validate_assignment_bundle_layout(bundle)
     assignment = _assignment_record(bundle)
     redispatches = _assignment_redispatches(bundle, assignment)
     ack = _assignment_ack(bundle, assignment)
@@ -1682,7 +1754,7 @@ def acknowledge_assignment(
             status["created"] = False
             return status
         event: dict[str, object] = {
-            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "schema_version": assignment["schema_version"],
             "event": "ACK",
             "assignment_id": assignment_id,
             "assignment_digest": assignment["assignment_digest"],
@@ -1732,7 +1804,7 @@ def redispatch_assignment(
             )
         sequence = len(status["redispatches"]) + 1
         event: dict[str, object] = {
-            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "schema_version": assignment["schema_version"],
             "event": "REDISPATCH",
             "assignment_id": assignment_id,
             "assignment_digest": assignment["assignment_digest"],
@@ -1770,7 +1842,7 @@ def close_assignment(
         if status["close"] is not None:
             return status
         event: dict[str, object] = {
-            "schema_version": ASSIGNMENT_SCHEMA_VERSION,
+            "schema_version": assignment["schema_version"],
             "event": "CLOSE",
             "assignment_id": assignment_id,
             "assignment_digest": assignment["assignment_digest"],

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import subprocess
@@ -890,6 +891,82 @@ class AgentAssignmentTest(unittest.TestCase):
         arguments.update(overrides)
         return contract.acknowledge_assignment(fixture["repository"], **arguments)
 
+    def _rewrite_assignment_record(
+        self,
+        bundle: Path,
+        changes: dict[str, object],
+    ) -> tuple[Path, dict[str, object]]:
+        record_path = bundle / "assignment.json"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        record.update(changes)
+        record.pop("assignment_digest", None)
+        record.pop("assignment_id", None)
+        assignment_id = contract._canonical_digest(record)[:32]
+        record["assignment_id"] = assignment_id
+        record["assignment_digest"] = contract._canonical_digest(record)
+        rewritten_bundle = bundle.parent / assignment_id
+        bundle.rename(rewritten_bundle)
+        (rewritten_bundle / "assignment.json").write_text(
+            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        return rewritten_bundle, record
+
+    def _convert_assignment_bundle_to_v2(
+        self,
+        bundle: Path,
+    ) -> tuple[Path, dict[str, object]]:
+        record = json.loads(
+            (bundle / "assignment.json").read_text(encoding="utf-8")
+        )
+        record["schema_version"] = contract.MAIN_ASSIGNMENT_SCHEMA_VERSION
+        del record["candidate_receipt_sha256"]
+        del record["run_receipt_sha256"]
+        record["baseline_kind"] = "origin-main"
+        record["baseline_ref"] = "refs/remotes/origin/main"
+        record["origin_url_sha256"] = hashlib.sha256(
+            b"https://example.invalid/repository.git"
+        ).hexdigest()
+        record.pop("assignment_digest")
+        record.pop("assignment_id")
+        assignment_id = contract._canonical_digest(record)[:32]
+        record["assignment_id"] = assignment_id
+        record["assignment_digest"] = contract._canonical_digest(record)
+        rewritten_bundle = bundle.parent / assignment_id
+        bundle.rename(rewritten_bundle)
+        (rewritten_bundle / "assignment.json").write_text(
+            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+
+        event_paths = [
+            rewritten_bundle / "ack.json",
+            rewritten_bundle / "close.json",
+        ]
+        redispatch = rewritten_bundle / "redispatch"
+        if redispatch.is_dir():
+            event_paths.extend(sorted(redispatch.glob("*.json")))
+        digest_fields = {
+            "ACK": "ack_digest",
+            "CLOSE": "close_digest",
+            "REDISPATCH": "redispatch_digest",
+        }
+        for event_path in event_paths:
+            if not event_path.is_file():
+                continue
+            event = json.loads(event_path.read_text(encoding="utf-8"))
+            event["schema_version"] = contract.MAIN_ASSIGNMENT_SCHEMA_VERSION
+            event["assignment_id"] = assignment_id
+            event["assignment_digest"] = record["assignment_digest"]
+            digest_field = digest_fields[str(event["event"])]
+            event.pop(digest_field)
+            event[digest_field] = contract._canonical_digest(event)
+            event_path.write_text(
+                json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+        return rewritten_bundle, record
+
     def test_lifecycle_ack_validate_close_and_retention_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = _assignment_candidate(Path(temporary))
@@ -945,6 +1022,164 @@ class AgentAssignmentTest(unittest.TestCase):
             self.assertEqual(plan["mode"], "PLAN_ONLY")
             self.assertEqual(plan["eligible_count"], 1)
             self.assertTrue(bundle.exists(), "retention planning must never delete")
+
+    def test_schema_v2_closed_history_is_readable_and_does_not_reserve_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            closed = contract.close_assignment(
+                fixture["repository"],
+                task_id=str(fixture["task_id"]),
+                assignment_id=str(created["assignment"]["assignment_id"]),
+                thread_id=str(fixture["thread_id"]),
+                reason="historical rollout",
+                now=fixture["now"] + timedelta(minutes=1),
+            )
+            self.assertEqual(closed["state"], contract.ASSIGNMENT_CLOSED)
+            bundle, record = self._convert_assignment_bundle_to_v2(
+                Path(created["bundle"])
+            )
+
+            historical = contract.assignment_status(
+                fixture["repository"],
+                assignment_id=str(record["assignment_id"]),
+                now=fixture["now"] + timedelta(minutes=2),
+            )
+            self.assertEqual(historical["state"], contract.ASSIGNMENT_CLOSED)
+            self.assertEqual(historical["close"]["schema_version"], 2)
+            plan = contract.assignment_gc_plan(
+                fixture["repository"],
+                retention_days=7,
+                now=fixture["now"] + timedelta(days=10),
+            )
+            self.assertEqual(plan["eligible_count"], 1)
+            self.assertTrue(bundle.exists())
+
+            replacement = dict(fixture)
+            replacement.update(
+                task_id="replacement-task",
+                thread_id="replacement-thread",
+                brief="same path after closed v2",
+                now=fixture["now"] + timedelta(minutes=3),
+            )
+            replacement_status = self._create(replacement)
+            self.assertTrue(replacement_status["created"])
+            self.assertEqual(
+                replacement_status["assignment"]["schema_version"],
+                contract.ASSIGNMENT_SCHEMA_VERSION,
+            )
+
+    def test_schema_v2_active_bundle_reserves_paths_and_inherits_event_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            bundle, record = self._convert_assignment_bundle_to_v2(
+                Path(created["bundle"])
+            )
+            status = contract.assignment_status(
+                fixture["repository"],
+                assignment_id=str(record["assignment_id"]),
+                now=fixture["now"],
+            )
+            running = self._ack(fixture, status)
+            self.assertEqual(running["state"], contract.ASSIGNMENT_RUNNING)
+            self.assertEqual(running["ack"]["schema_version"], 2)
+
+            overlapping = dict(fixture)
+            overlapping.update(
+                task_id="overlapping-task",
+                thread_id="overlapping-thread",
+                brief="must remain blocked by active v2",
+                now=fixture["now"] + timedelta(seconds=31),
+            )
+            with self.assertRaisesRegex(contract.ContractError, "overlaps"):
+                self._create(overlapping)
+
+            closed = contract.close_assignment(
+                fixture["repository"],
+                task_id=str(fixture["task_id"]),
+                assignment_id=str(record["assignment_id"]),
+                thread_id=str(fixture["thread_id"]),
+                reason="v2 lifecycle complete",
+                now=fixture["now"] + timedelta(minutes=2),
+            )
+            self.assertEqual(closed["close"]["schema_version"], 2)
+            self.assertTrue(bundle.exists())
+
+    def test_assignment_schema_discriminator_and_field_sets_fail_closed(self) -> None:
+        invalid_versions = (True, 1.0, 2.0, 999)
+        for index, invalid_version in enumerate(invalid_versions):
+            with self.subTest(schema_version=repr(invalid_version)):
+                with tempfile.TemporaryDirectory() as temporary:
+                    fixture = _assignment_candidate(
+                        Path(temporary), task_id=f"invalid-schema-{index}"
+                    )
+                    created = self._create(fixture)
+                    _, record = self._rewrite_assignment_record(
+                        Path(created["bundle"]),
+                        {"schema_version": invalid_version},
+                    )
+                    expected = (
+                        "exact integer" if invalid_version in (True, 1.0, 2.0)
+                        else "invalid exact schema"
+                    )
+                    with self.assertRaisesRegex(contract.ContractError, expected):
+                        contract.assignment_status(
+                            fixture["repository"],
+                            assignment_id=str(record["assignment_id"]),
+                            now=fixture["now"],
+                        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary), task_id="hybrid-v2")
+            created = self._create(fixture)
+            bundle, _ = self._convert_assignment_bundle_to_v2(Path(created["bundle"]))
+            _, record = self._rewrite_assignment_record(
+                bundle,
+                {"candidate_receipt_sha256": "0" * 64},
+            )
+            with self.assertRaisesRegex(contract.ContractError, "invalid exact schema"):
+                contract.assignment_status(
+                    fixture["repository"],
+                    assignment_id=str(record["assignment_id"]),
+                    now=fixture["now"],
+                )
+
+    def test_schema_v2_lifecycle_tamper_and_unknown_bundle_files_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            bundle, record = self._convert_assignment_bundle_to_v2(Path(created["bundle"]))
+            status = contract.assignment_status(
+                fixture["repository"],
+                assignment_id=str(record["assignment_id"]),
+                now=fixture["now"],
+            )
+            self._ack(fixture, status)
+            ack_path = bundle / "ack.json"
+            ack = json.loads(ack_path.read_text(encoding="utf-8"))
+            ack["schema_version"] = 1
+            ack.pop("ack_digest")
+            ack["ack_digest"] = contract._canonical_digest(ack)
+            ack_path.write_text(json.dumps(ack) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "event identity"):
+                contract.assignment_status(
+                    fixture["repository"],
+                    assignment_id=str(record["assignment_id"]),
+                    now=fixture["now"] + timedelta(minutes=1),
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = _assignment_candidate(Path(temporary))
+            created = self._create(fixture)
+            bundle = Path(created["bundle"])
+            (bundle / "future-event.json").write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(contract.ContractError, "unknown event or file"):
+                contract.assignment_status(
+                    fixture["repository"],
+                    assignment_id=str(created["assignment"]["assignment_id"]),
+                    now=fixture["now"],
+                )
 
     def test_ack_rejects_wrong_context_dirty_and_outside_write_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
