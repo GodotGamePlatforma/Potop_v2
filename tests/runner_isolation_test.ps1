@@ -183,7 +183,13 @@ Assert-RunnerInvariant `
         $runnerText,
         '(?m)^\s{4}if \(\$shardMode\) \{\r?$\n\s{8}Set-NativeShardDummyAudio `'
     ).Count -eq 1) `
-    "Dummy audio configuration must be invoked exactly once and only from shard execution."
+    "Shard execution must retain its explicit dummy audio configuration."
+Assert-RunnerInvariant `
+    ($runnerText.Contains('elseif ($Full -and [string]::Equals(') -and
+        $runnerText.Contains('[string]$env:GITHUB_ACTIONS,') -and
+        $runnerText.Contains('-TestCases @($testCases | Where-Object { $_.NativeWindow })') -and
+        $runnerText.Contains('-ShardLane "native"')) `
+    "The direct full GitHub Actions suite must select Dummy audio only for native targets."
 Assert-RunnerInvariant `
     ($runnerText.Contains('$engineErrorLines = @($lines | Where-Object { $_ -match "^\s*(?:SCRIPT ERROR|ERROR):" })') -and
         $runnerText.Contains('$reasons.Add("engine output contains ERROR:/SCRIPT ERROR:")')) `
