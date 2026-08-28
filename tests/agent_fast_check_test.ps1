@@ -88,12 +88,15 @@ raise SystemExit(0)
     Copy-Item -LiteralPath (Join-Path $projectRoot 'tools/ci_protected_paths.py') -Destination (Join-Path $repo 'tools/ci_protected_paths.py')
     Set-Content -LiteralPath (Join-Path $repo 'tools/workbench_contract.py') -Encoding UTF8 -Value 'print("EOL PASS")'
     Set-Content -LiteralPath (Join-Path $repo 'tests/run_all_tests.ps1') -Encoding UTF8 -Value @'
-param([string]$GodotConsolePath,[string]$SourceRepositoryPath,[string]$Target)
+param([string]$GodotConsolePath,[string]$SourceRepositoryPath,[string[]]$Target)
 if ($GodotConsolePath -like '*error*') { throw 'SCRIPT ERROR: parser failure' }
-Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value "GODOT=$GodotConsolePath TARGET=$Target"
-Write-Host "TARGET PASS $Target"
+foreach ($entry in $Target) {
+    Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value "GODOT=$GodotConsolePath TARGET=$entry"
+    Write-Host "TARGET PASS $entry"
+}
 '@
     Set-Content -LiteralPath (Join-Path $repo 'tests/game_test.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/deleted_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
     Set-Content -LiteralPath (Join-Path $repo 'game.gd') -Encoding UTF8 -Value 'extends Node'
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
@@ -107,6 +110,44 @@ Write-Host "TARGET PASS $Target"
     if ((Get-Content -LiteralPath $targetLog -Raw) -notmatch 'tests/game_test.gd') {
         throw 'Targeted test runner was not invoked.'
     }
+
+    Clear-Content -LiteralPath $targetLog
+    $nodeTestPath = Join-Path $repo 'tests/node_flow_test.gd'
+    $nodeScenePath = Join-Path $repo 'tests/NodeFlowTest.tscn'
+    Set-Content -LiteralPath $nodeTestPath -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath $nodeScenePath -Encoding UTF8 -Value @'
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/node_flow_test.gd" id="1"]
+
+[node name="NodeFlowTest" type="Node"]
+script = ExtResource("1")
+'@
+    $nodeScene = Run-FastCheck $repo $successGodot
+    $nodeSceneLog = Get-Content -LiteralPath $targetLog -Raw
+    if ($nodeScene.ExitCode -ne 0 -or $nodeScene.Output -notmatch 'FAST-CHECK PASS' -or
+        $nodeSceneLog -notmatch 'TARGET=tests/NodeFlowTest\.tscn' -or
+        $nodeSceneLog -match 'TARGET=tests/node_flow_test\.gd') {
+        throw "Changed Node test was not routed through its companion scene: $($nodeScene.Output) log=$nodeSceneLog"
+    }
+
+    $duplicateScenePath = Join-Path $repo 'tests/NodeFlowDuplicate.tscn'
+    Copy-Item -LiteralPath $nodeScenePath -Destination $duplicateScenePath
+    $ambiguousNode = Run-FastCheck $repo $successGodot
+    if ($ambiguousNode.ExitCode -eq 0 -or
+        $ambiguousNode.Output -notmatch 'requires exactly one companion \.tscn' -or
+        $ambiguousNode.Output -notmatch 'found\s+2') {
+        throw "Changed Node test with ambiguous companion scenes did not fail closed: $($ambiguousNode.Output)"
+    }
+    Remove-Item -LiteralPath $duplicateScenePath
+    Remove-Item -LiteralPath $nodeScenePath
+
+    $orphanNode = Run-FastCheck $repo $successGodot
+    if ($orphanNode.ExitCode -eq 0 -or
+        $orphanNode.Output -notmatch 'requires exactly one companion \.tscn') {
+        throw "Changed Node test without a companion scene did not fail closed: $($orphanNode.Output)"
+    }
+    Remove-Item -LiteralPath $nodeTestPath
 
     $toolOnlyPath = @(
         $mockBin,
@@ -147,6 +188,13 @@ Write-Host "TARGET PASS $Target"
         $missingGodot.Output -match 'Index was outside the bounds') {
         throw "Missing Godot aliases did not produce the explicit-path guidance: $($missingGodot.Output)"
     }
+
+    Remove-Item -LiteralPath (Join-Path $repo 'tests/deleted_test.gd')
+    $deletedTest = Run-FastCheck $repo $successGodot @('-TestTarget', 'tests/game_test.gd')
+    if ($deletedTest.ExitCode -ne 0 -or $deletedTest.Output -notmatch 'FAST-CHECK PASS') {
+        throw "Deleted changed Godot test was treated as a runnable target: $($deletedTest.Output)"
+    }
+    Git $repo checkout -- tests/deleted_test.gd | Out-Null
 
     $godotError = Run-FastCheck $repo $errorGodot @('-TestTarget', 'tests/game_test.gd', '-AllowControlPlane')
     if ($godotError.ExitCode -eq 0 -or $godotError.Output -notmatch 'SCRIPT ERROR') {
@@ -200,6 +248,7 @@ version https://git-lfs.github.com/spec/v1
 oid sha256:0000000000000000000000000000000000000000000000000000000000000000
 size 1
 '@
+    Git $repo add asset.bin | Out-Null
     $oldGitExecPath = $env:GIT_EXEC_PATH
     try {
         $env:GIT_EXEC_PATH = $mockBin
@@ -214,7 +263,21 @@ size 1
     if ($pointer.ExitCode -eq 0 -or $pointer.Output -notmatch 'LFS pointers remain unhydrated') {
         throw "Fast-check accepted a tracked LFS pointer in the working tree: $($pointer.Output)"
     }
+    Git $repo reset -- asset.bin | Out-Null
     Remove-Item -LiteralPath (Join-Path $repo 'asset.bin')
+
+    Set-Content -LiteralPath (Join-Path $repo 'rename-proof.txt') -Value 'candidate change' -Encoding UTF8
+    try {
+        $env:FAST_LFS_LISTING = '{"files":[{"name":"deleted-before-rename.bin","checkout":false}]}'
+        $deletedRenameSource = Run-FastCheck $repo $successGodot @('-AllowControlPlane')
+    }
+    finally {
+        Remove-Item Env:FAST_LFS_LISTING -ErrorAction SilentlyContinue
+    }
+    if ($deletedRenameSource.ExitCode -ne 0 -or $deletedRenameSource.Output -notmatch 'FAST-CHECK PASS') {
+        throw "Fast-check treated a deleted LFS rename source as an unhydrated candidate path: $($deletedRenameSource.Output)"
+    }
+    Remove-Item -LiteralPath (Join-Path $repo 'rename-proof.txt')
 
     $pathBeforeMissingTool = $env:PATH
     try {
@@ -228,7 +291,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check Godot-scene-routing/deleted-test/explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }

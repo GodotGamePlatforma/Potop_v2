@@ -13,12 +13,12 @@ const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd"
 const DiseaseExposureStateScript := preload("res://scripts/data/DiseaseExposureState.gd")
 const ReportStateScript := preload("res://scripts/data/ReportState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
-const DiseaseSystemScript := preload("res://scripts/base/DiseaseSystem.gd")
-const MedicalCareSystemScript := preload("res://scripts/base/MedicalCareSystem.gd")
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
-const WorkPaceSystemScript := preload("res://scripts/base/WorkPaceSystem.gd")
+const DiseaseSystemScript := preload("res://scripts/survivors/DiseaseSystem.gd")
+const MedicalCareSystemScript := preload("res://base_workbench/systems/MedicalCareSystem.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
+const WorkPaceSystemScript := preload("res://base_workbench/systems/WorkPaceSystem.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
-const InfirmaryDefinition := preload("res://data/buildings/infirmary.tres")
+const InfirmaryDefinition := preload("res://base_workbench/data/buildings/infirmary.tres")
 
 const PROFILE_PATHS := {
 	"easy": "res://data/difficulty/easy.tres",

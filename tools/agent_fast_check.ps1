@@ -82,6 +82,19 @@ function Assert-LfsHydrated {
     }
     try { $lfsEntries = @($listing.files) | Where-Object { $null -ne $_ } }
     catch { throw 'git lfs ls-files --json omitted the files collection.' }
+    $trackedPaths = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    $rawTrackedPaths = Invoke-NativeChecked git @(
+        '-C', $script:RepositoryPath,
+        '-c', 'core.quotepath=false',
+        'ls-files', '--cached'
+    )
+    foreach ($trackedPath in @($rawTrackedPaths -split "`r?`n")) {
+        if (-not [string]::IsNullOrWhiteSpace($trackedPath)) {
+            [void]$trackedPaths.Add((Normalize-RepoPath $trackedPath))
+        }
+    }
     $pointerHeader = [System.Text.Encoding]::ASCII.GetBytes(
         'version https://git-lfs.github.com/spec/v1'
     )
@@ -93,6 +106,10 @@ function Assert-LfsHydrated {
             throw 'git lfs ls-files --json returned an entry without a path.'
         }
         $path = Normalize-RepoPath $entryName
+        # `git lfs ls-files` can report both sides of an indexed rename. The
+        # deleted source is no longer tracked by the candidate and therefore
+        # must not be mistaken for an unhydrated pointer.
+        if (-not $trackedPaths.Contains($path)) { continue }
         $checkout = $false
         try { $checkout = [bool]$entry.checkout } catch { $checkout = $false }
         if (-not $checkout) {
@@ -169,6 +186,56 @@ function Normalize-RepoPath {
         throw "Invalid repository-relative path: '$Path'."
     }
     return $portable
+}
+
+function Resolve-AutomaticGodotTestTarget {
+    param([Parameter(Mandatory = $true)][string]$TestScript)
+
+    $normalizedScript = Normalize-RepoPath $TestScript
+    $absoluteScript = Join-Path $script:RepositoryPath $normalizedScript
+    if (-not (Test-Path -LiteralPath $absoluteScript -PathType Leaf)) {
+        throw "Changed Godot test script does not exist: '$normalizedScript'."
+    }
+
+    $source = Get-Content -LiteralPath $absoluteScript -Raw
+    $extendsMatch = [regex]::Match(
+        $source,
+        '(?m)^\s*extends\s+(?<base>[A-Za-z_][A-Za-z0-9_.]*)\s*(?:#.*)?$'
+    )
+    if (-not $extendsMatch.Success) {
+        throw "Changed Godot test '$normalizedScript' has no supported extends declaration."
+    }
+    $baseType = $extendsMatch.Groups['base'].Value
+    if ($baseType -ceq 'SceneTree' -or $baseType -ceq 'MainLoop') {
+        return $normalizedScript
+    }
+
+    # Preserve direct execution for existing custom test runners. A literal
+    # Node test cannot run as --script and must be routed through its scene.
+    if ($baseType -cne 'Node') { return $normalizedScript }
+
+    $resourcePath = "path=`"res://$normalizedScript`""
+    $sceneCandidates = Invoke-NativeChecked git @(
+        '-C', $script:RepositoryPath,
+        '-c', 'core.quotepath=false',
+        'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.tscn'
+    )
+    $sceneMatches = @(
+        @($sceneCandidates -split "`r?`n") |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { Normalize-RepoPath $_ } |
+            Where-Object {
+                $candidatePath = Join-Path $script:RepositoryPath $_
+                (Test-Path -LiteralPath $candidatePath -PathType Leaf) -and
+                ([System.IO.File]::ReadAllText($candidatePath)).IndexOf(
+                    $resourcePath, [System.StringComparison]::Ordinal
+                ) -ge 0
+            }
+    )
+    if ($sceneMatches.Count -ne 1) {
+        throw "Changed Godot test '$normalizedScript' extends Node and requires exactly one companion .tscn in the repository; found $($sceneMatches.Count)."
+    }
+    return Normalize-RepoPath $sceneMatches[0]
 }
 
 function Test-AllowedPath {
@@ -339,7 +406,11 @@ $godotChanged = @($changedPaths | Where-Object {
 $targets = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($target in $TestTarget) { [void]$targets.Add((Normalize-RepoPath $target)) }
 foreach ($path in $changedPaths) {
-    if ($path -match '(^|/)tests/.+_test\.gd$') { [void]$targets.Add($path) }
+    if ($path -match '(^|/)tests/.+_test\.gd$') {
+        $changedTestPath = Join-Path $script:RepositoryPath $path
+        if (-not (Test-Path -LiteralPath $changedTestPath -PathType Leaf)) { continue }
+        [void]$targets.Add((Resolve-AutomaticGodotTestTarget $path))
+    }
 }
 if ($godotChanged.Count -gt 0 -and $targets.Count -eq 0) {
     [void]$targets.Add('tests/smoke_test.gd')
@@ -347,19 +418,20 @@ if ($godotChanged.Count -gt 0 -and $targets.Count -eq 0) {
 
 if ($godotChanged.Count -gt 0 -or $targets.Count -gt 0) {
     $godot = Resolve-GodotPath
-    foreach ($target in @($targets | Sort-Object)) {
+    $sortedTargets = @($targets | Sort-Object)
+    foreach ($target in $sortedTargets) {
         $targetPath = Join-Path $script:RepositoryPath $target
         if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
             throw "Fast-check target does not exist: '$target'."
         }
-        # The project runner owns the complete isolation boundary: immutable
-        # snapshot, private .godot/user/temp directories, ports and ERROR scan.
-        & (Join-Path $script:RepositoryPath 'tests/run_all_tests.ps1') `
-            -GodotConsolePath $godot `
-            -SourceRepositoryPath $script:RepositoryPath `
-            -Target $target
-        if (-not $?) { throw "Targeted test failed: '$target'." }
     }
+    # The project runner owns the complete isolation boundary: one immutable
+    # imported seed plus private workspace/user/temp/ports for every target.
+    & (Join-Path $script:RepositoryPath 'tests/run_all_tests.ps1') `
+        -GodotConsolePath $godot `
+        -SourceRepositoryPath $script:RepositoryPath `
+        -Target $sortedTargets
+    if (-not $?) { throw "Targeted test batch failed: '$($sortedTargets -join ', ')'." }
 }
 
 Write-Host "FAST-CHECK PASS paths=$($changedPaths.Count) godot_targets=$($targets.Count) head=$actualHead"

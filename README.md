@@ -44,7 +44,7 @@ Następnie:
 3. uruchom lokalne testy zadania;
 4. osobno uruchom lokalny `fast-check`; po `FAIL` popraw zmianę i powtórz;
 5. po `PASS` sprawdź pełny diff i utwórz logiczny commit;
-6. opublikuj commit jednym helperem, który pushuje exact SHA, tworzy PR i dla zwykłej zmiany włącza squash auto-merge;
+6. uruchom `tools/publish_agent_pr.ps1`, który pushuje exact SHA, tworzy PR i dla zwykłej zmiany włącza squash auto-merge;
 7. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge.
 
 ```powershell
@@ -63,7 +63,7 @@ git commit -m "<typ>: <krótki opis>"
 .\tools\publish_agent_pr.ps1 -Title "<tytuł PR>" -TestTarget <test-zadania>
 ```
 
-Jeżeli zadanie nie ma celu Godot, pomiń `-TestTarget`, ale nadal wykonaj adekwatny test przed fast-checkiem. Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree innego autora; zależność pobieraj z Git po commicie albo przez zwykły PR.
+Jeżeli zadanie nie ma celu Godot, pomiń `-TestTarget`, ale nadal wykonaj adekwatny test przed fast-checkiem. Brak logicznego commitu albo PR opublikowanego przez helper oznacza zadanie niedostarczone, nie ukończone. Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree innego autora; zależność pobieraj z Git po commicie albo przez zwykły PR.
 
 ## Ochrona `main`
 
@@ -157,6 +157,22 @@ git -C .. status --short --branch
 
 W Codex Desktop otwórz `underwater_map_workbench/` razem z dostępnym katalogiem nadrzędnym projektu. Bliższy `AGENTS.md` zawęża zakres, a lokalny `README.md` opisuje workflow źródła mapy i pakietów → scena. Przy pracy nad jednym budynkiem przejdź następnie do `structures/<id>/AGENTS.md`; globalny origin nadal zmienia się wyłącznie w `map_manifest.json`. Nie edytuj wygenerowanej sceny ręcznie i nie twórz wariantów mapy.
 
+## Warsztat Bazy
+
+Jedyny aktywny pakiet lokalnej domeny i prezentacji Przystani znajduje się w `base_workbench/`: `runtime/BaseScene.tscn`, lokalne środowisko, sceny i skrypty UI, systemy budynków i zarządzania, definicje, dane, grafika, audio, narzędzia źródłowe oraz testy i capture'y Bazy. `runtime/`, `ui/`, `systems/`, `definitions/`, `data/`, `assets/`, `tools/` i `tests/` tworzą jeden warsztat w nadrzędnym projekcie; nie istnieje osobny katalog `scenes/` ani drugi `project.godot`.
+
+Root pozostaje właścicielem `GameState`, trwałych stanów, zapisu i migracji, końca dnia, kampanii, misji, difficulty, pogody, ocaleńców, nurkowania i integracji. Agent Bazy może je czytać jako publiczne zależności, ale zmiana ich kontraktu wraca do root.
+
+Na tej maszynie:
+
+```powershell
+Set-Location .\base_workbench
+Test-Path ..\project.godot
+git -C .. status --short --branch
+```
+
+Bliższy `base_workbench/AGENTS.md` routuje prywatne zadania Bazy i ogranicza zapis do warsztatu. Lokalny `README.md` opisuje układ źródeł oraz bezpośrednie cele wspólnego runnera. Nie utrzymuj kopii aktywnej sceny, skryptów, assetów, definicji, danych ani testów Bazy pod dawnymi ścieżkami root.
+
 ## Warsztat nurka
 
 Jedyny aktywny pakiet avatara gracza znajduje się w `diver_workbench/`: scena `CharacterBody2D`, collider, grafika, animacje, profil socketów, shadery, VFX i lokalne testy prezentacji. Katalog korzysta z nadrzędnego `project.godot`, InputMapu, ogólnych systemów nurkowania oraz wspólnego runnera; nie jest osobnym projektem.
@@ -204,6 +220,8 @@ Pojedynczy cel headless uruchamiaj przez `-Target`:
 ```powershell
 .\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
 .\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/<id>/tests/<test>.gd
+.\tests\run_all_tests.ps1 -Target base_workbench/tests/building_system_test.gd
+.\tests\run_all_tests.ps1 -Target base_workbench/tests/BaseOptionalPanelsFlowTest.tscn
 .\tests\run_all_tests.ps1 -Target diver_workbench/tests/DiverPresentationTest.tscn
 .\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
 ```
@@ -212,12 +230,13 @@ Pojedynczy cel wymagający prawdziwego okna uruchamiaj przez `-NativeTarget`:
 
 ```powershell
 .\tests\run_all_tests.ps1 -NativeTarget tests/native_window_settings_test.gd
+.\tests\run_all_tests.ps1 -NativeTarget base_workbench/tests/BaseWeatherSnapshot.tscn
 .\tests\run_all_tests.ps1 -NativeTarget diver_workbench/tests/DiverPresentationCapture.tscn
 ```
 
 `-KeepWorkspace` zachowuje izolowaną kopię do diagnozy. Runner celowo odrzuca `-InPlace`; test zawsze korzysta z pełnej kopii, aby odseparować cache, `user://` i snapshot źródeł. Ścieżkę do Godot można podać przez `-GodotConsolePath`; runner preferuje windowsowy wariant `*_console.exe`. `-AllowNativeSkip` służy wyłącznie środowisku, które jawnie nie obsługuje natywnego okna.
 
-Mapowy smoke jest jedynym testem technicznym całej złożonej mapy: sprawdza rejestr, pakiety, aktualność i ładowanie sceny oraz integrację kompilatora z runtime. Nie zawiera drugiej kopii ID, pozycji, liczby obiektów ani kolejności zawartości. Prywatny loop jednego `structures/<id>/` korzysta z celowanych trybów refresh/build/check opisanych w mapowym README oraz z testów kontraktu pakietu i jego runtime, bez globalnego placementu i persistence. Pełny mapowy build/check i smoke są bramką rejestracji, zmiany originu, publicznego montażu lub odbioru integracyjnego, a nie każdej prywatnej iteracji. `workbench_boundary_test.gd` pilnuje pojedynczych authority Root–Mapa–Struktury–Nurek, jednoznacznych pakietów struktur, zatwierdzonych dokumentów i indeksów lokalnych decyzji. Runner odkrywa testy wszystkich zarejestrowanych pakietów dynamicznie; Root nie prowadzi listy nazw budynków ani ich testów. Pozostałe testy nurkowania sprawdzają ogólne mechaniki, a nie topologię. Runner traktuje niezerowy kod procesu, timeout, `ERROR` i `SCRIPT ERROR` jako porażkę.
+Mapowy smoke jest jedynym testem technicznym całej złożonej mapy: sprawdza rejestr, pakiety, aktualność i ładowanie sceny oraz integrację kompilatora z runtime. Nie zawiera drugiej kopii ID, pozycji, liczby obiektów ani kolejności zawartości. Prywatny loop jednego `structures/<id>/` korzysta z celowanych trybów refresh/build/check opisanych w mapowym README oraz z testów kontraktu pakietu i jego runtime, bez globalnego placementu i persistence. Pełny mapowy build/check i smoke są bramką rejestracji, zmiany originu, publicznego montażu lub odbioru integracyjnego, a nie każdej prywatnej iteracji. Lokalne testy Bazy leżą bezpośrednio w `base_workbench/tests/` i sprawdzają jej systemy, scenę, UI oraz prezentację; persistence, kampania i publiczne złożenie pozostają w root. `workbench_boundary_test.gd` pilnuje pojedynczych authority Root–Baza–Mapa–Struktury–Nurek, jednoznacznych pakietów, zatwierdzonych dokumentów i indeksów lokalnych decyzji. Runner odkrywa testy wszystkich zarejestrowanych pakietów struktur dynamicznie; Root nie prowadzi listy nazw budynków mapy ani ich testów. Runner traktuje niezerowy kod procesu, timeout, `ERROR` i `SCRIPT ERROR` jako porażkę.
 
 ## Domyślne sterowanie
 
@@ -245,6 +264,7 @@ Menu pauzy udostępnia `KONTYNUUJ`, `ZAPISZ GRĘ`, `USTAWIENIA`, `POWRÓT DO MEN
 - `.ai/DECISIONS.md` — trwałe decyzje, powody i jawne zastąpienia;
 - `docs/OgolnyZarys.txt` — produkt, zasady, balans, narracja i zakres;
 - `docs/Ostatni_Pomost_architektura_Godot.txt` — mapowanie systemów, danych, persistence i testów;
+- `base_workbench/` — wyspecjalizowany onboarding, migawka, decyzje, runtime, UI, systemy, dane, assety i testy Bazy;
 - `underwater_map_workbench/` — wyspecjalizowany onboarding, kontekst produkcji i decyzje dla mapy podwodnej oraz jej grafiki świata;
 - `underwater_map_workbench/structures/<id>/` — operacyjny pakiet lokalnej topologii, grafiki, runtime i testów jednego zarejestrowanego budynku; reguły produktu pozostają w dokumentach root;
 - `diver_workbench/` — wyspecjalizowany onboarding, migawka, decyzje i testy sceny avatara nurka.

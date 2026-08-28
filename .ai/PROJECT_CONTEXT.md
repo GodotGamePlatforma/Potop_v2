@@ -2,7 +2,7 @@
 
 Ten dokument jest krótką, datowaną migawką potwierdzonego runtime. Odpowiada na pytanie „co działa teraz?”; nie ustanawia reguł produktu, architektury ani procesu pracy.
 
-Routing pracy określa `AGENTS.md`. Decyzje normatywne są w `.ai/DECISIONS.md`, reguły widoczne dla gracza w `docs/OgolnyZarys.txt`, a mapowanie techniczne w `docs/Ostatni_Pomost_architektura_Godot.txt`. Szczegóły Mapy i Nurka należą do ich lokalnych `PROJECT_CONTEXT.md`.
+Routing pracy określa `AGENTS.md`. Decyzje normatywne są w `.ai/DECISIONS.md`, reguły widoczne dla gracza w `docs/OgolnyZarys.txt`, a mapowanie techniczne w `docs/Ostatni_Pomost_architektura_Godot.txt`. Szczegóły Bazy, Mapy i Nurka należą do ich lokalnych `PROJECT_CONTEXT.md`.
 
 ## Kontrakt wpisu i edycji
 
@@ -14,8 +14,8 @@ Cały plik ma mieć najwyżej 12 000 znaków. Każdy zwykły wpis listy, liczony
 
 ## Stan odniesienia
 
-- Data migawki: 2026-08-28.
-- Potwierdzony stan runtime: `origin/main` `a4e42d50b8d0eb3ec28fd7eb16c3dc302ad9ac26`.
+- Data migawki: 2026-08-29.
+- Potwierdzony stan runtime: kandydat wydzielenia Bazy oparty na `origin/main` `015c9e0f199076251fa54fe0ab2f44c9b4b1a5d4`.
 - Projekt deklaruje Godot 4.7; ostatnia pełna bramka korzystała z Godot 4.7.1.
 - Główna scena: `res://scenes/main/GameRoot.tscn`.
 - Autoloady: `SaveManager` i `GameDatabase`.
@@ -30,6 +30,7 @@ Cały plik ma mieć najwyżej 12 000 znaków. Każdy zwykły wpis listy, liczony
 - `[AKTYWNE]` Obsada, produkcja, praca budynków, opieka medyczna i rozwój mieszkańców delegują mutacje do systemów domenowych; UI nie utrzymuje równoległego modelu stanu. Architektura: 4, 8.2 i 12.
 - `[AKTYWNE]` Wyprawa ma granicę `ExpeditionSetup -> DiveSessionState -> DiveResult`; działają tlen, sprint, obciążenie, prąd, loot, interakcje, wyposażenie, ryzyko, powrót i śmierć. Architektura: 5.
 - `[AKTYWNE]` Wspólna Linia prowadzi od tutoriala i J-7 przez Archiwum, R-3 i C-4 do trzech wyników energii, Kroniki oraz kontynuacji na tym samym zapisie. Produkt: 7 i 9–10.
+- `[AKTYWNE]` Scena, UI, lokalne systemy, definicje, dane, assety i testy Bazy należą do `base_workbench`; Root zachowuje trwały stan, koniec dnia i integrację. Kontrakt: ARD-0114.
 - `[AKTYWNE]` Mapa powstaje z `underwater_map_workbench/map_manifest.json`, a scena jest deterministyczną pochodną. Root nie przechowuje kopii mapowej semantyki ani worldowych assetów. Kontrakty: ARD-0102 i ARD-0106.
 - `[AKTYWNE]` Avatar należy do `diver_workbench`; root korzysta z publicznej granicy `DiverController`, a ogólne systemy wyprawy pozostają poza pakietem avatara. Kontrakt: ARD-0105.
 
@@ -40,7 +41,7 @@ Cały plik ma mieć najwyżej 12 000 znaków. Każdy zwykły wpis listy, liczony
 | Kampania | `GameState` | jeden trwały agregat |
 | Aplikacja | `GameRoot` | fazy, sceny, pauza i commit |
 | Dzień | `DayPlanState`, `EndOfDayResolver` | plan -> zamrożona migawka -> kandydat stanu |
-| Baza | systemy domenowe | projekcja -> jednorazowe zastosowanie |
+| Baza | `base_workbench` | `BaseScene` -> publiczny stan i komendy Root |
 | Nurkowanie | moduł nurkowania | setup -> sesja -> wynik |
 | Zapis | `SaveManager` i centralny validator | walidacja -> atomowa promocja |
 | Mapa | `underwater_map_workbench` | manifest -> scena pochodna -> publiczny runtime |
@@ -65,10 +66,10 @@ Szczegółowe kontrakty właścicieli opisują `.ai/DECISIONS.md` i architektura
 
 - Pole, hook, klasa, test albo szkielet nie czyni mechaniki aktywną. Kontrakt: ARD-0027.
 - Test i snapshot potwierdzają tylko własny kontrakt; nie dowodzą wszystkich tras, kombinacji trudności ani jakości prezentacji. Kontrakty: ARD-0028 i ARD-0079.
-- Root nie jest drugim authority Mapy ani Nurka. Prywatne ID, assety, sockety, pochodne i lokalne wyniki należy czytać w dokumentach właściwego warsztatu.
+- Root nie jest drugim authority Bazy, Mapy ani Nurka. Prywatne dane, assety, sockety, pochodne i lokalne wyniki należy czytać w dokumentach właściwego warsztatu.
 - Zapis obcej rewizji albo mapy o starszym podpisie jest odrzucany; nie wolno interpretować go według bieżącego schematu.
 
 ## Ostatnia weryfikacja
 
-- `[OSTATNIA WERYFIKACJA]` 2026-08-28, Godot 4.7.1, exact `origin/main` `a4e42d50b8d0eb3ec28fd7eb16c3dc302ad9ac26`: GitHub `fast-check` i merge-group run #33207376240 (oba shardy oraz `integration-green`) zakończyły się `PASS`.
-  Zakres nie obejmował ręcznego odbioru wszystkich tras, sterowania i jakości wizualnej; dla tego SHA nie sprawdzono lokalnego `builds/current`.
+- `[OSTATNIA WERYFIKACJA]` 2026-08-29, Godot 4.7.1, kandydat na bazie `015c9e0f199076251fa54fe0ab2f44c9b4b1a5d4`: celowane testy Bazy, runner isolation i lokalny fast-check zakończyły się `33/33 PASS`, w tym boundary, smoke i persistence przypisań.
+  Zakres był celowany dla relokacji Bazy; pełna regresja i certyfikacja merge group pozostają zadaniem kolejki.

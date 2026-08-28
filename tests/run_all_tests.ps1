@@ -12,7 +12,7 @@ param(
 
     [string]$SourceRepositoryPath,
 
-    [string]$Target,
+    [string[]]$Target = @(),
 
     [string]$NativeTarget,
 
@@ -66,7 +66,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $testTimeoutWasExplicit = $PSBoundParameters.ContainsKey("TestTimeoutSeconds")
-$testSpecificDefaultTimeoutSeconds = @{}
+$testSpecificDefaultTimeoutSeconds = @{
+    "base_workbench/tests/settlement_event_balance_test.gd" = 300
+}
 
 # PowerShell 7 can otherwise promote native stderr to PowerShell errors. Godot's
 # stdout and stderr are inspected together below, using the engine's own error
@@ -174,7 +176,7 @@ function Get-StructurePackageTestTargets {
 
 function Get-RunnerTestSelection {
     param(
-        [AllowNull()][string]$ResolvedTarget,
+        [AllowNull()][string[]]$ResolvedTargets,
         [string]$ProjectRoot,
         [bool]$FullSuite,
         [bool]$IncludeSnapshotScenes,
@@ -186,10 +188,13 @@ function Get-RunnerTestSelection {
     # An explicit target is an intentionally closed runner request. In
     # particular, it must not inspect Map package registration or reject a
     # target owned by Root/Diver because an unrelated structure is in flight.
-    if (-not [string]::IsNullOrWhiteSpace($ResolvedTarget)) {
+    $explicitTargets = @($ResolvedTargets | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    })
+    if ($explicitTargets.Count -gt 0) {
         return [pscustomobject]@{
             HeadlessScriptTests = @()
-            ManifestTargets = @($ResolvedTarget)
+            ManifestTargets = @($explicitTargets)
         }
     }
 
@@ -394,7 +399,7 @@ $quickHeadlessScriptTests = @(
     "interactable_visual_style_test.gd"
     "narrative_content_test.gd"
     "profession_talent_system_test.gd"
-    "production_system_test.gd"
+    "base_workbench/tests/production_system_test.gd"
     "roster_rotation_skeleton_test.gd"
     "campaign_format_test.gd"
     "smoke_test.gd"
@@ -402,8 +407,8 @@ $quickHeadlessScriptTests = @(
 )
 
 $fullHeadlessScriptTests = @(
-    "base_environment_test.gd"
-    "building_system_test.gd"
+    "base_workbench/tests/base_environment_test.gd"
+    "base_workbench/tests/building_system_test.gd"
     "campaign_map_contract_test.gd"
     "workbench_boundary_test.gd"
     "underwater_map_workbench/tests/underwater_map_smoke_test.gd"
@@ -426,13 +431,13 @@ $fullHeadlessScriptTests = @(
     "interactable_visual_style_test.gd"
     "narrative_content_test.gd"
     "portrait_catalog_test.gd"
-    "production_system_test.gd"
+    "base_workbench/tests/production_system_test.gd"
     "rescue_system_test.gd"
     "roster_rotation_skeleton_test.gd"
     "campaign_format_test.gd"
     "settings_manager_test.gd"
-    "settlement_event_balance_test.gd"
-    "settlement_event_system_test.gd"
+    "base_workbench/tests/settlement_event_balance_test.gd"
+    "base_workbench/tests/settlement_event_system_test.gd"
     "smoke_test.gd"
     "survival_dependencies_test.gd"
     "tutorial_flow_test.gd"
@@ -441,16 +446,16 @@ $fullHeadlessScriptTests = @(
 )
 
 $quickHeadlessFlowScenes = @(
-    "BaseMusicTest.tscn"
+    "base_workbench/tests/BaseMusicTest.tscn"
     "NarrativeDialogueFlowTest.tscn"
-    "WorkerCandidatePickerFlowTest.tscn"
+    "base_workbench/tests/WorkerCandidatePickerFlowTest.tscn"
 )
 
 $fullHeadlessFlowScenes = @(
-    "BaseMusicTest.tscn"
-    "BaseOptionalPanelsFlowTest.tscn"
-    "BasePortraitBindingTest.tscn"
-    "BuildingSlotMotionTest.tscn"
+    "base_workbench/tests/BaseMusicTest.tscn"
+    "base_workbench/tests/BaseOptionalPanelsFlowTest.tscn"
+    "base_workbench/tests/BasePortraitBindingTest.tscn"
+    "base_workbench/tests/BuildingSlotMotionTest.tscn"
     "DayTransitionPerformanceTest.tscn"
     "diver_workbench/tests/DiverPresentationTest.tscn"
     "IntroFlowTest.tscn"
@@ -458,20 +463,20 @@ $fullHeadlessFlowScenes = @(
     "NarrativeDialogueFlowTest.tscn"
     "PauseMenuFlowTest.tscn"
     "SettingsUIFlowTest.tscn"
-    "SurvivorDevelopmentFlowTest.tscn"
+    "base_workbench/tests/SurvivorDevelopmentFlowTest.tscn"
     "TutorialPartialLootFlowTest.tscn"
-    "WorkerCandidatePickerFlowTest.tscn"
+    "base_workbench/tests/WorkerCandidatePickerFlowTest.tscn"
 )
 
 $headlessScriptTests = @(if ($Full) { $fullHeadlessScriptTests } else { $quickHeadlessScriptTests })
 $headlessFlowScenes = @(if ($Full) { $fullHeadlessFlowScenes } else { $quickHeadlessFlowScenes })
 
 $nativeSnapshotScenes = @(
-    "BaseBuildingsSnapshot.tscn"
-    "BaseManagementWorkspaceSnapshot.tscn"
-    "BaseUISnapshot.tscn"
-    "BaseWeatherSnapshot.tscn"
-    "BuildingOccupancyBadgesSnapshot.tscn"
+    "base_workbench/tests/BaseBuildingsSnapshot.tscn"
+    "base_workbench/tests/BaseManagementWorkspaceSnapshot.tscn"
+    "base_workbench/tests/BaseUISnapshot.tscn"
+    "base_workbench/tests/BaseWeatherSnapshot.tscn"
+    "base_workbench/tests/BuildingOccupancyBadgesSnapshot.tscn"
     "CampaignOutcomesSnapshot.tscn"
     "DiveHudLayoutSnapshot.tscn"
     "IntroVisualSnapshot.tscn"
@@ -3362,7 +3367,7 @@ function Test-GodotTestRunReceipt {
     $snapshotBefore = Get-ProjectSnapshotFingerprint -ProjectRoot $ProjectRoot
     $includeSnapshotScenes = $receipt.SuiteMode -eq "full-with-snapshots"
     $expectedSelection = Get-RunnerTestSelection `
-        -ResolvedTarget $null `
+        -ResolvedTargets @() `
         -ProjectRoot $ProjectRoot `
         -FullSuite $true `
         -IncludeSnapshotScenes $includeSnapshotScenes `
@@ -3416,8 +3421,11 @@ function ConvertTo-TestProjectRelativePath {
     if ($normalized -match '(?i)^diver_workbench/tests/[^/]+\.(?:gd|tscn)$') {
         return $normalized
     }
+    if ($normalized -match '(?i)^base_workbench/tests/[^/]+\.(?:gd|tscn)$') {
+        return $normalized
+    }
     if ($normalized.Contains('/')) {
-        throw "Manifest test target must be a tests/ entry, a direct underwater_map_workbench/tests/*.gd script, a package-local underwater_map_workbench/structures/*/tests/*.gd script, or a direct diver_workbench/tests/*.(gd|tscn) target: '$TargetName'."
+        throw "Manifest test target must be a tests/ entry, a direct underwater_map_workbench/tests/*.gd script, a package-local underwater_map_workbench/structures/*/tests/*.gd script, a direct base_workbench/tests/*.(gd|tscn) target, or a direct diver_workbench/tests/*.(gd|tscn) target: '$TargetName'."
     }
     return "tests/$normalized"
 }
@@ -3438,12 +3446,13 @@ function Resolve-TestTarget {
     )
 
     if ([string]::IsNullOrWhiteSpace($RequestedTarget)) {
-        throw "$ParameterName requires a .gd script or .tscn scene from tests/, a direct .gd script from underwater_map_workbench/tests/, a package-local .gd script from underwater_map_workbench/structures/*/tests/, or a direct .gd/.tscn target from diver_workbench/tests/."
+        throw "$ParameterName requires a .gd script or .tscn scene from tests/, a direct .gd script from underwater_map_workbench/tests/, a package-local .gd script from underwater_map_workbench/structures/*/tests/, a direct .gd/.tscn target from base_workbench/tests/, or a direct .gd/.tscn target from diver_workbench/tests/."
     }
 
     $testsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "tests")).TrimEnd([char[]]"\/")
     $workbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "underwater_map_workbench/tests")).TrimEnd([char[]]"\/")
     $structurePackagesRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "underwater_map_workbench/structures")).TrimEnd([char[]]"\/")
+    $baseWorkbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "base_workbench/tests")).TrimEnd([char[]]"\/")
     $diverWorkbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "diver_workbench/tests")).TrimEnd([char[]]"\/")
     $targetText = $RequestedTarget.Trim()
     $candidatePath = $null
@@ -3459,6 +3468,7 @@ function Resolve-TestTarget {
         if ($normalizedRelative.StartsWith("tests/", [StringComparison]::OrdinalIgnoreCase) -or
             $normalizedRelative.StartsWith("underwater_map_workbench/tests/", [StringComparison]::OrdinalIgnoreCase) -or
             $normalizedRelative.StartsWith("underwater_map_workbench/structures/", [StringComparison]::OrdinalIgnoreCase) -or
+            $normalizedRelative.StartsWith("base_workbench/tests/", [StringComparison]::OrdinalIgnoreCase) -or
             $normalizedRelative.StartsWith("diver_workbench/tests/", [StringComparison]::OrdinalIgnoreCase)) {
             $candidatePath = Join-Path $SourceProjectRoot ($normalizedRelative.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
         }
@@ -3493,8 +3503,16 @@ function Resolve-TestTarget {
             [StringComparison]::OrdinalIgnoreCase
         )
     )
-    if (-not $isTestsTarget -and -not $isDirectWorkbenchScript -and -not $isStructurePackageScript -and -not $isDirectDiverWorkbenchTarget) {
-        throw "Test target must stay inside '$testsRoot', be a direct .gd script inside '$workbenchTestsRoot', be a package-local .gd script inside '$structurePackagesRoot/*/tests', or be a direct .gd/.tscn target inside '$diverWorkbenchTestsRoot': '$RequestedTarget'."
+    $isDirectBaseWorkbenchTarget = (
+        $extension -in @(".gd", ".tscn") -and
+        [string]::Equals(
+            [System.IO.Path]::GetDirectoryName($absoluteTarget).TrimEnd([char[]]"\/"),
+            $baseWorkbenchTestsRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    )
+    if (-not $isTestsTarget -and -not $isDirectWorkbenchScript -and -not $isStructurePackageScript -and -not $isDirectBaseWorkbenchTarget -and -not $isDirectDiverWorkbenchTarget) {
+        throw "Test target must stay inside '$testsRoot', be a direct .gd script inside '$workbenchTestsRoot', be a package-local .gd script inside '$structurePackagesRoot/*/tests', or be a direct .gd/.tscn target inside '$baseWorkbenchTestsRoot' or '$diverWorkbenchTestsRoot': '$RequestedTarget'."
     }
     if (-not (Test-Path -LiteralPath $absoluteTarget -PathType Leaf)) {
         throw "Test target does not exist: '$RequestedTarget'."
@@ -3508,6 +3526,9 @@ function Resolve-TestTarget {
     }
     if ($isStructurePackageScript) {
         return "underwater_map_workbench/structures/$relativeStructureTarget"
+    }
+    if ($isDirectBaseWorkbenchTarget) {
+        return "base_workbench/tests/$([System.IO.Path]::GetFileName($absoluteTarget))"
     }
     if ($isDirectDiverWorkbenchTarget) {
         return "diver_workbench/tests/$([System.IO.Path]::GetFileName($absoluteTarget))"
@@ -3891,11 +3912,21 @@ namespace OstatniPomost {
 function Complete-RunnerJob {
     param(
         [IntPtr]$JobHandle,
-        [bool]$Terminate
+        [bool]$Terminate,
+        [ValidateRange(0, 5000)]
+        [int]$GraceMilliseconds = 0
     )
     if ($JobHandle -eq [IntPtr]::Zero) { return 0 }
     $interopType = "OstatniPomost.RunnerJob" -as [type]
     $active = [int]$interopType::Active($JobHandle)
+    if (-not $Terminate -and $active -gt 0 -and $GraceMilliseconds -gt 0) {
+        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($active -gt 0 -and $stopwatch.ElapsedMilliseconds -lt $GraceMilliseconds) {
+            $remaining = $GraceMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+            Start-Sleep -Milliseconds ([Math]::Min(50, [Math]::Max(1, $remaining)))
+            $active = [int]$interopType::Active($JobHandle)
+        }
+    }
     try {
         if ($Terminate -or $active -gt 0) { $interopType::Terminate($JobHandle) }
     }
@@ -4058,7 +4089,10 @@ function Invoke-GodotImportPreflight {
         $standardError = $standardErrorTask.GetAwaiter().GetResult()
         $exitCode = $process.ExitCode
         if (-not $jobClosed) {
-            $activeAfterExit = Complete-RunnerJob -JobHandle $jobHandle -Terminate $false
+            $activeAfterExit = Complete-RunnerJob `
+                -JobHandle $jobHandle `
+                -Terminate $false `
+                -GraceMilliseconds 3000
             $jobClosed = $true
             if ($activeAfterExit -gt 0) {
                 $launchError = "project import left $activeAfterExit process(es) in its isolated Job Object"
@@ -4210,7 +4244,10 @@ function Invoke-GodotTest {
         $standardError = $standardErrorTask.GetAwaiter().GetResult()
         $exitCode = $process.ExitCode
         if (-not $jobClosed) {
-            $activeAfterExit = Complete-RunnerJob -JobHandle $jobHandle -Terminate $false
+            $activeAfterExit = Complete-RunnerJob `
+                -JobHandle $jobHandle `
+                -Terminate $false `
+                -GraceMilliseconds 3000
             $jobClosed = $true
             if ($activeAfterExit -gt 0) {
                 $launchError = "test left $activeAfterExit process(es) in its isolated Job Object"
@@ -4392,7 +4429,7 @@ if ($hasWriteShardPlan) {
         throw "Shard plan cannot bind the executing runner to the source snapshot."
     }
     $planSelection = Get-RunnerTestSelection `
-        -ResolvedTarget $null `
+        -ResolvedTargets @() `
         -ProjectRoot $sourceProjectRoot `
         -FullSuite $true `
         -IncludeSnapshotScenes ([bool]$IncludeSnapshots) `
@@ -4610,7 +4647,8 @@ if (-not [string]::IsNullOrWhiteSpace($targetUserArgumentsPayload)) {
     $resolvedTargetUserArguments = @($decodedTargetUserArguments | ForEach-Object { [string]$_ })
 }
 
-$hasTarget = -not [string]::IsNullOrWhiteSpace($Target)
+$requestedTargets = @($Target | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$hasTarget = $requestedTargets.Count -gt 0
 $hasNativeTarget = -not [string]::IsNullOrWhiteSpace($NativeTarget)
 $hasTargetUserArguments = $resolvedTargetUserArguments.Count -gt 0
 $hasNativeMovieOutput = -not [string]::IsNullOrWhiteSpace($NativeMovieOutputPath)
@@ -4627,6 +4665,9 @@ Assert-RunnerInvocationMode -InPlaceRequested ([bool]$InPlace)
 Assert-TrackedLfEol -ProjectRoot $sourceProjectRoot
 if ($hasTargetUserArguments -and -not ($hasTarget -or $hasNativeTarget)) {
     throw "Target user arguments require -Target or -NativeTarget."
+}
+if ($hasTargetUserArguments -and $hasTarget -and $requestedTargets.Count -ne 1) {
+    throw "Target user arguments require exactly one -Target value."
 }
 if ($hasNativeMovieOutput -and -not $hasNativeTarget) {
     throw "-NativeMovieOutputPath requires -NativeTarget."
@@ -4658,19 +4699,31 @@ if ($hasNativeMovieOutput) {
     [void](New-Item -ItemType Directory -Path $movieDirectory -Force)
 }
 
+$resolvedTargets = [System.Collections.Generic.List[string]]::new()
 $resolvedTarget = $null
 $targetUsesNativeWindow = $false
 if ($hasTarget) {
-    $resolvedTarget = Resolve-TestTarget `
-        -RequestedTarget $Target `
-        -SourceProjectRoot $sourceProjectRoot `
-        -ParameterName "-Target"
+    $resolvedTargetSet = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($requestedTarget in $requestedTargets) {
+        $candidateTarget = Resolve-TestTarget `
+            -RequestedTarget $requestedTarget `
+            -SourceProjectRoot $sourceProjectRoot `
+            -ParameterName "-Target"
+        if (-not $resolvedTargetSet.Add($candidateTarget)) {
+            throw "-Target contains a duplicate canonical target: '$candidateTarget'."
+        }
+        $resolvedTargets.Add($candidateTarget)
+    }
+    if ($resolvedTargets.Count -eq 1) { $resolvedTarget = $resolvedTargets[0] }
 }
 elseif ($hasNativeTarget) {
     $resolvedTarget = Resolve-TestTarget `
         -RequestedTarget $NativeTarget `
         -SourceProjectRoot $sourceProjectRoot `
         -ParameterName "-NativeTarget"
+    $resolvedTargets.Add($resolvedTarget)
     $targetUsesNativeWindow = $true
 }
 
@@ -4708,7 +4761,13 @@ try {
     }
     $workspacePath = [string]$sourceSnapshotReceipt.WorkspacePath
     $projectRoot = $workspacePath
-    $structureTargetId = Get-ExplicitStructureTestPackageId -ResolvedTarget $resolvedTarget
+    $structureTargetIds = @($resolvedTargets | ForEach-Object {
+        Get-ExplicitStructureTestPackageId -ResolvedTarget $_
+    } | Where-Object { $null -ne $_ })
+    if ($structureTargetIds.Count -gt 0 -and $resolvedTargets.Count -ne 1) {
+        throw "A multi-target run cannot include a package-local structure test because its source overlay is target-specific."
+    }
+    $structureTargetId = if ($structureTargetIds.Count -eq 1) { $structureTargetIds[0] } else { $null }
     if ($null -ne $structureTargetId) {
         $structureOverlayReceipt = Invoke-IsolatedStructureTargetOverlay `
             -SourceProjectRoot $sourceProjectRoot `
@@ -4744,7 +4803,7 @@ try {
     }
     else {
         Get-RunnerTestSelection `
-            -ResolvedTarget $resolvedTarget `
+            -ResolvedTargets @($resolvedTargets) `
             -ProjectRoot $projectRoot `
             -FullSuite ([bool]$Full) `
             -IncludeSnapshotScenes ([bool]$IncludeSnapshots) `
@@ -4793,42 +4852,44 @@ try {
                 -Arguments $targetArguments))
         }
     }
-    elseif ($null -ne $resolvedTarget) {
-        $targetExtension = [System.IO.Path]::GetExtension($resolvedTarget).ToLowerInvariant()
-        $isNativeTarget = $targetUsesNativeWindow
-        $targetResourcePath = "res://$resolvedTarget"
-        if ($targetExtension -eq ".gd") {
-            $targetArguments = if ($isNativeTarget) {
-                @("--path", $projectRoot, "--rendering-method", "gl_compatibility", "--script", $targetResourcePath)
-            }
-            else {
-                @("--headless", "--path", $projectRoot, "--script", $targetResourcePath)
-            }
-            $targetGroup = if ($isNativeTarget) { "native window" } else { "headless script" }
-        }
-        else {
-            $targetArguments = if ($isNativeTarget) {
-                $nativeSceneArguments = @("--path", $projectRoot)
-                if ($null -ne $resolvedNativeMovieOutputPath) {
-                    $nativeSceneArguments += @(
-                        "--write-movie", $resolvedNativeMovieOutputPath,
-                        "--fixed-fps", [string]$NativeMovieFps,
-                        "--disable-vsync"
-                    )
+    elseif ($resolvedTargets.Count -gt 0) {
+        foreach ($selectedTarget in $resolvedTargets) {
+            $targetExtension = [System.IO.Path]::GetExtension($selectedTarget).ToLowerInvariant()
+            $isNativeTarget = $targetUsesNativeWindow
+            $targetResourcePath = "res://$selectedTarget"
+            if ($targetExtension -eq ".gd") {
+                $targetArguments = if ($isNativeTarget) {
+                    @("--path", $projectRoot, "--rendering-method", "gl_compatibility", "--script", $targetResourcePath)
                 }
-                $nativeSceneArguments + @($targetResourcePath)
+                else {
+                    @("--headless", "--path", $projectRoot, "--script", $targetResourcePath)
+                }
+                $targetGroup = if ($isNativeTarget) { "native window" } else { "headless script" }
             }
             else {
-                @("--headless", "--path", $projectRoot, $targetResourcePath)
+                $targetArguments = if ($isNativeTarget) {
+                    $nativeSceneArguments = @("--path", $projectRoot)
+                    if ($null -ne $resolvedNativeMovieOutputPath) {
+                        $nativeSceneArguments += @(
+                            "--write-movie", $resolvedNativeMovieOutputPath,
+                            "--fixed-fps", [string]$NativeMovieFps,
+                            "--disable-vsync"
+                        )
+                    }
+                    $nativeSceneArguments + @($targetResourcePath)
+                }
+                else {
+                    @("--headless", "--path", $projectRoot, $targetResourcePath)
+                }
+                $targetGroup = if ($isNativeTarget) { "native snapshot" } else { "headless flow" }
             }
-            $targetGroup = if ($isNativeTarget) { "native snapshot" } else { "headless flow" }
+            $testCases.Add((New-TestCase `
+                -Name $selectedTarget `
+                -Group $targetGroup `
+                -NativeWindow $isNativeTarget `
+                -UserArguments @($resolvedTargetUserArguments) `
+                -Arguments $targetArguments))
         }
-        $testCases.Add((New-TestCase `
-            -Name $resolvedTarget `
-            -Group $targetGroup `
-            -NativeWindow $isNativeTarget `
-            -UserArguments @($resolvedTargetUserArguments) `
-            -Arguments $targetArguments))
     }
     else {
         foreach ($scriptName in $headlessScriptTests) {
@@ -4885,8 +4946,11 @@ try {
     $suiteDescription = if ($shardMode) {
         "planned shard '$($activePlannedShard.Id)' ($($activePlannedShard.Lane), $($activeShardTargets.Count) targets)"
     }
-    elseif ($null -ne $resolvedTarget) {
-        "{0} target '$resolvedTarget'" -f $(if ($targetUsesNativeWindow) { "native" } else { "headless" })
+    elseif ($resolvedTargets.Count -eq 1) {
+        "{0} target '$($resolvedTargets[0])'" -f $(if ($targetUsesNativeWindow) { "native" } else { "headless" })
+    }
+    elseif ($resolvedTargets.Count -gt 1) {
+        "target batch ($($resolvedTargets.Count) headless targets)"
     }
     else {
         "{0} ({1} headless scripts + {2} headless flows{3}{4})" -f `

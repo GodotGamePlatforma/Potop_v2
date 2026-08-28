@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/definitions/WorkshopRecipeDefinition.gd" id="1_recipe"]
+
+[resource]
+script = ExtResource("1_recipe")
+id = "diving_lantern_mk2"
+display_name = "Latarnia nurkowa II"
+description = "Wzmocnij obudowę, odbłyśnik i zasilanie podstawowej latarni, aby zwiększyć zasięg widoczności."
+output_gear_id = "diving_lantern_mk2"
+required_workshop_level = 1
+prerequisite_gear_id = "diving_lantern_mk1"
+craft_cost = {"fabric_rubber": 2, "scrap": 4, "tech_parts": 1}

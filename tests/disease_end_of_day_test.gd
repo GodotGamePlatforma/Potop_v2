@@ -1,20 +1,20 @@
 extends SceneTree
 
-const BuildingEffectSystemScript := preload("res://scripts/base/BuildingEffectSystem.gd")
+const BuildingEffectSystemScript := preload("res://base_workbench/systems/BuildingEffectSystem.gd")
 const BuildingStateScript := preload("res://scripts/data/BuildingState.gd")
-const DifficultyDirectorScript := preload("res://scripts/base/DifficultyDirector.gd")
+const DifficultyDirectorScript := preload("res://scripts/campaign/DifficultyDirector.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd")
 const DiseaseExposureStateScript := preload("res://scripts/data/DiseaseExposureState.gd")
 const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
-const MedicalCareSystemScript := preload("res://scripts/base/MedicalCareSystem.gd")
+const MedicalCareSystemScript := preload("res://base_workbench/systems/MedicalCareSystem.gd")
 const ReportStateScript := preload("res://scripts/data/ReportState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
-const InfirmaryDefinition := preload("res://data/buildings/infirmary.tres")
+const InfirmaryDefinition := preload("res://base_workbench/data/buildings/infirmary.tres")
 
 const DIVE_HAZARD_SOURCE_ID := "contaminated_salvage"
 

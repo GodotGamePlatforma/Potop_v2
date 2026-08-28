@@ -36,6 +36,8 @@ if (@($parseErrors).Count -gt 0) {
 $requiredFunctions = @(
     "Get-StructurePackageTestTargets",
     "Get-RunnerTestSelection",
+    "ConvertTo-TestProjectRelativePath",
+    "Resolve-TestTarget",
     "Assert-RunnerInvocationMode",
     "Assert-TrackedLfEol",
     "ConvertTo-NormalizedProjectPath",
@@ -160,9 +162,16 @@ Assert-RunnerInvariant `
     ($runnerText.Contains('Set-TrustedChildEnvironment') -and
         $runnerText.Contains('New-RunnerKillOnCloseJob') -and
         $runnerText.Contains('Complete-RunnerJob') -and
+        $runnerText.Contains('-GraceMilliseconds 3000') -and
         $runnerText.Contains('RedirectStandardOutput = $true') -and
         -not $runnerText.Contains('"--log-file"')) `
     "Godot verdict output must use trusted pipes and a kill-on-close process tree, never a child-owned log."
+Assert-RunnerInvariant `
+    ($runnerText.Contains('$testSpecificDefaultTimeoutSeconds = @{') -and
+        $runnerText.Contains('"base_workbench/tests/settlement_event_balance_test.gd" = 300') -and
+        $runnerText.Contains('$testTimeoutWasExplicit') -and
+        $runnerText.Contains('$testSpecificDefaultTimeoutSeconds.ContainsKey($Name)')) `
+    "The deterministic Base balance sample must retain its concurrency-tolerant default timeout without overriding explicit runner limits."
 Assert-RunnerInvariant `
     ($runnerText.Contains('$status = "FAIL"') -and
         $runnerText.Contains('New-TrustedCompletionRecord') -and
@@ -178,6 +187,11 @@ Assert-RunnerInvariant `
         '(?m)^\s+"underwater_map_workbench/tests/underwater_map_smoke_test\.gd"\s*$'
     ).Count -eq 1) `
     "The closed full-suite manifest must contain map smoke exactly once."
+Assert-RunnerInvariant `
+    ($runnerText.Contains('"base_workbench/tests/production_system_test.gd"') -and
+        $runnerText.Contains('"base_workbench/tests/BaseMusicTest.tscn"') -and
+        $runnerText.Contains('"base_workbench/tests/BaseWeatherSnapshot.tscn"')) `
+    "Quick, full and snapshot manifests must use canonical Base workbench targets."
 Assert-RunnerInvariant `
     ([regex]::Matches(
         $runnerText,
@@ -304,6 +318,7 @@ try {
     }
     [void](New-Item -ItemType Directory -Path $sourceRoot -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tests") -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "base_workbench/tests") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tools") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/tools") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/structures/tower_local/generated") -Force)
@@ -319,6 +334,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "tracked.txt"), "tracked before`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "deleted.txt"), "staged then deleted`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "tests/explicit_target.gd"), "extends SceneTree`n", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText((Join-Path $sourceRoot "base_workbench/tests/base_target.gd"), "extends SceneTree`n", [System.Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../tools/workbench_contract.py") -Destination (Join-Path $sourceRoot "tools/workbench_contract.py")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../tools/workbench_lock.py") -Destination (Join-Path $sourceRoot "tools/workbench_lock.py")
     $fakeBuilder = @'
@@ -378,6 +394,7 @@ generated.mkdir(parents=True, exist_ok=True)
         "tracked.txt",
         "deleted.txt",
         "tests/explicit_target.gd",
+        "base_workbench/tests/base_target.gd",
         "underwater_map_workbench/structures/inflight_package/runtime.gd",
         "diver_workbench/required_untracked.gd",
         "untracked with spaces/needed source.gd"
@@ -393,7 +410,7 @@ generated.mkdir(parents=True, exist_ok=True)
     Assert-RunnerInvariant ($beforeMutation.Digest -ne $afterMutation.Digest) "Source fingerprint did not detect a content mutation."
 
     $explicitSelection = Get-RunnerTestSelection `
-        -ResolvedTarget "tests/explicit_target.gd" `
+        -ResolvedTargets @("tests/explicit_target.gd") `
         -ProjectRoot $sourceRoot `
         -FullSuite $false `
         -IncludeSnapshotScenes $false `
@@ -403,6 +420,28 @@ generated.mkdir(parents=True, exist_ok=True)
     Assert-RunnerInvariant ($explicitSelection.ManifestTargets.Count -eq 1) "Explicit target selection added unrelated targets."
     Assert-RunnerInvariant ($explicitSelection.ManifestTargets[0] -eq "tests/explicit_target.gd") "Explicit target selection changed the requested target."
     Assert-RunnerInvariant ($explicitSelection.HeadlessScriptTests.Count -eq 0) "Explicit target selection performed global script discovery."
+    $explicitBatchSelection = Get-RunnerTestSelection `
+        -ResolvedTargets @("tests/explicit_target.gd", "base_workbench/tests/base_target.gd") `
+        -ProjectRoot $sourceRoot `
+        -FullSuite $false `
+        -IncludeSnapshotScenes $false `
+        -DefaultHeadlessScriptTests @("default.gd") `
+        -DefaultHeadlessFlowScenes @() `
+        -SnapshotScenes @()
+    Assert-RunnerInvariant ($explicitBatchSelection.ManifestTargets.Count -eq 2) "Explicit target batch changed its size."
+    Assert-RunnerInvariant `
+        ($explicitBatchSelection.ManifestTargets[1] -ceq "base_workbench/tests/base_target.gd") `
+        "Explicit target batch changed target order or identity."
+    $resolvedBaseTarget = Resolve-TestTarget `
+        -RequestedTarget "base_workbench/tests/base_target.gd" `
+        -SourceProjectRoot $sourceRoot `
+        -ParameterName "-Target"
+    Assert-RunnerInvariant `
+        ($resolvedBaseTarget -ceq "base_workbench/tests/base_target.gd") `
+        "Direct Base workbench target did not preserve its canonical project-relative path."
+    Assert-RunnerInvariant `
+        ((ConvertTo-TestProjectRelativePath -TargetName $resolvedBaseTarget) -ceq $resolvedBaseTarget) `
+        "Base workbench target was not accepted by manifest path normalization."
     Assert-RunnerInvocationMode -InPlaceRequested $false
     $inPlaceRejected = $false
     try {
@@ -416,7 +455,7 @@ generated.mkdir(parents=True, exist_ok=True)
     $defaultSelectionFailed = $false
     try {
         [void](Get-RunnerTestSelection `
-            -ResolvedTarget $null `
+            -ResolvedTargets @() `
             -ProjectRoot $sourceRoot `
             -FullSuite $false `
             -IncludeSnapshotScenes $false `
@@ -438,8 +477,12 @@ generated.mkdir(parents=True, exist_ok=True)
     Assert-RunnerInvariant `
         ($null -eq (Get-ExplicitStructureTestPackageId -ResolvedTarget "diver_workbench/tests/DiverPresentationTest.tscn")) `
         "Non-structure target incorrectly entered the structure overlay lane."
+    Assert-RunnerInvariant `
+        ($null -eq (Get-ExplicitStructureTestPackageId -ResolvedTarget "base_workbench/tests/base_target.gd")) `
+        "Base workbench target incorrectly entered the structure overlay lane."
 
     $workspacePath = [string]$sourceSnapshotReceipt.WorkspacePath
+    Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "base_workbench/tests/base_target.gd") -PathType Leaf) "Isolated copy omitted a tracked Base workbench test."
     Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "diver_workbench/required_untracked.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Diver source."
     Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "underwater_map_workbench/structures/inflight_package/runtime.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Map source."
     Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath "ignored/ignored.tmp"))) "Isolated copy included ignored content."
@@ -635,8 +678,12 @@ generated.mkdir(parents=True, exist_ok=True)
                 $jobType = "OstatniPomost.RunnerJob" -as [type]
                 $jobType::Assign($jobHandle, $sleepProcess)
                 Assert-RunnerInvariant ($jobType::Active($jobHandle) -ge 1) "Job Object did not retain its assigned process."
-                [void](Complete-RunnerJob -JobHandle $jobHandle -Terminate $true)
+                $activeAfterGrace = Complete-RunnerJob `
+                    -JobHandle $jobHandle `
+                    -Terminate $false `
+                    -GraceMilliseconds 50
                 $jobClosed = $true
+                Assert-RunnerInvariant ($activeAfterGrace -ge 1) "Job Object accepted a persistent process after the bounded grace period."
                 Assert-RunnerInvariant $sleepProcess.WaitForExit(5000) "Kill-on-close Job Object did not terminate its process."
             }
             finally {
@@ -644,6 +691,35 @@ generated.mkdir(parents=True, exist_ok=True)
                     try { [void](Complete-RunnerJob -JobHandle $jobHandle -Terminate $true) } catch { Write-Warning $_.Exception.Message }
                 }
                 if ($null -ne $sleepProcess) { $sleepProcess.Dispose() }
+            }
+
+            $graceJobHandle = [IntPtr]::Zero
+            $graceProcess = $null
+            $graceJobClosed = $false
+            try {
+                $graceJobHandle = New-RunnerKillOnCloseJob
+                $graceInfo = [System.Diagnostics.ProcessStartInfo]::new()
+                $graceInfo.FileName = $sleepExecutable
+                $graceInfo.Arguments = '-NoLogo -NoProfile -Command "Start-Sleep -Milliseconds 200"'
+                $graceInfo.UseShellExecute = $false
+                $graceInfo.CreateNoWindow = $true
+                $graceProcess = [System.Diagnostics.Process]::new()
+                $graceProcess.StartInfo = $graceInfo
+                Assert-RunnerInvariant $graceProcess.Start() "Grace-period Job Object fixture process did not start."
+                $jobType::Assign($graceJobHandle, $graceProcess)
+                $activeAfterNaturalExit = Complete-RunnerJob `
+                    -JobHandle $graceJobHandle `
+                    -Terminate $false `
+                    -GraceMilliseconds 2000
+                $graceJobClosed = $true
+                Assert-RunnerInvariant ($activeAfterNaturalExit -eq 0) "Grace period misclassified a naturally exiting child as a process leak."
+                Assert-RunnerInvariant $graceProcess.WaitForExit(5000) "Grace-period fixture did not exit naturally."
+            }
+            finally {
+                if (-not $graceJobClosed -and $graceJobHandle -ne [IntPtr]::Zero) {
+                    try { [void](Complete-RunnerJob -JobHandle $graceJobHandle -Terminate $true) } catch { Write-Warning $_.Exception.Message }
+                }
+                if ($null -ne $graceProcess) { $graceProcess.Dispose() }
             }
         }
 

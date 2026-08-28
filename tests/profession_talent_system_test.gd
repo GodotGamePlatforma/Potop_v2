@@ -6,8 +6,8 @@ const BuildingStateScript := preload("res://scripts/data/BuildingState.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const ProfessionTalentDefinitionScript := preload("res://scripts/definitions/ProfessionTalentDefinition.gd")
-const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
-const CareerProgressionSystemScript := preload("res://scripts/base/CareerProgressionSystem.gd")
+const ProfessionTalentSystemScript := preload("res://scripts/survivors/ProfessionTalentSystem.gd")
+const CareerProgressionSystemScript := preload("res://scripts/survivors/CareerProgressionSystem.gd")
 const PersistenceValidatorScript := preload("res://scripts/data/GameStatePersistenceValidator.gd")
 
 const ROUNDTRIP_PATH := "user://test_profession_talent_system.tres"

@@ -7,10 +7,10 @@ const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
 const ReportStateScript := preload("res://scripts/data/ReportState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
-const WorkerAssignmentSystemScript := preload("res://scripts/base/WorkerAssignmentSystem.gd")
-const WorkerAssignmentRailScript := preload("res://scripts/base/WorkerAssignmentRail.gd")
-const ExpeditionPreparationSystemScript := preload("res://scripts/base/ExpeditionPreparationSystem.gd")
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
+const WorkerAssignmentSystemScript := preload("res://base_workbench/systems/WorkerAssignmentSystem.gd")
+const WorkerAssignmentRailScript := preload("res://base_workbench/ui/WorkerAssignmentRail.gd")
+const ExpeditionPreparationSystemScript := preload("res://scripts/diving/ExpeditionPreparationSystem.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
 const PolicyStateScript := preload("res://scripts/data/PolicyState.gd")
 
 var _failed := false
@@ -61,7 +61,7 @@ func _test_locked_plan_and_ui() -> void:
 	var state = _state()
 	var station = _add_building(state, "station", "diving_station", "bottom_right", 1)
 	var assignments = WorkerAssignmentSystemScript.new()
-	var definition = ResourceLoader.load("res://data/buildings/diving_station.tres")
+	var definition = ResourceLoader.load("res://base_workbench/data/buildings/diving_station.tres")
 	_assert(ExpeditionPreparationSystemScript.new().select_diver(state, station, definition, "mira"), "Mira should be selected independently as the diver before locking.")
 	_assert(assignments.assign_worker_to_slot(state, station.id, 0, "igor", 1), "The Station should be staffed before locking.")
 	_assert(state.lock_day_plan(), "The day plan should lock for the UI guard test.")
@@ -82,7 +82,7 @@ func _test_living_diver_stays_assigned_next_day() -> void:
 	var state = _state()
 	var station = _add_building(state, "station", "diving_station", "bottom_right", 1)
 	var assignments = WorkerAssignmentSystemScript.new()
-	var definition = ResourceLoader.load("res://data/buildings/diving_station.tres")
+	var definition = ResourceLoader.load("res://base_workbench/data/buildings/diving_station.tres")
 	_assert(ExpeditionPreparationSystemScript.new().select_diver(state, station, definition, "igor"), "Igor should be selected independently before the expedition.")
 	_assert(assignments.assign_worker_to_slot(state, station.id, 0, "mira", 1), "Mira should staff the Station independently from Igor's dive.")
 	state.find_survivor("igor").status = SurvivorStateScript.Status.DIVING
@@ -113,7 +113,7 @@ func _test_dive_death_is_terminal_before_settlement() -> void:
 	guest.display_name = "Gość"
 	state.survivors.append(guest)
 	var igor = state.find_survivor("igor")
-	var station_definition = ResourceLoader.load("res://data/buildings/diving_station.tres")
+	var station_definition = ResourceLoader.load("res://base_workbench/data/buildings/diving_station.tres")
 	_assert(ExpeditionPreparationSystemScript.new().select_diver(state, station, station_definition, "igor"), "The fatal-dive fixture should select Igor independently from Station support.")
 	igor.health = 40
 	igor.hunger = 20
@@ -190,7 +190,7 @@ func _test_temporary_incapacity_keeps_roster_without_output() -> void:
 	_assert(fishing_hut.assigned_survivor_ids == ["mira"] and mira.current_assignment == fishing_hut.id, "Temporary incapacity should keep the remembered roster and reverse index.")
 	_assert(assignments.reconcile_assignments(state) == false, "Reconciliation should not treat temporary exhaustion as a terminal assignment.")
 
-	var definition = ResourceLoader.load("res://data/buildings/fishing_hut.tres")
+	var definition = ResourceLoader.load("res://base_workbench/data/buildings/fishing_hut.tres")
 	var rail = WorkerAssignmentRailScript.new()
 	get_root().add_child(rail)
 	rail.configure(state, definition, fishing_hut, state.tutorial.step)

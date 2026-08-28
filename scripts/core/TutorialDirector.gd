@@ -40,7 +40,7 @@ func apply_starting_supply_package(state) -> void:
 	var multiplier := float(state.difficulty_profile.build_cost_multiplier) if state.difficulty_profile != null else 1.0
 	var required: Dictionary = {}
 	for definition_id in REQUIRED_BUILDINGS:
-		var definition = ResourceLoader.load("res://data/buildings/%s.tres" % definition_id)
+		var definition = ResourceLoader.load("res://base_workbench/data/buildings/%s.tres" % definition_id)
 		if definition == null:
 			continue
 		var cost: Dictionary = DifficultyMathScript.scale_cost(definition.get_build_cost(), multiplier)
