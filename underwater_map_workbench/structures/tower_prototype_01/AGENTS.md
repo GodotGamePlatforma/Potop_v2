@@ -15,22 +15,22 @@ Przed inwentaryzacją, analizą albo zmianą przeczytaj w całości, z SHA-256 p
 
 Stosuj wymagania kompletności z `../../AGENTS.md` i `../../../AGENTS.md`. Dopiero po tych odczytach przeczytaj w całości `structure_manifest.json`, a następnie dokładny rekord `tower_prototype_01` w `../../map_manifest.json`. Rekord mapowy jest jedynym źródłem stable ID, originu, aktywności, opcjonalnego landmarku i referencji pakietu; manifest pakietu celowo nie powtarza pola `structure_id`.
 
-Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publiczną granicę Root–Mapa, schema mapy, persistence albo zapis, wróć do `../../../AGENTS.md` i dobierz pełny kontekst globalny. Zmiana lokalnego źródła może zmienić pochodny `map_gameplay_signature`; nadal jest authoringiem tego pakietu, po którym osobna zmiana Mapy odświeża pin i pochodne. Jeżeli zadanie zmienia mapowy origin, rejestrację, globalny payload lub kompozycję wielu pakietów, wróć do `../../AGENTS.md` i prowadź je jako zadanie Mapy.
+Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publiczną granicę Root–Mapa, schema mapy, persistence albo zapis, wróć do `../../../AGENTS.md` i dobierz pełny kontekst globalny. Zmiana lokalnego źródła wymagająca nowego seala i mapowego pinu jest jednym root-routed zadaniem obejmującym pakiet oraz pochodne Mapy. Jeżeli zadanie zmienia mapowy origin, rejestrację, globalny payload lub kompozycję wielu pakietów bez zmiany prywatnego źródła, wróć do `../../AGENTS.md` i prowadź je jako zadanie Mapy.
 
 ## Granica odczytu i zapisu
 
 - Domyślna allowlista zapisu obejmuje wyłącznie `underwater_map_workbench/structures/tower_prototype_01/**`.
-- `../../map_manifest.json`, pozostała Mapa, root i `../../../diver_workbench/**` są zawsze zależnościami tylko do odczytu. `--seal-structure-package tower_prototype_01` może zaktualizować wyłącznie lokalny manifest; `--refresh-structure-package` należy do osobnej zmiany właściciela Mapy.
+- W czysto lokalnej iteracji `../../map_manifest.json`, pozostała Mapa, root i `../../../diver_workbench/**` są tylko do odczytu. Jeżeli `--seal-structure-package tower_prototype_01` zmienia manifest i wymaga nowego pinu, zatrzymaj lokalny routing i przejdź do jednego root-routed zadania z jawnym write-setem pakietu oraz wymaganych plików Mapy; nie twórz package-only PR.
 - Pakiet może konsumować publiczne typy i kontrakty nadrzędnego projektu, ale nie kopiuje ani nie poprawia ich przy okazji prywatnego zadania.
 - Przed edycją wypisz planowane ścieżki i właścicieli. Po edycji porównaj pełny diff; zapis poza pakietem zatrzymuje lokalną pracę i wymaga przekierowania.
 - Pakiet nie posiada własnego `project.godot`, `.godot`, `.ai`, `map_manifest.json`, `UnderwaterMap.tscn`, ARD, kampanii ani konfiguracji zapisu.
 
 ### Współbieżność
 
-- Jeden autor pakietu pracuje w osobnym pełnym Git worktree i na własnej gałęzi `codex/structure/<task-slug>` utworzonej z aktualnego `origin/main`. Osobny CWD we wspólnym checkoutcie nie daje izolacji.
-- Autor wykonuje lokalny seal, build/check i testy pakietu, sprawdza diff oraz otwiera jeden PR. Mapowy pin i wspólne pochodne zmienia później osobny PR właściciela Mapy na podstawie dokładnego SHA-256 sealed manifestu.
+- Jeden autor zmiany seal+pin pracuje w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_prototype_01/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
+- Autor wykonuje pełny seal, build/check i oba testy pakietu, następnie mapowy refresh, pełny build/check i pełne testy Mapy. Tylko `fast-check PASS` pozwala enqueue PR; nie powstaje drugi PR Mapy.
 - Lokalny build/check i celowane testy pakietu nie odkrywają innych struktur. Runner izoluje `.godot`, `user://`, logi i capture w pełnej kopii oraz odrzuca `-InPlace`.
-- Autor nie poprawia ręcznie `generated/**` ani mapowego pinu. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera Mapy.
+- Autor nie poprawia ręcznie `generated/**` ani mapowego pinu. Jeżeli konkurencyjny PR zmieni `main`, aktualizuje bazę, ponownie uruchamia seal/refresh, builder oraz pełne testy pakietu i Mapy. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera.
 
 ## Authority i pochodne
 
@@ -52,9 +52,9 @@ Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzj
 ## Wykonanie i weryfikacja
 
 1. Ustal edytowalne źródło z `structure_manifest.json` i sprawdź wskazane pliki runtime, assety oraz lokalny test.
-2. Porównaj zmianę z aktywnymi MAP-ARD-0022, MAP-ARD-0026 i globalnym ARD-0106. Nie zmieniaj przy okazji mapowego placementu ani semantyki zapisu.
-3. Gdy zmieniło się źródło lub jego hash, uruchom `python ..\..\tools\build_underwater_map.py --seal-structure-package tower_prototype_01`. Następnie użyj lokalnego `--build-structure tower_prototype_01` i niedestrukcyjnego `--check-structure tower_prototype_01`; mapowy refresh, pin i wspólne pochodne należą do osobnej zmiany Mapy.
-4. Uruchom `tests/tower_package_contract_test.gd` oraz `tests/tower_runtime_test.gd`. Pełny mapowy build/check i smoke należą do rejestracji, zmiany originu albo publicznego montażu, a pełną integrację docelowo wykonuje merge queue. Rootowy test dobierz tylko dla publicznego montażu, resetu próby albo granicy persistence.
+2. Porównaj zmianę z aktywnymi MAP-ARD-0022, MAP-ARD-0027 i globalnym ARD-0106. Nie zmieniaj przy okazji mapowego placementu ani semantyki zapisu.
+3. Gdy zmieniło się źródło lub jego hash, w jednym root-routed worktree uruchom `--seal-structure-package tower_prototype_01`, `--build-structure tower_prototype_01`, `--check-structure tower_prototype_01`, oba testy pakietu, a następnie `--refresh-structure-package tower_prototype_01` z dokładnym SHA-256, pełny mapowy `--build`/`--check` i pełne testy Mapy.
+4. Jeden PR musi zawierać źródła, seal, mapowy pin i wszystkie pochodne. Rootowy test dobierz dodatkowo tylko dla publicznego montażu, resetu próby albo granicy persistence; po zmianie bazy powtórz cały builder i zestaw testów.
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnej wygenerowanej sceny i obejrzyj wynik.
 6. Po zmianie topologii zachowaj ręczny playtest całego budynku i wymaganych powrotów; nie zastępuj go BFS-em.
 

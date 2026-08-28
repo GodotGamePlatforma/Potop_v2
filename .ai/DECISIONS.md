@@ -1439,44 +1439,46 @@ Zastapienie jest zawsze symetryczne: nowy wpis wskazuje identyfikator i klauzule
 - Domena: proces wytwarzania
 - Status / aktywny zakres: Zastapione; brak aktywnego zakresu
 - Zatwierdzenie / zastapienie: 2026-08-26 / 2026-08-28
-- Relacje: Historycznie doprecyzowywalo ARD-0099, ARD-0102, ARD-0105 i ARD-0106 | Zastapiona przez: ARD-0111/calosc
+- Relacje: Historycznie doprecyzowywalo ARD-0099, ARD-0102, ARD-0105 i ARD-0106 | Zastapiona przez: ARD-0113/calosc
 - D1. Wpis historycznie wymagal lokalnego integratora, receiptow, LKG, immutable hand-offow i lokalnej promocji; mechanizmy te nie sa juz kontraktem pracy.
-- Powod i skutek zastapienia: model chronil wspolny checkout kosztem rozbudowanej obslugi procesu. ARD-0111 zachowuje worktrees, galezie, izolacje testow i zielone `main`, przenoszac pelna bramke do merge queue.
-- Odwolania: ARD-0111; AGENTS.md.
+- Powod i skutek zastapienia: model chronil wspolny checkout kosztem rozbudowanej obslugi procesu. ARD-0113 zachowuje worktrees, galezie, izolacje testow i zielone `main`, przenoszac pelna bramke do merge queue.
+- Odwolania: ARD-0113; AGENTS.md.
 
 ## ARD-0109 - Historyczny assignment i ACK
 
 - Domena: koordynacja agentow
 - Status / aktywny zakres: Zastapione; brak aktywnego zakresu
 - Zatwierdzenie / zastapienie: 2026-08-27 / 2026-08-28
-- Relacje: Historycznie doprecyzowywalo ARD-0108 | Zastapiona przez: ARD-0111/calosc
+- Relacje: Historycznie doprecyzowywalo ARD-0108 | Zastapiona przez: ARD-0113/calosc
 - D1. Wpis historycznie wymagal bundle'a assignmentu, ACK, write-setu, redispatchu i close; zadne z nich nie jest juz warunkiem rozpoczecia, zakonczenia ani scalenia zadania.
 - Powod i skutek zastapienia: koordynacja pochlaniala uwage autora bez poprawy samego wdrozenia. Rozdzielne worktrees i zwykly przeplyw PR zapewniaja potrzebna izolacje.
-- Odwolania: ARD-0111; AGENTS.md.
+- Odwolania: ARD-0113; AGENTS.md.
 
 ## ARD-0110 - Historyczny shardowany control-plane z attesterem
 
 - Domena: CI i integracja agentow
 - Status / aktywny zakres: Zastapione; brak aktywnego zakresu
 - Zatwierdzenie / zastapienie: 2026-08-27 / 2026-08-28
-- Relacje: Historycznie doprecyzowywalo ARD-0108 i ARD-0109 | Zastapiona przez: ARD-0111/calosc
+- Relacje: Historycznie doprecyzowywalo ARD-0108 i ARD-0109 | Zastapiona przez: ARD-0113/calosc
 - D1. Wpis historycznie wymagal receiptow shardow, agregatora, App attestera, auto-integratora i osobnego audytu po merge; szczegoly te nie sa juz kontraktem CI.
 - Powod i skutek zastapienia: ochrona `main` ma wynikac z pelnego testu merge group przed scaleniem, a nie z wlasnego protokolu dowodowego i testu finalnego kodu dopiero po merge.
-- Odwolania: ARD-0111; docs/Ostatni_Pomost_architektura_Godot.txt - integracja i testy.
+- Odwolania: ARD-0113; docs/Ostatni_Pomost_architektura_Godot.txt - integracja i testy.
 
-## ARD-0111 - Merge queue chroni main, a builder publikuje grywalne current
+Identyfikatory ARD-0111 i ARD-0112 sa zarezerwowane dla przyszlego podzialu `replace_guard`; nie maja jeszcze zatwierdzonego kontraktu i nie wolno ich cytowac jako obowiazujacych decyzji.
+
+## ARD-0113 - Merge queue chroni main, a builder publikuje grywalne current
 
 - Domena: integracja zmian, CI i publikacja buildow
 - Status / aktywny zakres: Obowiazuje; D1-D9
 - Zatwierdzenie: 2026-08-28
 - Relacje: Zastepuje ARD-0108/calosc, ARD-0109/calosc i ARD-0110/calosc | Zastapiona przez: brak
 - D1. Jedno zadanie ma jeden pelny Git worktree, jedna galaz `codex/<owner>/<task-slug>` i jeden logiczny PR. Autor wdraza zmiane w swojej domenie, uruchamia proporcjonalne testy lokalne i nie pushuje bezposrednio do `main`.
-- D2. `fast-check` daje szybka informacje zwrotna dla PR, ale nie certyfikuje `main`. Pelna bramka `integration-green` uruchamia sie w merge queue na merge group skladajacej aktualny `main` i dany PR.
+- D2. `fast-check` jest obowiazkowa bramka PR. Tylko jego jawny `PASS` pozwala dodac PR do merge queue; kazdy inny wynik blokuje kolejke i merge, takze dla rzadkiego PR control-plane. `fast-check` nie certyfikuje `main`: pelna bramka `integration-green` uruchamia sie wylacznie na merge group skladajacej aktualny `main` i dany PR.
 - D3. PR jest scalany metoda squash dopiero po pelnym `PASS` merge group. Czerwony wynik wraca do autora i nie trafia do `main`; dzieki temu `main` zawsze oznacza najnowszy kod po pelnej regresji.
 - D4. Lokalny czysty mirror `main` wykonuje kolejno sprawdzenie czystosci, `fetch`, fast-forward do `origin/main` i pobranie Git LFS. Dirty stan zatrzymuje synchronizacje; automat nie uzywa `reset --hard` ani nie usuwa zmian.
 - D5. Builder dziala dopiero po scaleniu i bierze exact finalne SHA `main`. Pobiera Git LFS, wykonuje finalny build oraz smoke i publikuje niezmienny artefakt pod `builds/by-sha/<SHA>`.
 - D6. Wskaznik `builds/current` przesuwa sie atomowo tylko po poprawnym buildzie i smoke exact SHA. Porazka pozostawia poprzednie `current`; `current` oznacza wiec najnowszy pelnozielony `main`, ktory dodatkowo poprawnie sie zbudowal.
-- D7. GitHub chroni workflowy, narzedzia CI, konfiguracje `integration-green` i control-plane buildera. Zwykly PR nie zmienia tych sciezek, a rzadka zmiana korzysta z osobnego PR i recznej zgody wlasciciela; nie wymaga drugiego agenta oceniajacego pierwszego.
+- D7. GitHub chroni workflowy, narzedzia CI, konfiguracje `integration-green` i control-plane buildera. Zwykly PR nie zmienia tych sciezek, a rzadka zmiana korzysta z osobnego PR i recznej zgody wlasciciela; nie wymaga drugiego agenta oceniajacego pierwszego. Reczna zgoda jest dodatkowa bramka i nie omija `fast-check PASS` ani pelnego `integration-green` merge group.
 - D8. Worktrees, lokalne testy i procesy Godota zachowuja osobne `.godot`, `user://`, cache, build, temp, logi, porty i capture. Rownoleglosc nie moze wspoldzielic zapisywalnego workspace ani danych uzytkownika.
 - D9. Assignmenty, ACK, lokalne LKG, candidate/run receipty, FROZEN hand-offy, App attester, auto-integrator, agenci-audytorzy i rozmowy miedzy agentami nie naleza do procesu. Szczegoly wykonania CI pozostaja wymienne, o ile zachowuja D2-D8.
 - Powod i skutek: autor skupia sie na implementacji oraz adekwatnych testach, merge queue chroni kod zrodlowy przed efektem domina, a prosty builder chroni grywalny artefakt. Powstaja dwa czytelne poziomy stabilnosci: pelnozielony `main` i dodatkowo zbudowane `current`.

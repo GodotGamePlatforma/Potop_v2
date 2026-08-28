@@ -32,7 +32,7 @@ git -C .. fetch origin main
 git -C .. worktree add -b codex/map/<slug> <absolute-path> origin/main
 ```
 
-W nowym worktree sprawdź status, wypisz planowane ścieżki Mapy, wprowadź zmianę i uruchom właściwe lokalne build/check/testy. Na końcu sprawdź diff, wykonaj logiczny commit, wypchnij tylko własną gałąź i otwórz jeden PR. Nie pushuj bezpośrednio do `main`.
+W nowym worktree sprawdź status, wypisz planowane ścieżki Mapy, wprowadź zmianę i uruchom właściwe lokalne build/check/testy. Na końcu sprawdź diff, wykonaj logiczny commit, wypchnij tylko własną gałąź i otwórz jeden PR. Nie pushuj bezpośrednio do `main`. Zmiana struktury wymagająca nowego seala i mapowego pinu używa opisanego niżej jednego root-routed brancha `codex/structure-<id>/<task-slug>`, nie drugiego PR Mapy.
 
 ## Szybki start
 
@@ -88,7 +88,7 @@ python .\tools\build_underwater_map.py --check
 ..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
 ```
 
-Prywatny producent jednego zarejestrowanego pakietu używa lżejszego loopu we własnym worktree. Pierwszą komendę uruchom tylko po zmianie źródła albo hasha:
+Zmiana źródła struktury wymagająca nowego seala i pinu jest jednym root-routed zadaniem, worktree, branchem i PR. Najpierw wykonaj lokalną część pakietu:
 
 ```powershell
 python .\tools\build_underwater_map.py --seal-structure-package <id>
@@ -96,15 +96,17 @@ python .\tools\build_underwater_map.py --build-structure <id>
 python .\tools\build_underwater_map.py --check-structure <id>
 ```
 
-Każdy tryb buildera wykonuje repozytoryjny preflight EOL i odrzuca tracked pliki `w/crlf` albo `w/mixed` objęte `eol=lf`. Następnie uruchom dwa cele wskazane w lokalnym `structures/<id>/README.md`, sprawdź diff i otwórz PR pakietu. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
+Każdy tryb buildera wykonuje repozytoryjny preflight EOL i odrzuca tracked pliki `w/crlf` albo `w/mixed` objęte `eol=lf`. Następnie uruchom oba testy pakietu wskazane w jego lokalnym `README.md`. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
 
-Aktualizacja mapowego pinu jest osobną zmianą właściciela Mapy. Dla dokładnego SHA-256 sealed manifestu wykonaj:
+W tym samym worktree, branchu i PR wykonaj refresh dokładnego SHA-256 sealed manifestu, odtwórz pochodne oraz uruchom pełny lokalny zestaw Mapy:
 
 ```powershell
 python .\tools\build_underwater_map.py --refresh-structure-package <id> --sealed-package-sha256 <SHA256>
 python .\tools\build_underwater_map.py --build
 python .\tools\build_underwater_map.py --check
 ..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
+..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_visual_residency_test.gd
+..\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
 ```
 
 Jeżeli zmieniło się kilka manifestów, można przekazać wszystkie pary w jednej komendzie, aby odtworzyć jeden spójny zestaw pochodnych:
@@ -115,9 +117,9 @@ python .\tools\build_underwater_map.py `
   --refresh-structure-package <id-b> --sealed-package-sha256 <SHA256-b>
 ```
 
-`--seal-structure-package <id>` zapisuje wyłącznie lokalne hashe i digesty prywatnego manifestu; nie dotyka mapowego pinu ani wspólnych pochodnych. Prywatne `--build-structure` i `--check-structure` rozwiązują tylko wskazany pakiet i używają rozłącznego outputu danego worktree pod `.godot/underwater_map_structure_builds/<id>/generated`. `--refresh-l05-source` służy wyłącznie zmianie złożonego źródła topologii. `--refresh-structure-package` należy do zmiany Mapy: aktualizuje mapowy pin i pochodne deklaracje, nigdy prywatne źródło. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera, a nie protokołem koordynacji agentów.
+`--seal-structure-package <id>` zapisuje wyłącznie lokalne hashe i digesty prywatnego manifestu; `--refresh-structure-package` aktualizuje mapowy pin i pochodne deklaracje, nigdy prywatne źródło. Prywatne `--build-structure` i `--check-structure` rozwiązują tylko wskazany pakiet i używają rozłącznego outputu danego worktree pod `.godot/underwater_map_structure_builds/<id>/generated`. `--refresh-l05-source` służy wyłącznie zmianie złożonego źródła topologii. Granice komend pozostają rozdzielone, ale źródła struktury, seal, pin i pochodne trafiają atomowo w jednym root-routed PR. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera.
 
-Pełny mapowy build/check i smoke uruchamiaj przy rejestracji, zmianie originu albo publicznym montażu, nie po każdej prywatnej iteracji. Pełne testy złożenia docelowo wykonuje merge queue przed scaleniem. Po zmianie publicznej granicy uruchom także właściwy test root. Po zmianie widocznej prezentacji wykonaj i obejrzyj natywny capture. Po zmianie topologii ręcznie przepłyń wymagane trasy — builder i smoke nie certyfikują ich jakości. Każdy przebieg izoluje `.godot`, `user://`, logi i capture.
+Jeżeli konkurencyjny PR zmieni `main`, późniejszy autor aktualizuje bazę do bieżącego `origin/main` i ponownie wykonuje seal, refresh, pełny builder oraz wszystkie testy struktury i Mapy przed nowym `fast-check`. Tylko `fast-check PASS` pozwala enqueue PR; pełne testy złożenia docelowo wykonuje merge queue przed scaleniem. Po zmianie publicznej granicy uruchom także właściwy test root. Po zmianie widocznej prezentacji wykonaj i obejrzyj natywny capture. Po zmianie topologii ręcznie przepłyń wymagane trasy — builder i smoke nie certyfikują ich jakości. Każdy przebieg izoluje `.godot`, `user://`, logi i capture.
 
 Nigdy nie poprawiaj ręcznie `UnderwaterMap.tscn`, masek ani innych pochodnych. Nie twórz plików `candidate`, `final`, drugiego `map_manifest.json`, manifestu wariantu, alternatywnej sceny, dodatkowego projektu ani kopii avatara. `structure_manifest.json` jest dozwolonym źródłem podrzędnym: nie może zawierać globalnego placementu ani trwałego stanu, a cykl próby deklaruje jawnie przez `attempt_state.persistence=none` i `checkpoint=none`.
 

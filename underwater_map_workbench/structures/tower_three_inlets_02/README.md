@@ -57,7 +57,7 @@ Artefakty trafiają do izolowanego `user://test_tower_three_inlets_02_proxy_capt
 
 ## Przepis zmiany
 
-Po zmianie edytowalnego źródła lub hash-pinned pliku autor pakietu wykonuje w swoim prywatnym worktree:
+Zmiana edytowalnego źródła wymagająca nowego seala i mapowego pinu jest jednym root-routed zadaniem na branchu `codex/structure-tower_three_inlets_02/<task-slug>`. W tym samym worktree uruchom najpierw pełną część pakietu:
 
 ```powershell
 python ..\..\tools\build_underwater_map.py --seal-structure-package tower_three_inlets_02
@@ -67,9 +67,20 @@ python ..\..\tools\build_underwater_map.py --check-structure tower_three_inlets_
 ..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_three_inlets_02/tests/tower_runtime_test.gd
 ```
 
-`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`. Po zgodnym checku sprawdź diff i otwórz PR pakietu. Osobny PR właściciela Mapy wykonuje `--refresh-structure-package tower_three_inlets_02 --sealed-package-sha256 <SHA256>` dla dokładnego SHA-256 sealed manifestu oraz odtwarza pin i wspólne pochodne; autor pakietu nigdy nie zapisuje `../../map_manifest.json`.
+Następnie, nadal przed jednym wspólnym PR, odśwież dokładny pin, odtwórz pochodne i uruchom pełny lokalny zestaw Mapy:
 
-Pełny `--build`, `--check`, mapowy smoke i właściwe testy root wykonuje się przy rejestracji, zmianie originu albo publicznym montażu. Nie należą do zwykłego prywatnego loopu; pełną integrację docelowo wykonuje merge queue przed scaleniem. Zmiana grafiki wymaga capture'u rzeczywistej sceny, a zmiana topologii ręcznego przepłynięcia struktury.
+```powershell
+python ..\..\tools\build_underwater_map.py --refresh-structure-package tower_three_inlets_02 --sealed-package-sha256 <SHA256>
+python ..\..\tools\build_underwater_map.py --build
+python ..\..\tools\build_underwater_map.py --check
+..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
+..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_visual_residency_test.gd
+..\..\..\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
+```
+
+`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`, a `--refresh-structure-package` wyłącznie mapowy pin i pochodne. Granice komend pozostają rozdzielone, lecz źródła pakietu, seal, dokładny pin i wszystkie pochodne muszą trafić atomowo w jednym branchu i PR. Nie twórz package-only PR ani późniejszego PR Mapy.
+
+Jeżeli konkurencyjny PR zmieni `main`, zaktualizuj bazę do bieżącego `origin/main` i powtórz cały seal/refresh, builder oraz testy pakietu i Mapy. Tylko `fast-check PASS` pozwala enqueue PR; pełną integrację następnie wykonuje merge queue. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga capture'u rzeczywistej sceny, a zmiana topologii ręcznego przepłynięcia struktury.
 
 ## Dokumentacja
 

@@ -55,13 +55,13 @@ Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree i
 
 ## Docelowa ochrona `main`
 
-Zatwierdzony kontrakt ARD-0111 rozdziela dwie bramki:
+Docelowy przepływ rozdziela dwie bramki:
 
-- `fast-check` daje szybki feedback dla PR;
+- `fast-check` musi zakończyć się `PASS`, zanim PR trafi do merge queue; każdy inny wynik blokuje enqueue i merge, także dla rzadkiej zmiany control-plane;
 - merge queue tworzy merge group `aktualny main + dany PR` i przed scaleniem uruchamia pełny `integration-green`;
 - tylko zielony wynik jest scalany metodą squash.
 
-Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Merge queue i ten przebieg `integration-green` nie są jeszcze wdrożone w bieżących workflowach; aktualna luka jest opisana w `.ai/PROJECT_CONTEXT.md`. Do czasu jej zamknięcia agent nadal kończy pracę na PR i lokalnych testach — nie odtwarza starej orkiestracji ręcznie.
+Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Bieżący stan wdrożenia opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
 Każdy przebieg Godota używa izolowanego workspace, `.godot`, `user://`, logów, katalogów tymczasowych i portów. Wspólny runner wykonuje tę izolację automatycznie; `-InPlace` pozostaje niedozwolone.
 
@@ -70,18 +70,35 @@ Każdy przebieg Godota używa izolowanego workspace, `.godot`, `user://`, logów
 Lokalny mirror `main` nie kasuje zmian. Najpierw sprawdza czystość, a dopiero potem wykonuje fetch, fast-forward i pobranie LFS:
 
 ```powershell
+$currentBranch = git branch --show-current
+if ($LASTEXITCODE -ne 0) { throw "Nie można ustalić bieżącej gałęzi." }
+if ($currentBranch.Trim() -ne "main") { throw "Synchronizacja jest dozwolona wyłącznie na gałęzi main." }
+
 $dirtyState = git status --porcelain
+if ($LASTEXITCODE -ne 0) { throw "Nie można sprawdzić czystości katalogu main." }
 if ($dirtyState) { throw "Katalog main jest dirty; synchronizacja zatrzymana." }
+
 git fetch origin main
+if ($LASTEXITCODE -ne 0) { throw "Fetch origin/main nie powiódł się." }
+
 git merge --ff-only origin/main
+if ($LASTEXITCODE -ne 0) { throw "Fast-forward do origin/main nie powiódł się." }
+
+$localMainSha = git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw "Nie można odczytać lokalnego SHA main." }
+$originMainSha = git rev-parse origin/main
+if ($LASTEXITCODE -ne 0) { throw "Nie można odczytać SHA origin/main." }
+if ($localMainSha.Trim() -ne $originMainSha.Trim()) { throw "Lokalny main nie jest dokładnie równy origin/main." }
+
 git lfs pull
+if ($LASTEXITCODE -ne 0) { throw "Pobranie Git LFS nie powiodło się." }
 ```
 
 Nie używaj automatycznego `reset --hard`. Dirty katalog wymaga świadomego uporządkowania przez właściciela.
 
 ## Finalny builder gry
 
-Po wdrożeniu ARD-0111 lokalny builder będzie działał wyłącznie po scaleniu:
+Po wdrożeniu docelowego procesu lokalny builder będzie działał wyłącznie po scaleniu:
 
 ```text
 exact final main SHA
@@ -92,18 +109,18 @@ exact final main SHA
   -> builds/current tylko po PASS
 ```
 
-Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian. Oznacza to dwa stabilne poziomy: `main` jest pełnozielonym kodem, a `current` najnowszym pełnozielonym `main`, który dodatkowo poprawnie się zbudował. Finalny builder również pozostaje luką implementacyjną; ten dokument nie podaje nieistniejącej komendy.
+Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian. Oznacza to dwa stabilne poziomy: `main` jest pełnozielonym kodem, a `current` najnowszym pełnozielonym `main`, który dodatkowo poprawnie się zbudował. Bieżący stan opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
 ## Chronione ścieżki
 
-Zwykły PR nie powinien zmieniać:
+Zwykły PR nie może zmieniać:
 
 - `.github/workflows/**`;
 - narzędzi odpowiedzialnych za CI;
 - konfiguracji `integration-green`;
 - control-plane finalnego buildera.
 
-Te ścieżki mają być chronione regułą GitHub. Rzadka zmiana wymaga osobnego PR i ręcznej zgody właściciela; nie uruchamia się drugiego Codexa do oceniania pierwszego.
+Te ścieżki mają być chronione regułą GitHub. Rzadka zmiana wymaga osobnego PR i ręcznej zgody właściciela; zgoda nie omija `fast-check PASS` ani `integration-green PASS` merge group. Nie uruchamia się drugiego Codexa do oceniania pierwszego.
 
 ## Mapa podwodna
 

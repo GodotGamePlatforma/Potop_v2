@@ -21,7 +21,7 @@ Jeżeli zadanie zmienia ogólną regułę gracza, kampanię, gameplay poza rozmi
 ## Granica odczytu i zapisu
 
 - Domyślna allowlista zapisu zadania mapowego obejmuje wyłącznie `underwater_map_workbench/**`.
-- Prywatne zadanie jednej struktury ma węższą allowlistę `underwater_map_workbench/structures/<id>/**`. Rekord mapowy jest zawsze tylko do odczytu. `--seal-structure-package <id>` może zaktualizować wyłącznie lokalne hashe i digesty `structure_manifest.json`; `--refresh-structure-package <id>` należy do późniejszego kroku Mapy i nie przepisuje prywatnego manifestu. Stable ID, origin, aktywność, landmark, globalny payload i kompozycja wielu struktur pozostają zadaniem Mapy prowadzonym z CWD warsztatu.
+- Prywatne zadanie jednej struktury ma węższą allowlistę `underwater_map_workbench/structures/<id>/**` tylko dopóki nie wymaga nowego seala i mapowego pinu. Gdy `--seal-structure-package <id>` zmienia manifest, zadanie staje się integracyjne i wraca do root: jeden Codex, worktree, branch `codex/structure-<id>/<task-slug>` oraz PR obejmuje źródła pakietu, sealed manifest, dokładny mapowy pin/refresh i deterministyczne pochodne. Stable ID, origin, aktywność, landmark, globalny payload i kompozycja wielu struktur pozostają authority Mapy.
 - W zadaniu Mapy prywatne źródła istniejącego pakietu — jego `structure_manifest.json`, `runtime/`, `assets/`, `references/` i `tests/` — są tylko do odczytu. Agent Mapy może edytować rejestrację, wspólny builder, kompilator i mapowe źródła oraz pozwolić builderowi deterministycznie odtworzyć pakietowe `generated/**`; zmiana prywatnego źródła wymaga osobnego zadania przekierowanego do `structures/<id>/`.
 - Root pod `../` i `../diver_workbench/**` są dla lokalnego agenta tylko do odczytu. Wolno korzystać z ich publicznych kontraktów oraz wspólnego projektu i runnera.
 - Zadanie wymagające zapisu poza warsztatem jest zakresem integracyjnym prowadzonym z root. Nie rozszerzaj samodzielnie allowlisty.
@@ -31,12 +31,12 @@ Jeżeli zadanie zmienia ogólną regułę gracza, kampanię, gameplay poza rozmi
 
 ### Współbieżna praca w warsztacie
 
-- Każde zadanie Mapy albo jednego `structures/<id>/` używa osobnego pełnego Git worktree i gałęzi `codex/map/<task-slug>` albo `codex/structure-<id>/<task-slug>` z aktualnego `origin/main`. Rozłączna allowlista pozostaje obowiązkowa; osobny CWD we wspólnym worktree nie wystarcza.
-- Autor wdraża zmianę, uruchamia lokalny build/check oraz testy właściwe dla domeny, sprawdza diff i otwiera jeden PR. Nie obsługuje receiptów, assignmentów, ACK, FROZEN hand-offu ani osobnego agenta-integratora.
-- Zmiana prywatnego pakietu kończy się jego sealed manifestem i lokalnymi testami. Aktualizacja mapowego pinu oraz wspólnych pochodnych jest osobną zmianą właściciela Mapy opartą na dokładnym SHA-256 manifestu dostępnego przez Git.
+- Zadanie wyłącznie Mapy używa gałęzi `codex/map/<task-slug>`. Zmiana struktury wymagająca nowego seala i pinu jest jednym root-routed zadaniem na `codex/structure-<id>/<task-slug>`; oba rodzaje startują z aktualnego `origin/main` w osobnym pełnym worktree.
+- Root-routed autor zmiany struktury zapisuje w jednym branchu i PR właściwe źródła pakietu, sealed manifest, mapowy refresh/pin oraz wszystkie pochodne. Uruchamia pełny build/check i testy struktury, następnie pełny build/check i testy Mapy. Nie powstaje drugi PR Mapy ani osobny agent-integrator.
+- Jeżeli konkurencyjny PR zmieni `main` przed enqueue późniejszej zmiany struktury, autor aktualizuje bazę do bieżącego `origin/main`, ponownie uruchamia seal/refresh i odtwarza builderem cały zestaw pochodnych, po czym powtarza pełne testy struktury i Mapy.
 - `map_manifest.json`, `UnderwaterMap.tscn`, mapowe metadane builda i `structures/*/generated/**` pozostają jednym spójnym zestawem. Builder publikuje go dopiero po walidacji wszystkich wejść; CAS/rollback, jeżeli jest używany, jest wewnętrzną ochroną zapisu buildera, nie protokołem współpracy agentów.
 - Builder i runner automatycznie egzekwują LF dla tracked plików z `eol=lf`. Celowany build/check i test nie odkrywają innych struktur.
-- Każdy przebieg Godota używa izolowanej pełnej kopii z prywatnym `.godot`, `user://`, logami, temp, portami i capture. `-InPlace` pozostaje odrzucane. Pełna integracja złożenia należy docelowo do merge queue zgodnie z rootowym ARD-0111.
+- Każdy przebieg Godota używa izolowanej pełnej kopii z prywatnym `.godot`, `user://`, logami, temp, portami i capture. `-InPlace` pozostaje odrzucane. Dopiero `fast-check PASS` pozwala enqueue PR, a pełna integracja złożenia należy docelowo do merge queue zgodnie z rootowym ARD-0113.
 
 ## Authority i pliki generowane
 
@@ -75,7 +75,7 @@ Przed edycją dokumentacji przedstaw użytkownikowi decyzję `aktualizuję / nie
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnie wygenerowanej sceny i obejrzyj wynik; techniczny `PASS` nie jest odbiorem artystycznym ani certyfikacją trasy.
 6. Po zmianie topologii zachowaj ręczny playtest rzeczywistej osiągalności. Nie zastępuj go blokującym BFS-em.
 
-Dla prywatnej zmiany jednej struktury po zmianie źródła lub hasha użyj `--seal-structure-package <id>`, następnie lokalnego `--build-structure <id>`, niedestrukcyjnego `--check-structure <id>` oraz obu lokalnych testów: kontraktu pakietu i runtime. Aktualizacja mapowego pinu jest osobną zmianą właściciela Mapy: używa dokładnego SHA-256 sealed manifestu, a przy kilku pakietach może wykonać jeden batch. Pełny mapowy build/check i smoke są wymagane przy rejestracji, zmianie originu albo publicznym montażu; pełne testy integracyjne docelowo wykonuje merge queue. Rootowy test jest potrzebny tylko dla publicznego montażu, resetu próby albo granicy persistence; nie powinien powtarzać lokalnych kombinacji, socketów czy originu. Zmiana package manifestu nie upoważnia do edycji mapowego rekordu placementu.
+Dla zmiany jednej struktury wymagającej nowego seala wykonaj w jednym root-routed worktree i PR: `--seal-structure-package <id>`, lokalne `--build-structure <id>` i `--check-structure <id>`, oba testy pakietu, `--refresh-structure-package <id>` z dokładnym SHA-256 manifestu, pełny mapowy `--build`/`--check` oraz pełne testy Mapy. Przy kilku zmienianych pakietach refresh może użyć jednego batcha. Rootowy test dodaj tylko dla publicznego montażu, resetu próby albo granicy persistence; nie powinien powtarzać lokalnych kombinacji, socketów czy originu. Zmiana package manifestu nie upoważnia do zmiany placementu niezwiązanej z zadaniem.
 
 Testy Godota uruchamiaj sekwencyjnie wspólnym runnerem w izolowanej pełnej kopii projektu. `ERROR` i `SCRIPT ERROR` oznaczają porażkę również przy kodzie wyjścia `0`.
 

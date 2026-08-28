@@ -21,7 +21,7 @@ Proces Codexa, CWD, allowlista i kolejność pracy należą wyłącznie do `../A
 | MAP-ARD-0022 | podrzędne pakiety struktur | Mapa posiada rejestr i globalny placement, a każdy `structures/<id>/structure_manifest.json` wyłącznie lokalną topologię, grafikę i runtime jednego budynku. |
 | MAP-ARD-0023 | rezydencja dalekich planów i odbiór prezentacji | L01/L02 są ładowane przejściowo dla bieżącego okna kamery, dynamiczny survey wynika z publicznej kompozycji, a detal L05 pozostaje klipowany kanoniczną bryłą bez zmiany topologii. |
 | MAP-ARD-0025 | rasterowy clearance tła przy wejściach struktur | Każdy anonimowy, przechodni run na granicy struktury otrzymuje world-locked, wyłącznie wizualny clearance nad L01/L02 i pod L04, niezależny od ID oraz bez wpływu na fizykę. |
-| MAP-ARD-0026 | pakiet struktury i mapowy pin | Pakiet publikuje własny sealed manifest, a osobna zmiana Mapy przypina jego dokładny SHA-256 i odtwarza spójne pochodne. |
+| MAP-ARD-0027 | atomowy PR pakietu i mapowego pinu | Nowy seal, dokładny pin oraz wszystkie pochodne trafiają razem w jednym root-routed branchu i PR. |
 
 Wyłącznie wpisy z powyższego indeksu obowiązują. MAP-ARD-0001–MAP-ARD-0012 pozostają historią i provenance; ich liczności, współrzędne, kolory masek, screenshoty i instrukcje ImageGen nie są wejściem bieżącej produkcji.
 
@@ -371,16 +371,30 @@ Wyłącznie wpisy z powyższego indeksu obowiązują. MAP-ARD-0001–MAP-ARD-001
 - D6. Techniczny build/check i capture nie stanowią samodzielnej akceptacji obrazu. Po każdej zmianie kontraktu trzeba obejrzeć oba kierunki każdego wejścia w rzeczywiście wygenerowanej `UnderwaterMap.tscn`; clearance jest przyjęty dopiero wtedy, gdy tło L01/L02 nie czyta się już jak fizyczna ściana, nie powstaje jasne prostokątne halo, a L04/L05 nadal jednoznacznie pokazują właściwą konstrukcję i otwartą wodę.
 - Powód i skutek: realistyczna fasada dalekiego planu może legalnie leżeć za otwartą wodą, ale bez lokalnego oddechu wizualnie zamyka wejście. Geometryczny clearance usuwa tę fałszywą informację bez uczenia wspólnego buildera nazw konkretnych wieżowców i bez przenoszenia grafiki tła do prywatnego pakietu.
 
-## MAP-ARD-0026 - Pakiet struktury i mapowy pin mają prostą granicę właścicieli
+## MAP-ARD-0026 - Historyczna osobna granica pakietu struktury i mapowego pinu
 
-- Status / aktywny zakres: Obowiązuje; D1-D7
+- Status / aktywny zakres: Historyczna; zastąpiona w całości przez MAP-ARD-0027
 - Zatwierdzenie: 2026-08-28
-- Relacje: Zastępuje MAP-ARD-0024; doprecyzowuje MAP-ARD-0013/D1-D3,D8-D9, MAP-ARD-0014/D7-D10 i MAP-ARD-0022/D1-D3,D7-D10; stosuje globalny ARD-0111 | Zastąpiona przez: brak
+- Relacje: Zastępuje MAP-ARD-0024; doprecyzowywała MAP-ARD-0013/D1-D3,D8-D9, MAP-ARD-0014/D7-D10 i MAP-ARD-0022/D1-D3,D7-D10; stosowała globalny ARD-0113 | Zastąpiona przez: MAP-ARD-0027
 - D1. `structures/<id>/structure_manifest.json` pozostaje authority prywatnych źródeł pakietu. `--seal-structure-package <id>` może zaktualizować wyłącznie jego lokalne hashe i digesty; nie zapisuje `map_manifest.json`, `UnderwaterMap.tscn`, L05, mapowych metadanych ani innego pakietu.
 - D2. Prywatne `--build-structure <id>` i `--check-structure <id>` rozwiązują tylko wskazany pakiet oraz wymagane publiczne kontrakty. Nie odkrywają ani nie zapisują innych struktur lub authority Mapy.
 - D3. Mapa przypina pakiet wyłącznie przez dokładny SHA-256 sealed manifestu. `--refresh-structure-package` aktualizuje mapowy pin i pochodne deklaracje złożenia, ale nigdy prywatny manifest ani źródła pakietu.
-- D4. Zmiana prywatnego pakietu i zmiana mapowego pinu są zwykłymi zmianami swoich właścicieli. Nie wymagają assignmentu, ACK, receiptu, FROZEN hand-offu, lokalnego integratora ani rozmowy agentów; autor implementuje, wykonuje lokalne testy i otwiera PR.
-- D5. Gdy zmienia się kilka sealed manifestów, Mapa może przekazać wszystkie pary `<id>, <SHA256>` w jednym batchu. Builder ma pozostawić jeden spójny zestaw pinów i deterministycznych pochodnych; blokady, rehash i sposób publikacji są jego wewnętrzną implementacją, nie protokołem pracy autora.
-- D6. Celowany test pakietu obejmuje jego kontrakt i runtime. Pełny mapowy build/check i smoke są potrzebne przy rejestracji, zmianie originu albo publicznym montażu; pełną integrację na aktualnym `main` i danym PR docelowo chroni merge queue zgodnie z ARD-0111.
+- D4. Zmiana prywatnego pakietu i zmiana mapowego pinu były zwykłymi zmianami swoich właścicieli. Nie wymagały assignmentu, ACK, receiptu, FROZEN hand-offu, lokalnego integratora ani rozmowy agentów; autor implementował, wykonywał lokalne testy i otwierał PR.
+- D5. Gdy zmieniało się kilka sealed manifestów, Mapa mogła przekazać wszystkie pary `<id>, <SHA256>` w jednym batchu. Builder miał pozostawić jeden spójny zestaw pinów i deterministycznych pochodnych; blokady, rehash i sposób publikacji były jego wewnętrzną implementacją, nie protokołem pracy autora.
+- D6. Celowany test pakietu obejmował jego kontrakt i runtime. Pełny mapowy build/check i smoke były potrzebne przy rejestracji, zmianie originu albo publicznym montażu; pełną integrację na aktualnym `main` i danym PR docelowo chroniła merge queue zgodnie z ARD-0113.
 - D7. `structures/<id>/generated/**`, generowana scena, L05 i mapowe metadane są deterministycznymi pochodnymi. Nie wolno poprawiać ich ręcznie ani używać ich dryfu jako drugiego źródła prywatnego stanu.
-- Powód i skutek: zachowujemy ścisłe hashowanie oraz spójność Mapy, ale agent struktury i agent Mapy mają prosty zakres: własna zmiana, lokalna weryfikacja i PR. Złożoność buildera nie rozlewa się na codzienny proces wdrażania.
+- Powód i skutek zastąpienia: rozdzielenie seala i mapowego pinu między dwa PR-y tworzyło wzajemne oczekiwanie. MAP-ARD-0027 zachowuje granice authority narzędzi, ale scala publikację w jeden root-routed PR.
+
+## MAP-ARD-0027 - Pakiet struktury i mapowy pin trafiają w jednym PR integracyjnym
+
+- Status / aktywny zakres: Obowiązuje; D1-D7
+- Zatwierdzenie: 2026-08-28
+- Relacje: Zastępuje MAP-ARD-0026; doprecyzowuje MAP-ARD-0013/D1-D3,D8-D9, MAP-ARD-0014/D7-D10 i MAP-ARD-0022/D1-D3,D7-D10; stosuje globalny ARD-0113 | Zastąpiona przez: brak
+- D1. `structures/<id>/structure_manifest.json` pozostaje authority prywatnych źródeł pakietu. `--seal-structure-package <id>` może zaktualizować wyłącznie jego lokalne hashe i digesty; nie zapisuje `map_manifest.json`, `UnderwaterMap.tscn`, L05, mapowych metadanych ani innego pakietu.
+- D2. Prywatne `--build-structure <id>` i `--check-structure <id>` rozwiązują tylko wskazany pakiet oraz wymagane publiczne kontrakty. Nie odkrywają ani nie zapisują innych struktur lub authority Mapy.
+- D3. Mapa przypina pakiet wyłącznie przez dokładny SHA-256 sealed manifestu. `--refresh-structure-package` aktualizuje mapowy pin i pochodne deklaracje złożenia, ale nigdy prywatny manifest ani źródła pakietu.
+- D4. Gdy zmiana prywatnych źródeł wymaga nowego seala i mapowego pinu, stanowi jedno zadanie routowane przez root: jeden Codex, worktree, branch `codex/structure-<id>/<task-slug>` i PR obejmuje atomowo źródła pakietu, sealed manifest, mapowy refresh/pin oraz deterministyczne pochodne. Rozdzielenie tego na PR struktury i późniejszy PR Mapy jest niedozwolone.
+- D5. Gdy zmienia się kilka sealed manifestów, jeden root-routed PR może przekazać wszystkie pary `<id>, <SHA256>` w batchu. Builder ma pozostawić jeden spójny zestaw pinów i pochodnych; blokady, rehash i sposób publikacji są jego wewnętrzną implementacją. Jeśli konkurencyjny PR trafi wcześniej do `main`, późniejsza gałąź aktualizuje bazę i ponownie wykonuje seal, refresh oraz pełny builder.
+- D6. Ten sam autor uruchamia pełny build/check i testy każdego zmienionego pakietu oraz pełny mapowy build/check i testy Mapy. Tylko `fast-check PASS` pozwala enqueue PR; pełną integrację na merge group `aktualny main + PR` chroni następnie `integration-green` zgodnie z ARD-0113.
+- D7. `structures/<id>/generated/**`, generowana scena, L05 i mapowe metadane są deterministycznymi pochodnymi. Nie wolno poprawiać ich ręcznie ani używać ich dryfu jako drugiego źródła prywatnego stanu.
+- Powód i skutek: seal i mapowy pin nie mogą oczekiwać na siebie w dwóch PR-ach. Jeden root-routed autor publikuje spójny zestaw i pełną lokalną weryfikację, a szczegóły atomowej publikacji pozostają wewnątrz buildera.
