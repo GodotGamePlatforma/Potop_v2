@@ -397,11 +397,9 @@ raise SystemExit(subprocess.run([real_git, *args]).returncode)
     if ((Git $ordinary.Remote rev-parse "refs/heads/$($ordinary.Branch)").Trim() -cne $ordinary.Head) {
         throw 'Ordinary branch was not pushed at exact HEAD.'
     }
-    foreach ($field in @('LocalHead', 'RemoteHead', 'PullRequestHead')) {
-        $pattern = "(?m)^$field\s*:\s*$([regex]::Escape($ordinary.Head))\s*$"
-        if ($ordinaryResult.Output -notmatch $pattern) {
-            throw "Successful publisher output omitted exact $field=$($ordinary.Head): $($ordinaryResult.Output)"
-        }
+    $publishProof = "PUBLISH PASS LocalHead=$($ordinary.Head) RemoteHead=$($ordinary.Head) PullRequestHead=$($ordinary.Head) PullRequest=1"
+    if ($ordinaryResult.Output -notmatch "(?m)^$([regex]::Escape($publishProof))\r?$") {
+        throw "Successful publisher output omitted the exact three-SHA proof: $($ordinaryResult.Output)"
     }
 
     $queueReady = New-Fixture 'queue-ready'
@@ -670,6 +668,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
         'isCrossRepository,headRepository,headRepositoryOwner',
         'mergeQueue(branch:$base)',
         '"${head}:refs/heads/$branch"',
+        'PUBLISH PASS LocalHead={0} RemoteHead={1} PullRequestHead={2}',
         'LocalHead = $head',
         'RemoteHead = [string]$finalRemoteFields[0]',
         'PullRequestHead = [string]$postOperationPr.headRefOid'
