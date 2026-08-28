@@ -17,6 +17,15 @@ function Git {
     return ($output | Out-String).Trim()
 }
 
+function Write-Utf8Fixture {
+    param([Parameter(Mandatory = $true)][string]$Path,[Parameter(Mandatory = $true)][string]$Value)
+    [System.IO.File]::WriteAllText(
+        $Path,
+        $Value.Replace("`r`n", "`n"),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
 try {
     $repo = Join-Path $tempRoot 'repo'
     $tools = Join-Path $repo 'tools'
@@ -25,22 +34,22 @@ try {
     Git $repo config user.name 'Finish Task Test' | Out-Null
     Git $repo config user.email 'finish-task@example.invalid' | Out-Null
     Copy-Item -LiteralPath $sourceTool -Destination (Join-Path $tools 'finish_agent_task.ps1')
-    Set-Content -LiteralPath (Join-Path $repo 'base.txt') -Value 'base' -Encoding UTF8
+    Write-Utf8Fixture -Path (Join-Path $repo 'base.txt') -Value "base`n"
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
     Git $repo checkout -b codex/root/test | Out-Null
 
     $publishLog = Join-Path $repo 'publish.log'
-    @'
+    Write-Utf8Fixture -Path (Join-Path $tools 'publish_agent_pr.ps1') -Value @'
 #requires -Version 5.1
 param([string]$Repository,[string]$Title,[string]$Body,[string]$PowerShellCommand,[string[]]$TestTarget,[string]$RepositorySlug,[string]$GodotConsolePath)
 if (-not [string]::IsNullOrWhiteSpace((git.exe -C $Repository status --porcelain=v1 --untracked-files=all))) {
     throw 'Publisher received a dirty worktree.'
 }
 Set-Content -LiteralPath (Join-Path $Repository 'publish.log') -Value "title=$Title targets=$($TestTarget -join ',')"
-'@ | Set-Content -LiteralPath (Join-Path $tools 'publish_agent_pr.ps1') -Encoding UTF8
+'@
 
-    Set-Content -LiteralPath (Join-Path $repo 'feature.txt') -Value 'feature' -Encoding UTF8
+    Write-Utf8Fixture -Path (Join-Path $repo 'feature.txt') -Value "feature`n"
     & (Join-Path $tools 'finish_agent_task.ps1') `
         -Repository $repo `
         -Title 'Simple feature' `
