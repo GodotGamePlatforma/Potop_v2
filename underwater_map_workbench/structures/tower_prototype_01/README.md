@@ -45,7 +45,7 @@ Artefakty trafiają do izolowanego `user://test_tower_prototype_01_proxy_capture
 
 ## Przepis zmiany
 
-Po zmianie edytowalnego źródła lub hash-pinned pliku pakietu uruchom najpierw refresh. Jeśli hashe się nie zmieniły, pomiń pierwszą komendę:
+Po zmianie edytowalnego źródła lub hash-pinned pliku pakietu uruchom najpierw seal. Jeśli hashe się nie zmieniły, pomiń pierwszą komendę:
 
 ```powershell
 python ..\..\tools\build_underwater_map.py --seal-structure-package tower_prototype_01
@@ -55,9 +55,9 @@ python ..\..\tools\build_underwater_map.py --check-structure tower_prototype_01
 ..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_prototype_01/tests/tower_runtime_test.gd
 ```
 
-`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`. Po zgodnym checku przekaż niezmienny commit albo zweryfikowaną rewizję FROZEN oraz dokładny SHA-256 manifestu. Mapowy `--refresh-structure-package tower_prototype_01 --sealed-package-sha256 <SHA256>`, pin, wspólne pochodne i placement wykonuje później integrator Mapy w osobnym worktree; producent nigdy nie zapisuje `../../map_manifest.json`.
+`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`. Po zgodnym checku sprawdź diff i otwórz PR pakietu. Osobny PR właściciela Mapy wykonuje `--refresh-structure-package tower_prototype_01 --sealed-package-sha256 <SHA256>` dla dokładnego SHA-256 sealed manifestu oraz odtwarza pin i wspólne pochodne; autor pakietu nigdy nie zapisuje `../../map_manifest.json`.
 
-Pełny `--build`, `--check`, `underwater_map_smoke_test.gd` i `workbench_boundary_test.gd` uruchamia zakres Mapy przy rejestracji pakietu, zmianie originu, publicznym montażu albo przed odbiorem integracyjnym. Nie należą do zwykłego prywatnego loopu. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga natywnego capture'u i oględzin, a zmiana topologii ręcznego przepłynięcia budynku. Nie poprawiaj ręcznie `generated/**` ani `../../UnderwaterMap.tscn`.
+Pełny `--build`, `--check`, `underwater_map_smoke_test.gd` i `workbench_boundary_test.gd` uruchamia zakres Mapy przy rejestracji pakietu, zmianie originu albo publicznym montażu. Nie należą do zwykłego prywatnego loopu; pełną integrację docelowo wykonuje merge queue przed scaleniem. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga natywnego capture'u i oględzin, a zmiana topologii ręcznego przepłynięcia budynku. Nie poprawiaj ręcznie `generated/**` ani `../../UnderwaterMap.tscn`.
 
 Zmiana globalnego originu, aktywności, landmarku lub referencji pakietu odbywa się wyłącznie w zadaniu Mapy z CWD `../..`; prywatny agent pakietu traktuje ten rekord jako read-only. Zmiana zachowania gracza, kampanii, publicznego kontraktu albo persistence jest zadaniem integracyjnym root.
 

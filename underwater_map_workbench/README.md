@@ -23,31 +23,16 @@ Root zachowuje kampanię, ogólne mechaniki nurkowania, dane, zapis, UI i testy 
 
 Aktualne rewizje, format schema, globalne pozycje, liczności, podpisy i wynik ostatniej weryfikacji znajdują się w `map_manifest.json` oraz `.ai/PROJECT_CONTEXT.md`. Lokalna zawartość budynku pochodzi z jego `structure_manifest.json`; trwałe zasady topologii, warstw i pakietów struktur znajdują się w `.ai/DECISIONS.md`.
 
-## Bootstrap worktree agenta
+## Praca na zadaniu
 
-Zadanie Mapy rozpoczynaj w osobnym worktree utworzonym z potwierdzonej pary candidate/full-run. Z CWD istniejącego `underwater_map_workbench/`:
-
-```powershell
-..\tools\setup_agent_worktree.ps1 `
-  -CandidateReceipt <candidate.json> -RunReceipt <full.receipt> `
-  -Owner map -TaskSlug <slug> -Destination <absolute-path> `
-  -Branch codex/map/<slug> -Create
-```
-
-Po wejściu do nowego warsztatu, jeszcze przed pierwszym zapisem, zadeklaruj zamknięty write-set i uruchom:
+Każde zadanie Mapy wykonuj w osobnym pełnym worktree i na własnej gałęzi utworzonej z aktualnego `origin/main`:
 
 ```powershell
-python -B ..\tools\workbench_contract.py --repo .. doctor --owner map --intent author
+git -C .. fetch origin main
+git -C .. worktree add -b codex/map/<slug> <absolute-path> origin/main
 ```
 
-Przed hand-offem pobierz aktualne refy i zweryfikuj pełny diff względem ownera:
-
-```powershell
-git -C .. fetch --prune
-python -B ..\tools\workbench_contract.py --repo .. validate --owner map --diff
-```
-
-Następnie wykonaj logiczny commit i wypchnij wyłącznie własną gałąź `codex/map/<slug>`; nie pushuj bezpośrednio do `main`, nie rebase'uj ani nie force-pushuj przekazanej rewizji.
+W nowym worktree sprawdź status, wypisz planowane ścieżki Mapy, wprowadź zmianę i uruchom właściwe lokalne build/check/testy. Na końcu sprawdź diff, wykonaj logiczny commit, wypchnij tylko własną gałąź i otwórz jeden PR. Nie pushuj bezpośrednio do `main`.
 
 ## Szybki start
 
@@ -111,11 +96,9 @@ python .\tools\build_underwater_map.py --build-structure <id>
 python .\tools\build_underwater_map.py --check-structure <id>
 ```
 
-Każdy tryb buildera wykonuje najpierw wspólny repozytoryjny preflight EOL. Tracked plik z atrybutem `eol=lf` w stanie `w/crlf` albo `w/mixed` zatrzymuje polecenie przed sealem, renderem lub publikacją; dirty zmiana zapisana LF pozostaje poprawnym wejściem authoringu. Sam `git status` nie certyfikuje późniejszego candidate receiptu, który porównuje także surowe bajty z exact HEAD/index. Official isolated runner celowanego testu struktury nie kopiuje `.git`: po byte-identycznym snapshotcie sam wystawia jednorazowy, podpisany dowód EOL związany z pełnym manifestem bajtów i exact ID pakietu, a builder przed lokalnym renderem ponownie sprawdza podpis i wszystkie pliki. Nie jest to ręczna komenda ani obejście dla zwykłego buildera uruchomionego poza Git; brak, manipulacja albo drift dowodu zatrzymują przebieg.
+Każdy tryb buildera wykonuje repozytoryjny preflight EOL i odrzuca tracked pliki `w/crlf` albo `w/mixed` objęte `eol=lf`. Następnie uruchom dwa cele wskazane w lokalnym `structures/<id>/README.md`, sprawdź diff i otwórz PR pakietu. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
 
-Następnie uruchom dwa cele wskazane w lokalnym `structures/<id>/README.md` i przekaż niezmienny commit albo zweryfikowaną rewizję FROZEN. Ich prywatnych nazw nie kopiuje się do dokumentacji Mapy.
-
-Integrator Mapy, w osobnym czystym worktree i dla dokładnego sealed hasha, wykonuje dopiero:
+Aktualizacja mapowego pinu jest osobną zmianą właściciela Mapy. Dla dokładnego SHA-256 sealed manifestu wykonaj:
 
 ```powershell
 python .\tools\build_underwater_map.py --refresh-structure-package <id> --sealed-package-sha256 <SHA256>
@@ -124,7 +107,7 @@ python .\tools\build_underwater_map.py --check
 ..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
 ```
 
-Jeżeli dwa lub więcej odebranych manifestów zmieniło się od ostatniej promocji, integrator przekazuje wszystkie pary w jednej komendzie. Builder najpierw rehashuje cały zamknięty batch, nakłada wszystkie piny na jednego kandydata, a dopiero potem waliduje i publikuje jednym CAS:
+Jeżeli zmieniło się kilka manifestów, można przekazać wszystkie pary w jednej komendzie, aby odtworzyć jeden spójny zestaw pochodnych:
 
 ```powershell
 python .\tools\build_underwater_map.py `
@@ -132,9 +115,9 @@ python .\tools\build_underwater_map.py `
   --refresh-structure-package <id-b> --sealed-package-sha256 <SHA256-b>
 ```
 
-`--seal-structure-package <id>` zapisuje wyłącznie lokalne hashe i digesty prywatnego manifestu; nie dotyka mapowego pinu ani wspólnych pochodnych. Prywatne `--build-structure` i `--check-structure` rozwiązują tylko wskazany pakiet i korzystają z ignorowanego, rozłącznego outputu danego worktree pod `.godot/underwater_map_structure_builds/<id>/generated`; nie zapisują authority `structures/<id>/generated/**` i nie zdobywają `map-promotion`. `--refresh-l05-source` służy wyłącznie zmianie złożonego źródła topologii; dla aktualnych źródeł jest byte-no-op. Powtarzalne pary `--refresh-structure-package <id> --sealed-package-sha256 <SHA256>` należą do Mapy: wymagają dokładnych hashy z immutable/FROZEN hand-offów, aktualizują w jednym kandydacie tylko mapowe piny i pochodne deklaracje, nigdy prywatne źródło. Pełny mapowy build/check i smoke są wymagane przy rejestracji, zmianie originu, publicznym montażu albo przed odbiorem integracyjnym, nie po każdej prywatnej iteracji. Po zmianie publicznej granicy uruchom także właściwy test root. Po zmianie widocznej prezentacji wykonaj i obejrzyj natywny capture. Po zmianie topologii ręcznie przepłyń wymagane trasy — builder i smoke nie certyfikują ich jakości.
+`--seal-structure-package <id>` zapisuje wyłącznie lokalne hashe i digesty prywatnego manifestu; nie dotyka mapowego pinu ani wspólnych pochodnych. Prywatne `--build-structure` i `--check-structure` rozwiązują tylko wskazany pakiet i używają rozłącznego outputu danego worktree pod `.godot/underwater_map_structure_builds/<id>/generated`. `--refresh-l05-source` służy wyłącznie zmianie złożonego źródła topologii. `--refresh-structure-package` należy do zmiany Mapy: aktualizuje mapowy pin i pochodne deklaracje, nigdy prywatne źródło. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera, a nie protokołem koordynacji agentów.
 
-Wspólna blokada `map-promotion` obejmuje tylko krótki rehash i publikację zestawu Mapy; prywatny seal, check i test pakietu jej nie zdobywają. Celowany runner nie odkrywa niezwiązanych pakietów, a każdy przebieg izoluje `.godot`, `user://`, logi i capture.
+Pełny mapowy build/check i smoke uruchamiaj przy rejestracji, zmianie originu albo publicznym montażu, nie po każdej prywatnej iteracji. Pełne testy złożenia docelowo wykonuje merge queue przed scaleniem. Po zmianie publicznej granicy uruchom także właściwy test root. Po zmianie widocznej prezentacji wykonaj i obejrzyj natywny capture. Po zmianie topologii ręcznie przepłyń wymagane trasy — builder i smoke nie certyfikują ich jakości. Każdy przebieg izoluje `.godot`, `user://`, logi i capture.
 
 Nigdy nie poprawiaj ręcznie `UnderwaterMap.tscn`, masek ani innych pochodnych. Nie twórz plików `candidate`, `final`, drugiego `map_manifest.json`, manifestu wariantu, alternatywnej sceny, dodatkowego projektu ani kopii avatara. `structure_manifest.json` jest dozwolonym źródłem podrzędnym: nie może zawierać globalnego placementu ani trwałego stanu, a cykl próby deklaruje jawnie przez `attempt_state.persistence=none` i `checkpoint=none`.
 

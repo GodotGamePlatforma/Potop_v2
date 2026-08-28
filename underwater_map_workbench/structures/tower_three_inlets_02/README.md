@@ -6,7 +6,7 @@ Ten katalog zawiera prywatny pakiet produkcyjnego budynku Mapy o stable ID `towe
 
 | Źródło | Właściciel szczegółu |
 |---|---|
-| `../../map_manifest.json`, rekord `tower_three_inlets_02` po promocji | stable ID, globalny origin, aktywność, opcjonalny landmark i hash-pinned rejestracja pakietu |
+| `../../map_manifest.json`, rekord `tower_three_inlets_02` po przypięciu | stable ID, globalny origin, aktywność, opcjonalny landmark i hash-pinned rejestracja pakietu |
 | `structure_manifest.json` | lokalny rozmiar, szablon, topologia, sockety, grafika, skrypty, runtime i nietrwały cykl życia próby |
 | `scripts/` | prywatna implementacja ładowana wyłącznie po hash-pinned ścieżkach z manifestu, bez globalnych `class_name` |
 | `assets/proxy/` | natywne proxy `2400 × 3840`; źródła SVG i renderowane PNG, bez skalowania |
@@ -55,7 +55,7 @@ Po zmianie grafiki lub prywatnej prezentacji uruchom natywny capture:
 
 Artefakty trafiają do izolowanego `user://test_tower_three_inlets_02_proxy_capture`. Obejrzenie obrazów jest obowiązkowe; sam kod wyjścia potwierdza działanie harnessu, nie jakość ani osiągalność wnętrza.
 
-## Przepis zmiany i promocji
+## Przepis zmiany
 
 Po zmianie edytowalnego źródła lub hash-pinned pliku autor pakietu wykonuje w swoim prywatnym worktree:
 
@@ -67,9 +67,9 @@ python ..\..\tools\build_underwater_map.py --check-structure tower_three_inlets_
 ..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_three_inlets_02/tests/tower_runtime_test.gd
 ```
 
-`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`. Po zgodnym checku przekaż niezmienny commit albo zweryfikowaną rewizję FROZEN oraz dokładny SHA-256 manifestu. Mapowy `--refresh-structure-package tower_three_inlets_02 --sealed-package-sha256 <SHA256>`, pin, wspólne pochodne i placement wykonuje później integrator Mapy w osobnym worktree; producent nigdy nie zapisuje `../../map_manifest.json`.
+`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`. Po zgodnym checku sprawdź diff i otwórz PR pakietu. Osobny PR właściciela Mapy wykonuje `--refresh-structure-package tower_three_inlets_02 --sealed-package-sha256 <SHA256>` dla dokładnego SHA-256 sealed manifestu oraz odtwarza pin i wspólne pochodne; autor pakietu nigdy nie zapisuje `../../map_manifest.json`.
 
-Pełny `--build`, `--check`, mapowy smoke i integracyjne testy root wykonuje się dopiero przy rejestracji, zmianie originu, publicznym montażu albo finalnym odbiorze integracyjnym. Nie należą do zwykłego prywatnego loopu i nie wolno nimi zastępować testów pakietu. Zmiana grafiki wymaga capture'u rzeczywistej sceny, a zmiana topologii ręcznego przepłynięcia struktury.
+Pełny `--build`, `--check`, mapowy smoke i właściwe testy root wykonuje się przy rejestracji, zmianie originu albo publicznym montażu. Nie należą do zwykłego prywatnego loopu; pełną integrację docelowo wykonuje merge queue przed scaleniem. Zmiana grafiki wymaga capture'u rzeczywistej sceny, a zmiana topologii ręcznego przepłynięcia struktury.
 
 ## Dokumentacja
 

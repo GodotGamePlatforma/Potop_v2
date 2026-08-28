@@ -23,9 +23,9 @@ Zmiana wyłącznie organizacji albo źródła prezentacji, która zachowuje zatw
 
 ### Współbieżność
 
-- Agent Nurka pracujący równolegle z Rootem, Mapą lub strukturami używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem oraz zgodnym pełnym run receiptem `PASS`. Osobny CWD nie izoluje wspólnego checkoutu; rozłączna allowlista pozostaje obowiązkowa także w osobnym worktree.
-- Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Do integracji trafia niezmienny commit lub zweryfikowana rewizja FROZEN, dzięki czemu autor może rozwijać N+1 bez czekania na testy poprzedniej rewizji.
-- Celowany test Nurka nie wykonuje discovery, refreshu ani walidacji prywatnych pakietów Mapy. Runner tworzy pełną FROZEN kopię z osobnym `.godot`, `user://`, logami i capture; równoległy Godot działa tylko w osobnych workspace z jawnym `--path`. `-InPlace` jest odrzucane.
+- Agent Nurka używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` utworzonej z aktualnego `origin/main`. Osobny CWD we wspólnym checkoutcie nie daje izolacji; lokalna allowlista nadal obejmuje wyłącznie `diver_workbench/**`.
+- Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Autor wdraża zmianę, uruchamia właściwy lokalny test i capture, sprawdza diff oraz otwiera jeden PR.
+- Celowany test Nurka nie wykonuje discovery, refreshu ani walidacji prywatnych pakietów Mapy. Runner używa pełnej izolowanej kopii z osobnym `.godot`, `user://`, logami i capture; równoległy Godot działa tylko w osobnych workspace z jawnym `--path`. `-InPlace` jest odrzucane.
 
 ## Granica odpowiedzialności
 

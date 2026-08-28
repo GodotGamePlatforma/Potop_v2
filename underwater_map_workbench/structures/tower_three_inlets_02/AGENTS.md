@@ -13,23 +13,23 @@ Przed inwentaryzacją, analizą albo zmianą przeczytaj w całości, z SHA-256 p
 3. `../../README.md`;
 4. lokalny `README.md`.
 
-Stosuj wymagania kompletności z `../../AGENTS.md` i `../../../AGENTS.md`. Dopiero po tych odczytach przeczytaj w całości `structure_manifest.json`, a po promocji także dokładny rekord `tower_three_inlets_02` w `../../map_manifest.json`. Rekord mapowy jest jedynym źródłem stable ID, originu, aktywności, opcjonalnego landmarku i referencji pakietu; manifest pakietu celowo nie powtarza pola `structure_id` ani globalnego originu. Jeżeli rekordu mapowego jeszcze nie ma, pakiet pozostaje prywatnym stagingiem i nie wolno samodzielnie wymyślać jego placementu.
+Stosuj wymagania kompletności z `../../AGENTS.md` i `../../../AGENTS.md`. Dopiero po tych odczytach przeczytaj w całości `structure_manifest.json`, a po przypięciu pakietu także dokładny rekord `tower_three_inlets_02` w `../../map_manifest.json`. Rekord mapowy jest jedynym źródłem stable ID, originu, aktywności, opcjonalnego landmarku i referencji pakietu; manifest pakietu celowo nie powtarza pola `structure_id` ani globalnego originu. Jeżeli rekordu mapowego jeszcze nie ma, pakiet pozostaje prywatnym stagingiem i nie wolno samodzielnie wymyślać jego placementu.
 
 Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publiczną granicę Root–Mapa, schemat Mapy, persistence albo zapis, wróć do `../../../AGENTS.md` i dobierz pełny kontekst globalny. Zmiana mapowego originu, rejestracji, globalnego payloadu lub kompozycji wielu pakietów należy do zadania Mapy z CWD `../..`.
 
 ## Granica odczytu i zapisu
 
 - Domyślna allowlista zapisu obejmuje wyłącznie `underwater_map_workbench/structures/tower_three_inlets_02/**`.
-- `../../map_manifest.json`, `../../UnderwaterMap.tscn`, pozostała Mapa, root, inne pakiety struktur i `../../../diver_workbench/**` są zależnościami tylko do odczytu. Kontrolowany refresh i promocję wykonuje integrator Mapy w krótkim, hashowanym oknie snapshotu.
+- `../../map_manifest.json`, `../../UnderwaterMap.tscn`, pozostała Mapa, root, inne pakiety struktur i `../../../diver_workbench/**` są zależnościami tylko do odczytu. `--refresh-structure-package` należy do osobnej zmiany właściciela Mapy.
 - Pakiet może konsumować publiczne typy i kontrakty projektu nadrzędnego, ale nie kopiuje ani nie poprawia ich przy okazji prywatnego zadania.
 - Przed edycją wypisz planowane ścieżki i właścicieli. Po edycji porównaj pełny diff; zapis poza pakietem zatrzymuje lokalną pracę i wymaga przekierowania.
 - Pakiet nie posiada własnego `project.godot`, `.godot`, `.ai`, `map_manifest.json`, `UnderwaterMap.tscn`, ARD, kampanii ani konfiguracji zapisu.
 
 ### Współbieżność
 
-- Jeden autor `tower_three_inlets_02/**` pracuje w osobnym pełnym Git worktree i na własnej gałęzi z ostatniego zielonego commita. Audytorzy korzystają z innych worktrees tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji.
-- Autor wykonuje lokalny seal i celowane testy bez `map-promotion`, a następnie przekazuje niezmienny commit albo zweryfikowaną rewizję FROZEN. Może od razu rozpocząć N+1; integrator Mapy pobiera wyłącznie wskazany hash i aktualizuje mapowy pin.
-- Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture; wspólna blokada dotyczy wyłącznie krótkiej publikacji Mapy.
+- Jeden autor `tower_three_inlets_02/**` pracuje w osobnym pełnym Git worktree i na własnej gałęzi `codex/structure/<task-slug>` utworzonej z aktualnego `origin/main`. Osobny CWD we wspólnym checkoutcie nie daje izolacji.
+- Autor wykonuje lokalny seal, build/check i testy pakietu, sprawdza diff oraz otwiera jeden PR. Mapowy pin i wspólne pochodne zmienia osobny PR właściciela Mapy na podstawie dokładnego SHA-256 sealed manifestu.
+- Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture; spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera Mapy.
 
 ## Authority i pochodne
 
@@ -38,7 +38,7 @@ Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publi
 - Wszystkie współrzędne pakietu są lokalne. Globalny placement istnieje wyłącznie w nadrzędnym `map_manifest.json`.
 - `generated/**` jest deterministyczną pochodną. Nie poprawiaj masek, prowadnic, kart socketów, sceny struktury ani truth package ręcznie.
 - Pliki w `references/` są provenance wskazanym przez manifest jako `authority=false`. Nie definiują topologii, aktywnego gameplayu, checkpointu, zapisu ani persistence i nie są wejściem kompilatora.
-- Aktualne zachowanie odczytuj z manifestu, prywatnego runtime i testów, a regułę widoczną dla gracza z globalnego dokumentu produktu po jej promocji.
+- Aktualne zachowanie odczytuj z manifestu, prywatnego runtime i testów, a zatwierdzoną regułę widoczną dla gracza z globalnego dokumentu produktu.
 
 ## Dokumentacja
 
@@ -53,8 +53,8 @@ Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzj
 
 1. Ustal edytowalne źródło z `structure_manifest.json` i sprawdź wskazane skrypty, assety oraz lokalne testy.
 2. Porównaj zmianę z aktywnymi decyzjami Mapy i globalnymi. Nie zmieniaj przy okazji placementu ani semantyki zapisu.
-3. Po zmianie źródła uruchom `--seal-structure-package tower_three_inlets_02`, lokalny `--build-structure tower_three_inlets_02` i `--check-structure tower_three_inlets_02`; mapowy refresh, pin i wspólne pochodne wykonuje później integrator Mapy.
-4. Uruchom `tests/tower_package_contract_test.gd` i `tests/tower_runtime_test.gd`. Pełny mapowy build/check i smoke należą dopiero do promocji albo odbioru integracyjnego.
+3. Po zmianie źródła uruchom `--seal-structure-package tower_three_inlets_02`, lokalny `--build-structure tower_three_inlets_02` i `--check-structure tower_three_inlets_02`; mapowy refresh, pin i wspólne pochodne należą do osobnej zmiany Mapy.
+4. Uruchom `tests/tower_package_contract_test.gd` i `tests/tower_runtime_test.gd`. Pełny mapowy build/check i smoke należą do rejestracji, zmiany originu albo publicznego montażu, a pełną integrację docelowo wykonuje merge queue.
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnej wygenerowanej sceny i obejrzyj wynik.
 6. ImageGen pozostaje zablokowany, dopóki proxy nie zostanie obejrzane w dokładnej wygenerowanej `UnderwaterMap.tscn` i jawnie zaakceptowane przez użytkownika. Produkcyjny wynik musi zachować natywne `2400 × 3840`, `scale = Vector2.ONE` i mapowanie jeden piksel na jedną jednostkę lokalną.
 7. Po zmianie topologii zachowaj ręczny playtest całej struktury. Automatyczna kontrola osiągalności nie zastępuje przepłynięcia.
