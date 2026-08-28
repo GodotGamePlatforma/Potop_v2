@@ -7,6 +7,7 @@ signal surface_contacts_reported(contacts: Array)
 const DiveMovementSystemScript := preload("res://scripts/diving/DiveMovementSystem.gd")
 const DiverSocketProfileScript := preload("res://diver_workbench/definitions/DiverSocketProfile.gd")
 const DiverFrameEnvelopeScript := preload("res://diver_workbench/definitions/DiverFrameEnvelope.gd")
+const DiverCameraProfileScript := preload("res://diver_workbench/definitions/DiverCameraProfile.gd")
 const DIVE_PLAYER_GROUP := &"dive_player"
 
 @export var swim_speed: float = 175.0
@@ -16,6 +17,7 @@ const DIVE_PLAYER_GROUP := &"dive_player"
 @export var turn_speed: float = 10.0
 @export var socket_profile: Resource
 @export var frame_envelope_profile: Resource
+@export var camera_profile: Resource
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var dive_light: PointLight2D = $DiveLight
@@ -31,6 +33,7 @@ const DIVE_PLAYER_GROUP := &"dive_player"
 
 const REDUCED_PRESENTATION_MOTION_SCALE := 0.34
 const PRESENTATION_POSE_RESPONSE := 13.0
+const CAMERA_CENTER_SNAP_DISTANCE := 0.05
 const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
 const DEFAULT_VISUAL_TARGET_SIZE := Vector2(105.0, 60.0)
 const CUE_DURATIONS := {
@@ -60,10 +63,16 @@ var _cue_elapsed := 0.0
 var _cue_duration := 0.0
 var _cue_strength := 0.0
 var _cue_direction_local := Vector2.RIGHT
+var _camera_lead_world := Vector2.ZERO
+var _camera_profile_valid := false
+var _camera_follow_smoothing_enabled := true
+var _camera_follow_smoothing_captured := false
 
 
 func _ready() -> void:
 	add_to_group(DIVE_PLAYER_GROUP)
+	_capture_camera_follow_smoothing()
+	_camera_profile_valid = _validate_camera_profile()
 	if animated_sprite != null:
 		animated_sprite.frame_changed.connect(_update_socket_markers)
 		animated_sprite.animation_changed.connect(_update_socket_markers)
@@ -176,9 +185,7 @@ func reset_at(world_position: Vector2) -> void:
 	_update_socket_markers()
 	_update_light_mount()
 	_update_readability_material()
-	var camera := get_node_or_null("Camera2D") as Camera2D
-	if camera != null:
-		camera.reset_smoothing()
+	_reset_camera_presentation()
 
 
 ## Public integration boundary for root systems. Presentation children stay private
@@ -233,7 +240,7 @@ func set_graphics_quality(quality_id: String) -> void:
 
 
 func configure_camera_world_bounds(world_size: Vector2) -> void:
-	var camera := get_node_or_null("Camera2D") as Camera2D
+	var camera := _camera_node()
 	if camera == null:
 		return
 	camera.limit_right = int(world_size.x)
@@ -242,7 +249,7 @@ func configure_camera_world_bounds(world_size: Vector2) -> void:
 
 
 func visual_camera_anchor() -> Vector2:
-	var camera := get_node_or_null("Camera2D") as Camera2D
+	var camera := _camera_node()
 	if camera != null and camera.is_inside_tree():
 		return camera.get_screen_center_position()
 	return global_position
@@ -272,6 +279,7 @@ func _update_visual(delta: float) -> void:
 		if animated_sprite.flip_h:
 			target_rotation = wrapf(target_rotation - PI, -PI, PI)
 	rotation = lerp_angle(rotation, target_rotation, minf(1.0, delta * turn_speed))
+	_update_camera_look_ahead(delta)
 
 
 func _switch_animation_preserving_phase(target_animation: StringName, target_flip: bool) -> void:
@@ -283,7 +291,16 @@ func _switch_animation_preserving_phase(target_animation: StringName, target_fli
 
 
 func set_reduced_motion(enabled: bool) -> void:
+	_capture_camera_follow_smoothing()
+	var was_reduced := _reduced_motion
 	_reduced_motion = enabled
+	var camera := _camera_node()
+	if camera != null:
+		camera.position_smoothing_enabled = _camera_follow_smoothing_enabled and not _reduced_motion
+	if _reduced_motion:
+		_reset_camera_presentation()
+	elif was_reduced and camera != null and camera.is_inside_tree():
+		camera.reset_smoothing()
 	_update_presentation_pose(0.0)
 	_update_socket_markers()
 	_update_light_mount()
@@ -291,6 +308,95 @@ func set_reduced_motion(enabled: bool) -> void:
 	var effects := visual_effects if visual_effects != null else get_node_or_null("VisualEffects")
 	if effects != null and effects.has_method("set_reduced_motion"):
 		effects.set_reduced_motion(_reduced_motion)
+
+
+func _validate_camera_profile() -> bool:
+	if camera_profile == null or camera_profile.get_script() != DiverCameraProfileScript:
+		return false
+	var errors: PackedStringArray = camera_profile.validation_errors()
+	if not errors.is_empty():
+		push_warning("Invalid DiverCameraProfile: %s" % errors)
+		return false
+	return true
+
+
+func _camera_node() -> Camera2D:
+	return get_node_or_null("Camera2D") as Camera2D
+
+
+func _capture_camera_follow_smoothing() -> void:
+	if _camera_follow_smoothing_captured:
+		return
+	var camera := _camera_node()
+	if camera == null:
+		return
+	_camera_follow_smoothing_enabled = camera.position_smoothing_enabled
+	_camera_follow_smoothing_captured = true
+
+
+func _reset_camera_presentation() -> void:
+	_camera_lead_world = Vector2.ZERO
+	var camera := _camera_node()
+	if camera == null:
+		return
+	camera.position = Vector2.ZERO
+	if camera.is_inside_tree():
+		camera.reset_smoothing()
+
+
+func _update_camera_look_ahead(delta: float) -> void:
+	var camera := _camera_node()
+	if camera == null:
+		return
+	if not _camera_profile_valid:
+		_camera_profile_valid = _validate_camera_profile()
+	var target_lead := Vector2.ZERO
+	var propulsion_speed := 0.0
+	if _camera_profile_valid and not _reduced_motion and _movement_input.length_squared() > 0.01:
+		var input_direction := _movement_input.normalized()
+		var propulsion_velocity := velocity - _current_velocity
+		if propulsion_velocity.is_finite() and not propulsion_velocity.is_zero_approx():
+			var propulsion_direction := propulsion_velocity.normalized()
+			var alignment := propulsion_direction.dot(input_direction)
+			var minimum_intent_alignment := float(camera_profile.get("minimum_intent_alignment"))
+			if alignment >= minimum_intent_alignment:
+				var movement_dead_zone := float(camera_profile.get("movement_dead_zone"))
+				var authored_speed := sprint_speed if _is_sprinting else swim_speed
+				var intended_speed_limit := authored_speed * _movement_speed_multiplier * _movement_input.length()
+				propulsion_speed = clampf(propulsion_velocity.dot(input_direction), 0.0, intended_speed_limit)
+				if propulsion_speed > movement_dead_zone:
+					var lead_distance := _camera_lead_distance(propulsion_speed)
+					target_lead = propulsion_direction * lead_distance
+
+	var response := float(camera_profile.get("recenter_response")) if _camera_profile_valid else 1.0
+	if not target_lead.is_zero_approx() and target_lead.length() >= _camera_lead_world.length():
+		response = _camera_movement_response(propulsion_speed)
+	var weight := 1.0 - exp(-maxf(response, 0.0) * maxf(delta, 0.0))
+	_camera_lead_world = _camera_lead_world.lerp(target_lead, clampf(weight, 0.0, 1.0))
+	if target_lead.is_zero_approx() and _camera_lead_world.length() <= CAMERA_CENTER_SNAP_DISTANCE:
+		_camera_lead_world = Vector2.ZERO
+	camera.position = to_local(global_position + _camera_lead_world)
+
+
+func _camera_lead_distance(speed: float) -> float:
+	var movement_dead_zone := float(camera_profile.get("movement_dead_zone"))
+	var swim_distance := float(camera_profile.get("swim_lead_distance"))
+	var sprint_distance := float(camera_profile.get("sprint_lead_distance"))
+	var swim_reference := maxf(swim_speed, movement_dead_zone + 0.001)
+	var sprint_reference := maxf(sprint_speed, swim_reference + 0.001)
+	if speed <= swim_reference:
+		var swim_weight := smoothstep(movement_dead_zone, swim_reference, speed)
+		return swim_distance * swim_weight
+	var sprint_weight := smoothstep(swim_reference, sprint_reference, speed)
+	return lerpf(swim_distance, sprint_distance, sprint_weight)
+
+
+func _camera_movement_response(speed: float) -> float:
+	var swim_response := float(camera_profile.get("swim_response"))
+	var sprint_response := float(camera_profile.get("sprint_response"))
+	var swim_reference := maxf(swim_speed, 0.001)
+	var sprint_reference := maxf(sprint_speed, swim_reference + 0.001)
+	return lerpf(swim_response, sprint_response, smoothstep(swim_reference, sprint_reference, speed))
 
 
 ## Compatibility seam for the root controller. The canonical LightSystem writes

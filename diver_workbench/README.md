@@ -19,13 +19,14 @@ Rutynowy agent korzysta z krótkiego routingu w lokalnym `AGENTS.md`: czyta wła
 | Ścieżka | Odpowiedzialność |
 |---|---|
 | `runtime/Diver.tscn` | Jedyna scena gracza wraz z fizyczną bryłą, `InteractionRange`, kamerą, socketami i jednym centralnym `PointLight2D`. |
-| `runtime/DiverController.gd` | Adapter wejścia i ogólnego kroku ruchu oraz właściciel orientacji, animacji, socketów i stałego wycentrowania źródła światła. |
+| `runtime/DiverController.gd` | Adapter wejścia i ogólnego kroku ruchu oraz właściciel orientacji, animacji, socketów, prezentacyjnego look-ahead kamery i stałego wycentrowania źródła światła. |
 | `runtime/DiverVisualEffects.gd` | Prezentacyjne pęcherzyki, ślady płetw, przeciek, działanie i krótkie cue. |
 | `definitions/DiverSocketProfile.gd` | Walidowany typ dyskretnych socketów klatek. |
 | `definitions/DiverFrameEnvelope.gd` | Zmierzone granice alfy 48 klatek konsumowane przez runtime i test. |
 | `definitions/DiverFrameEnvelopeProfile.gd` | Walidowany typ docelowej koperty, skali i wycentrowania grafiki. |
+| `definitions/DiverCameraProfile.gd` | Walidowany typ stożka zgodności, odległości i odpowiedzi prezentacyjnego look-ahead kamery. |
 | `assets/animation/` | Trzy aktywne arkusze 16-klatkowe i jeden zasób `SpriteFrames`. |
-| `assets/profiles/` | Aktywny profil 288 socketów oraz walidowany profil koperty `105 × 60`. |
+| `assets/profiles/` | Aktywny profil 288 socketów, profil koperty `105 × 60` oraz profil kamery. |
 | `assets/shaders/` | Shader czytelności sylwetki; radialną teksturę latarni tworzy rootowy `LightSystem`. |
 | `tests/` | Lokalny test Godot oraz natywny capture prezentacji. |
 
@@ -57,10 +58,11 @@ git -C .. commit -m "fix: <krótki opis>"
 
 Helper ponownie sprawdza czysty exact commit, pushuje branch, tworzy PR i dla zwykłej zmiany włącza squash auto-merge. Na tym agent kończy bez pollingu. Runner i fast-check korzystają z izolowanej pełnej kopii projektu z prywatnym `.godot`, `user://`, logami, portami procesu i capture. Jawny cel Nurka nie wykonuje globalnego discovery ani walidacji niezwiązanych pakietów Mapy.
 
-Rootowy test ruchu i integracji sceny:
+Rootowe testy ruchu, kamery i integracji sceny:
 
 ```powershell
 ..\tests\run_all_tests.ps1 -Target tests/dive_system_test.gd
+..\tests\run_all_tests.ps1 -Target tests/diver_clearance_integration_test.gd
 ```
 
 Lokalny smoke Mapy celowo nie ładuje ani nie sprawdza wnętrza sceny Nurka. Testy prywatnego runtime zarejestrowanych struktur są odkrywane dynamicznie przez wspólny runner i pozostają w ich pakietach; dokumentacja Nurka nie wskazuje nazw ani ścieżek konkretnego budynku. Składanie warsztatów należy do testów integracyjnych root.
