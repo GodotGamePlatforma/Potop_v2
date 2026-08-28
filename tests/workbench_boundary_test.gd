@@ -203,54 +203,70 @@ const DECISION_REGISTRIES := {
 	"res://diver_workbench/.ai/DECISIONS.md": "DIVER-ARD",
 }
 
-const REQUIRED_AGENT_CONCURRENCY_FRAGMENTS := {
+const REQUIRED_AGENT_DELIVERY_FRAGMENTS := {
 	"res://AGENTS.md": [
-		"osobnych pełnych Git worktrees",
-		"workbench_contract.py",
-		"candidate receiptem",
-		"run receiptem",
-		"codex-agent-assignments/v1",
-		"WAITING_ACK",
-		"RUNNING",
-		"redispatch",
-		"jednej komendzie batch",
-		"map-promotion",
-		"freeze_workbench_revision.py",
+		"jedno proste, niezależne zadanie jednemu agentowi",
+		"osobny pełny Git worktree",
+		"implementacja -> lokalne testy zadania -> lokalny fast-check",
+		"commit -> push + PR -> KONIEC",
+		"Agent nie pushuje do `main`, nie polluje i nie babysituje kolejki",
+		"dokładny head PR",
+		"aktualny main + dany PR",
+		"FAIL` oznacza brak merge",
+		"PASS` pozwala na squash do `main`",
+		"exact finalne SHA `main`",
+		"przesuwa `builds/current` tylko po `PASS`",
+		"Porażka pozostawia poprzednie `current` bez zmian",
+	],
+	"res://README.md": [
+		"jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR",
+		"uruchom lokalne testy zadania",
+		"osobno uruchom lokalny `fast-check`",
+		"zakończ zadanie — agent nie polluje kolejki",
+		"wymagany GitHub `fast-check` sprawdza dokładny head PR",
+		"aktualny main + dany PR",
+		"pełny `integration-green`",
+		"exact final main SHA",
+		"builds/current tylko po PASS",
+		"Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian",
 	],
 	"res://underwater_map_workbench/AGENTS.md": [
-		"osobnym pełnym Git worktree",
-		"--seal-structure-package",
-		"--build-structure",
-		"jednej komendzie batch",
-		"map-promotion",
+		"jedno proste zadanie jednemu agentowi",
+		"osobnym pełnym worktree",
+		"implementacja -> lokalne testy zadania -> lokalny fast-check",
+		"commit -> push + PR -> KONIEC",
+		"wymagany GitHub `fast-check` sprawdza dokładny head",
+		"pełny `integration-green`",
+		"autor starego PR nie babysituje kolejki",
+	],
+	"res://underwater_map_workbench/README.md": [
+		"osobnym pełnym worktree",
+		"lokalne testy zadania, a następnie osobny fast-check",
+		"zakończ bez pollingu",
+		"wymagany GitHub `fast-check` sprawdza exact head PR",
+		"aktualny main + PR",
+		"pełny `integration-green`",
 	],
 	"res://diver_workbench/AGENTS.md": [
-		"Osobny CWD nie izoluje wspólnego checkoutu",
-		"nie wykonuje discovery",
-		"user://",
-		"-InPlace",
+		"jedno proste zadanie jednemu agentowi Nurka",
+		"osobnego pełnego Git worktree",
+		"właściwy lokalny test zadania",
+		"osobny lokalny `agent_fast_check.ps1`",
+		"Na tym agent kończy bez pollingu",
+		"wymagany GitHub `fast-check` sprawdza exact head PR",
+		"pełny `integration-green` działa dopiero w merge queue",
+	],
+	"res://diver_workbench/README.md": [
+		"jedno proste zadanie jednemu agentowi Nurka",
+		"osobnym pełnym Git worktree",
+		"osobny lokalny fast-check",
+		"Na tym agent kończy bez pollingu",
+		"wymagany GitHub `fast-check` sprawdza dokładny head",
+		"aktualny main + PR",
+		"pełny `integration-green`",
 	],
 }
-const REQUIRED_CONCURRENCY_GUARD_FRAGMENTS := {
-	"res://tools/workbench_contract.py": [
-		"owner_for_path",
-		"create_publication_receipt",
-		"verify_publication_receipt",
-		"PUBLICATION_READY",
-		"create_assignment",
-		"acknowledge_assignment",
-		"validate_assignment_context",
-		"assignment_gc_plan",
-	],
-	"res://tests/workbench_contract_test.py": [
-		"test_owner_classification_and_generated_boundary",
-		"test_structure_doctor_rejects_typo_and_requires_explicit_staging",
-		"test_publication_lock_is_shared_by_linked_worktrees",
-		"test_receipt_verifies_clean_closed_candidate",
-		"test_timeout_redispatch_keeps_same_task_thread_and_bundle",
-		"test_process_races_create_one_bundle_and_one_ack_event",
-		"test_cli_validate_assignment_diff_fails_outside_closed_set",
-	],
+const REQUIRED_DELIVERY_GUARD_FRAGMENTS := {
 	"res://tools/setup_agent_worktree.ps1": [
 		"refs/remotes/origin/main",
 		"codex/$OwnerSegment/$TaskSlug",
@@ -284,6 +300,37 @@ const REQUIRED_CONCURRENCY_GUARD_FRAGMENTS := {
 		"no-non-FF",
 		"exact-multi-ref-LFS-stream",
 	],
+	"res://tools/agent_fast_check.ps1": [
+		"ExpectedHeadSha",
+		"ExpectedBranch",
+		"CI fast-check HEAD mismatch",
+		"ci_protected_paths.py",
+		"FAST-CHECK PASS",
+	],
+	"res://tests/agent_fast_check_test.ps1": [
+		"local-branch/detached-SHA/diff/LFS",
+		"Ordinary fast-check accepted a control-plane path",
+		"LFS pointers remain unhydrated",
+	],
+	"res://tools/publish_agent_pr.ps1": [
+		"Canonical agent_fast_check failed before publication",
+		"'--auto', '--squash', '--match-head-commit'",
+		"manual-control-plane",
+		"native-auto-merge",
+	],
+	"res://tests/publish_agent_pr_test.ps1": [
+		"exact-object-push",
+		"native-auto",
+		"manual-control-plane",
+		"--match-head-commit",
+	],
+	"res://.github/workflows/agent-validation.yml": [
+		"pull_request:",
+		"name: fast-check",
+		"github.event.pull_request.head.sha",
+		"-ExpectedHeadSha",
+		"-ExpectedBranch",
+	],
 	"res://.github/workflows/agent-integration.yml": [
 		"merge_group",
 		"integration-green",
@@ -293,6 +340,28 @@ const REQUIRED_CONCURRENCY_GUARD_FRAGMENTS := {
 		"run_all_tests.ps1",
 		"-Full",
 	],
+	"res://tools/ci_protected_paths.py": [
+		"PROTECTED_DIRECTORIES",
+		"tools/agent_fast_check.ps1",
+		"tools/publish_agent_pr.ps1",
+		"tools/build_playable_main.ps1",
+	],
+	"res://tests/ci_protected_paths_test.py": [
+		"tools/agent_fast_check.ps1",
+		"tools/publish_agent_pr.ps1",
+		"tools/build_playable_main.ps1",
+	],
+	"res://tools/build_playable_main.ps1": [
+		"refs/remotes/origin/main",
+		"Builder source is not exact clean origin/main",
+		"'lfs', 'fetch', 'origin', $Sha",
+		"--export-release",
+		"Playable smoke failed",
+		"Set-CurrentPointer -Sha $Sha",
+	],
+	"res://tests/build_playable_main_test.ps1": [
+		"exact-main-SHA/LFS/export/real-smoke/by-sha/atomic-current/failure-retention",
+	],
 	"res://tools/workbench_lock.py": [
 		"class InterprocessWorkspaceLock",
 		"CODEX_THREAD_ID",
@@ -301,18 +370,8 @@ const REQUIRED_CONCURRENCY_GUARD_FRAGMENTS := {
 		"test_same_lock_is_exclusive_between_processes",
 		"test_disjoint_locks_can_be_held_together",
 	],
-	"res://tools/freeze_workbench_revision.py": [
-		"FROZEN_RECEIPT.json",
-		"freeze_revision",
-		"verify_revision",
-	],
-	"res://tests/freeze_workbench_revision_test.py": [
-		"test_freeze_publishes_receipt_last_and_verify_accepts_it",
-		"test_mutation_or_extra_file_invalidates_frozen_revision",
-	],
 	"res://underwater_map_workbench/tools/build_underwater_map.py": [
 		"InterprocessWorkspaceLock",
-		"map-promotion",
 		"_structure_local_output_root",
 		"underwater_map_structure_builds",
 		"_structure_local_build_lock",
@@ -330,27 +389,13 @@ const REQUIRED_CONCURRENCY_GUARD_FRAGMENTS := {
 		"-InPlace is disabled",
 		"Get-GitSnapshotProjectPaths",
 		"sourceBefore",
-		"FROZEN copy",
 		"maxSnapshotAttempts = 3",
 		"custom_user_dir_name",
-		"godot-test-overlay-v1",
-		"godot-test-run-receipt-v2",
-		"godot-test-shard-plan-v1",
-		"godot-test-shard-receipt-v2",
-		"godot-test-aggregate-receipt-v2",
-		"VerifyRunReceipt",
 		"Get-ExplicitStructureTestPackageId",
 		"Invoke-IsolatedStructureTargetOverlay",
 		"--debug-server",
 		"--dap-port",
 		"--lsp-port",
-	],
-	"res://tests/runner_isolation_test.ps1": [
-		"Run receipt verifier accepted a tampered canonical body",
-		"HEAD/tree do not match",
-		"Receipt binding accepted a targeted run",
-		"Receipt binding accepted a full-suite",
-		"required full-suite PASS",
 	],
 	"res://tests/parallel_worktree_godot_test.ps1": [
 		"temporary_commit_from_git_closed_working_snapshot",
@@ -387,22 +432,22 @@ func _initialize() -> void:
 	_assert_structure_test_discovery()
 	_assert_diver_public_boundary()
 	_assert_local_decision_indexes()
-	_assert_concurrency_contracts()
+	_assert_delivery_contracts()
 	_finish()
 
 
-func _assert_concurrency_contracts() -> void:
-	for document_path in REQUIRED_AGENT_CONCURRENCY_FRAGMENTS:
+func _assert_delivery_contracts() -> void:
+	for document_path in REQUIRED_AGENT_DELIVERY_FRAGMENTS:
 		_assert_file_contains_fragments(
 			document_path,
-			REQUIRED_AGENT_CONCURRENCY_FRAGMENTS[document_path],
-			"Instrukcja agentów nie publikuje wymaganej reguły współbieżności",
+			REQUIRED_AGENT_DELIVERY_FRAGMENTS[document_path],
+			"Instrukcja agentów nie publikuje prostego przepływu dostarczenia zmiany",
 		)
-	for source_path in REQUIRED_CONCURRENCY_GUARD_FRAGMENTS:
+	for source_path in REQUIRED_DELIVERY_GUARD_FRAGMENTS:
 		_assert_file_contains_fragments(
 			source_path,
-			REQUIRED_CONCURRENCY_GUARD_FRAGMENTS[source_path],
-			"Brakuje mechanicznej ochrony współbieżności",
+			REQUIRED_DELIVERY_GUARD_FRAGMENTS[source_path],
+			"Brakuje mechanicznej ochrony prostego przepływu dostarczenia zmiany",
 		)
 
 	for structure_id in _structure_package_ids:
@@ -410,11 +455,16 @@ func _assert_concurrency_contracts() -> void:
 		_assert_file_contains_fragments(
 			agents_path,
 			[
+				"jedno proste zadanie jednemu autorowi",
 				"osobnym pełnym Git worktree",
-				"lokalny seal",
-				"map-promotion",
+				"codex/structure-%s/<task-slug>" % structure_id,
+				"lokalne testy zadania",
+				"osobny lokalny fast-check",
+				"commit -> push + PR -> KONIEC",
+				"osobny GitHub `fast-check`",
+				"pełny `integration-green`",
 			],
-			"Instrukcja pakietu struktury nie chroni wspólnej promocji",
+			"Instrukcja pakietu struktury nie publikuje prostego przepływu dostarczenia zmiany",
 		)
 
 
@@ -743,8 +793,9 @@ func _assert_structure_package_documents(
 				"allowlista zapisu",
 				exact_package_path + "**",
 				"tylko do odczytu",
-				"../../AGENTS.md",
-				"../../../AGENTS.md",
+				"jedno proste zadanie",
+				"codex/structure-%s/<task-slug>" % structure_id,
+				"Nie powstaje drugi PR Mapy",
 			]:
 				_assert(
 					document_text.contains(routing_fragment),
