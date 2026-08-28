@@ -6,30 +6,23 @@ Ten katalog jest podrzędnym pakietem Mapy, nie osobnym projektem Godot ani doda
 
 ## Kontekst przed pracą
 
-Przed inwentaryzacją, analizą albo zmianą przeczytaj w całości, z SHA-256 przed i po, w tej kolejności:
+Dla zwykłej poprawki tego budynku przeczytaj ten plik, lokalny `README.md`, `structure_manifest.json`, dokładny rekord `tower_three_inlets_02` w `../../map_manifest.json` oraz wyłącznie związane źródła i testy. W `.ai/PROJECT_CONTEXT.md` Mapy przeczytaj tylko punkt dotyczący bieżącej struktury lub otwartej luki. Nie czytaj pełnych decyzji, produktu ani architektury, jeżeli nie zmieniasz ich kontraktu. Jeżeli rekordu mapowego nie ma, nie wymyślaj placementu.
 
-1. `../../.ai/PROJECT_CONTEXT.md`;
-2. `../../.ai/DECISIONS.md`;
-3. `../../README.md`;
-4. lokalny `README.md`.
-
-Stosuj wymagania kompletności z `../../AGENTS.md` i `../../../AGENTS.md`. Dopiero po tych odczytach przeczytaj w całości `structure_manifest.json`, a po promocji także dokładny rekord `tower_three_inlets_02` w `../../map_manifest.json`. Rekord mapowy jest jedynym źródłem stable ID, originu, aktywności, opcjonalnego landmarku i referencji pakietu; manifest pakietu celowo nie powtarza pola `structure_id` ani globalnego originu. Jeżeli rekordu mapowego jeszcze nie ma, pakiet pozostaje prywatnym stagingiem i nie wolno samodzielnie wymyślać jego placementu.
-
-Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publiczną granicę Root–Mapa, schemat Mapy, persistence albo zapis, wróć do `../../../AGENTS.md` i dobierz pełny kontekst globalny. Zmiana mapowego originu, rejestracji, globalnego payloadu lub kompozycji wielu pakietów należy do zadania Mapy z CWD `../..`.
+Pełny routing root jest wymagany dopiero przy zmianie reguły produktu, publicznej granicy, schema, persistence, zapisu albo semantycznego kontraktu kilku właścicieli. Mechaniczne opublikowanie lokalnej poprawki razem z nowym sealem, mapowym pinem i pochodnymi nie uruchamia pełnego odczytu dokumentów: pozostaje jednym prostym, root-routed zadaniem według lokalnego README. Zmiana samego originu, rejestracji lub globalnego payloadu jest zadaniem Mapy.
 
 ## Granica odczytu i zapisu
 
 - Domyślna allowlista zapisu obejmuje wyłącznie `underwater_map_workbench/structures/tower_three_inlets_02/**`.
-- `../../map_manifest.json`, `../../UnderwaterMap.tscn`, pozostała Mapa, root, inne pakiety struktur i `../../../diver_workbench/**` są zależnościami tylko do odczytu. Kontrolowany refresh i promocję wykonuje integrator Mapy w krótkim, hashowanym oknie snapshotu.
+- W czysto lokalnej iteracji `../../map_manifest.json`, `../../UnderwaterMap.tscn`, pozostała Mapa, root, inne pakiety struktur i `../../../diver_workbench/**` są tylko do odczytu. Jeżeli seal wymaga nowego pinu, użyj jednego root-routed zadania obejmującego pakiet i wymagane pochodne Mapy; nie twórz package-only PR.
 - Pakiet może konsumować publiczne typy i kontrakty projektu nadrzędnego, ale nie kopiuje ani nie poprawia ich przy okazji prywatnego zadania.
-- Przed edycją wypisz planowane ścieżki i właścicieli. Po edycji porównaj pełny diff; zapis poza pakietem zatrzymuje lokalną pracę i wymaga przekierowania.
+- Rutynowa poprawka nie wymaga predeklaracji dokumentów ani pełnego write-setu. Po edycji porównaj diff z allowlistą; nieplanowany zapis poza nią zatrzymuje pracę.
 - Pakiet nie posiada własnego `project.godot`, `.godot`, `.ai`, `map_manifest.json`, `UnderwaterMap.tscn`, ARD, kampanii ani konfiguracji zapisu.
 
 ### Współbieżność
 
-- Jeden autor `tower_three_inlets_02/**` pracuje w osobnym pełnym Git worktree i na własnej gałęzi z ostatniego zielonego commita. Audytorzy korzystają z innych worktrees tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji.
-- Autor wykonuje lokalny seal i celowane testy bez `map-promotion`, a następnie przekazuje niezmienny commit albo zweryfikowaną rewizję FROZEN. Może od razu rozpocząć N+1; integrator Mapy pobiera wyłącznie wskazany hash i aktualizuje mapowy pin.
-- Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture; wspólna blokada dotyczy wyłącznie krótkiej publikacji Mapy.
+- Root lub koordynator przydziela zmianę seal+pin jako jedno proste zadanie jednemu autorowi w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_three_inlets_02/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
+- Po implementacji autor wykonuje mechaniczne kroki z lokalnego README, lokalne testy zadania, a następnie osobny lokalny fast-check. Obecny fast-check nie wykonuje seala ani odtworzenia pochodnych. Po `PASS` autor wykonuje `commit -> push + PR -> KONIEC`; osobny GitHub `fast-check` decyduje o enqueue, a pełny `integration-green` wykonuje merge queue. Nie powstaje drugi PR Mapy.
+- Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture. Autor nie babysituje starego PR: prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w kolejce wraca do root jako nowe zadanie dla nowego agenta startującego z aktualnego `main`, a koordynator zastępuje i zamyka stary PR.
 
 ## Authority i pochodne
 
@@ -38,7 +31,7 @@ Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publi
 - Wszystkie współrzędne pakietu są lokalne. Globalny placement istnieje wyłącznie w nadrzędnym `map_manifest.json`.
 - `generated/**` jest deterministyczną pochodną. Nie poprawiaj masek, prowadnic, kart socketów, sceny struktury ani truth package ręcznie.
 - Pliki w `references/` są provenance wskazanym przez manifest jako `authority=false`. Nie definiują topologii, aktywnego gameplayu, checkpointu, zapisu ani persistence i nie są wejściem kompilatora.
-- Aktualne zachowanie odczytuj z manifestu, prywatnego runtime i testów, a regułę widoczną dla gracza z globalnego dokumentu produktu po jej promocji.
+- Aktualne zachowanie odczytuj z manifestu, prywatnego runtime i testów, a zatwierdzoną regułę widoczną dla gracza z globalnego dokumentu produktu.
 
 ## Dokumentacja
 
@@ -52,11 +45,11 @@ Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzj
 ## Wykonanie i weryfikacja
 
 1. Ustal edytowalne źródło z `structure_manifest.json` i sprawdź wskazane skrypty, assety oraz lokalne testy.
-2. Porównaj zmianę z aktywnymi decyzjami Mapy i globalnymi. Nie zmieniaj przy okazji placementu ani semantyki zapisu.
-3. Po zmianie źródła uruchom `--seal-structure-package tower_three_inlets_02`, lokalny `--build-structure tower_three_inlets_02` i `--check-structure tower_three_inlets_02`; mapowy refresh, pin i wspólne pochodne wykonuje później integrator Mapy.
-4. Uruchom `tests/tower_package_contract_test.gd` i `tests/tower_runtime_test.gd`. Pełny mapowy build/check i smoke należą dopiero do promocji albo odbioru integracyjnego.
+2. Nie zmieniaj przy okazji placementu ani semantyki zapisu. Jeżeli zadanie wymaga zmiany kontraktu, dopiero wtedy przeczytaj właściwe ARD i wróć do routingu root.
+3. Gdy zmieniło się źródło lub jego hash, wykonaj jeden przepis „Zmiana pakietu” z lokalnego README. Zawiera on wymagane seal/refresh/build/check, lecz agent nie musi projektować tych kroków.
+4. Uruchom dwa lokalne testy zadania, a potem osobny fast-check. Po `PASS` utwórz commit i opublikuj jeden PR helperem wskazanym w README; zakończ bez pollingu. Pełną regresję wykonuje merge queue.
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnej wygenerowanej sceny i obejrzyj wynik.
 6. ImageGen pozostaje zablokowany, dopóki proxy nie zostanie obejrzane w dokładnej wygenerowanej `UnderwaterMap.tscn` i jawnie zaakceptowane przez użytkownika. Produkcyjny wynik musi zachować natywne `2400 × 3840`, `scale = Vector2.ONE` i mapowanie jeden piksel na jedną jednostkę lokalną.
 7. Po zmianie topologii zachowaj ręczny playtest całej struktury. Automatyczna kontrola osiągalności nie zastępuje przepłynięcia.
 
-`ERROR` i `SCRIPT ERROR` oznaczają porażkę także przy kodzie wyjścia `0`. W podsumowaniu podaj zmienione źródła, build/check/testy, dokumenty przeczytane w całości, wynik oględzin oraz następny krok.
+`ERROR` i `SCRIPT ERROR` oznaczają porażkę także przy kodzie wyjścia `0`. W podsumowaniu podaj zmienione źródła, testy i fast-check, wynik oględzin oraz następny krok.

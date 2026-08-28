@@ -6,31 +6,24 @@ Ten katalog jest podrzędnym pakietem Mapy, nie osobnym projektem Godot ani trze
 
 ## Kontekst przed pracą
 
-Przed inwentaryzacją, analizą albo zmianą przeczytaj w całości, z SHA-256 przed i po, w tej kolejności:
+Dla zwykłej poprawki tego budynku przeczytaj ten plik, lokalny `README.md`, `structure_manifest.json`, dokładny rekord `tower_prototype_01` w `../../map_manifest.json` oraz wyłącznie związane źródła i testy. W `.ai/PROJECT_CONTEXT.md` Mapy przeczytaj tylko punkt dotyczący bieżącej struktury lub otwartej luki. Nie czytaj pełnych decyzji, produktu ani architektury, jeżeli nie zmieniasz ich kontraktu.
 
-1. `../../.ai/PROJECT_CONTEXT.md`;
-2. `../../.ai/DECISIONS.md`;
-3. `../../README.md`;
-4. lokalny `README.md`.
-
-Stosuj wymagania kompletności z `../../AGENTS.md` i `../../../AGENTS.md`. Dopiero po tych odczytach przeczytaj w całości `structure_manifest.json`, a następnie dokładny rekord `tower_prototype_01` w `../../map_manifest.json`. Rekord mapowy jest jedynym źródłem stable ID, originu, aktywności, opcjonalnego landmarku i referencji pakietu; manifest pakietu celowo nie powtarza pola `structure_id`.
-
-Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publiczną granicę Root–Mapa, schema mapy, persistence albo zapis, wróć do `../../../AGENTS.md` i dobierz pełny kontekst globalny. Zmiana lokalnego źródła może zmienić pochodny `map_gameplay_signature`; nadal jest authoringiem tego pakietu, po którym wymagane są kontrolowany refresh i mapowy build/promocja, a nie automatyczne przejęcie zmiany przez Root. Jeżeli zadanie zmienia mapowy origin, rejestrację, globalny payload lub kompozycję wielu pakietów, wróć do `../../AGENTS.md` i prowadź je jako zadanie Mapy.
+Pełny routing root jest wymagany dopiero przy zmianie reguły produktu, publicznej granicy, schema, persistence, zapisu albo semantycznego kontraktu kilku właścicieli. Mechaniczne opublikowanie lokalnej poprawki razem z nowym sealem, mapowym pinem i pochodnymi nie uruchamia pełnego odczytu dokumentów: pozostaje jednym prostym, root-routed zadaniem według lokalnego README. Zmiana samego originu, rejestracji lub globalnego payloadu bez prywatnego źródła jest zadaniem Mapy.
 
 ## Granica odczytu i zapisu
 
 - Domyślna allowlista zapisu obejmuje wyłącznie `underwater_map_workbench/structures/tower_prototype_01/**`.
-- `../../map_manifest.json`, pozostała Mapa, root i `../../../diver_workbench/**` są zawsze zależnościami tylko do odczytu. `--seal-structure-package tower_prototype_01` może zaktualizować wyłącznie lokalny manifest; mapowy `--refresh-structure-package` wykonuje później integrator Mapy.
+- W czysto lokalnej iteracji `../../map_manifest.json`, pozostała Mapa, root i `../../../diver_workbench/**` są tylko do odczytu. Jeżeli seal wymaga nowego pinu, użyj jednego root-routed zadania obejmującego pakiet i wymagane pochodne Mapy; nie twórz package-only PR.
 - Pakiet może konsumować publiczne typy i kontrakty nadrzędnego projektu, ale nie kopiuje ani nie poprawia ich przy okazji prywatnego zadania.
-- Przed edycją wypisz planowane ścieżki i właścicieli. Po edycji porównaj pełny diff; zapis poza pakietem zatrzymuje lokalną pracę i wymaga przekierowania.
+- Rutynowa poprawka nie wymaga predeklaracji dokumentów ani pełnego write-setu. Po edycji porównaj diff z allowlistą; nieplanowany zapis poza nią zatrzymuje pracę.
 - Pakiet nie posiada własnego `project.godot`, `.godot`, `.ai`, `map_manifest.json`, `UnderwaterMap.tscn`, ARD, kampanii ani konfiguracji zapisu.
 
 ### Współbieżność
 
-- Jeden autor pakietu pracuje w osobnym pełnym Git worktree i na własnej gałęzi z ostatniego zielonego commita. Audytor może korzystać z innego worktree tylko do odczytu; osobny CWD we wspólnym checkoutcie nie daje izolacji.
-- Autor wykonuje lokalny seal i testy bez globalnego `map-promotion`, po czym przekazuje niezmienny commit albo rewizję FROZEN. Może natychmiast rozwijać N+1; integrator Mapy pobiera wyłącznie wskazany hash, aktualizuje mapowy pin i publikuje wspólne pochodne.
+- Root lub koordynator przydziela zmianę seal+pin jako jedno proste zadanie jednemu autorowi w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_prototype_01/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
+- Po implementacji autor wykonuje mechaniczne kroki z lokalnego README, lokalne testy zadania, a następnie osobny lokalny fast-check. Obecny fast-check nie wykonuje seala ani odtworzenia pochodnych. Po `PASS` autor wykonuje `commit -> push + PR -> KONIEC`; osobny GitHub `fast-check` decyduje o enqueue, a pełny `integration-green` wykonuje merge queue. Nie powstaje drugi PR Mapy.
 - Lokalny build/check i celowane testy pakietu nie odkrywają innych struktur. Runner izoluje `.godot`, `user://`, logi i capture w pełnej kopii oraz odrzuca `-InPlace`.
-- Autor nie poprawia ręcznie `generated/**` ani mapowego pinu. Zajęta blokada `map-promotion` dotyczy wyłącznie integratora Mapy i nie blokuje prywatnej pracy pakietu.
+- Autor nie poprawia ręcznie `generated/**` ani mapowego pinu i nie babysituje starego PR. Prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w merge queue wraca do root jako nowe zadanie naprawcze dla nowego agenta startującego z aktualnego `main`; koordynator zastępuje i zamyka stary PR. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera.
 
 ## Authority i pochodne
 
@@ -47,15 +40,15 @@ Pakiet posiada dokładnie dwa dokumenty kontraktowe:
 - `AGENTS.md` — ten proces i granice;
 - `README.md` — operacyjny indeks źródeł i komendy.
 
-Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzji. Nie kopiuj tu kombinacji, sekwencji progresji, reguł śmierci, persistence ani pełnej architektury. Przed edycją dokumentacji oceń oba dokumenty pakietu, cztery dokumenty warsztatu Mapy oraz wymagane dokumenty globalne zgodnie z routingiem nadrzędnym.
+Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzji. Nie kopiuj tu kombinacji, sekwencji progresji, reguł śmierci, persistence ani pełnej architektury. Rutynowa zmiana nie wymaga aktualizacji dokumentacji ani deklarowania jej zakresu przed edycją.
 
 ## Wykonanie i weryfikacja
 
 1. Ustal edytowalne źródło z `structure_manifest.json` i sprawdź wskazane pliki runtime, assety oraz lokalny test.
-2. Porównaj zmianę z aktywnym MAP-ARD-0022 i globalnym ARD-0106. Nie zmieniaj przy okazji mapowego placementu ani semantyki zapisu.
-3. Gdy zmieniło się źródło lub jego hash, uruchom `python ..\..\tools\build_underwater_map.py --seal-structure-package tower_prototype_01`. Następnie użyj lokalnego `--build-structure tower_prototype_01` i niedestrukcyjnego `--check-structure tower_prototype_01`; mapowy refresh, pin i wspólne pochodne należą dopiero do integratora.
-4. Uruchom `tests/tower_package_contract_test.gd` oraz `tests/tower_runtime_test.gd`. Pełny mapowy build/check i smoke należą dopiero do rejestracji, zmiany originu, publicznego montażu albo odbioru integracyjnego. Rootowy test dobierz tylko dla publicznego montażu, resetu próby albo granicy persistence.
+2. Nie zmieniaj przy okazji mapowego placementu ani semantyki zapisu. Jeżeli zadanie wymaga zmiany kontraktu, dopiero wtedy przeczytaj właściwe ARD i wróć do routingu root.
+3. Gdy zmieniło się źródło lub jego hash, wykonaj jeden przepis „Zmiana pakietu” z lokalnego README. Zawiera on wymagane seal/refresh/build/check, lecz agent nie musi projektować tych kroków.
+4. Uruchom dwa lokalne testy zadania, a potem osobny fast-check. Po `PASS` utwórz commit i opublikuj jeden PR helperem wskazanym w README; zakończ bez pollingu. Pełną regresję wykonuje merge queue.
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnej wygenerowanej sceny i obejrzyj wynik.
 6. Po zmianie topologii zachowaj ręczny playtest całego budynku i wymaganych powrotów; nie zastępuj go BFS-em.
 
-Testy Godota uruchamiaj sekwencyjnie wspólnym runnerem w izolowanej pełnej kopii projektu. `ERROR` i `SCRIPT ERROR` oznaczają porażkę także przy kodzie wyjścia `0`. W podsumowaniu podaj zmienione źródła, build/check/testy, dokumenty przeczytane w całości, brak lub wynik oględzin oraz ewentualny następny krok.
+Testy Godota uruchamiaj sekwencyjnie wspólnym runnerem w izolowanej pełnej kopii projektu. `ERROR` i `SCRIPT ERROR` oznaczają porażkę także przy kodzie wyjścia `0`. W podsumowaniu podaj zmienione źródła, testy i fast-check, brak lub wynik oględzin oraz ewentualny następny krok.

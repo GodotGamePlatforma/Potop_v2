@@ -4,28 +4,29 @@ Ten katalog jest jedynym miejscem authoringu sceny, fizycznej bryły, grafiki, a
 
 ## Start i routing kontekstu
 
-Przed inwentaryzacją, analizą albo zmianą przeczytaj w całości, z kontrolą SHA-256 przed i po:
+Dla zwykłego zadania w jednej prywatnej części avatara przeczytaj tylko:
 
-1. `.ai/PROJECT_CONTEXT.md` — co rzeczywiście działa, znane rozbieżności i ostatnia weryfikacja;
-2. `.ai/DECISIONS.md` — trwałe inwarianty avatara;
-3. `README.md` — pliki, granice i działające komendy.
+1. ten najbliższy `AGENTS.md`;
+2. właściwy punkt `.ai/PROJECT_CONTEXT.md`;
+3. odpowiednią sekcję `README.md` z granicą i komendami;
+4. zmieniany kod, scenę, asset i bezpośredni test lub capture.
 
-Do każdego wskazanego odczytu stosuj wymagania kompletności z `../AGENTS.md`. Nie testuj dostępu przez inne pliki przed ukończeniem bieżącego wymaganego odczytu.
+Nie czytaj całego rejestru `.ai/DECISIONS.md`, produktu ani architektury tylko dlatego, że istnieją. Pełny lokalny rejestr decyzji oraz wymagany kontekst root otwórz, gdy zadanie zmienia widoczną skalę, collider, punkt emisji światła, `InteractionRange`, ruch, sterowanie, zasięg, czytelny feedback, publiczne API albo skutek kontaktu. To samo dotyczy zmiany produktu, zapisu, migracji lub zakresu przekraczającego właściciela Nurka. Kontrole SHA-256 są wymagane tylko w zadaniu audytowym lub gdy dokładna rewizja dokumentu jest częścią dowodu.
 
-Zmiana wyłącznie organizacji albo źródła prezentacji, która zachowuje zatwierdzoną kopertę fizyczną i zachowanie, korzysta z powyższego lokalnego kontekstu. Jeżeli zadanie zmienia widoczną skalę, collider, punkt emisji światła, `InteractionRange`, ruch, sterowanie, zasięg, czytelny feedback albo skutek kontaktu, zastosuj także globalny routing i bramkę rozbieżności z `../AGENTS.md`. Zmiana tlenu, ryzyka, walki, wyposażenia, interakcji, sesji, wyniku, UI, persistence lub mapy nie jest lokalnym zadaniem warsztatu.
+Zmiana tlenu, ryzyka, walki, wyposażenia, interakcji, sesji, wyniku, UI, persistence lub mapy nie jest lokalnym zadaniem warsztatu.
 
 ## Granica odczytu i zapisu
 
 - Domyślną allowlistą zapisu lokalnego zadania jest wyłącznie `diver_workbench/**`, czyli ścieżki pod `.` z katalogu roboczego warsztatu. Root pod `../` oraz `../underwater_map_workbench/**` są dla lokalnego agenta tylko do odczytu.
 - Warsztat może konsumować publiczne kontrakty root i mapy, lecz nie poprawia ich plików, testów ani dokumentacji jako efektu ubocznego zadania avatara. Nie sięga także do wnętrza pakietu mapy poza jej publiczną integracją runtime.
 - Jeżeli poprawne rozwiązanie wymaga zapisu poza `diver_workbench/**`, zadanie staje się mieszane. Przed pierwszym takim zapisem przeroutuj je do root, zastosuj globalny protokół i przypisz każdą zmianę właścicielowi domeny. Test integracyjny obejmujący jednocześnie avatara, root i mapę należy do root.
-- Przed edycją wypisz planowane pliki i ich właścicieli. Po edycji sprawdź pełny diff repozytorium; obecność nieplanowanego zapisu poza allowlistą oznacza przerwanie lokalnej pracy, a nie zgodę na rozszerzenie zakresu.
+- Rutynowe zadanie jednego właściciela nie wymaga przed edycją deklaracji wszystkich plików ani dokumentów. Po edycji sprawdź pełny diff repozytorium; obecność nieplanowanego zapisu poza allowlistą oznacza przerwanie lokalnej pracy, a nie zgodę na rozszerzenie zakresu.
 
 ### Współbieżność
 
-- Agent Nurka pracujący równolegle z Rootem, Mapą lub strukturami używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` z commita integracyjnego potwierdzonego candidate receiptem oraz zgodnym pełnym run receiptem `PASS`. Osobny CWD nie izoluje wspólnego checkoutu; rozłączna allowlista pozostaje obowiązkowa także w osobnym worktree.
-- Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Do integracji trafia niezmienny commit lub zweryfikowana rewizja FROZEN, dzięki czemu autor może rozwijać N+1 bez czekania na testy poprzedniej rewizji.
-- Celowany test Nurka nie wykonuje discovery, refreshu ani walidacji prywatnych pakietów Mapy. Runner tworzy pełną FROZEN kopię z osobnym `.godot`, `user://`, logami i capture; równoległy Godot działa tylko w osobnych workspace z jawnym `--path`. `-InPlace` jest odrzucane.
+- Root lub koordynator przydziela jedno proste zadanie jednemu agentowi Nurka. Agent używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` utworzonej z aktualnego `origin/main`. Osobny CWD we wspólnym checkoutcie nie daje izolacji; lokalna allowlista nadal obejmuje wyłącznie `diver_workbench/**`.
+- Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Kolejność jest stała: implementacja -> właściwy lokalny test zadania i potrzebny capture -> osobny lokalny `agent_fast_check.ps1`. `FAIL` oznacza poprawę i powtórzenie; po `PASS` autor tworzy commit i uruchamia `publish_agent_pr.ps1`, który pushuje branch, otwiera jeden PR i dla zwykłej zmiany włącza squash auto-merge. Na tym agent kończy bez pollingu. Osobny wymagany GitHub `fast-check` sprawdza exact head PR, a pełny `integration-green` działa dopiero w merge queue.
+- Celowany test Nurka nie wykonuje discovery, refreshu ani walidacji prywatnych pakietów Mapy. Runner używa pełnej izolowanej kopii z osobnym `.godot`, `user://`, logami i capture; równoległy Godot działa tylko w osobnych workspace z jawnym `--path`. `-InPlace` jest odrzucane.
 
 ## Granica odpowiedzialności
 

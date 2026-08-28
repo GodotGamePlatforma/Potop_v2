@@ -43,23 +43,47 @@ Po zmianie grafiki lub prywatnej prezentacji uruchom natywny capture:
 
 Artefakty trafiają do izolowanego `user://test_tower_prototype_01_proxy_capture`. Obejrzenie obrazów jest obowiązkowe; sam kod wyjścia potwierdza działanie harnessu, nie jakość ani osiągalność wnętrza.
 
-## Przepis zmiany
+## Jeden przepis zmiany
 
-Po zmianie edytowalnego źródła lub hash-pinned pliku pakietu uruchom najpierw refresh. Jeśli hashe się nie zmieniły, pomiń pierwszą komendę:
+Zmiana edytowalnego źródła wymagająca nowego seala i mapowego pinu jest jednym root-routed zadaniem na branchu `codex/structure-tower_prototype_01/<task-slug>`. Agent nie projektuje osobnego procesu wdrożeniowego: wykonuje poniższy przepis w swoim worktree. Bieżący `agent_fast_check.ps1` nie wykonuje seala ani mapowego builda, dlatego te kroki pozostają tutaj jawne. Najpierw zmień źródła i odtwórz pakiet:
 
 ```powershell
 python ..\..\tools\build_underwater_map.py --seal-structure-package tower_prototype_01
 python ..\..\tools\build_underwater_map.py --build-structure tower_prototype_01
 python ..\..\tools\build_underwater_map.py --check-structure tower_prototype_01
-..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_prototype_01/tests/tower_package_contract_test.gd
-..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_prototype_01/tests/tower_runtime_test.gd
 ```
 
-`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`. Po zgodnym checku przekaż niezmienny commit albo zweryfikowaną rewizję FROZEN oraz dokładny SHA-256 manifestu. Mapowy `--refresh-structure-package tower_prototype_01 --sealed-package-sha256 <SHA256>`, pin, wspólne pochodne i placement wykonuje później integrator Mapy w osobnym worktree; producent nigdy nie zapisuje `../../map_manifest.json`.
+Następnie, nadal przed jednym wspólnym PR, odśwież dokładny pin i odtwórz pochodne:
 
-Pełny `--build`, `--check`, `underwater_map_smoke_test.gd` i `workbench_boundary_test.gd` uruchamia zakres Mapy przy rejestracji pakietu, zmianie originu, publicznym montażu albo przed odbiorem integracyjnym. Nie należą do zwykłego prywatnego loopu. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga natywnego capture'u i oględzin, a zmiana topologii ręcznego przepłynięcia budynku. Nie poprawiaj ręcznie `generated/**` ani `../../UnderwaterMap.tscn`.
+```powershell
+python ..\..\tools\build_underwater_map.py --refresh-structure-package tower_prototype_01 --sealed-package-sha256 <SHA256>
+python ..\..\tools\build_underwater_map.py --build
+python ..\..\tools\build_underwater_map.py --check
+```
 
-Zmiana globalnego originu, aktywności, landmarku lub referencji pakietu odbywa się wyłącznie w zadaniu Mapy z CWD `../..`; prywatny agent pakietu traktuje ten rekord jako read-only. Zmiana zachowania gracza, kampanii, publicznego kontraktu albo persistence jest zadaniem integracyjnym root.
+`--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`, a `--refresh-structure-package` wyłącznie mapowy pin i pochodne. Granice komend pozostają rozdzielone, lecz źródła pakietu, seal, dokładny pin i wszystkie pochodne muszą trafić atomowo w jednym branchu i PR. Nie twórz package-only PR ani późniejszego PR Mapy.
+
+Teraz uruchom lokalne testy zadania, a po nich osobny lokalny fast-check. `FAIL` oznacza poprawę i powtórzenie; dopiero `PASS` pozwala commitować:
+
+```powershell
+..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_prototype_01/tests/tower_package_contract_test.gd
+..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_prototype_01/tests/tower_runtime_test.gd
+..\..\..\tools\agent_fast_check.ps1 -TestTarget @(
+    "underwater_map_workbench/structures/tower_prototype_01/tests/tower_package_contract_test.gd",
+    "underwater_map_workbench/structures/tower_prototype_01/tests/tower_runtime_test.gd"
+)
+git -C ..\..\.. diff --check
+git -C ..\..\.. add <jawne-zmienione-pliki>
+git -C ..\..\.. commit -m "fix: <krótki opis>"
+..\..\..\tools\publish_agent_pr.ps1 -Title "<krótki tytuł>" -TestTarget @(
+    "underwater_map_workbench/structures/tower_prototype_01/tests/tower_package_contract_test.gd",
+    "underwater_map_workbench/structures/tower_prototype_01/tests/tower_runtime_test.gd"
+)
+```
+
+Helper ponownie sprawdza czysty exact commit, pushuje branch, tworzy jeden PR i dla zwykłej zmiany włącza squash auto-merge. Na tym agent kończy bez pollingu. GitHub osobno sprawdza exact head PR: `FAIL` pozostawia PR otwarty, a `PASS` kieruje go do merge queue, gdzie pełny `integration-green` testuje `aktualny main + PR`. Konflikt albo nieaktualny seal, pin lub pochodna wraca do root jako nowe zadanie dla nowego agenta w świeżym worktree i branchu z aktualnego `main`; koordynator zamyka stary PR jako zastąpiony. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga natywnego capture'u i oględzin, a zmiana topologii ręcznego przepłynięcia budynku. Nie poprawiaj ręcznie `generated/**` ani `../../UnderwaterMap.tscn`.
+
+Zmiana globalnego originu, aktywności lub landmarku niezwiązana z sealem odbywa się w zadaniu Mapy z CWD `../..`. Root-routed zadanie seal+pin może zmienić wyłącznie odpowiadającą mu hash-pinned referencję i wymagane pochodne, nie placement przy okazji. Zmiana zachowania gracza, kampanii, publicznego kontraktu albo persistence jest zadaniem integracyjnym root.
 
 ## Dokumentacja
 
