@@ -129,7 +129,7 @@ Pelna granica produktu aktywnego i docelowego nalezy do `docs/OgolnyZarys.txt`; 
 ## Wazne pulapki
 
 - Godot 4.7.1 moze zakonczyc jedna ze wspolbieznych instancji natywnym `c0000005`, gdy dwa procesy wspoldziela katalog projektu albo cache `.godot`. Kazde zadanie i przebieg testowy korzysta z osobnego pelnego workspace oraz prywatnych `.godot`, `user://`, logow, temp, portow i capture; `-InPlace` pozostaje odrzucane.
-- Celowany `-Target` lub `-NativeTarget` uruchamia tylko wskazany zakres i nie wykonuje discovery ani promocji obcych warsztatow. Pelna regresja nalezy docelowo do merge queue, nie do lokalnej bramki autora.
+- Celowany `-Target` lub `-NativeTarget` uruchamia tylko wskazany zakres i nie wykonuje discovery ani promocji obcych warsztatow. Pelna regresje wykonuje aktywna merge queue, nie lokalna bramka autora.
 - Tracked pliki z atrybutem `eol=lf` musza pozostać LF; runner i builder wykonuja preflight automatycznie. Agent naprawia wskazany plik zamiast obslugiwac osobny protokol dowodowy.
 - Lokalny mirror `main` wolno aktualizowac tylko po sprawdzeniu czystosci przez `fetch`, fast-forward i Git LFS. Dirty katalog zatrzymuje synchronizacje; automatyczny `reset --hard` jest niedozwolony.
 - Obecnosc pola w zasobie albo zapisie nie oznacza aktywnej mechaniki. Jedyna pelna lista zachowanych pol, aliasow i kontraktow zgodnosci jest w architekturze, sekcja 11.3.

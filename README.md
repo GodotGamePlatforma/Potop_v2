@@ -71,9 +71,8 @@ Przepływ rozdziela kolejne etapy weryfikacji:
 
 - lokalne testy zadania sprawdzają zmieniane zachowanie;
 - osobny lokalny `fast-check PASS` działa w worktree przed commitem i zapobiega publikacji oczywiście złej zmiany;
-- po utworzeniu PR osobny, wymagany GitHub `fast-check` sprawdza dokładny head PR; tylko jego `PASS` pozwala wejść do merge queue, a każdy inny wynik blokuje enqueue i merge, także dla rzadkiej zmiany control-plane;
-- merge queue tworzy merge group `aktualny main + dany PR` i przed scaleniem uruchamia pełny `integration-green`;
-- tylko zielony wynik jest scalany metodą squash.
+- po utworzeniu PR osobny, wymagany GitHub `fast-check` sprawdza dokładny head PR; `FAIL` pozostawia PR otwarty, a tylko `PASS` pozwala wejść do merge queue, także dla rzadkiej zmiany control-plane;
+- merge queue tworzy merge group `aktualny main + dany PR` i uruchamia pełny `integration-green`; `FAIL` oznacza brak merge, a `PASS` pozwala na squash do `main`.
 
 Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Pierwszy canary tej ścieżki jest zielony; bieżący stan buildera opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
 
@@ -164,7 +163,7 @@ Test-Path ..\project.godot
 git -C .. status --short --branch
 ```
 
-Agent zajmujący się skalą, colliderem, animacją, socketami albo punktem emisji latarki rozpoczyna od lokalnego `AGENTS.md`, `.ai/PROJECT_CONTEXT.md`, `.ai/DECISIONS.md` i `README.md`. Ogólne reguły ruchu, tlenu, ryzyka, wyposażenia, UI, sesji i zapisu pozostają w root, a mapa i okludery w `underwater_map_workbench/`.
+Agent Nurka rozpoczyna od krótkiego routingu w lokalnym `AGENTS.md`: dla rutynowej animacji albo socketu czyta tylko właściwy punkt `.ai/PROJECT_CONTEXT.md`, odpowiednią sekcję `README.md` oraz zmieniane źródła i test. Pełne lokalne decyzje i dokumenty root są wymagane dopiero przy zmianie skali, collidera, punktu emisji światła, produktu, publicznego kontraktu, zapisu, migracji albo granicy właściciela. Ogólne reguły ruchu, tlenu, ryzyka, wyposażenia, UI, sesji i zapisu pozostają w root, a mapa i okludery w `underwater_map_workbench/`.
 
 ## Uruchamianie
 
@@ -235,7 +234,7 @@ Menu pauzy udostępnia `KONTYNUUJ`, `ZAPISZ GRĘ`, `USTAWIENIA`, `POWRÓT DO MEN
 
 ## Dokumentacja
 
-- `AGENTS.md` — proces pracy, kolejność pełnego odczytu i routing edycji;
+- `AGENTS.md` — proces pracy, proporcjonalny dobór kontekstu i routing edycji;
 - `.ai/PROJECT_CONTEXT.md` — potwierdzony runtime, luki, pułapki i ostatnia weryfikacja;
 - `.ai/DECISIONS.md` — trwałe decyzje, powody i jawne zastąpienia;
 - `docs/OgolnyZarys.txt` — produkt, zasady, balans, narracja i zakres;
