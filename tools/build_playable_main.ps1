@@ -149,15 +149,11 @@ function Set-CurrentPointer {
     $temporary = Join-Path $script:BuildRootPath (".current-{0}.tmp" -f [guid]::NewGuid().ToString('N'))
     Write-DurableText -Path $temporary -Text "$Sha`n"
     try {
-        if (Test-Path -LiteralPath $current -PathType Leaf) {
-            [System.IO.File]::Replace($temporary, $current, $null, $true)
-        }
-        elseif (Test-Path -LiteralPath $current) {
+        if ((Test-Path -LiteralPath $current) -and
+            -not (Test-Path -LiteralPath $current -PathType Leaf)) {
             throw 'builds/current must be a file containing one full SHA.'
         }
-        else {
-            [System.IO.File]::Move($temporary, $current)
-        }
+        [System.IO.File]::Move($temporary, $current, $true)
     }
     finally {
         if (Test-Path -LiteralPath $temporary -PathType Leaf) {
@@ -451,6 +447,8 @@ function Build-OneSha {
         }
     }
 }
+
+if ($MyInvocation.InvocationName -eq '.') { return }
 
 $script:RepoRoot = [System.IO.Path]::GetFullPath(
     (Invoke-Native -FilePath 'git' -Arguments @('-C', $Repository, 'rev-parse', '--show-toplevel'))

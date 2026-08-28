@@ -48,6 +48,7 @@ $requiredFragments = @(
     "schema = 'potop-playable-build-v1'",
     "status = 'PASS'",
     '[System.IO.Directory]::Move($staging, $finalDirectory)',
+    '[System.IO.File]::Move($temporary, $current, $true)',
     'Set-CurrentPointer -Sha $Sha',
     "Join-Path `$script:BuildRootPath 'last-failure'",
     'Remove-StaleStaging',
@@ -59,6 +60,38 @@ foreach ($fragment in $requiredFragments) {
     if (-not $source.Contains($fragment)) {
         throw "Builder contract fragment is missing: $fragment"
     }
+}
+
+if ($source.Contains('[System.IO.File]::Replace(')) {
+    throw 'Builder must not use File.Replace without a backup path for current.'
+}
+
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $pointerRoot = Join-Path ([System.IO.Path]::GetTempPath()) (
+        'potop-builder-current-{0}' -f [guid]::NewGuid().ToString('N')
+    )
+    New-Item -ItemType Directory -Path $pointerRoot | Out-Null
+    try {
+        . $toolPath
+        $script:BuildRootPath = $pointerRoot
+        $currentPath = Join-Path $pointerRoot 'current'
+        foreach ($sha in @(('1' * 40), ('2' * 40), ('3' * 40))) {
+            Set-CurrentPointer -Sha $sha
+            $actual = Get-Content -LiteralPath $currentPath -Raw
+            if ($actual -cne "$sha`n") {
+                throw "Current pointer replacement produced unexpected content: '$actual'."
+            }
+        }
+        if (@(Get-ChildItem -LiteralPath $pointerRoot -Filter '.current-*.tmp' -Force).Count -ne 0) {
+            throw 'Current pointer replacement left a temporary file behind.'
+        }
+    }
+    finally {
+        [System.IO.Directory]::Delete($pointerRoot, $true)
+    }
+}
+else {
+    Write-Host 'SKIP current replacement runtime test: PowerShell 7 is required by the builder.'
 }
 
 $publishArtifact = $source.IndexOf(
