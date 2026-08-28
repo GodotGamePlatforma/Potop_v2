@@ -4872,6 +4872,15 @@ try {
             -TestCases @($testCases) `
             -ShardLane ([string]$activePlannedShard.Lane)
     }
+    elseif ($Full -and [string]::Equals(
+        [string]$env:GITHUB_ACTIONS,
+        "true",
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+        Set-NativeShardDummyAudio `
+            -TestCases @($testCases | Where-Object { $_.NativeWindow }) `
+            -ShardLane "native"
+    }
 
     $suiteDescription = if ($shardMode) {
         "planned shard '$($activePlannedShard.Id)' ($($activePlannedShard.Lane), $($activeShardTargets.Count) targets)"
