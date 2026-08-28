@@ -11,6 +11,8 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
     $PSNativeCommandUseErrorActionPreference = $false
 }
 
+$script:Repo = [System.IO.Path]::GetFullPath($Repository).TrimEnd('\', '/')
+
 function Invoke-GitResult {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
     $previous = $ErrorActionPreference
@@ -56,6 +58,128 @@ function Invoke-GitChecked {
         throw "git $($Arguments -join ' ') failed: $($result.Output)"
     }
     return $result.Output
+}
+
+function Invoke-LfsCheckoutChecked {
+    $hadSkipSmudge = Test-Path -LiteralPath 'Env:GIT_LFS_SKIP_SMUDGE'
+    $previousSkipSmudge = [string]$env:GIT_LFS_SKIP_SMUDGE
+    try {
+        Remove-Item -LiteralPath 'Env:GIT_LFS_SKIP_SMUDGE' -ErrorAction SilentlyContinue
+        Invoke-GitChecked @(
+            '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
+            'lfs', 'checkout'
+        ) | Out-Null
+    }
+    finally {
+        if ($hadSkipSmudge) {
+            $env:GIT_LFS_SKIP_SMUDGE = $previousSkipSmudge
+        }
+        else {
+            Remove-Item -LiteralPath 'Env:GIT_LFS_SKIP_SMUDGE' -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Resolve-PythonPath {
+    foreach ($name in @('python.exe', 'python')) {
+        $command = @(
+            Get-Command -Name $name -CommandType Application,ExternalScript -ErrorAction SilentlyContinue
+        ) | Select-Object -First 1
+        if ($null -eq $command) { continue }
+        $resolved = if (-not [string]::IsNullOrWhiteSpace([string]$command.Path)) {
+            [string]$command.Path
+        }
+        else {
+            [string]$command.Source
+        }
+        if (-not [string]::IsNullOrWhiteSpace($resolved)) { return $resolved }
+    }
+    throw 'Required external command python was not found.'
+}
+
+function Get-CanonicalPublicationLockPath {
+    $pythonPath = Resolve-PythonPath
+    $contractTool = Join-Path $PSScriptRoot 'workbench_contract.py'
+    if (-not (Test-Path -LiteralPath $contractTool -PathType Leaf)) {
+        throw "Canonical lock helper is missing: '$contractTool'."
+    }
+    $previous = $ErrorActionPreference
+    $output = @()
+    $exitCode = 127
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(
+            & $pythonPath -B $contractTool --repo $script:Repo `
+                lock-path --name integration-publish 2>&1
+        )
+        $exitCode = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    }
+    catch {
+        $output = @($output) + @($_.Exception.Message)
+        $exitCode = 127
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($exitCode -ne 0) {
+        throw "Canonical integration-publish lock path resolution failed: $(($output | Out-String).Trim())"
+    }
+    $lockPath = (($output | Out-String).Trim())
+    if ([string]::IsNullOrWhiteSpace($lockPath) -or
+        -not [System.IO.Path]::IsPathRooted($lockPath)) {
+        throw "Canonical integration-publish lock path is invalid: '$lockPath'."
+    }
+    return [System.IO.Path]::GetFullPath($lockPath)
+}
+
+function Enter-IntegrationPublishLock {
+    $lockPath = Get-CanonicalPublicationLockPath
+    [System.IO.Directory]::CreateDirectory(
+        [System.IO.Path]::GetDirectoryName($lockPath)
+    ) | Out-Null
+    $stream = $null
+    try {
+        $stream = [System.IO.File]::Open(
+            $lockPath,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::ReadWrite
+        )
+        if ($stream.Length -eq 0) {
+            $stream.WriteByte(0)
+            $stream.Flush()
+        }
+        $stream.Position = 0
+        $stream.Lock(0, 1)
+        $thread = if ([string]::IsNullOrWhiteSpace([string]$env:CODEX_THREAD_ID)) {
+            'external'
+        }
+        else {
+            [string]$env:CODEX_THREAD_ID
+        }
+        $owner = [ordered]@{ thread = $thread; pid = $PID } | ConvertTo-Json -Compress
+        $ownerBytes = [System.Text.UTF8Encoding]::new($false).GetBytes($owner)
+        $stream.SetLength(1)
+        $stream.Position = 1
+        $stream.Write($ownerBytes, 0, $ownerBytes.Length)
+        $stream.Flush()
+        return $stream
+    }
+    catch {
+        if ($null -ne $stream) { $stream.Dispose() }
+        throw "Workspace lock 'integration-publish' is already active or unavailable for exact repository '$script:Repo': $($_.Exception.Message)"
+    }
+}
+
+function Exit-IntegrationPublishLock {
+    param([Parameter(Mandatory = $true)][System.IO.FileStream]$Stream)
+
+    try {
+        $Stream.Unlock(0, 1)
+    }
+    finally {
+        $Stream.Dispose()
+    }
 }
 
 function Get-LfsListing {
@@ -182,7 +306,20 @@ function Assert-ExactCleanMainState {
     }
 }
 
-$script:Repo = [System.IO.Path]::GetFullPath($Repository).TrimEnd('\', '/')
+function Assert-ExactRemoteTarget {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExpectedSha,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $remote = Invoke-GitResult @('rev-parse', 'refs/remotes/origin/main')
+    if ($remote.ExitCode -ne 0 -or $remote.Output.Trim() -cne $ExpectedSha) {
+        throw "$Label exact origin/main fence failed: '$($remote.Output.Trim())'."
+    }
+}
+
+$publishLock = Enter-IntegrationPublishLock
+try {
 $top = [System.IO.Path]::GetFullPath((Invoke-GitChecked @('rev-parse', '--show-toplevel')).Trim()).TrimEnd('\', '/')
 if (-not [string]::Equals($script:Repo, $top, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Repository must be the Git top level: '$top'."
@@ -210,10 +347,7 @@ Invoke-GitChecked @(
     '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
     'lfs', 'fsck', $currentSha
 ) | Out-Null
-Invoke-GitChecked @(
-    '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
-    'lfs', 'checkout'
-) | Out-Null
+Invoke-LfsCheckoutChecked
 Assert-LfsWorktreeHydrated
 Assert-ExactCleanMainState -ExpectedSha $currentSha -Label 'Current LFS self-heal'
 
@@ -238,26 +372,22 @@ Invoke-GitChecked @(
     '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
     'lfs', 'fsck', $targetSha
 ) | Out-Null
+Assert-ExactRemoteTarget -ExpectedSha $targetSha -Label 'Pre-merge'
+Assert-ExactCleanMainState -ExpectedSha $currentSha -Label 'Pre-merge'
 
 $mergeAttempted = $false
 try {
     $mergeAttempted = $true
     Invoke-GitChecked @('merge', '--ff-only', $targetSha) | Out-Null
-    Invoke-GitChecked @(
-        '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
-        'lfs', 'checkout'
-    ) | Out-Null
+    Invoke-LfsCheckoutChecked
     Invoke-GitChecked @(
         '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
         'lfs', 'fsck', $targetSha
     ) | Out-Null
     Assert-LfsWorktreeHydrated
-
-    $actualSha = (Invoke-GitChecked @('rev-parse', 'HEAD')).Trim()
-    $afterStatus = Invoke-GitChecked @('status', '--porcelain=v1', '--untracked-files=all')
-    if ($actualSha -cne $targetSha -or -not [string]::IsNullOrWhiteSpace($afterStatus)) {
-        throw 'Post-sync exact SHA/clean verification failed.'
-    }
+    Assert-ExactRemoteTarget -ExpectedSha $targetSha -Label 'Success'
+    Assert-ExactCleanMainState -ExpectedSha $targetSha -Label 'Success'
+    $actualSha = $targetSha
 }
 catch {
     $syncFailure = $_
@@ -304,9 +434,19 @@ catch {
         if ($restoreRef.ExitCode -ne 0) {
             throw "Sync failed and exact main ref rollback failed: $($restoreRef.Output). Original error: $($syncFailure.Exception.Message)"
         }
+        Invoke-LfsCheckoutChecked
+        Assert-LfsObjectsDownloaded $currentSha
+        Invoke-GitChecked @(
+            '-c', 'lfs.fetchinclude=', '-c', 'lfs.fetchexclude=',
+            'lfs', 'fsck', $currentSha
+        ) | Out-Null
         Assert-LfsWorktreeHydrated
         Assert-ExactCleanMainState -ExpectedSha $currentSha -Label 'Rollback result'
     }
     throw $syncFailure
 }
 Write-Host "SYNC PASS main=$actualSha lfs=hydrated"
+}
+finally {
+    Exit-IntegrationPublishLock $publishLock
+}
