@@ -227,6 +227,15 @@ if ($branchExists.ExitCode -eq 0) {
 if ($branchExists.ExitCode -ne 1) {
     throw "Could not determine whether branch '$targetBranch' exists."
 }
+$remoteBranch = Invoke-GitResult $repositoryPath @(
+    'ls-remote', '--exit-code', '--heads', 'origin', "refs/heads/$targetBranch"
+)
+if ($remoteBranch.ExitCode -eq 0) {
+    throw "Remote branch already exists: '$targetBranch'."
+}
+if ($remoteBranch.ExitCode -ne 2) {
+    throw "Could not determine whether remote branch '$targetBranch' exists: $($remoteBranch.Output)"
+}
 if (Test-Path -LiteralPath $destinationPath) {
     throw "Destination already exists: '$destinationPath'."
 }

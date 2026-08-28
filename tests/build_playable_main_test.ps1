@@ -54,6 +54,10 @@ $requiredFragments = @(
     'Remove-StaleStaging',
     '$sha -ceq $lastFailedSha',
     'PLAYABLE BUILD WAITING: unchanged failed SHA',
+    'PLAYABLE BUILD WAITING: current SHA is unchanged',
+    '$currentSha -ceq $Sha',
+    "'ls-remote', '--exit-code', 'origin', 'refs/heads/main'",
+    'Test-AlreadyPublishedCurrent -Sha $remoteSha',
     'Builder attempt failed; current is unchanged.'
 )
 foreach ($fragment in $requiredFragments) {
