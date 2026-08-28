@@ -1,35 +1,43 @@
-name: Agent branch validation
+name: Agent fast-check
 
 on:
-  push:
+  pull_request:
     branches:
-      - "codex/**"
-  workflow_dispatch:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 
 permissions:
   contents: read
 
 concurrency:
-  group: agent-validation-${{ github.ref }}
+  group: agent-fast-check-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
-  GIT_LFS_SKIP_SMUDGE: "1"
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: core.autocrlf
   GIT_CONFIG_VALUE_0: "false"
+  GODOT_VERSION: 4.7.1-stable
+  GODOT_ARCHIVE_NAME: Godot_v4.7.1-stable_win64.exe.zip
+  GODOT_RELEASE_URL: https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip
+  GODOT_ARCHIVE_SHA256: c7a289051eaefb460b0106b60e9cd5bee0ef55fd102dcb2bed1eb356cf3d90a1
 
 jobs:
-  fast-contract:
-    name: Agent fast contract
+  fast-check:
+    name: fast-check
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - name: Check out exact branch commit without LFS payloads
+      - name: Check out the exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-          lfs: false
+          lfs: true
           persist-credentials: false
 
       - name: Set up Python
@@ -37,99 +45,77 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Verify immutable source and LF contract
+      - name: Hydrate and verify every tracked LFS object
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
-            $PSNativeCommandUseErrorActionPreference = $false
-          }
+          git lfs checkout
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git lfs fsck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          import json
+          import pathlib
+          import subprocess
 
+          root = pathlib.Path.cwd()
+          listing = json.loads(subprocess.run(
+              ["git", "lfs", "ls-files", "--json"],
+              check=True,
+              capture_output=True,
+          ).stdout)
+          pointers = []
+          header = b"version https://git-lfs.github.com/spec/v1"
+          for entry in listing["files"]:
+              relative = entry["name"]
+              candidate = root / pathlib.PurePosixPath(relative)
+              if not entry.get("checkout", False) or not candidate.is_file():
+                  pointers.append(relative)
+                  continue
+              with candidate.open("rb") as handle:
+                  if handle.read(len(header)) == header:
+                      pointers.append(relative)
+          if pointers:
+              raise SystemExit("Tracked LFS pointers remain unhydrated: " + ", ".join(pointers))
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install pinned Godot
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = Join-Path $env:RUNNER_TEMP $env:GODOT_ARCHIVE_NAME
+          $install = Join-Path $env:RUNNER_TEMP "godot-fast-check"
+          Invoke-WebRequest -Uri $env:GODOT_RELEASE_URL -OutFile $archive
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $env:GODOT_ARCHIVE_SHA256) {
+            throw "Godot archive checksum mismatch. expected=$env:GODOT_ARCHIVE_SHA256 actual=$actual"
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $install
+          $godot = Join-Path $install "Godot_v4.7.1-stable_win64_console.exe"
+          if (-not (Test-Path -LiteralPath $godot -PathType Leaf)) {
+            throw "Pinned Godot executable is missing."
+          }
+          "GODOT_CONSOLE_PATH=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run the canonical fast-check
+        shell: pwsh
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $actualHead = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $actualHead -cne $env:GITHUB_SHA) {
-            throw "Checkout HEAD does not match GITHUB_SHA. expected=$env:GITHUB_SHA actual=$actualHead"
+          if ($actualHead -cne $env:EXPECTED_HEAD) {
+            throw "Checkout is not the exact PR head. expected=$env:EXPECTED_HEAD actual=$actualHead"
           }
-          if (-not [string]::IsNullOrEmpty((git status --porcelain=v1 --untracked-files=all))) {
-            throw "Agent validation checkout is not clean."
-          }
-
-          python -B tools/workbench_contract.py --repo . eol-check
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Validate the complete committed owner diff
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
-            $PSNativeCommandUseErrorActionPreference = $false
-          }
-          git fetch --no-tags origin `
-            +refs/heads/main:refs/remotes/origin/main
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-          python -B tools/ci_branch_owner.py validate `
-            --repo . `
-            --branch $env:GITHUB_REF_NAME `
-            --base-ref refs/remotes/origin/main
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Run fast CI contract tests
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          if (Test-Path -LiteralPath variable:PSNativeCommandUseErrorActionPreference) {
-            $PSNativeCommandUseErrorActionPreference = $false
-          }
-
-          $tests = @(
-            Get-Item -LiteralPath "tests/agent_integration_workflow_test.py"
-            Get-ChildItem -LiteralPath tests -File -Filter "ci_*_test.py" |
-              ForEach-Object { $_ }
-          ) | Sort-Object -Property Name
-          if ($tests.Count -eq 0) {
-            throw "No CI contract tests were discovered."
-          }
-
-          $python = (Get-Command python -ErrorAction Stop).Source
-          $running = [System.Collections.Generic.List[object]]::new()
-          foreach ($test in $tests) {
-            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = $python
-            $startInfo.UseShellExecute = $false
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $startInfo.CreateNoWindow = $true
-            [void]$startInfo.ArgumentList.Add("-B")
-            [void]$startInfo.ArgumentList.Add($test.FullName)
-            $process = [System.Diagnostics.Process]::new()
-            $process.StartInfo = $startInfo
-            if (-not $process.Start()) {
-              throw "Could not start CI contract: $($test.Name)"
-            }
-            $running.Add([pscustomobject]@{
-              Name = $test.Name
-              Process = $process
-              Stdout = $process.StandardOutput.ReadToEndAsync()
-              Stderr = $process.StandardError.ReadToEndAsync()
-            })
-          }
-
-          $failures = [System.Collections.Generic.List[string]]::new()
-          foreach ($entry in $running) {
-            $entry.Process.WaitForExit()
-            $stdout = $entry.Stdout.GetAwaiter().GetResult()
-            $stderr = $entry.Stderr.GetAwaiter().GetResult()
-            Write-Host "CI CONTRACT: $($entry.Name) exit=$($entry.Process.ExitCode)"
-            if (-not [string]::IsNullOrWhiteSpace($stdout)) { Write-Host $stdout.TrimEnd() }
-            if (-not [string]::IsNullOrWhiteSpace($stderr)) { Write-Host $stderr.TrimEnd() }
-            if ($entry.Process.ExitCode -ne 0) { $failures.Add($entry.Name) }
-            $entry.Process.Dispose()
-          }
-          if ($failures.Count -gt 0) {
-            throw "CI contract failures: $([string]::Join(', ', $failures))"
-          }
+          & ./tools/agent_fast_check.ps1 `
+            -Repository . `
+            -BaseRef refs/remotes/origin/main `
+            -GodotConsolePath $env:GODOT_CONSOLE_PATH `
+            -ExpectedHeadSha $env:EXPECTED_HEAD `
+            -ExpectedBranch $env:EXPECTED_BRANCH `
+            -AllowControlPlane
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
