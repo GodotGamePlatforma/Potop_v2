@@ -19,7 +19,7 @@ Rola pliku: krótka, datowana migawka bieżącego pakietu mapy, luk i ostatniej 
 
 - Pakiety struktur, Mapa i Nurek mogą powstawać równolegle w osobnych worktrees i na osobnych gałęziach. Prywatne `--build-structure` i `--check-structure` pracują tylko na wskazanym ID i lokalnym `.godot`; nie zapisują authority Mapy ani innego pakietu.
 - Zmiana struktury wymagająca nowego seala i pinu jest jednym root-routed PR obejmującym źródła pakietu, mapowy pin oraz pochodne. Pozostałe zmiany `map_manifest.json`, `UnderwaterMap.tscn`, metadanych builda i `structures/*/generated/**` należą do zwykłego zakresu Mapy. Przy kilku nowych sealed manifestach builder może odświeżyć dokładne SHA-256 jednym batchem i musi pozostawić spójny zestaw.
-- Builder i runner odrzucają niezgodne EOL oraz izolują `.godot`, `user://`, logi i porty. `fast-check PASS` przed enqueue oraz pełne testy złożenia w merge queue przed scaleniem są zatwierdzonym celem ARD-0113; bieżący stan wdrożenia opisuje globalny `.ai/PROJECT_CONTEXT.md`.
+- Builder i runner odrzucają niezgodne EOL oraz izolują `.godot`, `user://`, logi i porty. Lokalny fast-check przed commitem, PR z włączonym GitHub `merge when ready`, osobny wymagany GitHub `fast-check PASS` oraz pełne testy złożenia w merge queue przed scaleniem są zatwierdzonym celem ARD-0113; autor kończy bez pollingu po publikacji PR, a bieżący stan wdrożenia opisuje globalny `.ai/PROJECT_CONTEXT.md`.
 
 ## Luki
 

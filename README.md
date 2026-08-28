@@ -26,7 +26,7 @@ git lfs pull
 
 ## Praca nad zmianą
 
-Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. Agent zajmuje się implementacją oraz adekwatnymi testami lokalnymi; nie tworzy assignmentu, ACK, receiptu, lokalnego LKG ani osobnego agenta-audytora.
+Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. To zwykłe przydzielenie pracy, nie bundle/store assignmentu, ACK, receipt, lokalne LKG ani osobny agent-audytor.
 
 Przykładowy start z czystej kopii repozytorium:
 
@@ -41,9 +41,10 @@ Następnie:
 
 1. przeczytaj kontekst wymagany przez najbliższy `AGENTS.md`;
 2. wprowadź zmianę wyłącznie w dozwolonej domenie;
-3. uruchom proporcjonalne testy lokalne opisane niżej lub w README warsztatu;
-4. sprawdź pełny diff i brak niezamierzonych plików;
-5. utwórz logiczny commit, wypchnij własną gałąź i otwórz jeden PR.
+3. uruchom proporcjonalne testy oraz lokalny `fast-check` w worktree;
+4. dopiero po lokalnym `fast-check PASS` sprawdź pełny diff i utwórz logiczny commit;
+5. wypchnij własną gałąź, otwórz jeden PR i włącz GitHub `merge when ready` metodą squash;
+6. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge.
 
 ```powershell
 git status --short
@@ -55,13 +56,16 @@ Nie pushuj bezpośrednio do `main`. Nie czytaj ani nie modyfikuj live worktree i
 
 ## Docelowa ochrona `main`
 
-Docelowy przepływ rozdziela dwie bramki:
+Docelowy przepływ rozdziela trzy etapy weryfikacji:
 
-- `fast-check` musi zakończyć się `PASS`, zanim PR trafi do merge queue; każdy inny wynik blokuje enqueue i merge, także dla rzadkiej zmiany control-plane;
+- lokalny `fast-check PASS` działa w worktree przed commitem i zapobiega publikacji oczywiście złej zmiany;
+- po utworzeniu PR osobny, wymagany GitHub `fast-check` sprawdza dokładny head PR; tylko jego `PASS` pozwala wejść do merge queue, a każdy inny wynik blokuje enqueue i merge, także dla rzadkiej zmiany control-plane;
 - merge queue tworzy merge group `aktualny main + dany PR` i przed scaleniem uruchamia pełny `integration-green`;
 - tylko zielony wynik jest scalany metodą squash.
 
 Dzięki temu `main` oznacza najnowszy kod, który przeszedł pełną regresję. Bieżący stan wdrożenia opisuje [`.ai/PROJECT_CONTEXT.md`](.ai/PROJECT_CONTEXT.md).
+
+Merge queue sama używa aktualnego `main`; autor nie babysituje PR. Jeżeli wystąpi prawdziwy konflikt albo `integration-green` wykryje nieaktualny seal, pin lub pochodne, koordynator zamyka stary PR jako zastąpiony i przydziela nowe zadanie naprawcze. Nowy agent rozpoczyna od aktualnego `main` w świeżym worktree, branchu i PR.
 
 Każdy przebieg Godota używa izolowanego workspace, `.godot`, `user://`, logów, katalogów tymczasowych i portów. Wspólny runner wykonuje tę izolację automatycznie; `-InPlace` pozostaje niedozwolone.
 
@@ -120,7 +124,7 @@ Zwykły PR nie może zmieniać:
 - konfiguracji `integration-green`;
 - control-plane finalnego buildera.
 
-Te ścieżki mają być chronione regułą GitHub. Rzadka zmiana wymaga osobnego PR i ręcznej zgody właściciela; zgoda nie omija `fast-check PASS` ani `integration-green PASS` merge group. Nie uruchamia się drugiego Codexa do oceniania pierwszego.
+Te ścieżki mają być chronione regułą GitHub. Rzadka zmiana wymaga osobnego PR i ręcznej zgody właściciela; zgoda nie omija wymaganego GitHub `fast-check PASS` ani `integration-green PASS` merge group. Nie uruchamia się drugiego Codexa do oceniania pierwszego.
 
 ## Mapa podwodna
 
@@ -170,17 +174,7 @@ Szybka bramka:
 .\tests\run_all_tests.ps1
 ```
 
-Pełna regresja wraz z dodatkowym lane'em wymagającym natywnego okna:
-
-```powershell
-.\tests\run_all_tests.ps1 -Full
-```
-
-Pełna regresja oraz aktywne cele snapshotowe:
-
-```powershell
-.\tests\run_all_tests.ps1 -Full -IncludeSnapshots
-```
+Pełną regresję uruchamia `integration-green` na merge group w GitHub. Zwykły agent nie wykonuje jej przed PR; lokalnie pozostaje szybka bramka i cele proporcjonalne do zadania. Tryby pełne i snapshotowe są narzędziami wykonawcy CI albo jawnej diagnostyki, nie krokiem codziennego przepływu autora.
 
 Odbiór infrastruktury współbieżnej tworzy tymczasowy Git-closed commit, dwa linked worktrees i uruchamia w nich równolegle dwa izolowane importy oraz cele Godota. Nie zmienia realnego `HEAD`, branchy ani źródeł:
 

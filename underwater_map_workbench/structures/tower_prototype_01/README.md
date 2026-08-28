@@ -55,20 +55,18 @@ python ..\..\tools\build_underwater_map.py --check-structure tower_prototype_01
 ..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_prototype_01/tests/tower_runtime_test.gd
 ```
 
-Następnie, nadal przed jednym wspólnym PR, odśwież dokładny pin, odtwórz pochodne i uruchom pełny lokalny zestaw Mapy:
+Następnie, nadal przed jednym wspólnym PR, odśwież dokładny pin, odtwórz pochodne i uruchom lokalny fast-check:
 
 ```powershell
 python ..\..\tools\build_underwater_map.py --refresh-structure-package tower_prototype_01 --sealed-package-sha256 <SHA256>
 python ..\..\tools\build_underwater_map.py --build
 python ..\..\tools\build_underwater_map.py --check
-..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
-..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_visual_residency_test.gd
-..\..\..\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
+..\..\..\tests\run_all_tests.ps1
 ```
 
 `--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`, a `--refresh-structure-package` wyłącznie mapowy pin i pochodne. Granice komend pozostają rozdzielone, lecz źródła pakietu, seal, dokładny pin i wszystkie pochodne muszą trafić atomowo w jednym branchu i PR. Nie twórz package-only PR ani późniejszego PR Mapy.
 
-Jeżeli konkurencyjny PR zmieni `main`, zaktualizuj bazę do bieżącego `origin/main` i powtórz cały seal/refresh, builder oraz testy pakietu i Mapy. Tylko `fast-check PASS` pozwala enqueue PR; pełną integrację następnie wykonuje merge queue. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga natywnego capture'u i oględzin, a zmiana topologii ręcznego przepłynięcia budynku. Nie poprawiaj ręcznie `generated/**` ani `../../UnderwaterMap.tscn`.
+Po lokalnym `fast-check PASS` utwórz commit, push i PR, włącz GitHub `merge when ready` metodą squash, a następnie zakończ pracę bez pollingu. Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head; jego `PASS` pozwala merge queue utworzyć `aktualny main + PR` i uruchomić pełny `integration-green`. Autor nie aktualizuje starego PR po każdym konkurencyjnym merge. Konflikt albo nieaktualny seal, pin lub pochodna wraca do root jako nowe zadanie dla nowego agenta w świeżym worktree i branchu z aktualnego `main`; koordynator zamyka stary PR jako zastąpiony. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga natywnego capture'u i oględzin, a zmiana topologii ręcznego przepłynięcia budynku. Nie poprawiaj ręcznie `generated/**` ani `../../UnderwaterMap.tscn`.
 
 Zmiana globalnego originu, aktywności lub landmarku niezwiązana z sealem odbywa się w zadaniu Mapy z CWD `../..`. Root-routed zadanie seal+pin może zmienić wyłącznie odpowiadającą mu hash-pinned referencję i wymagane pochodne, nie placement przy okazji. Zmiana zachowania gracza, kampanii, publicznego kontraktu albo persistence jest zadaniem integracyjnym root.
 

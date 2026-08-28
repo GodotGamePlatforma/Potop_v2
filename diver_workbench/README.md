@@ -37,7 +37,7 @@ Root steruje ruchem avatara przez publiczne metody `DiverController`, a ruchome 
 
 ## Uruchamianie i testy
 
-Autor Nurka pracuje w osobnym pełnym Git worktree na gałęzi `codex/diver/<task-slug>` utworzonej z aktualnego `origin/main`. Wdraża zmianę, uruchamia właściwy lokalny test i capture, sprawdza diff oraz otwiera jeden PR. Wszystkie komendy korzystają ze wspólnego runnera i izolowanej pełnej kopii projektu z prywatnym `.godot`, `user://`, logami, portami procesu i capture. Jawny cel Nurka nie wykonuje globalnego discovery ani walidacji niezwiązanych pakietów Mapy. Z katalogu `diver_workbench/`:
+Root lub koordynator przydziela jedno proste zadanie jednemu agentowi Nurka. Autor pracuje w osobnym pełnym Git worktree na gałęzi `codex/diver/<task-slug>` utworzonej z aktualnego `origin/main`. Wdraża zmianę, uruchamia właściwy lokalny test i capture oraz lokalny `fast-check`, a dopiero po jego `PASS` tworzy commit, pushuje, otwiera jeden PR i włącza GitHub `merge when ready` metodą squash. Na tym kończy pracę bez pollingu. Wszystkie komendy korzystają ze wspólnego runnera i izolowanej pełnej kopii projektu z prywatnym `.godot`, `user://`, logami, portami procesu i capture. Jawny cel Nurka nie wykonuje globalnego discovery ani walidacji niezwiązanych pakietów Mapy. Z katalogu `diver_workbench/`:
 
 ```powershell
 ..\tests\run_all_tests.ps1 -Target diver_workbench/tests/DiverPresentationTest.tscn
@@ -59,11 +59,7 @@ Natywny capture prezentacji:
 
 Capture zapisuje swoje artefakty w izolowanym workspace testu. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `105 × 60`, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*` z centralnym radialnym światłem, markerami kierunków oraz okluderami. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera, prześwitów produkcyjnej mapy ani odczucia sterowania.
 
-Pełna regresja nadal jest uruchamiana z root:
-
-```powershell
-..\tests\run_all_tests.ps1 -Full
-```
+Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head. Dopiero jego `PASS` pozwala merge queue utworzyć kandydat `aktualny main + PR`; pełny `integration-green` uruchamia się wyłącznie na tym kandydacie. Agent nie czeka na kolejkę ani nie aktualizuje starego PR po każdym cudzym merge. Konflikt wraca do root jako nowe zadanie dla nowego agenta startującego z aktualnego `main`.
 
 Runner odrzuca `-InPlace`; test Nurka zawsze działa w izolowanej kopii. `ERROR`, `SCRIPT ERROR`, timeout albo niezerowy kod procesu oznaczają porażkę.
 

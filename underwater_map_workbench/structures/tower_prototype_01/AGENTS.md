@@ -27,10 +27,10 @@ Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publi
 
 ### Współbieżność
 
-- Jeden autor zmiany seal+pin pracuje w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_prototype_01/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
-- Autor wykonuje pełny seal, build/check i oba testy pakietu, następnie mapowy refresh, pełny build/check i pełne testy Mapy. Tylko `fast-check PASS` pozwala enqueue PR; nie powstaje drugi PR Mapy.
+- Root lub koordynator przydziela zmianę seal+pin jako jedno proste zadanie jednemu autorowi w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_prototype_01/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
+- Autor wykonuje wymagany seal/refresh/build/check, celowane testy pakietu i lokalny `fast-check`. Po lokalnym `PASS` tworzy commit, pushuje, otwiera PR i włącza GitHub `merge when ready` metodą squash, na czym kończy pracę bez pollingu. Po PR osobny wymagany GitHub `fast-check` decyduje o enqueue; pełny `integration-green` wykonuje merge queue. Nie powstaje drugi PR Mapy.
 - Lokalny build/check i celowane testy pakietu nie odkrywają innych struktur. Runner izoluje `.godot`, `user://`, logi i capture w pełnej kopii oraz odrzuca `-InPlace`.
-- Autor nie poprawia ręcznie `generated/**` ani mapowego pinu. Jeżeli konkurencyjny PR zmieni `main`, aktualizuje bazę, ponownie uruchamia seal/refresh, builder oraz pełne testy pakietu i Mapy. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera.
+- Autor nie poprawia ręcznie `generated/**` ani mapowego pinu i nie babysituje starego PR. Prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w merge queue wraca do root jako nowe zadanie naprawcze dla nowego agenta startującego z aktualnego `main`; koordynator zastępuje i zamyka stary PR. Spójna publikacja pochodnych jest wewnętrznym obowiązkiem buildera.
 
 ## Authority i pochodne
 
@@ -53,8 +53,8 @@ Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzj
 
 1. Ustal edytowalne źródło z `structure_manifest.json` i sprawdź wskazane pliki runtime, assety oraz lokalny test.
 2. Porównaj zmianę z aktywnymi MAP-ARD-0022, MAP-ARD-0027 i globalnym ARD-0106. Nie zmieniaj przy okazji mapowego placementu ani semantyki zapisu.
-3. Gdy zmieniło się źródło lub jego hash, w jednym root-routed worktree uruchom `--seal-structure-package tower_prototype_01`, `--build-structure tower_prototype_01`, `--check-structure tower_prototype_01`, oba testy pakietu, a następnie `--refresh-structure-package tower_prototype_01` z dokładnym SHA-256, pełny mapowy `--build`/`--check` i pełne testy Mapy.
-4. Jeden PR musi zawierać źródła, seal, mapowy pin i wszystkie pochodne. Rootowy test dobierz dodatkowo tylko dla publicznego montażu, resetu próby albo granicy persistence; po zmianie bazy powtórz cały builder i zestaw testów.
+3. Gdy zmieniło się źródło lub jego hash, w jednym root-routed worktree uruchom `--seal-structure-package tower_prototype_01`, `--build-structure tower_prototype_01`, `--check-structure tower_prototype_01`, celowane testy pakietu, a następnie `--refresh-structure-package tower_prototype_01` z dokładnym SHA-256, mapowy `--build`/`--check` i lokalny `fast-check`.
+4. Dopiero po lokalnym `fast-check PASS` utwórz commit, push i jeden PR zawierający źródła, seal, mapowy pin i wszystkie pochodne; włącz GitHub `merge when ready` metodą squash i zakończ pracę bez pollingu. Rootowy test dobierz dodatkowo tylko dla publicznego montażu, resetu próby albo granicy persistence. Pełną regresję wykonuje merge queue.
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnej wygenerowanej sceny i obejrzyj wynik.
 6. Po zmianie topologii zachowaj ręczny playtest całego budynku i wymaganych powrotów; nie zastępuj go BFS-em.
 

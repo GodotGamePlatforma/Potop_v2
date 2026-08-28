@@ -23,8 +23,8 @@ Zmiana wyłącznie organizacji albo źródła prezentacji, która zachowuje zatw
 
 ### Współbieżność
 
-- Agent Nurka używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` utworzonej z aktualnego `origin/main`. Osobny CWD we wspólnym checkoutcie nie daje izolacji; lokalna allowlista nadal obejmuje wyłącznie `diver_workbench/**`.
-- Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Autor wdraża zmianę, uruchamia właściwy lokalny test i capture, sprawdza diff oraz otwiera jeden PR.
+- Root lub koordynator przydziela jedno proste zadanie jednemu agentowi Nurka. Agent używa osobnego pełnego Git worktree i gałęzi `codex/diver/<task-slug>` utworzonej z aktualnego `origin/main`. Osobny CWD we wspólnym checkoutcie nie daje izolacji; lokalna allowlista nadal obejmuje wyłącznie `diver_workbench/**`.
+- Zmiana aktywnych `assets/animation/`, `assets/profiles/`, `definitions/` albo `runtime/` ma jednego autora na gałęzi. Autor wdraża zmianę, uruchamia właściwy lokalny test i capture oraz lokalny `fast-check`, a po jego `PASS` tworzy commit, pushuje, otwiera jeden PR i włącza GitHub `merge when ready` metodą squash. Na tym kończy pracę bez pollingu; osobny wymagany GitHub `fast-check` sprawdza PR, a pełny `integration-green` działa dopiero w merge queue.
 - Celowany test Nurka nie wykonuje discovery, refreshu ani walidacji prywatnych pakietów Mapy. Runner używa pełnej izolowanej kopii z osobnym `.godot`, `user://`, logami i capture; równoległy Godot działa tylko w osobnych workspace z jawnym `--path`. `-InPlace` jest odrzucane.
 
 ## Granica odpowiedzialności

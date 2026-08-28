@@ -31,12 +31,12 @@ Jeżeli zadanie zmienia ogólną regułę gracza, kampanię, gameplay poza rozmi
 
 ### Współbieżna praca w warsztacie
 
-- Zadanie wyłącznie Mapy używa gałęzi `codex/map/<task-slug>`. Zmiana struktury wymagająca nowego seala i pinu jest jednym root-routed zadaniem na `codex/structure-<id>/<task-slug>`; oba rodzaje startują z aktualnego `origin/main` w osobnym pełnym worktree.
-- Root-routed autor zmiany struktury zapisuje w jednym branchu i PR właściwe źródła pakietu, sealed manifest, mapowy refresh/pin oraz wszystkie pochodne. Uruchamia pełny build/check i testy struktury, następnie pełny build/check i testy Mapy. Nie powstaje drugi PR Mapy ani osobny agent-integrator.
-- Jeżeli konkurencyjny PR zmieni `main` przed enqueue późniejszej zmiany struktury, autor aktualizuje bazę do bieżącego `origin/main`, ponownie uruchamia seal/refresh i odtwarza builderem cały zestaw pochodnych, po czym powtarza pełne testy struktury i Mapy.
+- Root lub koordynator przydziela jedno proste zadanie jednemu agentowi. Zadanie wyłącznie Mapy używa gałęzi `codex/map/<task-slug>`, a zmiana struktury wymagająca nowego seala i pinu jednego root-routed zadania na `codex/structure-<id>/<task-slug>`; oba rodzaje startują z aktualnego `origin/main` w osobnym pełnym worktree.
+- Root-routed autor zmiany struktury zapisuje w jednym branchu i PR właściwe źródła pakietu, sealed manifest, mapowy refresh/pin oraz wszystkie pochodne. Uruchamia wymagany seal/refresh/build/check, celowane testy i lokalny `fast-check`; po jego `PASS` tworzy commit, pushuje, otwiera PR i włącza GitHub `merge when ready` metodą squash, na czym kończy pracę bez pollingu. Nie powstaje drugi PR Mapy ani osobny agent-integrator.
+- Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head. Native merge queue sama składa go z aktualnym `main` i uruchamia pełny `integration-green`. Prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w kolejce powoduje zamknięcie starego PR przez koordynatora i nowe zadanie naprawcze dla nowego agenta startującego z aktualnego `main`; autor starego PR nie babysituje kolejki.
 - `map_manifest.json`, `UnderwaterMap.tscn`, mapowe metadane builda i `structures/*/generated/**` pozostają jednym spójnym zestawem. Builder publikuje go dopiero po walidacji wszystkich wejść; CAS/rollback, jeżeli jest używany, jest wewnętrzną ochroną zapisu buildera, nie protokołem współpracy agentów.
 - Builder i runner automatycznie egzekwują LF dla tracked plików z `eol=lf`. Celowany build/check i test nie odkrywają innych struktur.
-- Każdy przebieg Godota używa izolowanej pełnej kopii z prywatnym `.godot`, `user://`, logami, temp, portami i capture. `-InPlace` pozostaje odrzucane. Dopiero `fast-check PASS` pozwala enqueue PR, a pełna integracja złożenia należy docelowo do merge queue zgodnie z rootowym ARD-0113.
+- Każdy przebieg Godota używa izolowanej pełnej kopii z prywatnym `.godot`, `user://`, logami, temp, portami i capture. `-InPlace` pozostaje odrzucane. Lokalny fast-check przed commitem i wymagany GitHub `fast-check` po PR są osobnymi przebiegami; dopiero GitHub `fast-check PASS` pozwala enqueue, a pełna integracja złożenia należy docelowo do merge queue zgodnie z rootowym ARD-0113.
 
 ## Authority i pliki generowane
 
@@ -75,7 +75,7 @@ Przed edycją dokumentacji przedstaw użytkownikowi decyzję `aktualizuję / nie
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnie wygenerowanej sceny i obejrzyj wynik; techniczny `PASS` nie jest odbiorem artystycznym ani certyfikacją trasy.
 6. Po zmianie topologii zachowaj ręczny playtest rzeczywistej osiągalności. Nie zastępuj go blokującym BFS-em.
 
-Dla zmiany jednej struktury wymagającej nowego seala wykonaj w jednym root-routed worktree i PR: `--seal-structure-package <id>`, lokalne `--build-structure <id>` i `--check-structure <id>`, oba testy pakietu, `--refresh-structure-package <id>` z dokładnym SHA-256 manifestu, pełny mapowy `--build`/`--check` oraz pełne testy Mapy. Przy kilku zmienianych pakietach refresh może użyć jednego batcha. Rootowy test dodaj tylko dla publicznego montażu, resetu próby albo granicy persistence; nie powinien powtarzać lokalnych kombinacji, socketów czy originu. Zmiana package manifestu nie upoważnia do zmiany placementu niezwiązanej z zadaniem.
+Dla zmiany jednej struktury wymagającej nowego seala wykonaj w jednym root-routed worktree i PR: `--seal-structure-package <id>`, lokalne `--build-structure <id>` i `--check-structure <id>`, celowane testy pakietu, `--refresh-structure-package <id>` z dokładnym SHA-256 manifestu, mapowy `--build`/`--check` oraz lokalny `fast-check` przed commitem. Przy kilku zmienianych pakietach refresh może użyć jednego batcha. Rootowy test dodaj tylko dla publicznego montażu, resetu próby albo granicy persistence; nie powinien powtarzać lokalnych kombinacji, socketów czy originu. Pełny zestaw integracyjny uruchamia wyłącznie merge group. Zmiana package manifestu nie upoważnia do zmiany placementu niezwiązanej z zadaniem.
 
 Testy Godota uruchamiaj sekwencyjnie wspólnym runnerem w izolowanej pełnej kopii projektu. `ERROR` i `SCRIPT ERROR` oznaczają porażkę również przy kodzie wyjścia `0`.
 

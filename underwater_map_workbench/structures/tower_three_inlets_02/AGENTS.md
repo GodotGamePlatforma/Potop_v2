@@ -27,9 +27,9 @@ Jeżeli zadanie zmienia zachowanie widoczne dla gracza, regułę kampanii, publi
 
 ### Współbieżność
 
-- Jeden autor zmiany seal+pin pracuje w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_three_inlets_02/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
-- Autor wykonuje pełny seal, build/check i oba testy pakietu, następnie mapowy refresh, pełny build/check i pełne testy Mapy. Tylko `fast-check PASS` pozwala enqueue PR; nie powstaje drugi PR Mapy.
-- Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture. Jeżeli konkurencyjny PR zmieni `main`, autor aktualizuje bazę i powtarza seal/refresh, builder oraz pełne testy pakietu i Mapy.
+- Root lub koordynator przydziela zmianę seal+pin jako jedno proste zadanie jednemu autorowi w osobnym pełnym Git worktree i na gałęzi `codex/structure-tower_three_inlets_02/<task-slug>` utworzonej z aktualnego `origin/main`. Ten sam branch i PR zawiera źródła pakietu, sealed manifest, mapowy pin/refresh oraz pochodne.
+- Autor wykonuje wymagany seal/refresh/build/check, celowane testy pakietu i lokalny `fast-check`. Po lokalnym `PASS` tworzy commit, pushuje, otwiera PR i włącza GitHub `merge when ready` metodą squash, na czym kończy pracę bez pollingu. Po PR osobny wymagany GitHub `fast-check` decyduje o enqueue; pełny `integration-green` wykonuje merge queue. Nie powstaje drugi PR Mapy.
+- Lokalny build/check nie odkrywa innych struktur. Runner używa pełnej kopii z osobnym `.godot`, `user://`, logami i capture. Autor nie babysituje starego PR: prawdziwy konflikt albo nieaktualny seal, pin lub pochodna wykryta w kolejce wraca do root jako nowe zadanie dla nowego agenta startującego z aktualnego `main`, a koordynator zastępuje i zamyka stary PR.
 
 ## Authority i pochodne
 
@@ -53,8 +53,8 @@ Nie twórz innych plików `.md`, `.txt`, lokalnego kontekstu ani rejestru decyzj
 
 1. Ustal edytowalne źródło z `structure_manifest.json` i sprawdź wskazane skrypty, assety oraz lokalne testy.
 2. Porównaj zmianę z aktywnymi decyzjami Mapy i globalnymi. Nie zmieniaj przy okazji placementu ani semantyki zapisu.
-3. Po zmianie źródła w jednym root-routed worktree uruchom `--seal-structure-package tower_three_inlets_02`, `--build-structure tower_three_inlets_02`, `--check-structure tower_three_inlets_02`, oba testy pakietu, a następnie `--refresh-structure-package tower_three_inlets_02` z dokładnym SHA-256, pełny mapowy `--build`/`--check` i pełne testy Mapy.
-4. Jeden PR musi zawierać źródła, seal, mapowy pin i wszystkie pochodne. Po zmianie bazy powtórz cały builder i zestaw testów.
+3. Po zmianie źródła w jednym root-routed worktree uruchom `--seal-structure-package tower_three_inlets_02`, `--build-structure tower_three_inlets_02`, `--check-structure tower_three_inlets_02`, celowane testy pakietu, a następnie `--refresh-structure-package tower_three_inlets_02` z dokładnym SHA-256, mapowy `--build`/`--check` i lokalny `fast-check`.
+4. Dopiero po lokalnym `fast-check PASS` utwórz commit, push i jeden PR zawierający źródła, seal, mapowy pin i wszystkie pochodne; włącz GitHub `merge when ready` metodą squash i zakończ pracę bez pollingu. Pełną regresję wykonuje merge queue.
 5. Po zmianie widocznej grafiki wykonaj natywny capture dokładnej wygenerowanej sceny i obejrzyj wynik.
 6. ImageGen pozostaje zablokowany, dopóki proxy nie zostanie obejrzane w dokładnej wygenerowanej `UnderwaterMap.tscn` i jawnie zaakceptowane przez użytkownika. Produkcyjny wynik musi zachować natywne `2400 × 3840`, `scale = Vector2.ONE` i mapowanie jeden piksel na jedną jednostkę lokalną.
 7. Po zmianie topologii zachowaj ręczny playtest całej struktury. Automatyczna kontrola osiągalności nie zastępuje przepłynięcia.

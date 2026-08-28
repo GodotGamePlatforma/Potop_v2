@@ -67,20 +67,18 @@ python ..\..\tools\build_underwater_map.py --check-structure tower_three_inlets_
 ..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/tower_three_inlets_02/tests/tower_runtime_test.gd
 ```
 
-Następnie, nadal przed jednym wspólnym PR, odśwież dokładny pin, odtwórz pochodne i uruchom pełny lokalny zestaw Mapy:
+Następnie, nadal przed jednym wspólnym PR, odśwież dokładny pin, odtwórz pochodne i uruchom lokalny fast-check:
 
 ```powershell
 python ..\..\tools\build_underwater_map.py --refresh-structure-package tower_three_inlets_02 --sealed-package-sha256 <SHA256>
 python ..\..\tools\build_underwater_map.py --build
 python ..\..\tools\build_underwater_map.py --check
-..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
-..\..\..\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_visual_residency_test.gd
-..\..\..\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
+..\..\..\tests\run_all_tests.ps1
 ```
 
 `--seal-structure-package` aktualizuje wyłącznie lokalne hashe i digesty `structure_manifest.json`, a `--refresh-structure-package` wyłącznie mapowy pin i pochodne. Granice komend pozostają rozdzielone, lecz źródła pakietu, seal, dokładny pin i wszystkie pochodne muszą trafić atomowo w jednym branchu i PR. Nie twórz package-only PR ani późniejszego PR Mapy.
 
-Jeżeli konkurencyjny PR zmieni `main`, zaktualizuj bazę do bieżącego `origin/main` i powtórz cały seal/refresh, builder oraz testy pakietu i Mapy. Tylko `fast-check PASS` pozwala enqueue PR; pełną integrację następnie wykonuje merge queue. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga capture'u rzeczywistej sceny, a zmiana topologii ręcznego przepłynięcia struktury.
+Po lokalnym `fast-check PASS` utwórz commit, push i PR, włącz GitHub `merge when ready` metodą squash, a następnie zakończ pracę bez pollingu. Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head; jego `PASS` pozwala merge queue utworzyć `aktualny main + PR` i uruchomić pełny `integration-green`. Autor nie aktualizuje starego PR po każdym konkurencyjnym merge. Konflikt albo nieaktualny seal, pin lub pochodna wraca do root jako nowe zadanie dla nowego agenta w świeżym worktree i branchu z aktualnego `main`; koordynator zamyka stary PR jako zastąpiony. Zmiana publicznego montażu wymaga także właściwego testu root. Zmiana grafiki wymaga capture'u rzeczywistej sceny, a zmiana topologii ręcznego przepłynięcia struktury.
 
 ## Dokumentacja
 
