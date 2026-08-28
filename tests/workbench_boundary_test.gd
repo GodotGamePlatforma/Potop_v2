@@ -281,7 +281,8 @@ const REQUIRED_CONCURRENCY_GUARD_FRAGMENTS := {
 		"codex-only",
 		"no-main-bypass",
 		"no-delete",
-		"exact-LFS-stream",
+		"no-non-FF",
+		"exact-multi-ref-LFS-stream",
 	],
 	"res://.github/workflows/agent-integration.yml": [
 		"merge_group",

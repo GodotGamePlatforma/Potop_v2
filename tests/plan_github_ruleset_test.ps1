@@ -31,6 +31,12 @@ try {
     if (@($pull.allowed_merge_methods).Count -ne 1 -or [string]$pull.allowed_merge_methods[0] -cne 'squash') {
         throw 'Squash is not the only allowed PR merge method.'
     }
+    if ([int]$pull.required_approving_review_count -ne 0 -or
+        [bool]$pull.require_code_owner_review -or [bool]$pull.require_last_push_approval -or
+        [bool]$pull.require_extra_approval_for_unattributed_changes -or
+        [bool]$pull.required_review_thread_resolution -or @($pull.required_reviewers).Count -ne 0) {
+        throw 'Simple agent flow unexpectedly requires a general PR review.'
+    }
     $checks = $rules.required_status_checks.parameters
     if (@($checks.required_status_checks).Count -ne 1 -or
         [string]$checks.required_status_checks[0].context -cne 'fast-check' -or
@@ -42,7 +48,7 @@ try {
     if ([string]$queue.merge_method -cne 'SQUASH' -or [string]$queue.grouping_strategy -cne 'ALLGREEN' -or
         [int]$queue.min_entries_to_merge -ne 1 -or [int]$queue.max_entries_to_merge -ne 1 -or
         [int]$queue.max_entries_to_build -ne 1 -or [int]$queue.min_entries_to_merge_wait_minutes -ne 0) {
-        throw 'Native merge queue is not the exact SQUASH/ALLGREEN/group-size-one contract.'
+        throw 'Native merge queue is not SQUASH/ALLGREEN with one concurrent build and one sequential merge.'
     }
 
     $output = Join-Path $tempRoot 'plan.json'
@@ -56,7 +62,7 @@ try {
     foreach ($forbidden in @('Invoke-RestMethod', 'Invoke-WebRequest', 'gh api', 'Method PUT', 'Authorization =', 'GITHUB_TOKEN')) {
         if ($source -match [regex]::Escape($forbidden)) { throw "Plan tool can mutate live GitHub: '$forbidden'." }
     }
-    Write-Host 'PASS plan_github_ruleset native-queue/squash/one-Actions-fast-check/no-bypass/no-live-mutation contract'
+    Write-Host 'PASS plan_github_ruleset native-queue/squash/single-build/single-sequential-merge/one-Actions-fast-check/no-bypass/no-live-mutation contract'
 }
 finally {
     $resolved = [System.IO.Path]::GetFullPath($tempRoot)

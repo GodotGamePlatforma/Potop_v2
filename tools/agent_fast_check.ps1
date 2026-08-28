@@ -5,8 +5,11 @@ param(
     [string]$Repository = (Split-Path -Parent $PSScriptRoot),
     [string]$BaseRef = 'refs/remotes/origin/main',
     [string]$GodotConsolePath,
+    [string]$PowerShellCommand = 'pwsh',
     [string[]]$TestTarget = @(),
     [string[]]$AllowedPath = @(),
+    [string]$ExpectedHeadSha,
+    [string]$ExpectedBranch,
     [switch]$AllowControlPlane
 )
 
@@ -25,11 +28,35 @@ function Invoke-NativeResult {
 
     $previousLocation = Get-Location
     $previousPreference = $ErrorActionPreference
+    $exitCode = 127
+    $output = @()
     $ErrorActionPreference = 'Continue'
     try {
+        $command = @(Get-Command -Name $FilePath -CommandType Application,ExternalScript -ErrorAction Stop)[0]
+        $resolvedCommand = if (-not [string]::IsNullOrWhiteSpace([string]$command.Path)) {
+            [string]$command.Path
+        }
+        else {
+            [string]$command.Source
+        }
+        if ([string]::IsNullOrWhiteSpace($resolvedCommand)) {
+            throw "Cannot resolve external command '$FilePath'."
+        }
         Set-Location -LiteralPath $WorkingDirectory
-        $output = @(& $FilePath @Arguments 2>&1)
-        $exitCode = $LASTEXITCODE
+        $output = @(& $resolvedCommand @Arguments 2>&1)
+        if ($null -ne $LASTEXITCODE) {
+            $exitCode = [int]$LASTEXITCODE
+        }
+        elseif ($?) {
+            $exitCode = 0
+        }
+        else {
+            $exitCode = 1
+        }
+    }
+    catch {
+        $output = @($output) + @($_.Exception.Message)
+        $exitCode = 127
     }
     finally {
         Set-Location -LiteralPath $previousLocation
@@ -38,6 +65,67 @@ function Invoke-NativeResult {
     return [pscustomobject]@{
         ExitCode = $exitCode
         Output = ($output | Out-String).TrimEnd()
+    }
+}
+
+function Assert-LfsHydrated {
+    Invoke-NativeChecked git-lfs @('version') | Out-Null
+    Invoke-NativeChecked git-lfs @('checkout') | Out-Null
+    Invoke-NativeChecked git-lfs @('fsck') | Out-Null
+
+    $rawListing = Invoke-NativeChecked git-lfs @('ls-files', '--json')
+    try {
+        $listing = $rawListing | ConvertFrom-Json
+    }
+    catch {
+        throw "git lfs ls-files --json returned invalid JSON: $rawListing"
+    }
+    try { $lfsEntries = @($listing.files) | Where-Object { $null -ne $_ } }
+    catch { throw 'git lfs ls-files --json omitted the files collection.' }
+    $pointerHeader = [System.Text.Encoding]::ASCII.GetBytes(
+        'version https://git-lfs.github.com/spec/v1'
+    )
+    $remainingPointers = @()
+    foreach ($entry in $lfsEntries) {
+        try { $entryName = [string]$entry.name }
+        catch { throw 'git lfs ls-files --json returned an entry without a path.' }
+        if ([string]::IsNullOrWhiteSpace($entryName)) {
+            throw 'git lfs ls-files --json returned an entry without a path.'
+        }
+        $path = Normalize-RepoPath $entryName
+        $checkout = $false
+        try { $checkout = [bool]$entry.checkout } catch { $checkout = $false }
+        if (-not $checkout) {
+            $remainingPointers += $path
+            continue
+        }
+        $absolute = Join-Path $script:RepositoryPath $path
+        if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) {
+            $remainingPointers += $path
+            continue
+        }
+
+        $stream = [System.IO.File]::OpenRead($absolute)
+        try {
+            $prefix = New-Object byte[] $pointerHeader.Length
+            $read = $stream.Read($prefix, 0, $prefix.Length)
+        }
+        finally {
+            $stream.Dispose()
+        }
+        if ($read -eq $pointerHeader.Length) {
+            $matches = $true
+            for ($index = 0; $index -lt $pointerHeader.Length; $index++) {
+                if ($prefix[$index] -ne $pointerHeader[$index]) {
+                    $matches = $false
+                    break
+                }
+            }
+            if ($matches) { $remainingPointers += $path }
+        }
+    }
+    if ($remainingPointers.Count -gt 0) {
+        throw "Tracked LFS pointers remain unhydrated: $($remainingPointers -join ', ')"
     }
 }
 
@@ -53,6 +141,23 @@ function Invoke-NativeChecked {
         throw "$FilePath $($Arguments -join ' ') failed (exit $($result.ExitCode)):`n$($result.Output)"
     }
     return $result.Output
+}
+
+function Assert-ExternalCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [string]$Label = $Name
+    )
+    try {
+        $command = @(Get-Command -Name $Name -CommandType Application,ExternalScript -ErrorAction Stop)[0]
+    }
+    catch {
+        throw "Required external command '$Label' is unavailable: $($_.Exception.Message)"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$command.Path) -and
+        [string]::IsNullOrWhiteSpace([string]$command.Source)) {
+        throw "Required external command '$Label' cannot be resolved."
+    }
 }
 
 function Normalize-RepoPath {
@@ -102,13 +207,17 @@ function Resolve-GodotPath {
         return $resolved
     }
     foreach ($name in @('godot4', 'godot')) {
-        $command = Get-Command $name -ErrorAction SilentlyContinue
+        $command = @(Get-Command $name -ErrorAction SilentlyContinue)[0]
         if ($null -ne $command) { return $command.Source }
     }
     throw 'Godot is required for changed Godot files or targeted tests. Pass -GodotConsolePath.'
 }
 
 $script:RepositoryPath = [System.IO.Path]::GetFullPath($Repository).TrimEnd('\', '/')
+foreach ($requiredCommand in @('git', 'git-lfs', 'python')) {
+    Assert-ExternalCommand $requiredCommand
+}
+Assert-ExternalCommand -Name $PowerShellCommand -Label 'pwsh'
 $top = [System.IO.Path]::GetFullPath(
     (Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'rev-parse', '--show-toplevel')).Trim()
 ).TrimEnd('\', '/')
@@ -116,8 +225,29 @@ if (-not [string]::Equals($top, $script:RepositoryPath, [System.StringComparison
     throw "Repository must be the Git top level: '$top'."
 }
 $branch = (Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'branch', '--show-current')).Trim()
-if ($branch -cnotmatch '^codex/.+') {
-    throw "Fast-check must run from a codex/* branch; current branch is '$branch'."
+$actualHead = (Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'rev-parse', 'HEAD')).Trim()
+if ([string]::IsNullOrWhiteSpace($ExpectedHeadSha)) {
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedBranch)) {
+        throw '-ExpectedBranch is valid only together with -ExpectedHeadSha.'
+    }
+    if ($branch -cnotmatch '^codex/.+') {
+        throw "Local fast-check must run from a codex/* branch; current branch is '$branch'."
+    }
+}
+else {
+    if ($ExpectedHeadSha -cnotmatch '^[0-9a-f]{40}$') {
+        throw '-ExpectedHeadSha must be one exact lowercase 40-character commit SHA.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedBranch) -and
+        $ExpectedBranch -cnotmatch '^codex/.+') {
+        throw "CI expected branch must be under codex/*: '$ExpectedBranch'."
+    }
+    if (-not [string]::IsNullOrEmpty($branch)) {
+        throw "CI fast-check requires detached HEAD; current branch is '$branch'."
+    }
+    if ($actualHead -cne $ExpectedHeadSha) {
+        throw "CI fast-check HEAD mismatch. expected=$ExpectedHeadSha actual=$actualHead"
+    }
 }
 Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'rev-parse', '--verify', "$BaseRef^{commit}") | Out-Null
 
@@ -148,9 +278,8 @@ Invoke-NativeChecked python @(
     '-B', (Join-Path $script:RepositoryPath 'tools/workbench_contract.py'),
     '--repo', $script:RepositoryPath, 'eol-check'
 ) | Out-Null
-Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'lfs', 'version') | Out-Null
-Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'lfs', 'fsck') | Out-Null
-Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'lfs', 'status', '--porcelain') | Out-Null
+Assert-LfsHydrated
+Invoke-NativeChecked git-lfs @('status', '--porcelain') | Out-Null
 
 foreach ($path in $changedPaths) {
     $absolute = Join-Path $script:RepositoryPath $path
@@ -189,7 +318,7 @@ foreach ($path in $changedPaths) {
         Invoke-NativeChecked python @('-B', $absolute) | Out-Null
     }
     elseif ($path -match '(^|/)tests/.+_test\.ps1$') {
-        Invoke-NativeChecked pwsh @('-NoLogo', '-NoProfile', '-File', $absolute) | Out-Null
+        Invoke-NativeChecked $PowerShellCommand @('-NoLogo', '-NoProfile', '-File', $absolute) | Out-Null
     }
 }
 
@@ -223,4 +352,4 @@ if ($godotChanged.Count -gt 0 -or $targets.Count -gt 0) {
     }
 }
 
-Write-Host "FAST-CHECK PASS paths=$($changedPaths.Count) godot_targets=$($targets.Count) head=$((Invoke-NativeChecked git @('-C', $script:RepositoryPath, 'rev-parse', 'HEAD')).Trim())"
+Write-Host "FAST-CHECK PASS paths=$($changedPaths.Count) godot_targets=$($targets.Count) head=$actualHead"

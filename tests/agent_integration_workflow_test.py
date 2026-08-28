@@ -32,6 +32,9 @@ class SimpleAgentWorkflowTest(unittest.TestCase):
         self.assertIn("runs-on: windows-latest", workflow)
         self.assertIn("./tools/agent_fast_check.ps1", workflow)
         self.assertIn("refs/remotes/origin/main", workflow)
+        self.assertIn("-ExpectedHeadSha $env:EXPECTED_HEAD", workflow)
+        self.assertIn("-ExpectedBranch $env:EXPECTED_BRANCH", workflow)
+        self.assertIn("EXPECTED_BRANCH: ${{ github.event.pull_request.head.ref }}", workflow)
         self.assertIn("persist-credentials: false", workflow)
 
     def test_merge_group_full_integration_releases_required_fast_check(self) -> None:
@@ -65,6 +68,18 @@ class SimpleAgentWorkflowTest(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, combined)
         self.assertNotRegex(combined, r"(?m)^\s+(?:checks|contents|pull-requests): write$")
+
+    def test_both_workflows_hydrate_and_reject_remaining_lfs_pointers(self) -> None:
+        workflows = (text("agent-validation.yml"), text("agent-integration.yml"))
+        for workflow in workflows:
+            with self.subTest(workflow=workflow.splitlines()[0]):
+                self.assertNotIn("GIT_LFS_SKIP_SMUDGE", workflow)
+                self.assertIn("lfs: true", workflow)
+                self.assertIn("git lfs checkout", workflow)
+                self.assertIn("git lfs fsck", workflow)
+                self.assertIn('"git", "lfs", "ls-files", "--json"', workflow)
+                self.assertIn("version https://git-lfs.github.com/spec/v1", workflow)
+                self.assertIn("Tracked LFS pointers remain unhydrated", workflow)
 
     def test_actions_are_pinned_and_godot_archive_is_verified(self) -> None:
         combined = text("agent-validation.yml") + "\n" + text("agent-integration.yml")

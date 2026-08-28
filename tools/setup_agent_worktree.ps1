@@ -32,10 +32,34 @@ function Invoke-GitResult {
     )
 
     $previous = $ErrorActionPreference
+    $output = @()
+    $exitCode = 127
     $ErrorActionPreference = 'Continue'
     try {
-        $output = @(& git -C $WorkingRepository @Arguments 2>&1)
-        $exitCode = $LASTEXITCODE
+        $command = @(Get-Command -Name git -CommandType Application,ExternalScript -ErrorAction Stop)[0]
+        $resolvedCommand = if (-not [string]::IsNullOrWhiteSpace([string]$command.Path)) {
+            [string]$command.Path
+        }
+        else {
+            [string]$command.Source
+        }
+        if ([string]::IsNullOrWhiteSpace($resolvedCommand)) {
+            throw 'Cannot resolve external command git.'
+        }
+        $output = @(& $resolvedCommand -C $WorkingRepository @Arguments 2>&1)
+        if ($null -ne $LASTEXITCODE) {
+            $exitCode = [int]$LASTEXITCODE
+        }
+        elseif ($?) {
+            $exitCode = 0
+        }
+        else {
+            $exitCode = 1
+        }
+    }
+    catch {
+        $output = @($output) + @($_.Exception.Message)
+        $exitCode = 127
     }
     finally {
         $ErrorActionPreference = $previous
@@ -177,8 +201,15 @@ catch {
     if ($created) {
         $statusProbe = Invoke-GitResult $destinationPath @('status', '--porcelain=v1', '--untracked-files=all')
         if ($statusProbe.ExitCode -eq 0 -and [string]::IsNullOrWhiteSpace($statusProbe.Output)) {
-            Invoke-GitResult $repositoryPath @('worktree', 'remove', '--force', $destinationPath) | Out-Null
-            Invoke-GitResult $repositoryPath @('branch', '-D', $targetBranch) | Out-Null
+            $removed = Invoke-GitResult $repositoryPath @('worktree', 'remove', '--force', $destinationPath)
+            if ($removed.ExitCode -eq 0) {
+                $deleted = Invoke-GitResult $repositoryPath @(
+                    'update-ref', '-d', "refs/heads/$targetBranch", $baseSha
+                )
+                if ($deleted.ExitCode -ne 0) {
+                    Write-Warning "Cleanup preserved changed branch '$targetBranch': $($deleted.Output)"
+                }
+            }
         }
     }
     throw

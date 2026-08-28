@@ -13,7 +13,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GIT_LFS_SKIP_SMUDGE: "1"
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: core.autocrlf
   GIT_CONFIG_VALUE_0: "false"
@@ -41,7 +40,7 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Verify exact candidate
+      - name: Verify exact candidate and hydrate every tracked LFS object
         shell: pwsh
         env:
           EXPECTED_HEAD: ${{ github.event.merge_group.head_sha }}
@@ -54,7 +53,35 @@ jobs:
           if (-not [string]::IsNullOrEmpty((git status --porcelain=v1 --untracked-files=all))) {
             throw "Merge-group checkout is not clean."
           }
+          git lfs checkout
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git lfs fsck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          import json
+          import pathlib
+          import subprocess
+
+          root = pathlib.Path.cwd()
+          listing = json.loads(subprocess.run(
+              ["git", "lfs", "ls-files", "--json"],
+              check=True,
+              capture_output=True,
+          ).stdout)
+          pointers = []
+          header = b"version https://git-lfs.github.com/spec/v1"
+          for entry in listing["files"]:
+              relative = entry["name"]
+              candidate = root / pathlib.PurePosixPath(relative)
+              if not entry.get("checkout", False) or not candidate.is_file():
+                  pointers.append(relative)
+                  continue
+              with candidate.open("rb") as handle:
+                  if handle.read(len(header)) == header:
+                      pointers.append(relative)
+          if pointers:
+              raise SystemExit("Tracked LFS pointers remain unhydrated: " + ", ".join(pointers))
+          '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install pinned Godot

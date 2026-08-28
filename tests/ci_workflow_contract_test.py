@@ -23,6 +23,7 @@ def violations(validation: str, integration: str) -> list[str]:
         "/check-runs",
         "self-hosted",
         "secrets.",
+        "GIT_LFS_SKIP_SMUDGE",
     ):
         if token in combined:
             findings.append(f"forbidden token: {token}")
@@ -32,6 +33,10 @@ def violations(validation: str, integration: str) -> list[str]:
         findings.append("PR workflow must expose exactly one fast-check job")
     if "github.event.pull_request.head.sha" not in validation:
         findings.append("PR workflow must check out the exact head")
+    if "-ExpectedHeadSha $env:EXPECTED_HEAD" not in validation:
+        findings.append("PR fast-check must bind detached HEAD to the event SHA")
+    if "-ExpectedBranch $env:EXPECTED_BRANCH" not in validation:
+        findings.append("PR fast-check must bind the event branch")
     if "./tools/agent_fast_check.ps1" not in validation:
         findings.append("PR workflow must use the canonical fast-check")
     if "  merge_group:\n" not in integration:
@@ -52,6 +57,15 @@ def violations(validation: str, integration: str) -> list[str]:
         findings.append("PR workflow must be read-only")
     if "permissions:\n  contents: read" not in integration:
         findings.append("group workflow must be read-only")
+    for label, workflow in (("PR", validation), ("merge-group", integration)):
+        if "lfs: true" not in workflow:
+            findings.append(f"{label} checkout must fetch LFS objects")
+        if "git lfs checkout" not in workflow or "git lfs fsck" not in workflow:
+            findings.append(f"{label} workflow must hydrate and fsck LFS before tests")
+        if '"git", "lfs", "ls-files", "--json"' not in workflow:
+            findings.append(f"{label} workflow must enumerate tracked LFS files")
+        if "version https://git-lfs.github.com/spec/v1" not in workflow:
+            findings.append(f"{label} workflow must reject remaining LFS pointers")
     return findings
 
 
@@ -89,6 +103,31 @@ class WorkflowContractTest(unittest.TestCase):
         findings = violations(mutated, self.integration)
         self.assertIn("validation must use pull_request", findings)
         self.assertIn("PR workflow must check out the exact head", findings)
+
+    def test_detached_sha_binding_and_lfs_regressions_are_detected(self) -> None:
+        detached = self.validation.replace("-ExpectedHeadSha $env:EXPECTED_HEAD", "")
+        self.assertIn(
+            "PR fast-check must bind detached HEAD to the event SHA",
+            violations(detached, self.integration),
+        )
+        for target, other, label in (
+            (self.validation, self.integration, "PR"),
+            (self.integration, self.validation, "merge-group"),
+        ):
+            mutated = target.replace("git lfs checkout", "git lfs status", 1)
+            candidate_validation = mutated if label == "PR" else other
+            candidate_integration = other if label == "PR" else mutated
+            self.assertIn(
+                f"{label} workflow must hydrate and fsck LFS before tests",
+                violations(candidate_validation, candidate_integration),
+            )
+
+    def test_skip_smudge_regression_is_detected(self) -> None:
+        mutated = self.validation + '\n  GIT_LFS_SKIP_SMUDGE: "1"\n'
+        self.assertIn(
+            "forbidden token: GIT_LFS_SKIP_SMUDGE",
+            violations(mutated, self.integration),
+        )
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@
 
 remote_name=${1:-origin}
 remote_url=${2:-unknown}
+git_command=git
 updates_file=
 
 cleanup() {
@@ -51,6 +52,16 @@ do
             rejected=1
             ;;
         refs/heads/codex/?*)
+            case "$remote_oid" in
+                ''|*[!0]*)
+                    if ! "$git_command" merge-base --is-ancestor "$remote_oid" "$local_oid"; then
+                        printf '%s\n' "PRE-PUSH REJECTED: non-fast-forward update '$remote_ref' jest zabroniony." >&2
+                        rejected=1
+                    fi
+                    ;;
+                *)
+                    ;;
+            esac
             ;;
         *)
             printf '%s\n' "PRE-PUSH REJECTED: agent może publikować wyłącznie refs/heads/codex/*." >&2
@@ -63,12 +74,12 @@ if [ "$rejected" -ne 0 ]; then
     exit 1
 fi
 
-if ! command -v git-lfs >/dev/null 2>&1; then
+if ! "$git_command" lfs version >/dev/null 2>&1; then
     printf '%s\n' "PRE-PUSH REJECTED: Git LFS nie jest dostępny." >&2
     exit 1
 fi
 
-if ! git lfs pre-push "$remote_name" "$remote_url" < "$updates_file"; then
+if ! "$git_command" lfs pre-push "$remote_name" "$remote_url" < "$updates_file"; then
     printf '%s\n' "PRE-PUSH REJECTED: git lfs pre-push zakończył się błędem." >&2
     exit 1
 fi

@@ -41,10 +41,10 @@ $payload = [ordered]@{
                     enabled = $false
                 }
                 require_code_owner_review = $false
-                require_extra_approval_for_unattributed_changes = $true
+                require_extra_approval_for_unattributed_changes = $false
                 require_last_push_approval = $false
                 required_approving_review_count = 0
-                required_review_thread_resolution = $true
+                required_review_thread_resolution = $false
                 required_reviewers = @()
             }
         },
@@ -66,7 +66,10 @@ $payload = [ordered]@{
             parameters = [ordered]@{
                 check_response_timeout_minutes = $QueueTimeoutMinutes
                 grouping_strategy = 'ALLGREEN'
+                # One candidate may build at once; this is queue concurrency,
+                # not a claim about how many PRs GitHub puts in a group.
                 max_entries_to_build = 1
+                # Merge exactly one successful squash result at a time.
                 max_entries_to_merge = 1
                 merge_method = 'SQUASH'
                 min_entries_to_merge = 1

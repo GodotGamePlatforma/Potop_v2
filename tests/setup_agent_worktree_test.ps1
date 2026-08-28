@@ -9,20 +9,44 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $helper = Join-Path $projectRoot 'tools/setup_agent_worktree.ps1'
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("potop-simple-worktree-test-" + [guid]::NewGuid().ToString('N'))
+$hostPowerShell = if ($PSVersionTable.PSEdition -eq 'Desktop') {
+    Join-Path $PSHOME 'powershell.exe'
+}
+else {
+    Join-Path $PSHOME 'pwsh.exe'
+}
+
+function Git-Result {
+    param([string]$Repository, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& git.exe -C $Repository @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previous }
+    return [pscustomobject]@{ ExitCode = $exitCode; Output = ($output | Out-String).Trim() }
+}
 
 function Git {
     param([string]$Repository, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
-    $output = @(& git.exe -C $Repository @Arguments 2>&1)
-    if ($LASTEXITCODE -ne 0) {
-        throw "git $($Arguments -join ' ') failed: $($output | Out-String)"
+    $result = Git-Result $Repository @Arguments
+    if ($result.ExitCode -ne 0) {
+        throw "git $($Arguments -join ' ') failed: $($result.Output)"
     }
-    return ($output | Out-String).Trim()
+    return $result.Output
 }
 
 function Run-Helper {
     param([string[]]$Arguments)
-    $output = @(& pwsh -NoLogo -NoProfile -File $helper @Arguments 2>&1)
-    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output | Out-String).Trim() }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& $hostPowerShell -NoLogo -NoProfile -File $helper @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previous }
+    return [pscustomobject]@{ ExitCode = $exitCode; Output = ($output | Out-String).Trim() }
 }
 
 try {
@@ -37,14 +61,14 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $seed 'tools'),(Join-Path $seed '.githooks') | Out-Null
     Copy-Item -LiteralPath (Join-Path $projectRoot 'tools/install_agent_git_hooks.ps1') -Destination (Join-Path $seed 'tools/install_agent_git_hooks.ps1')
     Copy-Item -LiteralPath (Join-Path $projectRoot '.githooks/pre-push') -Destination (Join-Path $seed '.githooks/pre-push')
-    Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'one' -Encoding utf8NoBOM
+    Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'one' -Encoding UTF8
     Git $seed add . | Out-Null
     Git $seed commit -m initial | Out-Null
     Git $seed remote add origin $remote | Out-Null
     Git $seed push -u origin main | Out-Null
     Git $tempRoot clone $remote $primary | Out-Null
     Git $primary checkout main | Out-Null
-    Set-Content -LiteralPath (Join-Path $primary 'local-untracked.txt') -Value 'preserve me' -Encoding utf8NoBOM
+    Set-Content -LiteralPath (Join-Path $primary 'local-untracked.txt') -Value 'preserve me' -Encoding UTF8
 
     $firstDestination = Join-Path $tempRoot 'worktrees/first'
     $plan = Run-Helper @(
@@ -91,7 +115,7 @@ try {
         throw 'Duplicate branch was not rejected.'
     }
 
-    Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'two' -Encoding utf8NoBOM
+    Set-Content -LiteralPath (Join-Path $seed 'game.txt') -Value 'two' -Encoding UTF8
     Git $seed add game.txt | Out-Null
     Git $seed commit -m second | Out-Null
     Git $seed push origin main | Out-Null
@@ -112,13 +136,54 @@ try {
         throw 'Owner segment did not route to the expected codex/* branch.'
     }
 
+    Git $seed rm tools/install_agent_git_hooks.ps1 | Out-Null
+    Git $seed commit -m 'missing installer rollback fixture' | Out-Null
+    Git $seed push origin main | Out-Null
+    $rollbackDestination = Join-Path $tempRoot 'worktrees/rollback'
+    $rollback = Run-Helper @(
+        '-Repository', $primary,
+        '-TaskSlug', 'rollback',
+        '-OwnerSegment', 'root',
+        '-Destination', $rollbackDestination,
+        '-Create'
+    )
+    if ($rollback.ExitCode -eq 0 -or $rollback.Output -notmatch 'installer is missing' -or
+        (Test-Path -LiteralPath $rollbackDestination) -or
+        (Git-Result $primary show-ref --verify --quiet refs/heads/codex/root/rollback).ExitCode -eq 0) {
+        throw "Failed setup did not remove its unchanged exact-base branch/worktree: $($rollback.Output)"
+    }
+
+    $rollbackBase = (Git $primary rev-parse refs/remotes/origin/main).Trim()
+    $rollbackTree = (Git $primary rev-parse "$rollbackBase`^{tree}").Trim()
+    $advancedOutput = @(
+        "competing writer`n" | & git.exe -C $primary `
+            -c user.name='Competing Writer' `
+            -c user.email='competing@example.invalid' `
+            commit-tree $rollbackTree -p $rollbackBase 2>&1
+    )
+    if ($LASTEXITCODE -ne 0) { throw "commit-tree fixture failed: $($advancedOutput | Out-String)" }
+    $advanced = ($advancedOutput | Out-String).Trim()
+    if ($advanced -ceq $rollbackBase) { throw 'Competing commit fixture did not advance the ref.' }
+    Git $primary update-ref refs/heads/codex/root/atomic-cleanup $advanced | Out-Null
+    Git-Result -Repository $primary -Arguments @(
+        'update-ref', '-d', 'refs/heads/codex/root/atomic-cleanup', $rollbackBase
+    ) | Out-Null
+    $afterGuard = Git-Result $primary rev-parse refs/heads/codex/root/atomic-cleanup
+    if ($afterGuard.ExitCode -ne 0 -or $afterGuard.Output.Trim() -cne $advanced) {
+        throw "Expected-old update-ref deletion did not preserve a competing branch generation. base=$rollbackBase advanced=$advanced after=$($afterGuard.Output)"
+    }
+
     $source = Get-Content -LiteralPath $helper -Raw
     foreach ($forbidden in @('CandidateReceipt', 'RunReceipt', 'assignment ack', 'last-green', 'WAITING_ACK', 'FROZEN')) {
         if ($source -match [regex]::Escape($forbidden)) {
             throw "Simple setup still contains legacy token '$forbidden'."
         }
     }
-    Write-Host 'PASS setup_agent_worktree fresh-origin-main/clean-worktree/codex-branch/dirty-source-isolation contract'
+    $atomicDelete = "'update-ref', '-d', `"refs/heads/`$targetBranch`", `$baseSha"
+    if ($source -match "@\('branch', '-D'" -or -not $source.Contains($atomicDelete)) {
+        throw 'Setup cleanup is not an exact expected-old update-ref deletion.'
+    }
+    Write-Host 'PASS setup_agent_worktree fresh-origin-main/clean-worktree/codex-branch/dirty-source-isolation/atomic-cleanup contract'
 }
 finally {
     $resolvedTemp = [System.IO.Path]::GetFullPath($tempRoot)

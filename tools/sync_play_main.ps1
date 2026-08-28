@@ -14,10 +14,34 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 function Invoke-GitResult {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
     $previous = $ErrorActionPreference
+    $output = @()
+    $exitCode = 127
     $ErrorActionPreference = 'Continue'
     try {
-        $output = @(& git -C $script:Repo @Arguments 2>&1)
-        $exitCode = $LASTEXITCODE
+        $command = @(Get-Command -Name git -CommandType Application,ExternalScript -ErrorAction Stop)[0]
+        $resolvedCommand = if (-not [string]::IsNullOrWhiteSpace([string]$command.Path)) {
+            [string]$command.Path
+        }
+        else {
+            [string]$command.Source
+        }
+        if ([string]::IsNullOrWhiteSpace($resolvedCommand)) {
+            throw 'Cannot resolve external command git.'
+        }
+        $output = @(& $resolvedCommand -C $script:Repo @Arguments 2>&1)
+        if ($null -ne $LASTEXITCODE) {
+            $exitCode = [int]$LASTEXITCODE
+        }
+        elseif ($?) {
+            $exitCode = 0
+        }
+        else {
+            $exitCode = 1
+        }
+    }
+    catch {
+        $output = @($output) + @($_.Exception.Message)
+        $exitCode = 127
     }
     finally {
         $ErrorActionPreference = $previous
