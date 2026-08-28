@@ -22,10 +22,21 @@ env:
   GODOT_ARCHIVE_SHA256: c7a289051eaefb460b0106b60e9cd5bee0ef55fd102dcb2bed1eb356cf3d90a1
 
 jobs:
-  integration-green:
-    name: integration-green
-    runs-on: windows-latest
+  integration-shards:
+    name: integration-shard-${{ matrix.slot }}
+    runs-on: potop-windows-16core-64gb
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - slot: 1-of-2
+            headless_shard: headless-0
+            run_native: false
+          - slot: 2-of-2
+            headless_shard: headless-1
+            run_native: true
     steps:
       - name: Check out the exact merge-group candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,6 +95,21 @@ jobs:
           '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Create the exact three-shard plan
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $evidenceDirectory = Join-Path $env:RUNNER_TEMP "integration-shard-evidence"
+          [void](New-Item -ItemType Directory -Path $evidenceDirectory -Force)
+          $planPath = Join-Path $evidenceDirectory "shard-plan.receipt"
+          & ./tests/run_all_tests.ps1 `
+            -SourceRepositoryPath . `
+            -Full `
+            -WriteShardPlan $planPath `
+            -HeadlessShardCount 2 `
+            -NativeShardCount 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Install pinned Godot
         shell: pwsh
         run: |
@@ -102,15 +128,57 @@ jobs:
           }
           "GODOT_CONSOLE_PATH=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Run the complete isolated test suite
+      - name: Run the assigned headless shard
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $headlessShard = "${{ matrix.headless_shard }}"
+          $evidenceDirectory = Join-Path $env:RUNNER_TEMP "integration-shard-evidence"
+          $planPath = Join-Path $evidenceDirectory "shard-plan.receipt"
+          $receiptPath = Join-Path $evidenceDirectory "$headlessShard.receipt"
           & ./tests/run_all_tests.ps1 `
             -GodotConsolePath $env:GODOT_CONSOLE_PATH `
             -SourceRepositoryPath . `
-            -Full
+            -ShardPlan $planPath `
+            -ShardId $headlessShard `
+            -RunReceiptOutputPath $receiptPath
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run the required native shard on job 2
+        if: ${{ matrix.run_native }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $evidenceDirectory = Join-Path $env:RUNNER_TEMP "integration-shard-evidence"
+          $planPath = Join-Path $evidenceDirectory "shard-plan.receipt"
+          $receiptPath = Join-Path $evidenceDirectory "native-0.receipt"
+          & ./tests/run_all_tests.ps1 `
+            -GodotConsolePath $env:GODOT_CONSOLE_PATH `
+            -SourceRepositoryPath . `
+            -ShardPlan $planPath `
+            -ShardId "native-0" `
+            -RunReceiptOutputPath $receiptPath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  integration-green:
+    name: integration-green
+    needs:
+      - integration-shards
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require both paid shard jobs to pass
+        shell: bash
+        env:
+          SHARD_JOBS_RESULT: ${{ needs.integration-shards.result }}
+        run: |
+          if [ "$SHARD_JOBS_RESULT" != "success" ]; then
+            echo "One or both integration shard jobs did not pass: $SHARD_JOBS_RESULT" >&2
+            exit 1
+          fi
+          echo "integration-green PASS: both paid shard jobs completed successfully"
 
   fast-check:
     name: fast-check
