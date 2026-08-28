@@ -397,6 +397,10 @@ raise SystemExit(subprocess.run([real_git, *args]).returncode)
     if ((Git $ordinary.Remote rev-parse "refs/heads/$($ordinary.Branch)").Trim() -cne $ordinary.Head) {
         throw 'Ordinary branch was not pushed at exact HEAD.'
     }
+    $publishProof = "PUBLISH PASS LocalHead=$($ordinary.Head) RemoteHead=$($ordinary.Head) PullRequestHead=$($ordinary.Head) PullRequest=1"
+    if ($ordinaryResult.Output -notmatch "(?m)^$([regex]::Escape($publishProof))\r?$") {
+        throw "Successful publisher output omitted the exact three-SHA proof: $($ordinaryResult.Output)"
+    }
 
     $queueReady = New-Fixture 'queue-ready'
     $queueReadyResult = Run-Publish $queueReady -QueueAcceptance queued
@@ -663,7 +667,11 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
         "'remote', 'get-url', '--push', '--all', 'origin'",
         'isCrossRepository,headRepository,headRepositoryOwner',
         'mergeQueue(branch:$base)',
-        '"${head}:refs/heads/$branch"'
+        '"${head}:refs/heads/$branch"',
+        'PUBLISH PASS LocalHead={0} RemoteHead={1} PullRequestHead={2}',
+        'LocalHead = $head',
+        'RemoteHead = [string]$finalRemoteFields[0]',
+        'PullRequestHead = [string]$postOperationPr.headRefOid'
     )) {
         if (-not $source.Contains($required)) {
             throw "publish-pr is missing required exact identity/push binding '$required'."
@@ -672,7 +680,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
     if ($source -match [regex]::Escape('--set-upstream')) {
         throw 'publish-pr still pushes a moving branch through --set-upstream.'
     }
-    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/SQUASH-native-queue/manual-control-plane/race contract'
+    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/explicit-three-SHA-proof/SQUASH-native-queue/manual-control-plane/race contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }

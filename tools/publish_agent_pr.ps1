@@ -634,8 +634,17 @@ if ($finalRemoteFields.Count -ne 2 -or $finalRemoteFields[0] -cne $head -or
     throw 'Repository state drifted after PR publication.'
 }
 
+Write-Host ("PUBLISH PASS LocalHead={0} RemoteHead={1} PullRequestHead={2} PullRequest={3}" -f `
+    $head,
+    [string]$finalRemoteFields[0],
+    [string]$postOperationPr.headRefOid,
+    [int]$postOperationPr.number)
+
 [pscustomobject]@{
     CommitSha = $head
+    LocalHead = $head
+    RemoteHead = [string]$finalRemoteFields[0]
+    PullRequestHead = [string]$postOperationPr.headRefOid
     PullRequest = [int]$postOperationPr.number
     Url = [string]$postOperationPr.url
     Mode = $mode
