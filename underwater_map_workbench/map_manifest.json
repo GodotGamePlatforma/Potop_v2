@@ -3,7 +3,7 @@
   "revision": {
     "revision_id": "center-station-right-city-two-tower-runtime-v13",
     "topology_revision": "l05-owned-two-tower-route-v5",
-    "presentation_revision": "center-station-right-city-two-tower-production-v19"
+    "presentation_revision": "center-station-right-city-two-tower-production-v20"
   },
   "map": {
     "id": "underwater_map_clean_12x12",
@@ -995,7 +995,7 @@
         "package": {
           "format": "structure_package_v1",
           "path": "structures/tower_prototype_01/structure_manifest.json",
-          "sha256": "9cc1c6067882c43be312040673eff16c8a80ee8081f6155ba13303739ac863a7"
+          "sha256": "b7d382f28adca9a69262329033e44ff30e780a9ef245dc51ea2ae07e82ead844"
         }
       },
       {

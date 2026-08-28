@@ -39,7 +39,7 @@ position = Vector2(0, 0)
 scale = Vector2(1, 1)
 visible = true
 metadata/package_manifest_path = "res://underwater_map_workbench/structures/tower_prototype_01/structure_manifest.json"
-metadata/package_manifest_sha256 = "9cc1c6067882c43be312040673eff16c8a80ee8081f6155ba13303739ac863a7"
+metadata/package_manifest_sha256 = "b7d382f28adca9a69262329033e44ff30e780a9ef245dc51ea2ae07e82ead844"
 metadata/local_topology_digest = "structure-topology-v1:35cec4f902213c0e5260db83ced132ae2a9a3a603d8fc1fb836ce09508ee7dc2"
 metadata/controller_script = "res://underwater_map_workbench/structures/tower_prototype_01/runtime/DiveEnterableTowerController.gd"
 metadata/structure_id = "tower_prototype_01"
@@ -979,7 +979,7 @@ metadata/local_rect = Rect2(0, 0, 2240, 3680)
 metadata/pixel_size = Vector2i(2240, 3680)
 metadata/topology_digest = "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
 metadata/partition_digest = "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded"
-metadata/source = {"affordance": "open_water_clipped_interior", "enabled": true, "group_id": "TowerArtwork", "id": "tower_prototype_01_interior", "kind": "structure_interior_texture", "layer_id": "L04", "local_rect": [0, 0, 2240, 3680], "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded", "path": "structures/tower_prototype_01/assets/visual/tower_interior.png", "pixel_size": [2240, 3680], "sha256": "1cf7718b0e10b4b93dd87bdfed633441b5cc04d5b4ad11ac0142145765789058", "structure_id": "tower_prototype_01", "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"}
+metadata/source = {"affordance": "open_water_clipped_interior", "enabled": true, "group_id": "TowerArtwork", "id": "tower_prototype_01_interior", "kind": "structure_interior_texture", "layer_id": "L04", "local_rect": [0, 0, 2240, 3680], "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded", "path": "structures/tower_prototype_01/assets/visual/tower_interior.png", "pixel_size": [2240, 3680], "sha256": "e0dde25393294d945b9f98fcb765179bd8f16add3b9ac00861e8f4d778bcd612", "structure_id": "tower_prototype_01", "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"}
 
 [node name="Bitmap" type="TextureRect" parent="InteriorVisual/TowerArtwork/tower_prototype_01_interior"]
 position = Vector2(0, 0)

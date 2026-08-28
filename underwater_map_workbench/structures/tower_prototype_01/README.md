@@ -43,6 +43,16 @@ Po zmianie grafiki lub prywatnej prezentacji uruchom natywny capture:
 
 Artefakty trafiają do izolowanego `user://test_tower_prototype_01_proxy_capture`. Obejrzenie obrazów jest obowiązkowe; sam kod wyjścia potwierdza działanie harnessu, nie jakość ani osiągalność wnętrza.
 
+### Natywny authoring L04
+
+`tools/author_l04_from_scratch.py` odtwarza L04 bezpośrednio w docelowym rastrze `2240x3680`. Czyta wyłącznie kanoniczną maskę open-water i `structure_truth.json`; istniejący `tower_interior.png` nie jest wejściem. Generator nie wykonuje resize'u, skalowania ani resamplingu:
+
+```powershell
+python .\tools\author_l04_from_scratch.py
+```
+
+Po authoringu obowiązuje pełny przepis seala, builda, checku, testów i natywnego capture'u poniżej. Grafika L04 pozostaje wyłącznie niekolizyjną prezentacją open-water; L05 i kanoniczna topologia są jedynym źródłem powierzchni stałych.
+
 ## Jeden przepis zmiany
 
 Zmiana edytowalnego źródła wymagająca nowego seala i mapowego pinu jest jednym root-routed zadaniem na branchu `codex/structure-tower_prototype_01/<task-slug>`. Agent nie projektuje osobnego procesu wdrożeniowego: wykonuje poniższy przepis w swoim worktree. Bieżący `agent_fast_check.ps1` nie wykonuje seala ani mapowego builda, dlatego te kroki pozostają tutaj jawne. Najpierw zmień źródła i odtwórz pakiet:

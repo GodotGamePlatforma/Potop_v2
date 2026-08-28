@@ -157,7 +157,7 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertIn("z_as_relative = false", first_render)
         self.assertIn("z_index = -79", first_render)
         self.assertIn("metadata/clearance_count = 2", first_render)
-        self.assertIn("metadata/feather_outer_tint = 0.82", first_render)
+        self.assertIn("metadata/feather_outer_tint = 0.98", first_render)
 
     def test_generated_fragment_is_visual_only_and_deterministic(self) -> None:
         topology = _fixture()
@@ -176,10 +176,10 @@ class PortalBackdropClearanceTest(unittest.TestCase):
         self.assertNotIn("PackedColorArray(Color", rendered)
         self.assertIn(
             "vertex_colors = PackedColorArray("
-            "0.022509804, 0.093254902, 0.13505882, 1, "
+            "0.026901961, 0.11145098, 0.16141176, 1, "
             "0.02745098, 0.11372549, 0.16470588, 1, "
             "0.02745098, 0.11372549, 0.16470588, 1, "
-            "0.022509804, 0.093254902, 0.13505882, 1)",
+            "0.026901961, 0.11145098, 0.16141176, 1)",
             rendered,
         )
         vertex_color_lines = [
