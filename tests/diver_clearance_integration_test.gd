@@ -3,8 +3,10 @@ extends SceneTree
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
+const TutorialStateScript := preload("res://scripts/data/TutorialState.gd")
 
 const DIVE_SCENE_PATH := "res://scenes/diving/DiveScene.tscn"
+const DIVER_SCENE_PATH := "res://diver_workbench/runtime/Diver.tscn"
 const REPORT_ROOT := "user://test_diver_clearance_integration"
 const REPORT_FILE := "diver_clearance_report.json"
 const CAPTURE_RESOLUTION := Vector2i(1280, 720)
@@ -13,6 +15,9 @@ const TARGET_DISTANCE := 9.0
 const MAX_MOTION_TICKS := 360
 const STAGNANT_TICKS := 90
 const STOP_TICKS := 45
+const CAMERA_MOTION_TICKS := 45
+const CAMERA_RECENTER_TICKS := 120
+const CAMERA_CENTER_TOLERANCE := 1.5
 const QUERY_MARGIN := 0.05
 const THROAT_SIDE_MARGIN := 92.0
 const DIAGONAL_OFFSET := 18.0
@@ -30,6 +35,7 @@ var _report := {
 	"replays": [],
 	"dynamic_barriers": [],
 	"currents": [],
+	"camera": {},
 	"structure_runtime_states": [],
 	"clearance_ab": {},
 	"captures": [],
@@ -49,6 +55,10 @@ func _run() -> void:
 	if not _prepare_report_root():
 		_finish()
 		return
+	await _audit_camera_cold_start_contract()
+	if _failed:
+		_finish()
+		return
 
 	var state = GameStateScript.new()
 	state.setup_new_campaign(105_060, DifficultyProfileScript.new())
@@ -58,6 +68,8 @@ func _run() -> void:
 	setup.target_sector = setup.start_entry_point
 	setup.selected_objective = "basic_scavenge"
 	setup.item_weights = {"food": 1.0, "planks": 1.2, "scrap": 1.5}
+	setup.tutorial_mode = true
+	setup.tutorial_baseline_step = TutorialStateScript.Step.DIVE_MOVEMENT
 	state.current_expedition_setup = setup
 
 	var dive_scene_value := ResourceLoader.load(DIVE_SCENE_PATH)
@@ -91,17 +103,29 @@ func _run() -> void:
 	if _camera == null:
 		_finish()
 		return
-	_diver.call("configure_camera_world_bounds", state.underwater_world.blueprint.world_size)
+	var world_size: Vector2 = state.underwater_world.blueprint.world_size
+	_diver.call("configure_camera_world_bounds", world_size)
 	_camera.enabled = true
 	_camera.make_current()
 
 	var entry_position: Vector2 = state.underwater_world.blueprint.entry_position
+	await _audit_camera_world_limits(world_size, entry_position)
+	if _failed:
+		_finish()
+		return
 	_map.call("update_streaming", entry_position, true, Vector2(900.0, 600.0))
 	await process_frame
 	await physics_frame
 	var tutorial_case := _find_open_water_case(entry_position)
 	_assert(not tutorial_case.is_empty(), "Tutorialowe wejście musi zawierać fizyczny odcinek dla realnego collidera.")
 	if not tutorial_case.is_empty():
+		if not await _audit_camera_motion_contract(tutorial_case):
+			_finish()
+			return
+		await _audit_tutorial_indicator_tracks_diver(tutorial_case)
+		if _failed:
+			_finish()
+			return
 		if not await _run_replay(tutorial_case, false):
 			_finish()
 			return
@@ -323,6 +347,306 @@ func _find_open_water_case(anchor: Vector2) -> Dictionary:
 				"exact_80_square": false,
 			}
 	return {}
+
+
+func _audit_camera_cold_start_contract() -> void:
+	var diver_scene_value := ResourceLoader.load(DIVER_SCENE_PATH)
+	_assert(diver_scene_value is PackedScene, "Harness musi załadować produkcyjną scenę Nurka do próby cold-start.")
+	if not diver_scene_value is PackedScene:
+		return
+	var probe := (diver_scene_value as PackedScene).instantiate() as CharacterBody2D
+	_assert(probe != null, "Próba cold-start musi utworzyć prawdziwy DiverController.")
+	if probe == null:
+		return
+	probe.call("seed_presentation_settings_before_ready", "low", true)
+	root.add_child(probe)
+	await process_frame
+	probe.set_physics_process(false)
+	var probe_camera := _find_gameplay_camera(probe)
+	_assert(probe_camera != null, "Próba cold-start musi znaleźć prywatną Camera2D Nurka.")
+	if probe_camera != null:
+		_assert(not probe_camera.position_smoothing_enabled, "Ograniczenie ruchu ustawione przed _ready() musi wyłączyć smoothing kamery od pierwszej klatki.")
+		_assert((probe_camera.global_position - probe.global_position).is_zero_approx(), "Ograniczenie ruchu ustawione przed _ready() musi rozpocząć z kamerą na środku Nurka.")
+		probe.call("set_reduced_motion", false)
+		_assert(probe_camera.position_smoothing_enabled, "Wyjście z cold-start reduced motion musi przywrócić authored smoothing kamery.")
+	probe.queue_free()
+	await process_frame
+
+
+func _audit_camera_world_limits(world_size: Vector2, restore_position: Vector2) -> void:
+	var viewport_size := Vector2(root.get_visible_rect().size)
+	var half_visible_world := viewport_size * 0.5 / _camera.zoom
+	var probes: Array[Dictionary] = [
+		{
+			"label": "top_left_outward_lead",
+			"position": Vector2.ZERO,
+			"lead": half_visible_world * Vector2(-0.5, -0.5),
+		},
+		{
+			"label": "bottom_right_outward_lead",
+			"position": world_size,
+			"lead": half_visible_world * Vector2(0.5, 0.5),
+		},
+	]
+	var records: Array[Dictionary] = []
+	for probe in probes:
+		var probe_position: Vector2 = probe.get("position", Vector2.ZERO) as Vector2
+		var emulated_lead: Vector2 = probe.get("lead", Vector2.ZERO) as Vector2
+		_diver.call("reset_at", probe_position)
+		_camera.position = emulated_lead
+		_camera.reset_smoothing()
+		_camera.force_update_scroll()
+		await process_frame
+		var center := _camera.get_screen_center_position()
+		var visible_min := center - half_visible_world
+		var visible_max := center + half_visible_world
+		var within_limits := (
+			visible_min.x >= -CAMERA_CENTER_TOLERANCE
+			and visible_min.y >= -CAMERA_CENTER_TOLERANCE
+			and visible_max.x <= world_size.x + CAMERA_CENTER_TOLERANCE
+			and visible_max.y <= world_size.y + CAMERA_CENTER_TOLERANCE
+		)
+		_assert(
+			within_limits,
+			"Camera2D z wychyleniem %s nie może odsłonić obszaru poza granicami świata: min=%s max=%s world=%s."
+			% [probe.label, visible_min, visible_max, world_size],
+		)
+		records.append({
+			"label": str(probe.label),
+			"emulated_world_lead": _vector_json(emulated_lead),
+			"screen_center": _vector_json(center),
+			"visible_min": _vector_json(visible_min),
+			"visible_max": _vector_json(visible_max),
+			"within_limits": within_limits,
+		})
+	_diver.call("reset_at", restore_position)
+	_camera.force_update_scroll()
+	await process_frame
+	var camera_report := _report.get("camera", {}) as Dictionary
+	camera_report["world_limits"] = records
+	_report["camera"] = camera_report
+
+
+func _audit_camera_motion_contract(case: Dictionary) -> bool:
+	var start: Vector2 = case.get("start", Vector2.ZERO) as Vector2
+	var direction: Vector2 = (case.get("axis", Vector2.RIGHT) as Vector2).normalized()
+	var original_signal_blocking := _diver.is_blocking_signals()
+	_diver.set_block_signals(true)
+	_diver.call("set_reduced_motion", false)
+	_diver.call("reset_at", start)
+	_camera.make_current()
+	_camera.force_update_scroll()
+	await process_frame
+	var idle_target_lead := _camera_target_world_lead()
+	var idle_screen_lead := _camera.get_screen_center_position() - _diver.global_position
+	_assert(_camera.zoom.is_equal_approx(Vector2(1.2, 1.2)), "Gameplayowa Camera2D musi zachować stały zoom 1.2.")
+	_assert(
+		idle_target_lead.length() <= CAMERA_CENTER_TOLERANCE,
+		"Po resecie cel Camera2D musi być wycentrowany na Nurku; lead=%s." % idle_target_lead,
+	)
+	_assert(
+		idle_screen_lead.length() <= CAMERA_CENTER_TOLERANCE,
+		"W bezruchu rzeczywisty środek ekranu musi pokrywać się z Nurkiem; lead=%s." % idle_screen_lead,
+	)
+
+	var swim_sample: Dictionary = await _sample_camera_motion(start, direction, false)
+	var sprint_sample: Dictionary = await _sample_camera_motion(start, direction, true)
+	_assert(int(swim_sample.get("collision_ticks", 0)) == 0, "Próba kamery podczas zwykłego pływania nie może opierać się o kolizję.")
+	_assert(int(sprint_sample.get("collision_ticks", 0)) == 0, "Próba kamery podczas sprintu nie może opierać się o kolizję.")
+	var swim_target_along := float(swim_sample.get("target_along", 0.0))
+	var sprint_target_along := float(sprint_sample.get("target_along", 0.0))
+	var swim_screen_along := float(swim_sample.get("screen_along", 0.0))
+	var sprint_screen_along := float(sprint_sample.get("screen_along", 0.0))
+	_assert(swim_target_along > 10.0, "Zwykłe pływanie musi przesunąć cel kamery przed Nurka; lead=%.3f." % swim_target_along)
+	_assert(swim_screen_along > 3.0, "Zwykłe pływanie musi pokazać więcej świata przed Nurkiem; screen lead=%.3f." % swim_screen_along)
+	_assert(
+		sprint_target_along > swim_target_along + 10.0,
+		"Sprint musi mieć większe wychylenie celu kamery niż zwykłe pływanie: swim=%.3f sprint=%.3f."
+		% [swim_target_along, sprint_target_along],
+	)
+	_assert(
+		sprint_screen_along > swim_screen_along + 3.0,
+		"Sprint musi rzeczywiście pokazać więcej świata przed Nurkiem niż zwykłe pływanie: swim=%.3f sprint=%.3f."
+		% [swim_screen_along, sprint_screen_along],
+	)
+
+	var release_mid_target := 0.0
+	for tick in range(CAMERA_RECENTER_TICKS):
+		_diver.call("simulate_motion_tick", Vector2.ZERO, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+		await physics_frame
+		await process_frame
+		if tick == 14:
+			release_mid_target = _camera_target_world_lead().length()
+	_camera.force_update_scroll()
+	await process_frame
+	var release_target_lead := _camera_target_world_lead()
+	var release_screen_lead := _camera.get_screen_center_position() - _diver.global_position
+	_assert(
+		release_mid_target < sprint_target_along,
+		"Po puszczeniu sterowania kamera musi płynnie wracać do środka: start=%.3f po_15=%.3f."
+		% [sprint_target_along, release_mid_target],
+	)
+	_assert(
+		release_target_lead.length() <= CAMERA_CENTER_TOLERANCE,
+		"Po wyhamowaniu cel kamery musi wrócić do Nurka; lead=%s." % release_target_lead,
+	)
+	_assert(
+		release_screen_lead.length() <= CAMERA_CENTER_TOLERANCE,
+		"Po wyhamowaniu rzeczywisty środek ekranu musi wrócić do Nurka; lead=%s." % release_screen_lead,
+	)
+
+	var slowed_sample: Dictionary = await _sample_camera_motion(start, direction, false, 0.5)
+	var slowed_target_along := float(slowed_sample.get("target_along", 0.0))
+	_assert(slowed_target_along > 0.0 and slowed_target_along < swim_target_along, "Rzeczywiste spowolnienie pływania musi zmniejszyć wychylenie kamery: slow=%.3f swim=%.3f." % [slowed_target_along, swim_target_along])
+
+	_diver.call("reset_at", start)
+	for _tick in range(CAMERA_MOTION_TICKS):
+		_diver.call("simulate_motion_tick", direction, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+	var lead_before_reversal := _camera_target_world_lead()
+	_diver.call("simulate_motion_tick", -direction, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+	var first_reversal_lead := _camera_target_world_lead()
+	_assert(first_reversal_lead.dot(direction) < lead_before_reversal.dot(direction), "Bezpośrednia zmiana kierunku musi natychmiast zacząć wygaszać stare wychylenie.")
+	for _tick in range(CAMERA_MOTION_TICKS * 2):
+		_diver.call("simulate_motion_tick", -direction, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+	var reversed_lead := _camera_target_world_lead()
+	_assert(reversed_lead.dot(-direction) > 10.0, "Po zmianie kierunku kamera musi osiąść przed Nurkiem w nowym kierunku; lead=%s." % reversed_lead)
+
+	_diver.call("reset_at", start)
+	for _tick in range(CAMERA_MOTION_TICKS):
+		_diver.call("simulate_motion_tick", direction, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+	var lead_before_cross_current := _camera_target_world_lead()
+	var cross_current := direction.rotated(PI * 0.5) * 240.0
+	_diver.call("simulate_motion_tick", direction, false, cross_current, 1.0, MOTION_DELTA, true)
+	var cross_current_lead := _camera_target_world_lead()
+	_assert(absf(cross_current_lead.dot(direction.rotated(PI * 0.5))) <= 0.05, "Nagły poprzeczny prąd nie może skręcić celu kamery; lead=%s." % cross_current_lead)
+	_assert(cross_current_lead.length() < lead_before_cross_current.length(), "Odrzucony kierunek poprzecznego prądu musi wygaszać stare wychylenie zamiast je zamrażać.")
+
+	var reduced_fixture: Dictionary = await _sample_camera_motion(start, direction, true)
+	_assert(float(reduced_fixture.get("target_along", 0.0)) > 10.0, "Próba reduced motion wymaga aktywnego sprintowego wychylenia.")
+	_diver.call("set_reduced_motion", true)
+	_camera.force_update_scroll()
+	await process_frame
+	var reduced_target_lead := _camera_target_world_lead()
+	var reduced_screen_lead := _camera.get_screen_center_position() - _diver.global_position
+	_assert(reduced_target_lead.length() <= CAMERA_CENTER_TOLERANCE, "Reduced motion musi natychmiast wycentrować cel kamery.")
+	_assert(reduced_screen_lead.length() <= CAMERA_CENTER_TOLERANCE, "Reduced motion musi natychmiast wycentrować rzeczywisty kadr kamery.")
+	_assert(not _camera.position_smoothing_enabled, "Reduced motion musi wyłączyć smoothing śledzenia.")
+	for _tick in range(15):
+		_diver.call("simulate_motion_tick", direction, true, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+	_assert(_camera_target_world_lead().length() <= CAMERA_CENTER_TOLERANCE, "Reduced motion musi utrzymać kamerę na środku także podczas sprintu.")
+	_diver.call("set_reduced_motion", false)
+	_assert(_camera.position_smoothing_enabled, "Wyjście z reduced motion musi przywrócić authored smoothing śledzenia.")
+	_diver.call("reset_at", start)
+
+	var camera_report := _report.get("camera", {}) as Dictionary
+	camera_report["motion"] = {
+		"zoom": _vector_json(_camera.zoom),
+		"idle_target_lead": _vector_json(idle_target_lead),
+		"idle_screen_lead": _vector_json(idle_screen_lead),
+		"swim": swim_sample,
+		"sprint": sprint_sample,
+		"release_mid_target_distance": release_mid_target,
+		"release_target_lead": _vector_json(release_target_lead),
+		"release_screen_lead": _vector_json(release_screen_lead),
+		"slowed": slowed_sample,
+		"reversal_first_lead": _vector_json(first_reversal_lead),
+		"reversed_lead": _vector_json(reversed_lead),
+		"cross_current_lead": _vector_json(cross_current_lead),
+		"reduced_target_lead": _vector_json(reduced_target_lead),
+		"reduced_screen_lead": _vector_json(reduced_screen_lead),
+	}
+	_report["camera"] = camera_report
+	_diver.call("reset_at", start)
+	_diver.set_block_signals(original_signal_blocking)
+	return not _failed
+
+
+func _audit_tutorial_indicator_tracks_diver(case: Dictionary) -> void:
+	var indicator := _dive.find_child("TutorialDirectionIndicator", true, false) as Control
+	_assert(indicator != null, "Produkcyjna DiveScene musi zbudować tutorialowy wskaźnik kierunku.")
+	if indicator == null:
+		return
+	var start: Vector2 = case.get("start", Vector2.ZERO) as Vector2
+	var direction: Vector2 = (case.get("axis", Vector2.RIGHT) as Vector2).normalized()
+	var original_signal_blocking := _diver.is_blocking_signals()
+	_diver.set_block_signals(true)
+	_diver.call("reset_at", start)
+	for _tick in range(CAMERA_MOTION_TICKS):
+		_diver.call("simulate_motion_tick", direction, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
+		await physics_frame
+		await process_frame
+	_dive.call("_update_ui")
+	await process_frame
+
+	var state := indicator.call("state_for_tests") as Dictionary
+	var diver_screen_position: Vector2 = _diver.get_global_transform_with_canvas().origin
+	var ring_center := indicator.get_global_rect().get_center()
+	var viewport_center := Vector2(root.get_visible_rect().size) * 0.5
+	var shifted_distance := diver_screen_position.distance_to(viewport_center)
+	var shifted_alignment := ring_center.distance_to(diver_screen_position)
+	_assert(bool(state.get("visible", false)), "Wskaźnik tutoriala musi być widoczny podczas pierwszego zejścia.")
+	_assert(str(state.get("target_label", "")) == "ZASOBY", "Próba kamery nie może zmienić semantycznego celu wskaźnika tutoriala.")
+	_assert(shifted_distance > 20.0, "Fixture wskaźnika musi rzeczywiście przesunąć Nurka poza środek viewportu.")
+	_assert(shifted_alignment <= 1.0, "Pierścień tutoriala musi pozostać wycentrowany na Nurku przy aktywnym look-ahead.")
+
+	_diver.call("reset_at", start)
+	_camera.force_update_scroll()
+	await process_frame
+	_dive.call("_update_ui")
+	await process_frame
+	diver_screen_position = _diver.get_global_transform_with_canvas().origin
+	ring_center = indicator.get_global_rect().get_center()
+	var centered_alignment := ring_center.distance_to(diver_screen_position)
+	_assert(centered_alignment <= 1.0, "Pierścień tutoriala musi pozostać na Nurku po powrocie kamery do centrum.")
+	_diver.set_block_signals(original_signal_blocking)
+
+	var camera_report := _report.get("camera", {}) as Dictionary
+	camera_report["tutorial_indicator"] = {
+		"target_label": str(state.get("target_label", "")),
+		"shifted_diver_from_viewport_center": shifted_distance,
+		"shifted_ring_alignment": shifted_alignment,
+		"centered_ring_alignment": centered_alignment,
+	}
+	_report["camera"] = camera_report
+
+
+func _sample_camera_motion(start: Vector2, direction: Vector2, sprint_requested: bool, speed_multiplier: float = 1.0) -> Dictionary:
+	_diver.call("reset_at", start)
+	_camera.force_update_scroll()
+	await process_frame
+	var collision_ticks := 0
+	for _tick in range(CAMERA_MOTION_TICKS):
+		var motion := _diver.call(
+			"simulate_motion_tick",
+			direction,
+			sprint_requested,
+			Vector2.ZERO,
+			speed_multiplier,
+			MOTION_DELTA,
+			true,
+		) as Dictionary
+		collision_ticks += 1 if bool(motion.get("collided", false)) else 0
+		await physics_frame
+		await process_frame
+	_camera.force_update_scroll()
+	await process_frame
+	var target_lead := _camera_target_world_lead()
+	var screen_lead := _camera.get_screen_center_position() - _diver.global_position
+	return {
+		"sprint": sprint_requested,
+		"speed_multiplier": speed_multiplier,
+		"ticks": CAMERA_MOTION_TICKS,
+		"collision_ticks": collision_ticks,
+		"diver_position": _vector_json(_diver.global_position),
+		"target_lead": _vector_json(target_lead),
+		"target_along": target_lead.dot(direction),
+		"screen_lead": _vector_json(screen_lead),
+		"screen_along": screen_lead.dot(direction),
+	}
+
+
+func _camera_target_world_lead() -> Vector2:
+	return _camera.global_position - _diver.global_position
 
 
 func _find_structure_throat_case(structure_root: Node2D, manifest: Dictionary, axis_id: String) -> Dictionary:
@@ -586,13 +910,17 @@ func _stop_at_current_pose(label: String) -> Dictionary:
 		travelled += float(motion.get("travelled", 0.0))
 		await physics_frame
 	var clear := _pose_clear(_diver.global_position, _diver.rotation)
+	var camera_target_lead := _camera_target_world_lead()
+	var camera_centered := camera_target_lead.length() <= 2.0
 	return {
-		"success": clear,
+		"success": clear and camera_centered,
 		"label": label,
 		"position": _vector_json(_diver.global_position),
 		"rotation": _diver.rotation,
 		"travelled": travelled,
 		"pose_clear": clear,
+		"camera_target_lead": _vector_json(camera_target_lead),
+		"camera_centered": camera_centered,
 	}
 
 
@@ -644,6 +972,12 @@ func _audit_structure_current(structure_root: Node2D, manifest: Dictionary) -> D
 			var displacement := _diver.global_position - start
 			if displacement.dot(current.normalized()) <= 5.0:
 				continue
+			var camera_target_lead := _camera_target_world_lead()
+			_assert(
+				camera_target_lead.length() <= CAMERA_CENTER_TOLERANCE,
+				"Pasywny prąd w %s nie może tworzyć dodatkowego celu wyprzedzenia kamery; lead=%s."
+				% [str(structure_root.get_meta(&"structure_id", "")), camera_target_lead],
+			)
 			var record := {
 				"structure_id": str(structure_root.get_meta(&"structure_id", "")),
 				"position": position,
@@ -655,6 +989,7 @@ func _audit_structure_current(structure_root: Node2D, manifest: Dictionary) -> D
 				"position": _vector_json(position),
 				"current": _vector_json(current),
 				"idle_displacement": _vector_json(displacement),
+				"camera_target_lead": _vector_json(camera_target_lead),
 			})
 			return record
 	return {}

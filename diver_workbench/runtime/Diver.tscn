@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://bpl1dvxy5p701"]
+[gd_scene load_steps=11 format=3 uid="uid://bpl1dvxy5p701"]
 
 [ext_resource type="Script" uid="uid://h1dogxd7e64l" path="res://diver_workbench/runtime/DiverController.gd" id="1_diver_controller"]
 [ext_resource type="SpriteFrames" path="res://diver_workbench/assets/animation/diver_sprite_frames.tres" id="2_diver_frames"]
@@ -6,6 +6,7 @@
 [ext_resource type="Shader" path="res://diver_workbench/assets/shaders/diver_readability.gdshader" id="4_readability_shader"]
 [ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_socket_profile.tres" id="5_socket_profile"]
 [ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_frame_envelope_profile.tres" id="6_envelope_profile"]
+[ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_camera_profile.tres" id="7_camera_profile"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_diver_readability"]
 shader = ExtResource("4_readability_shader")
@@ -21,6 +22,7 @@ radius = 112.0
 script = ExtResource("1_diver_controller")
 socket_profile = ExtResource("5_socket_profile")
 frame_envelope_profile = ExtResource("6_envelope_profile")
+camera_profile = ExtResource("7_camera_profile")
 
 [node name="VisualEffects" type="Node2D" parent="." unique_id=1308266921]
 z_index = -1
