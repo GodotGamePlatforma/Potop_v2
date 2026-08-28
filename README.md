@@ -28,7 +28,7 @@ git lfs pull
 
 Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Zadanie implementacyjne uruchamia od razu jako **Worktree**, nigdy jako Local. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. Agent ma skupić się na implementacji, nie na obsłudze systemu integracji.
 
-Tylko zadania zapisujące wspólny manifest, scenę, metadane builda lub generowane wyniki Mapy koordynator uruchamia sekwencyjnie z aktualnego `origin/main`; kolejne takie zadanie zaczyna się dopiero po `MERGED` albo `CLOSED` poprzedniego PR, a pozostałe rozłączne zadania nadal działają równolegle.
+Tylko zadania zapisujące wspólny manifest, scenę, builder, kompilator, metadane builda lub generowane wyniki Mapy koordynator uruchamia sekwencyjnie z aktualnego `origin/main`; kolejne takie zadanie zaczyna się dopiero po `MERGED` albo `CLOSED` poprzedniego PR, a pozostałe rozłączne zadania nadal działają równolegle.
 
 Jeżeli rozmowa rozpoczęła się jako „tylko analiza”, a później ma przejść do wdrożenia, najpierw użyj **Hand off do Worktree**. W przeniesionym worktree utwórz gałąź `codex/*` i dopiero wtedy rozpocznij edycję. Sam branch w głównym checkoutcie nie zastępuje osobnego worktree.
 
