@@ -240,6 +240,26 @@ if ([string]::IsNullOrWhiteSpace($ExpectedHeadSha)) {
     if (-not [string]::IsNullOrWhiteSpace($ExpectedBranch)) {
         throw '-ExpectedBranch is valid only together with -ExpectedHeadSha.'
     }
+    $gitDirectory = [System.IO.Path]::GetFullPath(
+        (Invoke-NativeChecked git @(
+            '-C', $script:RepositoryPath,
+            'rev-parse', '--path-format=absolute', '--git-dir'
+        )).Trim()
+    ).TrimEnd('\', '/')
+    $gitCommonDirectory = [System.IO.Path]::GetFullPath(
+        (Invoke-NativeChecked git @(
+            '-C', $script:RepositoryPath,
+            'rev-parse', '--path-format=absolute', '--git-common-dir'
+        )).Trim()
+    ).TrimEnd('\', '/')
+    if ([string]::Equals(
+        $gitDirectory,
+        $gitCommonDirectory,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+        throw ('Local fast-check requires a separate linked Git worktree. ' +
+            'Start the task as Worktree, or Hand off to Worktree before editing.')
+    }
     if ($branch -cnotmatch '^codex/.+') {
         throw "Local fast-check must run from a codex/* branch; current branch is '$branch'."
     }

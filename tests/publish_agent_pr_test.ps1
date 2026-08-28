@@ -397,6 +397,12 @@ raise SystemExit(subprocess.run([real_git, *args]).returncode)
     if ((Git $ordinary.Remote rev-parse "refs/heads/$($ordinary.Branch)").Trim() -cne $ordinary.Head) {
         throw 'Ordinary branch was not pushed at exact HEAD.'
     }
+    foreach ($field in @('LocalHead', 'RemoteHead', 'PullRequestHead')) {
+        $pattern = "(?m)^$field\s*:\s*$([regex]::Escape($ordinary.Head))\s*$"
+        if ($ordinaryResult.Output -notmatch $pattern) {
+            throw "Successful publisher output omitted exact $field=$($ordinary.Head): $($ordinaryResult.Output)"
+        }
+    }
 
     $queueReady = New-Fixture 'queue-ready'
     $queueReadyResult = Run-Publish $queueReady -QueueAcceptance queued
@@ -663,7 +669,10 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
         "'remote', 'get-url', '--push', '--all', 'origin'",
         'isCrossRepository,headRepository,headRepositoryOwner',
         'mergeQueue(branch:$base)',
-        '"${head}:refs/heads/$branch"'
+        '"${head}:refs/heads/$branch"',
+        'LocalHead = $head',
+        'RemoteHead = [string]$finalRemoteFields[0]',
+        'PullRequestHead = [string]$postOperationPr.headRefOid'
     )) {
         if (-not $source.Contains($required)) {
             throw "publish-pr is missing required exact identity/push binding '$required'."
@@ -672,7 +681,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
     if ($source -match [regex]::Escape('--set-upstream')) {
         throw 'publish-pr still pushes a moving branch through --set-upstream.'
     }
-    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/SQUASH-native-queue/manual-control-plane/race contract'
+    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/explicit-three-SHA-proof/SQUASH-native-queue/manual-control-plane/race contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }

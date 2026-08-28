@@ -636,6 +636,9 @@ if ($finalRemoteFields.Count -ne 2 -or $finalRemoteFields[0] -cne $head -or
 
 [pscustomobject]@{
     CommitSha = $head
+    LocalHead = $head
+    RemoteHead = [string]$finalRemoteFields[0]
+    PullRequestHead = [string]$postOperationPr.headRefOid
     PullRequest = [int]$postOperationPr.number
     Url = [string]$postOperationPr.url
     Mode = $mode

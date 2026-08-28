@@ -26,7 +26,9 @@ git lfs pull
 
 ## Praca nad zmianą
 
-Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. Agent ma skupić się na implementacji, nie na obsłudze systemu integracji.
+Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Zadanie implementacyjne uruchamia od razu jako **Worktree**, nigdy jako Local. Jedno zadanie oznacza jeden pełny Git worktree, jedną gałąź `codex/<owner>/<task-slug>` i jeden PR. Agent ma skupić się na implementacji, nie na obsłudze systemu integracji.
+
+Jeżeli rozmowa rozpoczęła się jako „tylko analiza”, a później ma przejść do wdrożenia, najpierw użyj **Hand off do Worktree**. W przeniesionym worktree utwórz gałąź `codex/*` i dopiero wtedy rozpocznij edycję. Sam branch w głównym checkoutcie nie zastępuje osobnego worktree.
 
 Przykładowy start z czystej kopii repozytorium:
 
@@ -45,7 +47,7 @@ Następnie:
 4. osobno uruchom lokalny `fast-check`; po `FAIL` popraw zmianę i powtórz;
 5. po `PASS` sprawdź pełny diff i utwórz logiczny commit;
 6. opublikuj commit jednym helperem, który pushuje exact SHA, tworzy PR i dla zwykłej zmiany włącza squash auto-merge;
-7. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge.
+7. zakończ zadanie — agent nie polluje kolejki i nie aktualizuje starego PR po każdym cudzym merge; może powiedzieć „gotowe” dopiero po potwierdzeniu `LocalHead = RemoteHead = PullRequestHead` dla jedynego otwartego PR.
 
 ```powershell
 # Najpierw właściwy test zmienianego zachowania, na przykład:
@@ -59,7 +61,8 @@ git diff --check
 git add <jawne-zmienione-pliki>
 git commit -m "<typ>: <krótki opis>"
 
-# Rewaliduje clean exact commit, pushuje i tworzy PR:
+# Rewaliduje clean exact commit, pushuje i tworzy PR. Udany wynik wypisuje
+# LocalHead, RemoteHead i PullRequestHead; wszystkie trzy muszą być identyczne:
 .\tools\publish_agent_pr.ps1 -Title "<tytuł PR>" -TestTarget <test-zadania>
 ```
 

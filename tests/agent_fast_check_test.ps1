@@ -53,6 +53,7 @@ function Run-FastCheck {
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     $repo = Join-Path $tempRoot 'repo'
+    $worktree = Join-Path $tempRoot 'worktree'
     $mockBin = Join-Path $tempRoot 'bin'
     $targetLog = Join-Path $tempRoot 'target.log'
     New-Item -ItemType Directory -Path $mockBin | Out-Null
@@ -97,16 +98,27 @@ Write-Host "TARGET PASS $Target"
     Set-Content -LiteralPath (Join-Path $repo 'game.gd') -Encoding UTF8 -Value 'extends Node'
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
-    Git $repo checkout -b codex/root/feature | Out-Null
-    Add-Content -LiteralPath (Join-Path $repo 'game.gd') -Value 'var changed := true' -Encoding UTF8
+    Git $repo worktree add -b codex/root/feature $worktree main | Out-Null
+    Add-Content -LiteralPath (Join-Path $worktree 'game.gd') -Value 'var changed := true' -Encoding UTF8
 
-    $pass = Run-FastCheck $repo $successGodot @('-TestTarget', 'tests/game_test.gd', '-AllowedPath', 'game.gd')
+    $pass = Run-FastCheck $worktree $successGodot @('-TestTarget', 'tests/game_test.gd', '-AllowedPath', 'game.gd')
     if ($pass.ExitCode -ne 0 -or $pass.Output -notmatch 'FAST-CHECK PASS') {
-        throw "Expected fast-check PASS: $($pass.Output)"
+        throw "Expected linked-worktree fast-check PASS: $($pass.Output)"
     }
     if ((Get-Content -LiteralPath $targetLog -Raw) -notmatch 'tests/game_test.gd') {
         throw 'Targeted test runner was not invoked.'
     }
+
+    $primaryMain = Run-FastCheck $repo $successGodot
+    if ($primaryMain.ExitCode -eq 0 -or $primaryMain.Output -notmatch 'separate linked Git worktree') {
+        throw "Fast-check accepted the primary main checkout: $($primaryMain.Output)"
+    }
+    Git $repo checkout -b codex/root/primary-bypass | Out-Null
+    $primaryCodex = Run-FastCheck $repo $successGodot
+    if ($primaryCodex.ExitCode -eq 0 -or $primaryCodex.Output -notmatch 'separate linked Git worktree') {
+        throw "Fast-check accepted a codex/* branch in the primary checkout: $($primaryCodex.Output)"
+    }
+    Git $repo checkout main | Out-Null
 
     $toolOnlyPath = @(
         $mockBin,
@@ -119,7 +131,7 @@ Write-Host "TARGET PASS $Target"
     $pathBeforeFallback = $env:PATH
     try {
         $env:PATH = $toolOnlyPath
-        $fallback = Run-FastCheck $repo $null @(
+        $fallback = Run-FastCheck $worktree $null @(
             '-TestTarget', 'tests/game_test.gd', '-AllowedPath', 'game.gd'
         )
     }
@@ -134,7 +146,7 @@ Write-Host "TARGET PASS $Target"
     Move-Item -LiteralPath $autoGodot -Destination $hiddenGodot
     try {
         $env:PATH = $toolOnlyPath
-        $missingGodot = Run-FastCheck $repo $null @(
+        $missingGodot = Run-FastCheck $worktree $null @(
             '-TestTarget', 'tests/game_test.gd', '-AllowedPath', 'game.gd'
         )
     }
@@ -148,24 +160,24 @@ Write-Host "TARGET PASS $Target"
         throw "Missing Godot aliases did not produce the explicit-path guidance: $($missingGodot.Output)"
     }
 
-    $godotError = Run-FastCheck $repo $errorGodot @('-TestTarget', 'tests/game_test.gd', '-AllowControlPlane')
+    $godotError = Run-FastCheck $worktree $errorGodot @('-TestTarget', 'tests/game_test.gd', '-AllowControlPlane')
     if ($godotError.ExitCode -eq 0 -or $godotError.Output -notmatch 'SCRIPT ERROR') {
         throw 'SCRIPT ERROR from Godot was not rejected.'
     }
 
-    New-Item -ItemType Directory -Path (Join-Path $repo '.github/workflows') | Out-Null
-    Set-Content -LiteralPath (Join-Path $repo '.github/workflows/unsafe.yml') -Value 'name: unsafe' -Encoding UTF8
-    $protected = Run-FastCheck $repo $successGodot
+    New-Item -ItemType Directory -Path (Join-Path $worktree '.github/workflows') | Out-Null
+    Set-Content -LiteralPath (Join-Path $worktree '.github/workflows/unsafe.yml') -Value 'name: unsafe' -Encoding UTF8
+    $protected = Run-FastCheck $worktree $successGodot
     if ($protected.ExitCode -eq 0 -or $protected.Output -notmatch 'PROTECTED') {
         throw 'Ordinary fast-check accepted a control-plane path.'
     }
-    Remove-Item -LiteralPath (Join-Path $repo '.github') -Recurse -Force
+    Remove-Item -LiteralPath (Join-Path $worktree '.github') -Recurse -Force
 
-    Git $repo add game.gd | Out-Null
-    Git $repo commit -m 'feature for detached CI' | Out-Null
-    $featureHead = (Git $repo rev-parse HEAD).Trim()
-    Git $repo checkout --detach $featureHead | Out-Null
-    $detachedPass = Run-FastCheck $repo $successGodot @(
+    Git $worktree add game.gd | Out-Null
+    Git $worktree commit -m 'feature for detached CI' | Out-Null
+    $featureHead = (Git $worktree rev-parse HEAD).Trim()
+    Git $worktree checkout --detach $featureHead | Out-Null
+    $detachedPass = Run-FastCheck $worktree $successGodot @(
         '-ExpectedHeadSha', $featureHead,
         '-ExpectedBranch', 'codex/root/feature',
         '-TestTarget', 'tests/game_test.gd',
@@ -174,8 +186,8 @@ Write-Host "TARGET PASS $Target"
     if ($detachedPass.ExitCode -ne 0 -or $detachedPass.Output -notmatch 'FAST-CHECK PASS') {
         throw "Exact detached CI fast-check failed: $($detachedPass.Output)"
     }
-    $baseHead = (Git $repo rev-parse refs/heads/main).Trim()
-    $detachedMismatch = Run-FastCheck $repo $successGodot @(
+    $baseHead = (Git $worktree rev-parse refs/heads/main).Trim()
+    $detachedMismatch = Run-FastCheck $worktree $successGodot @(
         '-ExpectedHeadSha', $baseHead,
         '-ExpectedBranch', 'codex/root/feature',
         '-AllowControlPlane'
@@ -184,18 +196,18 @@ Write-Host "TARGET PASS $Target"
         throw 'Detached CI fast-check accepted a mismatched expected SHA.'
     }
 
-    Git $repo checkout main | Out-Null
-    $wrongBranch = Run-FastCheck $repo $successGodot
+    Git $worktree checkout -b feature/wrong $featureHead | Out-Null
+    $wrongBranch = Run-FastCheck $worktree $successGodot
     if ($wrongBranch.ExitCode -eq 0 -or $wrongBranch.Output -notmatch 'codex/') {
-        throw 'Fast-check accepted main.'
+        throw 'Fast-check accepted a non-codex branch in a linked worktree.'
     }
-    Git $repo checkout -b codex/root/empty | Out-Null
-    $empty = Run-FastCheck $repo $successGodot
+    Git $worktree checkout -b codex/root/empty refs/heads/main | Out-Null
+    $empty = Run-FastCheck $worktree $successGodot
     if ($empty.ExitCode -eq 0 -or $empty.Output -notmatch 'found no changes') {
         throw 'Fast-check accepted an empty branch.'
     }
 
-    Set-Content -LiteralPath (Join-Path $repo 'asset.bin') -Encoding ASCII -Value @'
+    Set-Content -LiteralPath (Join-Path $worktree 'asset.bin') -Encoding ASCII -Value @'
 version https://git-lfs.github.com/spec/v1
 oid sha256:0000000000000000000000000000000000000000000000000000000000000000
 size 1
@@ -204,7 +216,7 @@ size 1
     try {
         $env:GIT_EXEC_PATH = $mockBin
         $env:FAST_LFS_LISTING = '{"files":[{"name":"asset.bin","checkout":false}]}'
-        $pointer = Run-FastCheck $repo $successGodot @('-AllowControlPlane')
+        $pointer = Run-FastCheck $worktree $successGodot @('-AllowControlPlane')
     }
     finally {
         if ($null -eq $oldGitExecPath) { Remove-Item Env:GIT_EXEC_PATH -ErrorAction SilentlyContinue }
@@ -214,12 +226,12 @@ size 1
     if ($pointer.ExitCode -eq 0 -or $pointer.Output -notmatch 'LFS pointers remain unhydrated') {
         throw "Fast-check accepted a tracked LFS pointer in the working tree: $($pointer.Output)"
     }
-    Remove-Item -LiteralPath (Join-Path $repo 'asset.bin')
+    Remove-Item -LiteralPath (Join-Path $worktree 'asset.bin')
 
     $pathBeforeMissingTool = $env:PATH
     try {
         $env:PATH = $mockBin
-        $missingTool = Run-FastCheck $repo $successGodot
+        $missingTool = Run-FastCheck $worktree $successGodot
     }
     finally {
         $env:PATH = $pathBeforeMissingTool
@@ -228,7 +240,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check linked-worktree-only/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
