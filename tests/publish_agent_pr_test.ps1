@@ -113,7 +113,9 @@ function Initialize-GhState {
         [bool]$Existing,
         [bool]$AutoEnabled,
         [bool]$Foreign,
-        [bool]$MissingMergeMethod
+        [string]$QueueMethod,
+        [bool]$QueueExists,
+        [string]$QueueAcceptance
     )
     $statePath = Join-Path $Fixture.Root 'gh-state.json'
     $auto = $null
@@ -121,9 +123,12 @@ function Initialize-GhState {
     $state = [ordered]@{
         exists = $Existing
         auto = $auto
+        entry = $false
         head = $Fixture.Head
         foreign = $Foreign
-        missingMergeMethod = $MissingMergeMethod
+        queueMethod = $QueueMethod
+        queueExists = $QueueExists
+        queueAcceptance = $QueueAcceptance
     }
     Write-Utf8Fixture $statePath ($state | ConvertTo-Json -Depth 5 -Compress)
     return $statePath
@@ -139,7 +144,9 @@ function Run-Publish {
         [ValidateSet('', 'fail', 'dirty')][string]$FastMode = '',
         [switch]$HeadRaceOnMerge,
         [switch]$ForeignPr,
-        [switch]$MissingMergeMethod,
+        [ValidateSet('SQUASH', 'MERGE', 'REBASE')][string]$QueueMethod = 'SQUASH',
+        [ValidateSet('pending', 'queued', 'both', 'none', 'foreign')][string]$QueueAcceptance = 'pending',
+        [switch]$MissingQueue,
         [switch]$AdvanceBranchOnPush,
         [string]$PowerShellCommand = 'pwsh'
     )
@@ -148,7 +155,9 @@ function Run-Publish {
         $ExistingPr.IsPresent `
         $AutoEnabled.IsPresent `
         $ForeignPr.IsPresent `
-        $MissingMergeMethod.IsPresent
+        $QueueMethod `
+        (-not $MissingQueue.IsPresent) `
+        $QueueAcceptance
     $logPath = Join-Path $Fixture.Root 'gh.log'
     $fastLog = Join-Path $Fixture.Root 'fast.log'
     $transportLog = Join-Path $Fixture.Root 'git-transport.log'
@@ -246,6 +255,7 @@ if args[:2] == ["pr", "list"]:
 elif args[:2] == ["pr", "create"]:
     state["exists"] = True
     state["auto"] = None
+    state["entry"] = False
     save()
     print("https://example.invalid/pr/1")
 elif args[:2] == ["pr", "edit"]:
@@ -271,8 +281,36 @@ elif args[:2] == ["pr", "view"]:
             "login": "ForeignOwner" if state["foreign"] else "GodotGamePlatforma"
         },
     }))
+elif args[:2] == ["api", "graphql"]:
+    queue = None
+    if state["queueExists"]:
+        queue = {
+            "id": "QUEUE_main",
+            "configuration": {"mergeMethod": state["queueMethod"]},
+        }
+    entry = None
+    if state["entry"]:
+        entry_queue_id = "QUEUE_other" if state["queueAcceptance"] == "foreign" else "QUEUE_main"
+        entry = {"mergeQueue": {"id": entry_queue_id}}
+    auto = None if state["auto"] is None else {"enabledAt": "2026-08-28T00:00:00Z"}
+    print(json.dumps({
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "state": "OPEN",
+                    "headRefName": os.environ["MOCK_BRANCH"],
+                    "headRefOid": state["head"],
+                    "baseRefName": os.environ["MOCK_BASE"],
+                    "autoMergeRequest": auto,
+                    "mergeQueueEntry": entry,
+                },
+                "mergeQueue": queue,
+            }
+        }
+    }))
 elif args[:2] == ["pr", "merge"] and "--disable-auto" in args:
     state["auto"] = None
+    state["entry"] = False
     save()
 elif args[:2] == ["pr", "merge"] and "--auto" in args:
     if os.environ.get("MOCK_HEAD_RACE") == "1":
@@ -280,7 +318,9 @@ elif args[:2] == ["pr", "merge"] and "--auto" in args:
         save()
         print("head changed before auto-merge", file=sys.stderr)
         raise SystemExit(1)
-    state["auto"] = {} if state["missingMergeMethod"] else {"mergeMethod": "SQUASH"}
+    acceptance = state["queueAcceptance"]
+    state["auto"] = {"mergeMethod": "MERGE"} if acceptance in {"pending", "both"} else None
+    state["entry"] = acceptance in {"queued", "both", "foreign"}
     save()
 raise SystemExit(0)
 '@
@@ -350,11 +390,27 @@ raise SystemExit(subprocess.run([real_git, *args]).returncode)
     if (-not $ordinaryResult.Log.Contains($ordinaryMerge)) {
         throw "Ordinary PR did not bind native auto+squash to exact HEAD: $($ordinaryResult.Log)"
     }
-    if ($null -eq $ordinaryResult.State.auto -or [string]$ordinaryResult.State.auto.mergeMethod -cne 'SQUASH') {
-        throw 'Ordinary PR did not finish with SQUASH auto-merge enabled.'
+    if ($null -eq $ordinaryResult.State.auto -or [string]$ordinaryResult.State.auto.mergeMethod -cne 'MERGE' -or
+        [bool]$ordinaryResult.State.entry -or $ordinaryResult.Log -notmatch '(?m)^api graphql ') {
+        throw 'Ordinary PR did not accept the queue-managed pending-check state.'
     }
     if ((Git $ordinary.Remote rev-parse "refs/heads/$($ordinary.Branch)").Trim() -cne $ordinary.Head) {
         throw 'Ordinary branch was not pushed at exact HEAD.'
+    }
+
+    $queueReady = New-Fixture 'queue-ready'
+    $queueReadyResult = Run-Publish $queueReady -QueueAcceptance queued
+    if ($queueReadyResult.ExitCode -ne 0 -or $null -ne $queueReadyResult.State.auto -or
+        -not [bool]$queueReadyResult.State.entry -or
+        $queueReadyResult.Log -notmatch "--match-head-commit $($queueReady.Head)") {
+        throw "Already-ready PR did not finish in the exact native queue: $($queueReadyResult.Output)"
+    }
+
+    $queueTransition = New-Fixture 'queue-transition'
+    $queueTransitionResult = Run-Publish $queueTransition -QueueAcceptance both
+    if ($queueTransitionResult.ExitCode -ne 0 -or $null -eq $queueTransitionResult.State.auto -or
+        -not [bool]$queueTransitionResult.State.entry) {
+        throw "Safe auto-request to queue transition was rejected: $($queueTransitionResult.Output)"
     }
 
     $control = New-Fixture 'control-plane' -ControlPlane
@@ -385,12 +441,36 @@ raise SystemExit(subprocess.run([real_git, *args]).returncode)
         throw 'Foreign PR auto-merge state was mutated before repository identity passed.'
     }
 
-    $missingMergeMethod = New-Fixture 'missing-merge-method'
-    $missingMergeMethodResult = Run-Publish $missingMergeMethod -MissingMergeMethod
-    if ($missingMergeMethodResult.ExitCode -eq 0 -or
-        $missingMergeMethodResult.Output -notmatch 'auto-merge method is not SQUASH' -or
-        $missingMergeMethodResult.Log -notmatch '--auto --squash --match-head-commit') {
-        throw "Missing nested auto mergeMethod was accepted: $($missingMergeMethodResult.Output)"
+    $wrongQueueMethod = New-Fixture 'wrong-queue-method'
+    $wrongQueueMethodResult = Run-Publish $wrongQueueMethod -QueueMethod MERGE
+    if ($wrongQueueMethodResult.ExitCode -eq 0 -or
+        $wrongQueueMethodResult.Output -notmatch 'does not have an exact native SQUASH merge queue' -or
+        $wrongQueueMethodResult.Log -match '(?m)^pr merge .*--auto ') {
+        throw "Non-squash native queue was accepted: $($wrongQueueMethodResult.Output)"
+    }
+
+    $missingQueue = New-Fixture 'missing-queue'
+    $missingQueueResult = Run-Publish $missingQueue -MissingQueue
+    if ($missingQueueResult.ExitCode -eq 0 -or
+        $missingQueueResult.Output -notmatch 'does not have an exact native SQUASH merge queue' -or
+        $missingQueueResult.Log -match '(?m)^pr merge .*--auto ') {
+        throw "Missing native queue was accepted: $($missingQueueResult.Output)"
+    }
+
+    $notAccepted = New-Fixture 'queue-not-accepted'
+    $notAcceptedResult = Run-Publish $notAccepted -QueueAcceptance none
+    if ($notAcceptedResult.ExitCode -eq 0 -or
+        $notAcceptedResult.Output -notmatch 'did not return an accepted native state' -or
+        $notAcceptedResult.Log -notmatch '--auto --squash --match-head-commit') {
+        throw "Missing auto-request and queue entry were accepted: $($notAcceptedResult.Output)"
+    }
+
+    $foreignQueue = New-Fixture 'foreign-queue-entry'
+    $foreignQueueResult = Run-Publish $foreignQueue -QueueAcceptance foreign
+    if ($foreignQueueResult.ExitCode -eq 0 -or
+        $foreignQueueResult.Output -notmatch 'does not belong to the exact' -or
+        $foreignQueueResult.Log -notmatch '--auto --squash --match-head-commit') {
+        throw "Foreign merge queue entry was accepted: $($foreignQueueResult.Output)"
     }
 
     $red = New-Fixture 'red-fast-check'
@@ -582,6 +662,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
         "'remote', 'get-url', '--all', 'origin'",
         "'remote', 'get-url', '--push', '--all', 'origin'",
         'isCrossRepository,headRepository,headRepositoryOwner',
+        'mergeQueue(branch:$base)',
         '"${head}:refs/heads/$branch"'
     )) {
         if (-not $source.Contains($required)) {
@@ -591,7 +672,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
     if ($source -match [regex]::Escape('--set-upstream')) {
         throw 'publish-pr still pushes a moving branch through --set-upstream.'
     }
-    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/SQUASH/native-auto/manual-control-plane/race contract'
+    Write-Host 'PASS publish_agent_pr effective-origin/exact-object-push/repo-bound-PR/SQUASH-native-queue/manual-control-plane/race contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }

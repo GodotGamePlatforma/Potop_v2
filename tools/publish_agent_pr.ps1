@@ -228,6 +228,108 @@ function Read-Pr {
     return $pr
 }
 
+function Read-NativeMergeQueueSnapshot {
+    param(
+        [Parameter(Mandatory = $true)][int]$Number,
+        [Parameter(Mandatory = $true)][string]$Slug,
+        [Parameter(Mandatory = $true)][string]$BaseBranch,
+        [Parameter(Mandatory = $true)][string]$RepositoryPath
+    )
+
+    $slugParts = @($Slug -split '/', 2)
+    if ($slugParts.Count -ne 2) {
+        throw "Repository slug is not one owner/name pair: '$Slug'."
+    }
+    $query = @'
+query($owner:String!,$name:String!,$number:Int!,$base:String!){
+  repository(owner:$owner,name:$name){
+    pullRequest(number:$number){
+      state
+      headRefName
+      headRefOid
+      baseRefName
+      autoMergeRequest{enabledAt}
+      mergeQueueEntry{mergeQueue{id}}
+    }
+    mergeQueue(branch:$base){id configuration{mergeMethod}}
+  }
+}
+'@
+    $json = Invoke-Checked gh @(
+        'api', 'graphql',
+        '-F', "owner=$($slugParts[0])",
+        '-F', "name=$($slugParts[1])",
+        '-F', "number=$Number",
+        '-F', "base=$BaseBranch",
+        '-f', "query=$query"
+    ) $RepositoryPath
+    try {
+        $payload = $json | ConvertFrom-Json
+    }
+    catch {
+        throw "GitHub returned invalid merge queue JSON for #${Number}: $json"
+    }
+    if ($null -eq $payload -or $null -eq $payload.PSObject.Properties['data'] -or
+        $null -eq $payload.data -or $null -eq $payload.data.PSObject.Properties['repository'] -or
+        $null -eq $payload.data.repository) {
+        throw "GitHub did not return repository merge queue data for #$Number."
+    }
+    $repository = $payload.data.repository
+    foreach ($property in @('pullRequest', 'mergeQueue')) {
+        if ($null -eq $repository.PSObject.Properties[$property]) {
+            throw "GitHub merge queue JSON is missing '$property' for #$Number."
+        }
+    }
+    if ($null -eq $repository.pullRequest) {
+        throw "GitHub did not return PR #$Number while checking the native merge queue."
+    }
+    return $repository
+}
+
+function Assert-NativeSquashQueue {
+    param(
+        [Parameter(Mandatory = $true)][object]$Snapshot,
+        [Parameter(Mandatory = $true)][string]$Branch,
+        [Parameter(Mandatory = $true)][string]$HeadSha,
+        [Parameter(Mandatory = $true)][string]$BaseBranch,
+        [switch]$RequireAccepted
+    )
+
+    $pr = $Snapshot.pullRequest
+    if ([string]$pr.state -cne 'OPEN' -or
+        [string]$pr.headRefName -cne $Branch -or
+        [string]$pr.headRefOid -cne $HeadSha -or
+        [string]$pr.baseRefName -cne $BaseBranch) {
+        throw 'Native merge queue snapshot does not match the exact open branch/base/HEAD.'
+    }
+    if ($null -eq $Snapshot.mergeQueue -or
+        $null -eq $Snapshot.mergeQueue.PSObject.Properties['id'] -or
+        [string]::IsNullOrWhiteSpace([string]$Snapshot.mergeQueue.id) -or
+        $null -eq $Snapshot.mergeQueue.PSObject.Properties['configuration'] -or
+        $null -eq $Snapshot.mergeQueue.configuration -or
+        $null -eq $Snapshot.mergeQueue.configuration.PSObject.Properties['mergeMethod'] -or
+        [string]$Snapshot.mergeQueue.configuration.mergeMethod -cne 'SQUASH') {
+        throw "Base branch '$BaseBranch' does not have an exact native SQUASH merge queue."
+    }
+
+    $entry = $pr.mergeQueueEntry
+    if ($null -ne $entry) {
+        if ($null -eq $entry.PSObject.Properties['mergeQueue'] -or
+            $null -eq $entry.mergeQueue -or
+            $null -eq $entry.mergeQueue.PSObject.Properties['id'] -or
+            [string]$entry.mergeQueue.id -cne [string]$Snapshot.mergeQueue.id) {
+            throw "PR merge queue entry does not belong to the exact '$BaseBranch' queue."
+        }
+    }
+    if ($RequireAccepted) {
+        $hasAutoRequest = $null -ne $pr.autoMergeRequest
+        $hasQueueEntry = $null -ne $entry
+        if (-not $hasAutoRequest -and -not $hasQueueEntry) {
+            throw 'GitHub did not return an accepted native state: auto-merge request or merge queue entry.'
+        }
+    }
+}
+
 function Assert-PrIdentity {
     param(
         [Parameter(Mandatory = $true)][object]$PullRequest,
@@ -476,6 +578,16 @@ if ($controlPlane) {
     }
 }
 else {
+    $preQueueSnapshot = Read-NativeMergeQueueSnapshot `
+        -Number ([int]$pr.number) `
+        -Slug $slug `
+        -BaseBranch $BaseBranch `
+        -RepositoryPath $repo
+    Assert-NativeSquashQueue `
+        -Snapshot $preQueueSnapshot `
+        -Branch $branch `
+        -HeadSha $head `
+        -BaseBranch $BaseBranch
     Invoke-Checked gh @(
         'pr', 'merge', [string]$pr.number, '--repo', $slug,
         '--auto', '--squash', '--match-head-commit', $head
@@ -496,13 +608,17 @@ if ($controlPlane) {
     }
 }
 else {
-    if ($null -eq $postOperationPr.autoMergeRequest) {
-        throw 'Ordinary PR does not have native auto-merge enabled.'
-    }
-    $mergeMethodProperty = $postOperationPr.autoMergeRequest.PSObject.Properties['mergeMethod']
-    if ($null -eq $mergeMethodProperty -or [string]$mergeMethodProperty.Value -cne 'SQUASH') {
-        throw 'Ordinary PR auto-merge method is not SQUASH.'
-    }
+    $postQueueSnapshot = Read-NativeMergeQueueSnapshot `
+        -Number ([int]$postOperationPr.number) `
+        -Slug $slug `
+        -BaseBranch $BaseBranch `
+        -RepositoryPath $repo
+    Assert-NativeSquashQueue `
+        -Snapshot $postQueueSnapshot `
+        -Branch $branch `
+        -HeadSha $head `
+        -BaseBranch $BaseBranch `
+        -RequireAccepted
 }
 
 $finalRemoteLine = (Invoke-Checked git @('ls-remote', '--heads', 'origin', "refs/heads/$branch") $repo).Trim()
