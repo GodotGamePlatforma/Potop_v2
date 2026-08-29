@@ -1,0 +1,31 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://dk2wm2jkakpy6" path="res://diver_workbench/definitions/DiverSuitPresentationProfile.gd" id="1_suit_profile"]
+
+[resource]
+script = ExtResource("1_suit_profile")
+quality_2_fabric = Color(0.0392157, 0.341176, 0.384314, 1)
+quality_2_metal = Color(0.74902, 0.309804, 0.105882, 1)
+quality_2_pattern = Color(0.215686, 0.721569, 0.713726, 1)
+quality_2_rim = Color(0.270588, 0.705882, 0.721569, 1)
+quality_2_fabric_mix = 0.30
+quality_2_metal_mix = 0.28
+quality_2_pattern_strength = 0.18
+quality_2_plate_strength = 0.06
+quality_3_fabric = Color(0.0705882, 0.156863, 0.321569, 1)
+quality_3_metal = Color(0.462745, 0.505882, 0.541176, 1)
+quality_3_pattern = Color(0.352941, 0.482353, 0.611765, 1)
+quality_3_rim = Color(0.368627, 0.729412, 0.788235, 1)
+quality_3_fabric_mix = 0.34
+quality_3_metal_mix = 0.38
+quality_3_pattern_strength = 0.18
+quality_3_plate_strength = 0.20
+quality_4_fabric = Color(0.00784314, 0.0509804, 0.0745098, 1)
+quality_4_metal = Color(0.780392, 0.545098, 0.184314, 1)
+quality_4_pattern = Color(0.27451, 0.92549, 0.858824, 1)
+quality_4_rim = Color(0.431373, 0.854902, 0.839216, 1)
+quality_4_fabric_mix = 0.46
+quality_4_metal_mix = 0.45
+quality_4_pattern_strength = 0.34
+quality_4_plate_strength = 0.12
+quality_4_emissive_strength = 0.22

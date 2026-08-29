@@ -1,6 +1,7 @@
 extends Node2D
 
 const DiverScene := preload("res://diver_workbench/runtime/Diver.tscn")
+const DiverFrameEnvelopeScript := preload("res://diver_workbench/definitions/DiverFrameEnvelope.gd")
 const LightSystemScript := preload("res://scripts/diving/LightSystem.gd")
 const LanternMk1 := preload("res://data/diving_gear/diving_lantern_mk1.tres")
 const LanternMk2 := preload("res://data/diving_gear/diving_lantern_mk2.tres")
@@ -9,6 +10,23 @@ const CAPTURE_FPS := 24
 const DURATION_SECONDS := 8.0
 const CAPTURE_RESOLUTION := Vector2i(1280, 720)
 const APPROVED_ENVELOPE := Vector2(105.0, 60.0)
+const TRANSITION_ROUTES := [
+	[&"idle", &"swim"], [&"swim", &"idle"],
+	[&"idle", &"sprint"], [&"sprint", &"idle"],
+	[&"swim", &"sprint"], [&"sprint", &"swim"],
+]
+const TRANSITION_PHASES := [0.15, 0.50, 0.85]
+const KNIFE_PHASES := [0.0, 0.20, 0.40, 0.70, 1.0]
+const KNIFE_DIRECTIONS := {
+	"east": Vector2.RIGHT,
+	"north_east": Vector2(0.70710678, -0.70710678),
+	"north": Vector2.UP,
+	"north_west": Vector2(-0.70710678, -0.70710678),
+	"west": Vector2.LEFT,
+	"south_west": Vector2(-0.70710678, 0.70710678),
+	"south": Vector2.DOWN,
+	"south_east": Vector2(0.70710678, 0.70710678),
+}
 
 var _diver: DiverController
 var _visual_effects: Node
@@ -17,6 +35,8 @@ var _triggered: Dictionary = {}
 var _show_socket_overlay := false
 var _show_light_overlay := false
 var _show_envelope_overlay := false
+var _show_action_overlay := false
+var _action_aim_global := Vector2.RIGHT
 var _contact_wall_rect := Rect2()
 var _light_qa_geometry: Node2D
 
@@ -55,6 +75,15 @@ func _ready() -> void:
 	if not await _capture_envelope_matrix():
 		get_tree().quit(1)
 		return
+	if not await _capture_transition_matrix():
+		get_tree().quit(1)
+		return
+	if not await _capture_suit_matrix():
+		get_tree().quit(1)
+		return
+	if not await _capture_knife_matrix():
+		get_tree().quit(1)
+		return
 	if not await _capture_lantern_matrix():
 		get_tree().quit(1)
 		return
@@ -67,7 +96,7 @@ func _ready() -> void:
 		return
 	report_file.store_string(JSON.stringify(performance_report, "  "))
 	report_file.close()
-	print("Diver presentation capture saved: motion, quality/reduced matrix, sockets, %s envelope/contact matrix, radial lantern matrix and performance." % _physical_envelope_label())
+	print("Diver presentation capture saved: motion, quality/reduced, sockets, %s body envelope/contact, transitions, suits, knife action, radial lantern and performance." % _physical_envelope_label())
 	print("DIVER_PRESENTATION_PERFORMANCE %s" % JSON.stringify(performance_report))
 	get_tree().quit(0)
 
@@ -84,6 +113,8 @@ func _draw() -> void:
 	draw_line(Vector2(640, 340), Vector2(640, 400), Color(0.95, 0.70, 0.26, 0.34), 1.0)
 	if _show_envelope_overlay:
 		_draw_envelope_qa_overlay()
+	if _show_action_overlay:
+		_draw_action_qa_overlay()
 	if not _show_socket_overlay or _diver == null or not _diver.has_method("visual_socket_global"):
 		return
 	var socket_colors := {
@@ -141,6 +172,37 @@ func _draw_envelope_qa_overlay() -> void:
 	draw_circle(center, 3.0, Color("ffd36b"))
 	draw_line(center - Vector2(8.0, 0.0), center + Vector2(8.0, 0.0), Color("ffd36b"), 1.0)
 	draw_line(center - Vector2(0.0, 8.0), center + Vector2(0.0, 8.0), Color("ffd36b"), 1.0)
+
+
+func _draw_action_qa_overlay() -> void:
+	if _diver == null:
+		return
+	var action := _diver.get_node_or_null("AnimatedSprite2D/ToolHandSocket/ActionSprite2D") as AnimatedSprite2D
+	var hand := _diver.get_node_or_null("AnimatedSprite2D/ToolHandSocket") as Marker2D
+	if action == null or hand == null or not action.visible:
+		return
+	var source_bounds: Rect2 = DiverFrameEnvelopeScript.bounds_for(action.animation, action.frame)
+	if source_bounds.size.is_zero_approx():
+		return
+	source_bounds = source_bounds.grow(DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING)
+	var source_corners := PackedVector2Array([
+		source_bounds.position,
+		Vector2(source_bounds.end.x, source_bounds.position.y),
+		source_bounds.end,
+		Vector2(source_bounds.position.x, source_bounds.end.y),
+		source_bounds.position,
+	])
+	var world_corners := PackedVector2Array()
+	for source_corner in source_corners:
+		var corner := source_corner
+		if action.flip_h:
+			corner.x = -corner.x
+		world_corners.append(action.global_transform * corner)
+	draw_polyline(world_corners, Color(1.0, 0.48, 0.18, 0.96), 1.8)
+	var aim_end := hand.global_position + _action_aim_global.normalized() * 118.0
+	draw_line(hand.global_position, aim_end, Color(0.96, 0.98, 1.0, 0.92), 1.5)
+	draw_circle(hand.global_position, 4.0, Color("8aff8d"))
+	draw_arc(hand.global_position, 8.0, 0.0, TAU, 20, Color("8aff8d"), 1.2)
 
 
 func _build_preview() -> void:
@@ -212,6 +274,7 @@ func _draw_light_qa_background() -> void:
 func _set_profile(quality: String, reduced_motion: bool) -> void:
 	_diver.reset_at(Vector2(640, 370))
 	_diver.set_reduced_motion(reduced_motion)
+	_diver.set_suit_quality_presentation(1)
 	if _visual_effects != null:
 		if _visual_effects.has_method("set_graphics_quality"):
 			_visual_effects.set_graphics_quality(quality)
@@ -414,6 +477,187 @@ func _capture_envelope_matrix() -> bool:
 		return false
 	_show_envelope_overlay = false
 	_contact_wall_rect = Rect2()
+	if _visual_effects != null:
+		_visual_effects.visible = true
+	queue_redraw()
+	return true
+
+
+func _capture_transition_matrix() -> bool:
+	_set_profile("high", false)
+	_show_action_overlay = false
+	_show_envelope_overlay = true
+	_contact_wall_rect = Rect2()
+	if _visual_effects != null:
+		_visual_effects.visible = false
+	for route: Array in TRANSITION_ROUTES:
+		var from_state: StringName = route[0]
+		var to_state: StringName = route[1]
+		_diver.reset_at(Vector2(640, 370))
+		_diver._locomotion_state = from_state
+		_diver._locomotion_target = from_state
+		_diver.animated_sprite.play(from_state)
+		_diver.animated_sprite.pause()
+		_diver._begin_locomotion_transition(from_state, to_state)
+		var half_handoff_time := DiverController.TRANSITION_HANDOFF_DURATION * 0.5
+		_diver._transition_progress = minf(
+			half_handoff_time / maxf(_diver._transition_duration, 0.001),
+			1.0
+		)
+		_diver._sample_transition_frame()
+		_diver._advance_handoff(half_handoff_time)
+		_diver._update_presentation_pose(0.0)
+		_diver._update_socket_markers()
+		_show_socket_overlay = true
+		queue_redraw()
+		_status.text = "HANDOFF %s → %s  |  OPACITY 50%%  |  SOCKETY BLEND 50%%\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: TARGET %s" % [
+			String(from_state).to_upper(),
+			String(to_state).to_upper(),
+			_physical_envelope_label(),
+		]
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var handoff_name := "transition_%s_to_%s_handoff50.png" % [from_state, to_state]
+		if not _save_viewport_png("%s/%s" % [CAPTURE_ROOT, handoff_name]):
+			return false
+
+		for phase_value in TRANSITION_PHASES:
+			var phase := float(phase_value)
+			_diver.reset_at(Vector2(640, 370))
+			_diver._locomotion_state = from_state
+			_diver._locomotion_target = from_state
+			_diver.animated_sprite.play(from_state)
+			_diver.animated_sprite.pause()
+			_diver._begin_locomotion_transition(from_state, to_state)
+			_diver._transition_progress = phase
+			_diver._sample_transition_frame()
+			_diver._advance_handoff(phase * _diver._transition_duration)
+			_diver._update_presentation_pose(0.0)
+			_diver._update_socket_markers()
+			_show_socket_overlay = is_equal_approx(phase, 0.15) or is_equal_approx(phase, 0.5)
+			queue_redraw()
+			_status.text = "PRZEJŚCIE %s → %s  |  %02d%%  |  KLATKA %02d\nTURKUS: COLLIDER  •  RÓŻ: ALFA+RIM  •  ZŁOTO: TARGET %s" % [
+				String(from_state).to_upper(),
+				String(to_state).to_upper(),
+				roundi(phase * 100.0),
+				_diver.animated_sprite.frame,
+				_physical_envelope_label(),
+			]
+			await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			var file_name := "transition_%s_to_%s_p%02d.png" % [from_state, to_state, roundi(phase * 100.0)]
+			if not _save_viewport_png("%s/%s" % [CAPTURE_ROOT, file_name]):
+				return false
+	_show_socket_overlay = false
+	_show_envelope_overlay = false
+	if _visual_effects != null:
+		_visual_effects.visible = true
+	_diver.reset_at(Vector2(640, 370))
+	queue_redraw()
+	return true
+
+
+func _capture_suit_matrix() -> bool:
+	_set_profile("high", false)
+	_show_socket_overlay = false
+	_show_envelope_overlay = false
+	_show_action_overlay = false
+	if _visual_effects != null:
+		_visual_effects.visible = false
+	for quality in range(1, 5):
+		_diver.reset_at(Vector2(640, 370))
+		_diver.set_suit_quality_presentation(quality)
+		_diver.animated_sprite.play(&"idle")
+		_diver.animated_sprite.pause()
+		_diver.animated_sprite.set_frame_and_progress(4, 0.0)
+		_diver._update_presentation_pose(0.0)
+		_diver._update_socket_markers()
+		var style: Dictionary = _diver.suit_presentation_profile.style_for(quality)
+		_status.text = "KOMBINEZON Q%d — %s  |  NEUTRALNA POZA" % [quality, String(style["label"]).to_upper()]
+		queue_redraw()
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		if not _save_viewport_png("%s/suit_q%d_idle.png" % [CAPTURE_ROOT, quality]):
+			return false
+
+		var target := _diver.global_position + Vector2.RIGHT * 110.0
+		if not _diver.begin_attack_presentation(1, &"knife", target, 0.40):
+			push_error("Could not start suit Q%d knife presentation capture." % quality)
+			return false
+		_diver.set_attack_presentation_progress(1, 0.40)
+		_diver._update_presentation_pose(0.0)
+		_diver._update_socket_markers()
+		_diver._update_action_sprite()
+		_status.text = "KOMBINEZON Q%d — %s  |  WARSTWA AKCJI" % [quality, String(style["label"]).to_upper()]
+		queue_redraw()
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		if not _save_viewport_png("%s/suit_q%d_knife_contact.png" % [CAPTURE_ROOT, quality]):
+			return false
+		_diver.end_attack_presentation(1)
+	_diver.set_suit_quality_presentation(1)
+	_diver.reset_at(Vector2(640, 370))
+	if _visual_effects != null:
+		_visual_effects.visible = true
+	queue_redraw()
+	return true
+
+
+func _capture_knife_matrix() -> bool:
+	_set_profile("high", false)
+	_show_socket_overlay = false
+	_show_envelope_overlay = true
+	_show_action_overlay = true
+	if _visual_effects != null:
+		_visual_effects.visible = false
+	for phase_value in KNIFE_PHASES:
+		var phase := float(phase_value)
+		_diver.reset_at(Vector2(640, 370))
+		_diver.animated_sprite.flip_h = false
+		_diver._update_socket_markers()
+		_action_aim_global = Vector2.RIGHT
+		var target := _diver.global_position + _action_aim_global * 118.0
+		if not _diver.begin_attack_presentation(1, &"knife", target, 0.40):
+			push_error("Could not start knife phase capture %.2f." % phase)
+			return false
+		_diver.set_attack_presentation_progress(1, phase)
+		_diver._update_presentation_pose(0.0)
+		_diver._update_socket_markers()
+		_diver._update_action_sprite()
+		_status.text = "NÓŻ — FAZA %02d%%  |  KLATKA %02d  |  CEL WSCHÓD\nPOMARAŃCZ: KOPERTA AKCJI  •  BIAŁY: CEL PREZENTACJI, NIE HITBOX" % [roundi(phase * 100.0), _diver.action_sprite.frame]
+		queue_redraw()
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		if not _save_viewport_png("%s/knife_phase_%03d_east.png" % [CAPTURE_ROOT, roundi(phase * 100.0)]):
+			return false
+		_diver.end_attack_presentation(1)
+
+	for direction_name: String in KNIFE_DIRECTIONS:
+		var direction: Vector2 = KNIFE_DIRECTIONS[direction_name]
+		_diver.reset_at(Vector2(640, 370))
+		_diver.animated_sprite.flip_h = direction.x < 0.0
+		_diver._update_socket_markers()
+		_action_aim_global = direction
+		var target := _diver.global_position + direction * 118.0
+		if not _diver.begin_attack_presentation(1, &"knife", target, 0.40):
+			push_error("Could not start knife direction capture %s." % direction_name)
+			return false
+		_diver.set_attack_presentation_progress(1, 0.40)
+		_diver._update_presentation_pose(0.0)
+		_diver._update_socket_markers()
+		_diver._update_action_sprite()
+		_status.text = "NÓŻ — KONTAKT %s  |  KLATKA 06\nPOMARAŃCZ: KOPERTA AKCJI  •  BIAŁY: CEL PREZENTACJI, NIE HITBOX" % direction_name.to_upper()
+		queue_redraw()
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		if not _save_viewport_png("%s/knife_contact_%s.png" % [CAPTURE_ROOT, direction_name]):
+			return false
+		_diver.end_attack_presentation(1)
+
+	_show_action_overlay = false
+	_show_envelope_overlay = false
+	_diver.set_suit_quality_presentation(1)
+	_diver.reset_at(Vector2(640, 370))
 	if _visual_effects != null:
 		_visual_effects.visible = true
 	queue_redraw()

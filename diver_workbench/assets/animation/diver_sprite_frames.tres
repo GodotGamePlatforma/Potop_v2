@@ -3,6 +3,9 @@
 [ext_resource type="Texture2D" uid="uid://bqcnimumwub08" path="res://diver_workbench/assets/animation/diver_idle_16f.png" id="1_idle"]
 [ext_resource type="Texture2D" uid="uid://cnw2ilc60d1hx" path="res://diver_workbench/assets/animation/diver_swim_16f.png" id="2_swim"]
 [ext_resource type="Texture2D" uid="uid://djb7gcw2gin72" path="res://diver_workbench/assets/animation/diver_sprint_16f.png" id="3_sprint"]
+[ext_resource type="Texture2D" path="res://diver_workbench/assets/animation/diver_transition_idle_swim_16f.png" id="4_transition_idle_swim"]
+[ext_resource type="Texture2D" path="res://diver_workbench/assets/animation/diver_transition_idle_sprint_16f.png" id="5_transition_idle_sprint"]
+[ext_resource type="Texture2D" path="res://diver_workbench/assets/animation/diver_transition_swim_sprint_16f.png" id="6_transition_swim_sprint"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_idle_00"]
 atlas = ExtResource("1_idle")
@@ -196,6 +199,198 @@ region = Rect2(1024, 768, 512, 256)
 atlas = ExtResource("2_swim")
 region = Rect2(1536, 768, 512, 256)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_00"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(0, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_01"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(512, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_02"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1024, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_03"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1536, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_04"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(0, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_05"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(512, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_06"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1024, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_07"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1536, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_08"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(0, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_09"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(512, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_10"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1024, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_11"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1536, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_12"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(0, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_13"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(512, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_14"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1024, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_swim_15"]
+atlas = ExtResource("4_transition_idle_swim")
+region = Rect2(1536, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_00"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(0, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_01"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(512, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_02"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1024, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_03"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1536, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_04"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(0, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_05"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(512, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_06"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1024, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_07"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1536, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_08"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(0, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_09"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(512, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_10"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1024, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_11"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1536, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_12"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(0, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_13"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(512, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_14"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1024, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_idle_sprint_15"]
+atlas = ExtResource("5_transition_idle_sprint")
+region = Rect2(1536, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_00"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(0, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_01"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(512, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_02"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1024, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_03"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1536, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_04"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(0, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_05"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(512, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_06"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1024, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_07"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1536, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_08"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(0, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_09"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(512, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_10"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1024, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_11"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1536, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_12"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(0, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_13"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(512, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_14"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1024, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_transition_swim_sprint_15"]
+atlas = ExtResource("6_transition_swim_sprint")
+region = Rect2(1536, 768, 512, 256)
+
 [resource]
 animations = [{
 "frames": [{
@@ -356,4 +551,163 @@ animations = [{
 "loop": 1,
 "name": &"swim",
 "speed": 16.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_00")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_01")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_02")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_03")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_04")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_05")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_06")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_07")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_08")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_09")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_10")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_11")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_12")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_13")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_14")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_swim_15")
+}],
+"loop": false,
+"name": &"transition_idle_swim",
+"speed": 1.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_00")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_01")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_02")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_03")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_04")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_05")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_06")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_07")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_08")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_09")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_10")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_11")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_12")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_13")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_14")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_idle_sprint_15")
+}],
+"loop": false,
+"name": &"transition_idle_sprint",
+"speed": 1.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_00")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_01")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_02")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_03")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_04")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_05")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_06")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_07")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_08")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_09")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_10")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_11")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_12")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_13")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_14")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_transition_swim_sprint_15")
+}],
+"loop": false,
+"name": &"transition_swim_sprint",
+"speed": 1.0
 }]

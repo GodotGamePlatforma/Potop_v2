@@ -8,7 +8,14 @@ extends Resource
 ## visible bitmap changes on frame boundaries, so interpolating a socket while
 ## the source frame is still static would make the attachment visibly slide.
 
-const REQUIRED_ANIMATIONS: Array[StringName] = [&"idle", &"swim", &"sprint"]
+const REQUIRED_ANIMATIONS: Array[StringName] = [
+	&"idle",
+	&"swim",
+	&"sprint",
+	&"transition_idle_swim",
+	&"transition_idle_sprint",
+	&"transition_swim_sprint",
+]
 const REQUIRED_SOCKETS: Array[StringName] = [
 	&"breath",
 	&"fin_upper",
@@ -44,6 +51,30 @@ const REQUIRED_SOCKETS: Array[StringName] = [
 @export var sprint_tool_hand := PackedVector2Array()
 @export var sprint_lamp := PackedVector2Array()
 @export var sprint_leak_valve := PackedVector2Array()
+
+@export_group("Idle to Swim Transition")
+@export var transition_idle_swim_breath := PackedVector2Array()
+@export var transition_idle_swim_fin_upper := PackedVector2Array()
+@export var transition_idle_swim_fin_lower := PackedVector2Array()
+@export var transition_idle_swim_tool_hand := PackedVector2Array()
+@export var transition_idle_swim_lamp := PackedVector2Array()
+@export var transition_idle_swim_leak_valve := PackedVector2Array()
+
+@export_group("Idle to Sprint Transition")
+@export var transition_idle_sprint_breath := PackedVector2Array()
+@export var transition_idle_sprint_fin_upper := PackedVector2Array()
+@export var transition_idle_sprint_fin_lower := PackedVector2Array()
+@export var transition_idle_sprint_tool_hand := PackedVector2Array()
+@export var transition_idle_sprint_lamp := PackedVector2Array()
+@export var transition_idle_sprint_leak_valve := PackedVector2Array()
+
+@export_group("Swim to Sprint Transition")
+@export var transition_swim_sprint_breath := PackedVector2Array()
+@export var transition_swim_sprint_fin_upper := PackedVector2Array()
+@export var transition_swim_sprint_fin_lower := PackedVector2Array()
+@export var transition_swim_sprint_tool_hand := PackedVector2Array()
+@export var transition_swim_sprint_lamp := PackedVector2Array()
+@export var transition_swim_sprint_leak_valve := PackedVector2Array()
 
 
 func points_for(animation_name: StringName, socket_id: StringName) -> PackedVector2Array:

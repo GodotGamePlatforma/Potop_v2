@@ -8,6 +8,7 @@ const DiveMovementSystemScript := preload("res://scripts/diving/DiveMovementSyst
 const DiverSocketProfileScript := preload("res://diver_workbench/definitions/DiverSocketProfile.gd")
 const DiverFrameEnvelopeScript := preload("res://diver_workbench/definitions/DiverFrameEnvelope.gd")
 const DiverCameraProfileScript := preload("res://diver_workbench/definitions/DiverCameraProfile.gd")
+const DiverSuitPresentationProfileScript := preload("res://diver_workbench/definitions/DiverSuitPresentationProfile.gd")
 const DIVE_PLAYER_GROUP := &"dive_player"
 
 @export var swim_speed: float = 175.0
@@ -18,8 +19,11 @@ const DIVE_PLAYER_GROUP := &"dive_player"
 @export var socket_profile: Resource
 @export var frame_envelope_profile: Resource
 @export var camera_profile: Resource
+@export var suit_presentation_profile: Resource
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var handoff_sprite: AnimatedSprite2D = $HandoffSprite2D
+@onready var action_sprite: AnimatedSprite2D = $AnimatedSprite2D/ToolHandSocket/ActionSprite2D
 @onready var dive_light: PointLight2D = $DiveLight
 @onready var visual_effects: Node2D = $VisualEffects
 @onready var breath_socket: Marker2D = $AnimatedSprite2D/BreathSocket
@@ -36,6 +40,33 @@ const PRESENTATION_POSE_RESPONSE := 13.0
 const CAMERA_CENTER_SNAP_DISTANCE := 0.05
 const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
 const DEFAULT_VISUAL_TARGET_SIZE := Vector2(105.0, 60.0)
+const TRANSITION_FRAME_COUNT := 16
+const TRANSITION_HANDOFF_DURATION := 0.05
+const TRANSITION_CLIPS := {
+	&"idle|swim": &"transition_idle_swim",
+	&"idle|sprint": &"transition_idle_sprint",
+	&"swim|sprint": &"transition_swim_sprint",
+}
+const TRANSITION_DURATIONS := {
+	&"idle>swim": 0.30,
+	&"swim>idle": 0.36,
+	&"idle>sprint": 0.28,
+	&"sprint>idle": 0.40,
+	&"swim>sprint": 0.28,
+	&"sprint>swim": 0.32,
+}
+const TRANSITION_TARGET_ANCHORS := {
+	&"idle>swim": 9,
+	&"swim>idle": 13,
+	&"idle>sprint": 0,
+	&"sprint>idle": 7,
+	&"swim>sprint": 9,
+	&"sprint>swim": 11,
+}
+const KNIFE_WEAPON_ID := &"knife"
+const KNIFE_ACTION_CLIP := &"knife_swing"
+const KNIFE_CONTACT_FRAME := 6.0
+const KNIFE_LEGACY_IMPACT_PROGRESS := 0.2666667
 const CUE_DURATIONS := {
 	&"knife_attack": 0.30,
 	&"harpoon_attack": 0.36,
@@ -63,6 +94,32 @@ var _cue_elapsed := 0.0
 var _cue_duration := 0.0
 var _cue_strength := 0.0
 var _cue_direction_local := Vector2.RIGHT
+var _legacy_knife_aim_global := Vector2.RIGHT
+var _locomotion_state: StringName = &"idle"
+var _locomotion_target: StringName = &"idle"
+var _transition_from: StringName = &""
+var _transition_to: StringName = &""
+var _transition_clip: StringName = &""
+var _transition_progress := 0.0
+var _transition_duration := 0.0
+var _transition_forward := true
+var _handoff_active := false
+var _handoff_elapsed := 0.0
+var _suit_quality := 1
+var _legacy_knife_action_active := false
+var _attack_active := false
+var _attack_id := -1
+var _attack_last_completed_id := -1
+var _attack_weapon: StringName = &""
+var _attack_progress := 0.0
+var _attack_impact_progress := 0.0
+var _attack_target_global := Vector2.ZERO
+var _attack_aim_global := Vector2.RIGHT
+var _attack_confirmed := false
+var _attack_hit := false
+var _attack_contact_global := Vector2.ZERO
+var _attack_defeated := false
+var _attack_canceled := false
 var _camera_lead_world := Vector2.ZERO
 var _camera_profile_valid := false
 var _camera_follow_smoothing_enabled := true
@@ -77,6 +134,15 @@ func _ready() -> void:
 	if animated_sprite != null:
 		animated_sprite.frame_changed.connect(_update_socket_markers)
 		animated_sprite.animation_changed.connect(_update_socket_markers)
+	if handoff_sprite != null:
+		handoff_sprite.visible = false
+		handoff_sprite.pause()
+	if action_sprite != null:
+		action_sprite.visible = false
+		action_sprite.pause()
+	_set_handoff_material_state(false, 1.0)
+	_validate_suit_presentation_profile()
+	_apply_suit_style()
 	_update_socket_markers()
 	_update_light_mount()
 	_update_readability_material()
@@ -94,6 +160,8 @@ func _apply_frame_envelope_profile() -> void:
 	if configured_position is Vector2:
 		_visual_base_position = configured_position
 	_reset_presentation_pose(animated_sprite)
+	if handoff_sprite != null:
+		_reset_presentation_pose(handoff_sprite)
 
 
 func _physics_process(delta: float) -> void:
@@ -186,6 +254,11 @@ func reset_at(world_position: Vector2) -> void:
 		animated_sprite.modulate = Color.WHITE
 		animated_sprite.play(&"idle")
 		_reset_presentation_pose(animated_sprite)
+	_locomotion_state = &"idle"
+	_locomotion_target = &"idle"
+	_clear_locomotion_transition()
+	_clear_attack_presentation(true)
+	_legacy_knife_action_active = false
 	_visual_pose_offset = Vector2.ZERO
 	_visual_pose_rotation = 0.0
 	_visual_pose_scale = Vector2.ONE
@@ -253,6 +326,13 @@ func set_graphics_quality(quality_id: String) -> void:
 		effects.set_graphics_quality(_graphics_quality)
 
 
+## Applies only the local material construction treatment. Root equipment owns
+## the canonical suit quality and must explicitly bridge its value to this seam.
+func set_suit_quality_presentation(value: int) -> void:
+	_suit_quality = clampi(value, 1, 4)
+	_apply_suit_style()
+
+
 func configure_camera_world_bounds(world_size: Vector2) -> void:
 	var camera := _camera_node()
 	if camera == null:
@@ -279,29 +359,187 @@ func _update_visual(delta: float) -> void:
 	var target_flip := animated_sprite.flip_h
 	if is_swimming and absf(_movement_input.x) > 0.05:
 		target_flip = _movement_input.x < 0.0
-	if animated_sprite.animation != target_animation:
-		_switch_animation_preserving_phase(target_animation, target_flip)
-	else:
-		_set_visual_flip_preserving_heading(target_flip)
+	_set_visual_flip_preserving_heading(target_flip)
+	_advance_locomotion_graph(target_animation, delta)
 	_update_presentation_pose(delta)
 	_update_socket_markers()
-	_update_light_mount()
-	_update_readability_material()
 	var target_rotation := 0.0
 	if is_swimming:
 		target_rotation = _movement_input.angle()
 		if animated_sprite.flip_h:
 			target_rotation = wrapf(target_rotation - PI, -PI, PI)
 	rotation = lerp_angle(rotation, target_rotation, minf(1.0, delta * turn_speed))
+	_update_action_sprite()
+	_update_light_mount()
+	_update_readability_material()
 	_update_camera_look_ahead(delta)
 
 
-func _switch_animation_preserving_phase(target_animation: StringName, target_flip: bool) -> void:
-	var normalized_phase := _animation_phase(animated_sprite)
-	_set_visual_flip_preserving_heading(target_flip)
-	animated_sprite.play(target_animation)
-	_set_animation_phase(animated_sprite, normalized_phase)
+func _advance_locomotion_graph(desired_state: StringName, delta: float) -> void:
+	_locomotion_target = desired_state
+	if _transition_clip.is_empty():
+		if desired_state != _locomotion_state:
+			_begin_locomotion_transition(_locomotion_state, desired_state)
+		elif animated_sprite.animation != _locomotion_state:
+			animated_sprite.play(_locomotion_state)
+			_set_animation_phase(animated_sprite, 0.0)
+	else:
+		if desired_state == _transition_from:
+			_reverse_locomotion_transition()
+		elif desired_state != _transition_to:
+			_redirect_locomotion_transition(desired_state)
+	if not _transition_clip.is_empty():
+		_transition_progress = minf(
+			_transition_progress + maxf(delta, 0.0) / maxf(_transition_duration, 0.001),
+			1.0
+		)
+		_sample_transition_frame()
+		_advance_handoff(delta)
+		if _transition_progress >= 1.0:
+			_finish_locomotion_transition()
+
+
+func _begin_locomotion_transition(from_state: StringName, to_state: StringName) -> void:
+	var clip := _transition_clip_for(from_state, to_state)
+	if clip.is_empty():
+		_locomotion_state = to_state
+		animated_sprite.play(to_state)
+		_set_animation_phase(animated_sprite, 0.0)
+		return
+	_begin_handoff_from(animated_sprite)
+	_transition_from = from_state
+	_transition_to = to_state
+	_transition_clip = clip
+	_transition_progress = 0.0
+	_transition_duration = float(
+		TRANSITION_DURATIONS.get(_directed_transition_key(from_state, to_state), 0.32)
+	)
+	_transition_forward = _transition_is_forward(from_state, to_state)
+	animated_sprite.play(_transition_clip)
+	animated_sprite.pause()
+	_sample_transition_frame()
 	animated_sprite.modulate = Color.WHITE
+
+
+func _reverse_locomotion_transition() -> void:
+	var previous_from := _transition_from
+	_transition_from = _transition_to
+	_transition_to = previous_from
+	_transition_progress = 1.0 - _transition_progress
+	_transition_forward = not _transition_forward
+	_transition_duration = float(
+		TRANSITION_DURATIONS.get(
+			_directed_transition_key(_transition_from, _transition_to),
+			0.32
+		)
+	)
+	_sample_transition_frame()
+
+
+func _redirect_locomotion_transition(new_target: StringName) -> void:
+	var dominant_state := _transition_from if _transition_progress < 0.5 else _transition_to
+	_begin_handoff_from(animated_sprite)
+	_locomotion_state = dominant_state
+	_clear_locomotion_transition(false)
+	_begin_locomotion_transition(dominant_state, new_target)
+
+
+func _sample_transition_frame() -> void:
+	if animated_sprite == null or _transition_clip.is_empty():
+		return
+	var authored_progress := _transition_progress if _transition_forward else 1.0 - _transition_progress
+	var frame_position := clampf(authored_progress, 0.0, 1.0) * float(TRANSITION_FRAME_COUNT - 1)
+	var frame_index := mini(int(floor(frame_position + 0.000001)), TRANSITION_FRAME_COUNT - 1)
+	animated_sprite.set_frame_and_progress(frame_index, frame_position - float(frame_index))
+	animated_sprite.pause()
+
+
+func _finish_locomotion_transition() -> void:
+	var target_state := _transition_to
+	var anchor_frame := int(
+		TRANSITION_TARGET_ANCHORS.get(
+			_directed_transition_key(_transition_from, target_state),
+			0
+		)
+	)
+	_locomotion_state = target_state
+	animated_sprite.play(target_state)
+	_set_animation_phase(animated_sprite, float(anchor_frame) / 16.0)
+	_clear_locomotion_transition()
+
+
+func _clear_locomotion_transition(clear_handoff: bool = true) -> void:
+	_transition_from = &""
+	_transition_to = &""
+	_transition_clip = &""
+	_transition_progress = 0.0
+	_transition_duration = 0.0
+	_transition_forward = true
+	if clear_handoff:
+		_handoff_active = false
+		_handoff_elapsed = 0.0
+		if handoff_sprite != null:
+			handoff_sprite.visible = false
+		_set_handoff_material_state(false, 1.0)
+
+
+func _begin_handoff_from(source: AnimatedSprite2D) -> void:
+	if source == null or handoff_sprite == null:
+		return
+	handoff_sprite.animation = source.animation
+	handoff_sprite.set_frame_and_progress(source.frame, source.frame_progress)
+	handoff_sprite.flip_h = source.flip_h
+	handoff_sprite.position = source.position
+	handoff_sprite.rotation = source.rotation
+	handoff_sprite.scale = source.scale
+	handoff_sprite.modulate = source.modulate
+	handoff_sprite.pause()
+	handoff_sprite.visible = true
+	_handoff_active = true
+	_handoff_elapsed = 0.0
+	_set_handoff_material_state(true, 0.0)
+
+
+func _advance_handoff(delta: float) -> void:
+	if not _handoff_active:
+		return
+	_handoff_elapsed += maxf(delta, 0.0)
+	var mix_value := clampf(_handoff_elapsed / TRANSITION_HANDOFF_DURATION, 0.0, 1.0)
+	_set_handoff_material_state(true, mix_value)
+	if mix_value >= 1.0:
+		_handoff_active = false
+		if handoff_sprite != null:
+			handoff_sprite.visible = false
+		_set_handoff_material_state(false, 1.0)
+
+
+func _transition_clip_for(from_state: StringName, to_state: StringName) -> StringName:
+	return TRANSITION_CLIPS.get(_transition_pair_key(from_state, to_state), &"")
+
+
+func _transition_pair_key(first: StringName, second: StringName) -> StringName:
+	if first == second:
+		return &""
+	if first in [&"idle", &"swim"] and second in [&"idle", &"swim"]:
+		return &"idle|swim"
+	if first in [&"idle", &"sprint"] and second in [&"idle", &"sprint"]:
+		return &"idle|sprint"
+	if first in [&"swim", &"sprint"] and second in [&"swim", &"sprint"]:
+		return &"swim|sprint"
+	return &""
+
+
+func _transition_is_forward(from_state: StringName, to_state: StringName) -> bool:
+	var pair := _transition_pair_key(from_state, to_state)
+	return (
+		(pair == &"idle|swim" and from_state == &"idle")
+		or (pair == &"idle|sprint" and from_state == &"idle")
+		or (pair == &"swim|sprint" and from_state == &"swim")
+	)
+
+
+func _directed_transition_key(from_state: StringName, to_state: StringName) -> StringName:
+	return StringName("%s>%s" % [from_state, to_state])
 
 
 ## Horizontal mirroring changes the sprite's local forward vector by PI. Rebase
@@ -309,10 +547,13 @@ func _switch_animation_preserving_phase(target_animation: StringName, target_fli
 ## continuous while steering crosses the vertical axis. The capsule is centrally
 ## symmetric, therefore this representation-only rebase does not change contact.
 func _set_visual_flip_preserving_heading(target_flip: bool) -> void:
-	if animated_sprite == null or animated_sprite.flip_h == target_flip:
+	if animated_sprite == null:
 		return
-	rotation = wrapf(rotation + PI, -PI, PI)
-	animated_sprite.flip_h = target_flip
+	if animated_sprite.flip_h != target_flip:
+		rotation = wrapf(rotation + PI, -PI, PI)
+		animated_sprite.flip_h = target_flip
+	if handoff_sprite != null:
+		handoff_sprite.flip_h = target_flip
 
 
 func set_reduced_motion(enabled: bool) -> void:
@@ -463,14 +704,173 @@ func play_visual_cue(
 	_cue_elapsed = 0.0
 	_cue_duration = float(CUE_DURATIONS[cue])
 	_cue_strength = clampf(strength, 0.0, 1.5)
+	_legacy_knife_action_active = cue == &"knife_attack" and not _attack_active
 	var global_direction := target_global_position - global_position
 	if global_direction.length_squared() <= 0.001:
 		global_direction = Vector2(-1.0 if animated_sprite != null and animated_sprite.flip_h else 1.0, -0.18)
 	var local_target := to_local(global_position + global_direction.normalized())
 	var local_origin := to_local(global_position)
 	_cue_direction_local = (local_target - local_origin).normalized()
+	_legacy_knife_aim_global = global_direction.normalized()
 	if visual_effects != null and visual_effects.has_method("play_cue"):
 		visual_effects.play_cue(cue, target_global_position, _cue_strength)
+	_update_action_sprite()
+
+
+## Presentation-only lifecycle. Root combat supplies the already-resolved target,
+## timing and result; this API never performs overlap queries or applies damage.
+func begin_attack_presentation(
+	attack_id: int,
+	weapon_id: StringName,
+	target_global_position: Vector2,
+	impact_progress: float
+) -> bool:
+	if attack_id <= 0 or weapon_id != KNIFE_WEAPON_ID:
+		return false
+	if (
+		not target_global_position.is_finite()
+		or global_position.distance_squared_to(target_global_position) <= 0.000001
+		or not is_finite(impact_progress)
+		or impact_progress < 0.05
+		or impact_progress > 0.95
+	):
+		return false
+	if _attack_active:
+		if attack_id != _attack_id:
+			return false
+		return (
+			weapon_id == _attack_weapon
+			and target_global_position.is_equal_approx(_attack_target_global)
+			and is_equal_approx(impact_progress, _attack_impact_progress)
+		)
+	if attack_id <= _attack_last_completed_id:
+		return false
+	_attack_active = true
+	_attack_id = attack_id
+	_attack_weapon = weapon_id
+	_attack_progress = 0.0
+	_attack_impact_progress = impact_progress
+	_attack_target_global = target_global_position
+	_attack_aim_global = (target_global_position - global_position).normalized()
+	_attack_confirmed = false
+	_attack_hit = false
+	_attack_contact_global = Vector2.ZERO
+	_attack_defeated = false
+	_attack_canceled = false
+	_legacy_knife_action_active = false
+	_update_action_sprite()
+	_update_readability_material()
+	return true
+
+
+func set_attack_presentation_progress(attack_id: int, normalized_progress: float) -> bool:
+	if not _attack_active or attack_id != _attack_id or not is_finite(normalized_progress):
+		return false
+	var clamped_progress := clampf(normalized_progress, 0.0, 1.0)
+	if clamped_progress + 0.000001 < _attack_progress:
+		return false
+	_attack_progress = maxf(_attack_progress, clamped_progress)
+	_update_action_sprite()
+	_update_readability_material()
+	return true
+
+
+func confirm_attack_presentation(
+	attack_id: int,
+	hit: bool,
+	contact_global_position: Vector2,
+	defeated: bool
+) -> bool:
+	if not _attack_active or attack_id != _attack_id or _attack_confirmed:
+		return false
+	if defeated and not hit:
+		return false
+	if hit and not contact_global_position.is_finite():
+		return false
+	_attack_confirmed = true
+	_attack_hit = hit
+	_attack_contact_global = contact_global_position if contact_global_position.is_finite() else _attack_target_global
+	_attack_defeated = defeated
+	_update_readability_material()
+	return true
+
+
+func end_attack_presentation(attack_id: int, canceled: bool = false) -> bool:
+	if not _attack_active or attack_id != _attack_id:
+		return false
+	_attack_active = false
+	_attack_last_completed_id = maxi(_attack_last_completed_id, attack_id)
+	_attack_canceled = canceled
+	_legacy_knife_action_active = false
+	if _cue_kind == &"knife_attack":
+		_clear_visual_cue()
+	if action_sprite != null:
+		action_sprite.visible = false
+	_update_readability_material()
+	return true
+
+
+func _clear_attack_presentation(reset_serial: bool) -> void:
+	_attack_active = false
+	_attack_weapon = &""
+	_attack_progress = 0.0
+	_attack_impact_progress = 0.0
+	_attack_target_global = Vector2.ZERO
+	_attack_aim_global = Vector2.RIGHT
+	_attack_confirmed = false
+	_attack_hit = false
+	_attack_contact_global = Vector2.ZERO
+	_attack_defeated = false
+	_attack_canceled = false
+	_legacy_knife_action_active = false
+	if reset_serial:
+		_attack_id = -1
+		_attack_last_completed_id = -1
+	if action_sprite != null:
+		action_sprite.visible = false
+
+
+func _update_action_sprite() -> void:
+	if action_sprite == null or animated_sprite == null or tool_hand_socket == null:
+		return
+	var legacy_active := (
+		_legacy_knife_action_active
+		and _cue_kind == &"knife_attack"
+		and _cue_duration > 0.0
+		and _cue_elapsed < _cue_duration
+	)
+	if not _attack_active and not legacy_active:
+		action_sprite.visible = false
+		return
+	var normalized_progress := _attack_progress
+	var impact_progress := _attack_impact_progress
+	var aim_global := _attack_aim_global
+	if not _attack_active:
+		normalized_progress = clampf(_cue_elapsed / maxf(_cue_duration, 0.001), 0.0, 1.0)
+		impact_progress = KNIFE_LEGACY_IMPACT_PROGRESS
+		aim_global = _legacy_knife_aim_global
+	var authored_progress := _knife_authored_progress(normalized_progress, impact_progress)
+	var frame_count := action_sprite.sprite_frames.get_frame_count(KNIFE_ACTION_CLIP)
+	var frame_position := authored_progress * float(maxi(frame_count - 1, 0))
+	var frame_index := mini(int(floor(frame_position + 0.000001)), maxi(frame_count - 1, 0))
+	action_sprite.animation = KNIFE_ACTION_CLIP
+	action_sprite.set_frame_and_progress(frame_index, frame_position - float(frame_index))
+	action_sprite.pause()
+	# The authored knife points left. A fixed horizontal mirror establishes +X
+	# as its local forward axis; full local rotation then supports every aim angle.
+	action_sprite.flip_h = true
+	var local_direction := tool_hand_socket.to_local(tool_hand_socket.global_position + aim_global)
+	action_sprite.rotation = local_direction.angle() if not local_direction.is_zero_approx() else 0.0
+	action_sprite.visible = true
+
+
+func _knife_authored_progress(normalized_progress: float, impact_progress: float) -> float:
+	var progress := clampf(normalized_progress, 0.0, 1.0)
+	var impact := clampf(impact_progress, 0.05, 0.95)
+	var authored_contact := KNIFE_CONTACT_FRAME / float(TRANSITION_FRAME_COUNT - 1)
+	if progress <= impact:
+		return (progress / impact) * authored_contact
+	return authored_contact + ((progress - impact) / (1.0 - impact)) * (1.0 - authored_contact)
 
 
 func visual_socket_global(socket_id: StringName) -> Vector2:
@@ -478,6 +878,34 @@ func visual_socket_global(socket_id: StringName) -> Vector2:
 	if marker == null:
 		return global_position
 	return marker.global_position
+
+
+func action_visual_alpha_bounds() -> Rect2:
+	if action_sprite == null or not action_sprite.visible:
+		return Rect2()
+	var source_bounds: Rect2 = DiverFrameEnvelopeScript.bounds_for(
+		action_sprite.animation,
+		action_sprite.frame
+	)
+	if source_bounds.size.is_zero_approx():
+		return Rect2()
+	source_bounds = source_bounds.grow(DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING)
+	var source_corners := PackedVector2Array([
+		source_bounds.position,
+		Vector2(source_bounds.end.x, source_bounds.position.y),
+		source_bounds.end,
+		Vector2(source_bounds.position.x, source_bounds.end.y),
+	])
+	var minimum := Vector2(INF, INF)
+	var maximum := Vector2(-INF, -INF)
+	for source_corner in source_corners:
+		var corner := source_corner
+		if action_sprite.flip_h:
+			corner.x = -corner.x
+		var root_corner := to_local(action_sprite.to_global(corner))
+		minimum = minimum.min(root_corner)
+		maximum = maximum.max(root_corner)
+	return Rect2(minimum, maximum - minimum)
 
 
 func presentation_state() -> Dictionary:
@@ -488,6 +916,25 @@ func presentation_state() -> Dictionary:
 		"is_towing": _is_towing,
 		"cue": _cue_kind,
 		"cue_time_left": maxf(_cue_duration - _cue_elapsed, 0.0),
+		"suit_quality": _suit_quality,
+		"locomotion_state": _locomotion_state,
+		"locomotion_target": _locomotion_target,
+		"transition_clip": _transition_clip,
+		"transition_progress": _transition_progress,
+		"transition_duration": _transition_duration,
+		"transition_forward": _transition_forward,
+		"handoff_active": _handoff_active,
+		"attack_active": _attack_active,
+		"attack_id": _attack_id,
+		"attack_last_completed_id": _attack_last_completed_id,
+		"attack_weapon": _attack_weapon,
+		"attack_progress": _attack_progress,
+		"attack_impact_progress": _attack_impact_progress,
+		"attack_confirmed": _attack_confirmed,
+		"attack_hit": _attack_hit,
+		"attack_contact_global": _attack_contact_global,
+		"attack_defeated": _attack_defeated,
+		"attack_canceled": _attack_canceled,
 	}
 
 
@@ -503,6 +950,58 @@ func _update_presentation_pose(delta: float) -> void:
 	_visual_pose_rotation = lerpf(_visual_pose_rotation, target_rotation, blend)
 	_visual_pose_scale = _visual_pose_scale.lerp(target_scale, blend)
 	_apply_presentation_pose(animated_sprite)
+	_synchronize_handoff_pose()
+
+
+func _synchronize_handoff_pose() -> void:
+	if not _handoff_active or handoff_sprite == null or not handoff_sprite.visible:
+		return
+	handoff_sprite.flip_h = animated_sprite.flip_h
+	handoff_sprite.rotation = animated_sprite.rotation
+	handoff_sprite.scale = animated_sprite.scale
+	handoff_sprite.position = animated_sprite.position
+	var local_main := _transformed_alpha_bounds(
+		animated_sprite,
+		animated_sprite.scale,
+		animated_sprite.rotation
+	)
+	var local_handoff := _transformed_alpha_bounds(
+		handoff_sprite,
+		handoff_sprite.scale,
+		handoff_sprite.rotation
+	)
+	var local_union := local_main.merge(local_handoff)
+	var fit_scale := minf(
+		1.0,
+		minf(
+			_visual_target_size().x / maxf(local_union.size.x, 0.001),
+			_visual_target_size().y / maxf(local_union.size.y, 0.001)
+		)
+	)
+	if fit_scale < 1.0:
+		animated_sprite.scale *= fit_scale
+		handoff_sprite.scale = animated_sprite.scale
+		local_main = _transformed_alpha_bounds(
+			animated_sprite,
+			animated_sprite.scale,
+			animated_sprite.rotation
+		)
+		local_handoff = _transformed_alpha_bounds(
+			handoff_sprite,
+			handoff_sprite.scale,
+			handoff_sprite.rotation
+		)
+		local_union = local_main.merge(local_handoff)
+	var intended_position := _authored_visual_position(animated_sprite) + _visual_pose_offset
+	var half_envelope := _visual_target_size() * 0.5
+	var minimum_position := -half_envelope - local_union.position
+	var maximum_position := half_envelope - local_union.end
+	var fitted_position := Vector2(
+		clampf(intended_position.x, minimum_position.x, maximum_position.x),
+		clampf(intended_position.y, minimum_position.y, maximum_position.y)
+	)
+	animated_sprite.position = fitted_position
+	handoff_sprite.position = fitted_position
 
 
 func _presentation_pose_for(sprite: AnimatedSprite2D) -> Dictionary:
@@ -559,15 +1058,28 @@ func _action_pose_for(sprite: AnimatedSprite2D) -> Dictionary:
 		offset += Vector2(0.8 * facing, 1.2 + work_pulse * 0.75) * decoration_scale
 		roll += (0.012 + work_pulse * 0.010) * facing * decoration_scale
 		pose_scale *= Vector2(1.004, 0.998)
+	if _attack_active:
+		var attack_envelope := sin(clampf(_attack_progress, 0.0, 1.0) * PI)
+		var local_attack_direction := to_local(global_position + _attack_aim_global) - to_local(global_position)
+		if not local_attack_direction.is_zero_approx():
+			local_attack_direction = local_attack_direction.normalized()
+		offset += local_attack_direction * (3.8 * attack_envelope * decoration_scale)
+		roll += local_attack_direction.y * 0.040 * attack_envelope * decoration_scale
+		pose_scale *= Vector2(1.0 + 0.012 * attack_envelope, 1.0 - 0.006 * attack_envelope)
 	if _cue_duration > 0.0 and _cue_elapsed < _cue_duration:
 		var normalized := clampf(_cue_elapsed / _cue_duration, 0.0, 1.0)
 		var cue_motion_scale := 0.62 if _reduced_motion else 1.0
 		var envelope := sin(normalized * PI) * _cue_strength * cue_motion_scale
 		match _cue_kind:
 			&"knife_attack":
-				offset += _cue_direction_local * (5.4 * envelope)
-				roll += _cue_direction_local.y * 0.055 * envelope
-				pose_scale *= Vector2(1.0 + 0.018 * envelope, 1.0 - 0.010 * envelope)
+				if _legacy_knife_action_active:
+					var legacy_direction_local := (
+						to_local(global_position + _legacy_knife_aim_global)
+						- to_local(global_position)
+					).normalized()
+					offset += legacy_direction_local * (5.4 * envelope)
+					roll += legacy_direction_local.y * 0.055 * envelope
+					pose_scale *= Vector2(1.0 + 0.018 * envelope, 1.0 - 0.010 * envelope)
 			&"harpoon_attack":
 				offset -= _cue_direction_local * (3.2 * envelope)
 				roll -= _cue_direction_local.y * 0.036 * envelope
@@ -665,12 +1177,17 @@ func _transformed_alpha_bounds(
 func _current_visual_alpha_bounds() -> Rect2:
 	if animated_sprite == null:
 		return Rect2()
-	var local_bounds := _transformed_alpha_bounds(
-		animated_sprite,
-		animated_sprite.scale,
-		animated_sprite.rotation
-	)
-	return Rect2(animated_sprite.position + local_bounds.position, local_bounds.size)
+	var bounds := _visual_bounds_for_sprite(animated_sprite)
+	if _handoff_active and handoff_sprite != null and handoff_sprite.visible:
+		bounds = bounds.merge(_visual_bounds_for_sprite(handoff_sprite))
+	return bounds
+
+
+func _visual_bounds_for_sprite(sprite: AnimatedSprite2D) -> Rect2:
+	if sprite == null:
+		return Rect2()
+	var local_bounds := _transformed_alpha_bounds(sprite, sprite.scale, sprite.rotation)
+	return Rect2(sprite.position + local_bounds.position, local_bounds.size)
 
 
 func _animation_phase(sprite: AnimatedSprite2D) -> float:
@@ -707,6 +1224,10 @@ func _clear_visual_cue() -> void:
 	_cue_duration = 0.0
 	_cue_strength = 0.0
 	_cue_direction_local = Vector2.RIGHT
+	_legacy_knife_aim_global = Vector2.RIGHT
+	_legacy_knife_action_active = false
+	if not _attack_active and action_sprite != null:
+		action_sprite.visible = false
 
 
 func _update_socket_markers() -> void:
@@ -716,12 +1237,26 @@ func _update_socket_markers() -> void:
 		var marker := _marker_for_socket(socket_id)
 		if marker == null:
 			continue
-		marker.position = socket_profile.position_for(
+		var target_position: Vector2 = socket_profile.position_for(
 			animated_sprite.animation,
 			socket_id,
 			animated_sprite.frame,
 			animated_sprite.flip_h
 		)
+		if _handoff_active and handoff_sprite != null and handoff_sprite.visible:
+			var source_position: Vector2 = socket_profile.position_for(
+				handoff_sprite.animation,
+				socket_id,
+				handoff_sprite.frame,
+				handoff_sprite.flip_h
+			)
+			var handoff_mix := clampf(
+				_handoff_elapsed / TRANSITION_HANDOFF_DURATION,
+				0.0,
+				1.0
+			)
+			target_position = source_position.lerp(target_position, handoff_mix)
+		marker.position = target_position
 
 
 func _marker_for_socket(socket_id: StringName) -> Marker2D:
@@ -748,9 +1283,6 @@ func _update_light_mount() -> void:
 
 
 func _update_readability_material() -> void:
-	if animated_sprite == null or not (animated_sprite.material is ShaderMaterial):
-		return
-	var shader_material := animated_sprite.material as ShaderMaterial
 	var cue_phase := 0.0
 	if _cue_duration > 0.0 and _cue_elapsed < _cue_duration:
 		cue_phase = sin(clampf(_cue_elapsed / _cue_duration, 0.0, 1.0) * PI) * _cue_strength
@@ -762,10 +1294,123 @@ func _update_readability_material() -> void:
 	if _cue_kind in [&"knife_attack", &"harpoon_attack", &"repair", &"interaction"]:
 		action_glow = maxf(action_glow, cue_phase * (0.42 if _cue_kind == &"harpoon_attack" else 0.30))
 		action_color = Color("e8bd66") if _cue_kind == &"harpoon_attack" else Color("79ded4")
+	if _attack_active:
+		var attack_envelope := sin(clampf(_attack_progress, 0.0, 1.0) * PI)
+		action_glow = maxf(action_glow, 0.24 + attack_envelope * 0.24)
+		var contact_reached := _attack_progress + 0.000001 >= _attack_impact_progress
+		action_color = (
+			Color("f0c56b")
+			if _attack_confirmed and _attack_hit and contact_reached
+			else Color("79ded4")
+		)
 	var damage_flash := cue_phase * 0.46 if _cue_kind == &"hit" else 0.0
 	if _reduced_motion:
 		action_glow *= 0.72
 		damage_flash *= 0.72
-	shader_material.set_shader_parameter(&"action_glow", clampf(action_glow, 0.0, 1.0))
-	shader_material.set_shader_parameter(&"damage_flash", clampf(damage_flash, 0.0, 1.0))
-	shader_material.set_shader_parameter(&"action_color", action_color)
+	for shader_material in _readability_materials():
+		shader_material.set_shader_parameter(&"action_glow", clampf(action_glow, 0.0, 1.0))
+		shader_material.set_shader_parameter(&"damage_flash", clampf(damage_flash, 0.0, 1.0))
+		shader_material.set_shader_parameter(&"action_color", action_color)
+
+
+func _validate_suit_presentation_profile() -> bool:
+	if (
+		suit_presentation_profile == null
+		or suit_presentation_profile.get_script() != DiverSuitPresentationProfileScript
+	):
+		push_warning("Missing or invalid DiverSuitPresentationProfile.")
+		return false
+	var errors: PackedStringArray = suit_presentation_profile.validation_errors()
+	if not errors.is_empty():
+		push_warning("Invalid DiverSuitPresentationProfile: %s" % errors)
+		return false
+	return true
+
+
+func _apply_suit_style() -> void:
+	if suit_presentation_profile == null or not suit_presentation_profile.has_method("style_for"):
+		return
+	var style: Dictionary = suit_presentation_profile.style_for(_suit_quality)
+	for shader_material in _suit_materials():
+		shader_material.set_shader_parameter(&"suit_fabric_color", style["fabric_color"])
+		shader_material.set_shader_parameter(&"suit_metal_color", style["metal_color"])
+		shader_material.set_shader_parameter(&"suit_pattern_color", style["pattern_color"])
+		shader_material.set_shader_parameter(&"rim_color", style["rim_color"])
+		shader_material.set_shader_parameter(&"suit_style", float(style["style_id"]))
+		shader_material.set_shader_parameter(&"suit_fabric_mix", style["fabric_mix"])
+		shader_material.set_shader_parameter(&"suit_metal_mix", style["metal_mix"])
+		shader_material.set_shader_parameter(&"suit_pattern_strength", style["pattern_strength"])
+		shader_material.set_shader_parameter(&"suit_plate_strength", style["plate_strength"])
+		shader_material.set_shader_parameter(&"suit_emissive_strength", style["emissive_strength"])
+		shader_material.set_shader_parameter(&"accent_strength", style["accent_strength"])
+		shader_material.set_shader_parameter(&"outline_width", style["outline_width"])
+
+
+func _suit_materials() -> Array[ShaderMaterial]:
+	var materials: Array[ShaderMaterial] = []
+	var main_sprite := (
+		animated_sprite
+		if animated_sprite != null
+		else get_node_or_null("AnimatedSprite2D") as AnimatedSprite2D
+	)
+	var old_sprite := (
+		handoff_sprite
+		if handoff_sprite != null
+		else get_node_or_null("HandoffSprite2D") as AnimatedSprite2D
+	)
+	for sprite in [main_sprite, old_sprite]:
+		var shader_material := _material_for_sprite(sprite)
+		if shader_material != null and shader_material not in materials:
+			materials.append(shader_material)
+	return materials
+
+
+func _set_handoff_material_state(enabled: bool, mix_value: float) -> void:
+	var main_material := _material_for_sprite(
+		animated_sprite
+		if animated_sprite != null
+		else get_node_or_null("AnimatedSprite2D") as AnimatedSprite2D
+	)
+	var old_material := _material_for_sprite(
+		handoff_sprite
+		if handoff_sprite != null
+		else get_node_or_null("HandoffSprite2D") as AnimatedSprite2D
+	)
+	if main_material != null:
+		main_material.set_shader_parameter(&"handoff_enabled", enabled)
+		main_material.set_shader_parameter(&"handoff_mix", clampf(mix_value, 0.0, 1.0))
+		main_material.set_shader_parameter(&"handoff_role", 1.0)
+	if old_material != null:
+		old_material.set_shader_parameter(&"handoff_enabled", enabled)
+		old_material.set_shader_parameter(&"handoff_mix", clampf(mix_value, 0.0, 1.0))
+		old_material.set_shader_parameter(&"handoff_role", 0.0)
+
+
+func _readability_materials() -> Array[ShaderMaterial]:
+	var materials: Array[ShaderMaterial] = []
+	var main_sprite := (
+		animated_sprite
+		if animated_sprite != null
+		else get_node_or_null("AnimatedSprite2D") as AnimatedSprite2D
+	)
+	var old_sprite := (
+		handoff_sprite
+		if handoff_sprite != null
+		else get_node_or_null("HandoffSprite2D") as AnimatedSprite2D
+	)
+	var weapon_sprite := (
+		action_sprite
+		if action_sprite != null
+		else get_node_or_null("AnimatedSprite2D/ToolHandSocket/ActionSprite2D") as AnimatedSprite2D
+	)
+	for sprite in [main_sprite, old_sprite, weapon_sprite]:
+		var shader_material := _material_for_sprite(sprite)
+		if shader_material != null and shader_material not in materials:
+			materials.append(shader_material)
+	return materials
+
+
+func _material_for_sprite(sprite: AnimatedSprite2D) -> ShaderMaterial:
+	if sprite != null and sprite.material is ShaderMaterial:
+		return sprite.material as ShaderMaterial
+	return null
