@@ -1,0 +1,123 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://diver_workbench/assets/animation/diver_knife_swing_16f.png" id="1_knife"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_00"]
+atlas = ExtResource("1_knife")
+region = Rect2(0, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_01"]
+atlas = ExtResource("1_knife")
+region = Rect2(512, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_02"]
+atlas = ExtResource("1_knife")
+region = Rect2(1024, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_03"]
+atlas = ExtResource("1_knife")
+region = Rect2(1536, 0, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_04"]
+atlas = ExtResource("1_knife")
+region = Rect2(0, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_05"]
+atlas = ExtResource("1_knife")
+region = Rect2(512, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_06"]
+atlas = ExtResource("1_knife")
+region = Rect2(1024, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_07"]
+atlas = ExtResource("1_knife")
+region = Rect2(1536, 256, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_08"]
+atlas = ExtResource("1_knife")
+region = Rect2(0, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_09"]
+atlas = ExtResource("1_knife")
+region = Rect2(512, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_10"]
+atlas = ExtResource("1_knife")
+region = Rect2(1024, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_11"]
+atlas = ExtResource("1_knife")
+region = Rect2(1536, 512, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_12"]
+atlas = ExtResource("1_knife")
+region = Rect2(0, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_13"]
+atlas = ExtResource("1_knife")
+region = Rect2(512, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_14"]
+atlas = ExtResource("1_knife")
+region = Rect2(1024, 768, 512, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_knife_swing_15"]
+atlas = ExtResource("1_knife")
+region = Rect2(1536, 768, 512, 256)
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_00")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_01")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_02")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_03")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_04")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_05")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_06")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_07")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_08")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_09")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_10")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_11")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_12")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_13")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_14")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_knife_swing_15")
+}],
+"loop": false,
+"name": &"knife_swing",
+"speed": 53.333333
+}]
