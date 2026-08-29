@@ -171,6 +171,78 @@ function Normalize-RepoPath {
     return $portable
 }
 
+function Test-StandaloneGodotTestScript {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $absolute = Join-Path $script:RepositoryPath $Path
+    if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) {
+        return $false
+    }
+    $source = [System.IO.File]::ReadAllText($absolute)
+    return [regex]::IsMatch(
+        $source,
+        '(?m)^[ \t]*extends[ \t]+SceneTree(?:[ \t]*(?:#.*)?)?\r?$'
+    )
+}
+
+function Get-TrackedGodotScenePaths {
+    $rawScenes = Invoke-NativeChecked git @(
+        '-C', $script:RepositoryPath,
+        'ls-files', '--', ':(glob)**/*.tscn'
+    )
+    $scenes = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in @($rawScenes -split "`r?`n")) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            $scenes.Add((Normalize-RepoPath $line))
+        }
+    }
+    return @($scenes | Sort-Object -Unique)
+}
+
+function Find-SceneTargetsForTestScript {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string[]]$ScenePaths
+    )
+
+    $resourcePath = "res://$(Normalize-RepoPath $Path)"
+    $matches = [System.Collections.Generic.List[string]]::new()
+    foreach ($scenePath in $ScenePaths) {
+        $absolute = Join-Path $script:RepositoryPath $scenePath
+        if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) { continue }
+        foreach ($line in [System.IO.File]::ReadAllLines($absolute)) {
+            $declaration = [regex]::Match(
+                $line,
+                '^[ \t]*\[ext_resource(?<attributes>[ \t]+[^\]]*)\][ \t]*$'
+            )
+            if (-not $declaration.Success) { continue }
+            $attributes = $declaration.Groups['attributes'].Value
+            $pathAttribute = [regex]::Match(
+                $attributes,
+                '(?:^|[ \t]+)path[ \t]*=[ \t]*"(?<value>[^"]*)"(?:[ \t]+|$)'
+            )
+            $typeAttribute = [regex]::Match(
+                $attributes,
+                '(?:^|[ \t]+)type[ \t]*=[ \t]*"(?<value>[^"]*)"(?:[ \t]+|$)'
+            )
+            if ($pathAttribute.Success -and $typeAttribute.Success -and
+                [string]::Equals(
+                    $pathAttribute.Groups['value'].Value,
+                    $resourcePath,
+                    [System.StringComparison]::Ordinal
+                ) -and
+                [string]::Equals(
+                    $typeAttribute.Groups['value'].Value,
+                    'Script',
+                    [System.StringComparison]::Ordinal
+                )) {
+                $matches.Add($scenePath)
+                break
+            }
+        }
+    }
+    return @($matches | Sort-Object -Unique)
+}
+
 function Test-AllowedPath {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -356,10 +428,32 @@ $godotExtensions = @('.gd', '.tscn', '.tres', '.res', '.godot')
 $godotChanged = @($changedPaths | Where-Object {
     $godotExtensions -contains [System.IO.Path]::GetExtension($_).ToLowerInvariant()
 })
+$explicitTargets = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 $targets = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-foreach ($target in $TestTarget) { [void]$targets.Add((Normalize-RepoPath $target)) }
+foreach ($target in $TestTarget) {
+    $normalizedTarget = Normalize-RepoPath $target
+    [void]$explicitTargets.Add($normalizedTarget)
+    [void]$targets.Add($normalizedTarget)
+}
+$trackedScenePaths = $null
 foreach ($path in $changedPaths) {
-    if ($path -match '(^|/)tests/.+_test\.gd$') { [void]$targets.Add($path) }
+    if ($path -notmatch '(^|/)tests/.+_test\.gd$') { continue }
+    if (Test-StandaloneGodotTestScript -Path $path) {
+        [void]$targets.Add($path)
+        continue
+    }
+    if ($null -eq $trackedScenePaths) {
+        $trackedScenePaths = @(Get-TrackedGodotScenePaths)
+    }
+    $sceneTargets = @(Find-SceneTargetsForTestScript -Path $path -ScenePaths $trackedScenePaths)
+    $explicitSceneTargets = @($sceneTargets | Where-Object { $explicitTargets.Contains($_) })
+    if ($explicitSceneTargets.Count -gt 0) { continue }
+    if ($sceneTargets.Count -ne 1) {
+        $found = if ($sceneTargets.Count -eq 0) { 'none' } else { $sceneTargets -join ', ' }
+        throw ("Changed non-SceneTree Godot test '$path' requires exactly one tracked " +
+            ".tscn wrapper; found $found. Pass the intended tracked scene with -TestTarget.")
+    }
+    [void]$targets.Add($sceneTargets[0])
 }
 if ($godotChanged.Count -gt 0 -and $targets.Count -eq 0) {
     [void]$targets.Add('tests/smoke_test.gd')

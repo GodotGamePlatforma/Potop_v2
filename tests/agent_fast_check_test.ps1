@@ -95,6 +95,45 @@ Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value "GODOT=$GodotConsolePath TA
 Write-Host "TARGET PASS $Target"
 '@
     Set-Content -LiteralPath (Join-Path $repo 'tests/game_test.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/explicit_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/ExplicitSceneTest.tscn') -Encoding UTF8 -Value @'
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/explicit_scene_test.gd" id="1"]
+
+[node name="ExplicitSceneTest" type="Node"]
+script = ExtResource("1")
+'@
+    Set-Content -LiteralPath (Join-Path $repo 'tests/unique_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/UniqueSceneTest.tscn') -Encoding UTF8 -Value @'
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://tests/unique_scene_test.gd" type="Script" id="1"]
+
+[node name="UniqueSceneTest" type="Node"]
+script = ExtResource("1")
+'@
+    Set-Content -LiteralPath (Join-Path $repo 'tests/UniqueSceneSubstringDecoy.tscn') -Encoding UTF8 -Value @'
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/unique_scene_test.gd.extra" id="1"]
+
+[node name="SubstringDecoy" type="Node"]
+script = ExtResource("1")
+'@
+    Set-Content -LiteralPath (Join-Path $repo 'tests/no_wrapper_test.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/ambiguous_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
+    foreach ($suffix in @('A', 'B')) {
+        Set-Content -LiteralPath (Join-Path $repo "tests/AmbiguousSceneTest$suffix.tscn") -Encoding UTF8 -Value @"
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/ambiguous_scene_test.gd" id="1"]
+
+[node name="AmbiguousSceneTest$suffix" type="Node"]
+script = ExtResource("1")
+"@
+    }
     Set-Content -LiteralPath (Join-Path $repo 'game.gd') -Encoding UTF8 -Value 'extends Node'
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
@@ -108,6 +147,63 @@ Write-Host "TARGET PASS $Target"
     if ((Get-Content -LiteralPath $targetLog -Raw) -notmatch 'tests/game_test.gd') {
         throw 'Targeted test runner was not invoked.'
     }
+
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Clear-Content -LiteralPath $targetLog
+    $directSceneTree = Run-FastCheck $worktree $successGodot
+    $directSceneTreeLog = @(Get-Content -LiteralPath $targetLog | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($directSceneTree.ExitCode -ne 0 -or $directSceneTree.Output -notmatch 'FAST-CHECK PASS' -or
+        $directSceneTreeLog.Count -ne 1 -or
+        $directSceneTreeLog[0] -notmatch 'TARGET=tests/direct_scene_tree_test\.gd$') {
+        throw "Changed SceneTree test did not run its .gd target exactly once: $($directSceneTree.Output) log=$($directSceneTreeLog -join '; ')"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
+
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/explicit_scene_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Clear-Content -LiteralPath $targetLog
+    $explicitScene = Run-FastCheck $worktree $successGodot @('-TestTarget', 'tests/ExplicitSceneTest.tscn')
+    $explicitSceneLog = @(Get-Content -LiteralPath $targetLog | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($explicitScene.ExitCode -ne 0 -or $explicitScene.Output -notmatch 'FAST-CHECK PASS' -or
+        $explicitSceneLog.Count -ne 1 -or
+        $explicitSceneLog[0] -notmatch 'TARGET=tests/ExplicitSceneTest\.tscn$') {
+        throw "Explicit scene-backed test did not run only its .tscn target exactly once: $($explicitScene.Output) log=$($explicitSceneLog -join '; ')"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/explicit_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
+
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/unique_scene_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Clear-Content -LiteralPath $targetLog
+    $uniqueScene = Run-FastCheck $worktree $successGodot
+    $uniqueSceneLog = @(Get-Content -LiteralPath $targetLog | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($uniqueScene.ExitCode -ne 0 -or $uniqueScene.Output -notmatch 'FAST-CHECK PASS' -or
+        $uniqueSceneLog.Count -ne 1 -or
+        $uniqueSceneLog[0] -notmatch 'TARGET=tests/UniqueSceneTest\.tscn$') {
+        throw "Unique exact scene wrapper was not autodiscovered exactly once: $($uniqueScene.Output) log=$($uniqueSceneLog -join '; ')"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/unique_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
+
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/no_wrapper_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Clear-Content -LiteralPath $targetLog
+    $missingScene = Run-FastCheck $worktree $successGodot
+    $missingSceneLog = Get-Content -LiteralPath $targetLog -Raw
+    if ($null -eq $missingSceneLog) { $missingSceneLog = '' }
+    else { $missingSceneLog = $missingSceneLog.Trim() }
+    if ($missingScene.ExitCode -eq 0 -or $missingScene.Output -notmatch '\-TestTarget' -or
+        -not [string]::IsNullOrWhiteSpace($missingSceneLog)) {
+        throw "Node-based test without a wrapper did not fail closed with -TestTarget guidance: $($missingScene.Output) log=$missingSceneLog"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/no_wrapper_test.gd') -Encoding UTF8 -Value 'extends Node'
+
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/ambiguous_scene_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Clear-Content -LiteralPath $targetLog
+    $ambiguousScene = Run-FastCheck $worktree $successGodot
+    $ambiguousSceneLog = Get-Content -LiteralPath $targetLog -Raw
+    if ($null -eq $ambiguousSceneLog) { $ambiguousSceneLog = '' }
+    else { $ambiguousSceneLog = $ambiguousSceneLog.Trim() }
+    if ($ambiguousScene.ExitCode -eq 0 -or $ambiguousScene.Output -notmatch '\-TestTarget' -or
+        -not [string]::IsNullOrWhiteSpace($ambiguousSceneLog)) {
+        throw "Node-based test with ambiguous wrappers did not fail closed with -TestTarget guidance: $($ambiguousScene.Output) log=$ambiguousSceneLog"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/ambiguous_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
 
     $primaryMain = Run-FastCheck $repo $successGodot
     if ($primaryMain.ExitCode -eq 0 -or $primaryMain.Output -notmatch 'separate linked Git worktree') {
@@ -240,7 +336,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check linked-worktree-only/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check linked-worktree-only/scene-target-routing/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
