@@ -38,6 +38,8 @@ const DIVE_PLAYER_GROUP := &"dive_player"
 const REDUCED_PRESENTATION_MOTION_SCALE := 0.34
 const PRESENTATION_POSE_RESPONSE := 13.0
 const CAMERA_CENTER_SNAP_DISTANCE := 0.05
+const CAMERA_CENTER_SNAP_SPEED := 0.05
+const CAMERA_CRITICAL_DAMPING_RATE_SCALE := 1.5
 const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
 const DEFAULT_VISUAL_TARGET_SIZE := Vector2(105.0, 60.0)
 const TRANSITION_FRAME_COUNT := 16
@@ -121,6 +123,7 @@ var _attack_contact_global := Vector2.ZERO
 var _attack_defeated := false
 var _attack_canceled := false
 var _camera_lead_world := Vector2.ZERO
+var _camera_lead_velocity_world := Vector2.ZERO
 var _camera_profile_valid := false
 var _camera_follow_smoothing_enabled := true
 var _camera_follow_smoothing_captured := false
@@ -249,6 +252,7 @@ func reset_at(world_position: Vector2) -> void:
 	_is_sprinting = false
 	_movement_speed_multiplier = 1.0
 	rotation = 0.0
+	scale = Vector2.ONE
 	if animated_sprite != null:
 		animated_sprite.flip_h = false
 		animated_sprite.modulate = Color.WHITE
@@ -369,6 +373,10 @@ func _update_visual(delta: float) -> void:
 		if animated_sprite.flip_h:
 			target_rotation = wrapf(target_rotation - PI, -PI, PI)
 	rotation = lerp_angle(rotation, target_rotation, minf(1.0, delta * turn_speed))
+	# Repeated Transform2D angle decomposition can accumulate a tiny uniform scale
+	# drift. The gameplay root contract is exactly unit scale, so reassert it after
+	# every authored orientation update instead of letting presentation affect shape.
+	scale = Vector2.ONE
 	_update_action_sprite()
 	_update_light_mount()
 	_update_readability_material()
@@ -602,6 +610,7 @@ func _capture_camera_follow_smoothing() -> void:
 
 func _reset_camera_presentation() -> void:
 	_camera_lead_world = Vector2.ZERO
+	_camera_lead_velocity_world = Vector2.ZERO
 	var camera := _camera_node()
 	if camera == null:
 		return
@@ -625,23 +634,71 @@ func _update_camera_look_ahead(delta: float) -> void:
 			var propulsion_direction := propulsion_velocity.normalized()
 			var alignment := propulsion_direction.dot(input_direction)
 			var minimum_intent_alignment := float(camera_profile.get("minimum_intent_alignment"))
-			if alignment >= minimum_intent_alignment:
+			var intent_weight := _camera_intent_weight(alignment, minimum_intent_alignment)
+			if intent_weight > 0.0:
 				var movement_dead_zone := float(camera_profile.get("movement_dead_zone"))
 				var authored_speed := sprint_speed if _is_sprinting else swim_speed
 				var intended_speed_limit := authored_speed * _movement_speed_multiplier * _movement_input.length()
 				propulsion_speed = clampf(propulsion_velocity.dot(input_direction), 0.0, intended_speed_limit)
 				if propulsion_speed > movement_dead_zone:
 					var lead_distance := _camera_lead_distance(propulsion_speed)
-					target_lead = propulsion_direction * lead_distance
+					target_lead = propulsion_direction * lead_distance * intent_weight
 
 	var response := float(camera_profile.get("recenter_response")) if _camera_profile_valid else 1.0
-	if not target_lead.is_zero_approx() and target_lead.length() >= _camera_lead_world.length():
+	if not target_lead.is_zero_approx():
 		response = _camera_movement_response(propulsion_speed)
-	var weight := 1.0 - exp(-maxf(response, 0.0) * maxf(delta, 0.0))
-	_camera_lead_world = _camera_lead_world.lerp(target_lead, clampf(weight, 0.0, 1.0))
-	if target_lead.is_zero_approx() and _camera_lead_world.length() <= CAMERA_CENTER_SNAP_DISTANCE:
+	_smooth_camera_lead(target_lead, response, delta)
+	if (
+		target_lead.is_zero_approx()
+		and _camera_lead_world.length() <= CAMERA_CENTER_SNAP_DISTANCE
+		and _camera_lead_velocity_world.length() <= CAMERA_CENTER_SNAP_SPEED
+	):
 		_camera_lead_world = Vector2.ZERO
+		_camera_lead_velocity_world = Vector2.ZERO
 	camera.position = to_local(global_position + _camera_lead_world)
+	# The controller owns the only temporal filter. Keep Camera2D's authored flag as
+	# the reduced-motion integration seam, but synchronize its cache once per physics
+	# tick so the engine smoother cannot add a second, frame-dependent lag layer.
+	if camera.is_inside_tree() and camera.position_smoothing_enabled:
+		camera.reset_smoothing()
+
+
+func _camera_intent_weight(alignment: float, minimum_alignment: float) -> float:
+	if alignment < minimum_alignment:
+		return 0.0
+	if minimum_alignment >= 1.0:
+		return 1.0
+	return smoothstep(minimum_alignment, 1.0, clampf(alignment, minimum_alignment, 1.0))
+
+
+func _smooth_camera_lead(target_lead: Vector2, response: float, delta: float) -> void:
+	var step := maxf(delta, 0.0)
+	# Match the settling window of the profile's original exponential rates while
+	# using a critically damped trajectory with continuous camera-lead velocity.
+	var frequency := maxf(response, 0.0) * CAMERA_CRITICAL_DAMPING_RATE_SCALE
+	if step <= 0.0 or frequency <= 0.0:
+		return
+
+	var displacement := _camera_lead_world - target_lead
+	var to_target := -displacement
+	if not to_target.is_zero_approx():
+		var target_direction := to_target.normalized()
+		var closing_speed := _camera_lead_velocity_world.dot(target_direction)
+		if closing_speed < 0.0:
+			# A changed target may put the retained spring velocity on the wrong side
+			# of the new route. Remove only that separating component so release and
+			# a 180-degree turn move toward the new target on their very first tick.
+			_camera_lead_velocity_world -= target_direction * closing_speed
+
+	var spring_term := _camera_lead_velocity_world + displacement * frequency
+	var decay := exp(-frequency * step)
+	_camera_lead_world = target_lead + (displacement + spring_term * step) * decay
+	_camera_lead_velocity_world = (
+		_camera_lead_velocity_world - spring_term * frequency * step
+	) * decay
+	if not _camera_lead_world.is_finite() or not _camera_lead_velocity_world.is_finite():
+		_camera_lead_world = target_lead
+		_camera_lead_velocity_world = Vector2.ZERO
 
 
 func _camera_lead_distance(speed: float) -> float:

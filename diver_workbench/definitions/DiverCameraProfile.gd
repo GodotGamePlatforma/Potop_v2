@@ -2,7 +2,7 @@ class_name DiverCameraProfile
 extends Resource
 
 ## Tunable, presentation-only contract for the diver camera look-ahead.
-## Distances are world units and response values are exponential rates per second.
+## Distances are world units and response values are exponential-equivalent rates per second.
 
 @export_range(0.0, 100.0, 0.5) var movement_dead_zone := 12.0
 @export_range(0.0, 1.0, 0.01) var minimum_intent_alignment := 0.8
