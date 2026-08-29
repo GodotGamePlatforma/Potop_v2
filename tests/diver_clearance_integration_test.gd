@@ -575,8 +575,10 @@ func _audit_tutorial_indicator_tracks_diver(case: Dictionary) -> void:
 		_diver.call("simulate_motion_tick", direction, false, Vector2.ZERO, 1.0, MOTION_DELTA, true)
 		await physics_frame
 		await process_frame
+	# The harness disables DiveController._process(), while production refreshes
+	# this HUD after the camera step every frame. Mirror that phase explicitly and
+	# measure synchronously so another smoothing step cannot stale the ring.
 	_dive.call("_update_ui")
-	await process_frame
 
 	var state := indicator.call("state_for_tests") as Dictionary
 	var diver_screen_position: Vector2 = _diver.get_global_transform_with_canvas().origin
@@ -597,7 +599,6 @@ func _audit_tutorial_indicator_tracks_diver(case: Dictionary) -> void:
 	_camera.force_update_scroll()
 	await process_frame
 	_dive.call("_update_ui")
-	await process_frame
 	diver_screen_position = _diver.get_global_transform_with_canvas().origin
 	ring_center = indicator.get_global_rect().get_center()
 	var centered_alignment := ring_center.distance_to(diver_screen_position)
