@@ -275,7 +275,7 @@
     },
     {
       "id": "l01_independent_city_assets",
-      "status": "active_referenced_by_manifest",
+      "status": "inactive_superseded_not_referenced_by_manifest",
       "role": "nonblocking_backdrop",
       "generated_at": "2026-08-25",
       "tool": "OpenAI built-in image_gen",
@@ -620,6 +620,356 @@
           "sha256": "4516c968e341e80563d3c6ff7008847d8baee0bddcfaa22711e36220606af10d",
           "pixel_size": [1120, 3040],
           "world_rect": [20080, 3520, 1120, 3040]
+        }
+      ]
+    },
+    {
+      "id": "l01_air_ruin_cutouts",
+      "status": "active_referenced_by_manifest",
+      "role": "nonblocking_backdrop",
+      "generated_at": "2026-08-29",
+      "tool": "OpenAI built-in image_gen",
+      "model": "not_exposed_by_tool",
+      "seed": "not_exposed_by_tool",
+      "canonical_prompt_set": {
+        "capture_kind": "canonical_prompt_set_not_verbatim_tool_log",
+        "shared_prompt": "Create a production-ready transparent far-background L01 parallax asset for a side-view underwater game in the established hand-painted drowned-city style. Orthographic front/side elevation, subdued charcoal, navy and steel-blue values, broken incomplete open framework, irregular silhouette and generous negative space. The remnant is distant, calm and nonblocking: no door, entrance, route, walkable floor, platform, terrain authority, collider cue or gameplay landmark. Show the whole remnant with transparent margins. No water field, fog, haze, light rays, caustics, glow, plankton, particles, sediment, bubbles, seabed, ground, rocks, rectangular background, checkerboard, text, HUD, logo or watermark.",
+        "initial_variants": [
+          "Approach: sparse broken communications or office skeleton with a snapped crown and cables.",
+          "Archive: two separated skeletal civic or archival fragments with a broad void between them.",
+          "R3: damaged industrial crane and lattice framework with an asymmetric diagonal rhythm.",
+          "C4: scattered low heavy stumps with one slender antenna-like remnant."
+        ],
+        "wide_prompt": "Create an original ultra-wide low horizontal approximately 2.5:1 transparent L01 ruin cutout in the same orthographic distant-city style. Keep it porous, asymmetrical and visibly broken; avoid any intact facade, path, floor, wall, entrance, terrain strip, atmosphere or background.",
+        "wide_variants": [
+          "Approach: three staggered ribs with broken cables.",
+          "Archive: low stepped archival frames separated by open gaps.",
+          "R3: collapsed lattice and crane fragments.",
+          "C4: heavy megafacade shards broken into independent low masses."
+        ]
+      },
+      "source_outputs": [
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-74c49dd8-72d0-40dc-872e-eda18c8ad945.png",
+          "sha256": "3f7882b57fb6b65cf37fcdcc08319673f2d84caa668344fa557a591b6ea89d9d",
+          "pixel_size": [
+            887,
+            1774
+          ],
+          "stage": "initial_ruin_variant"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-8f44b784-7a57-4bd0-91a2-df15471bccad.png",
+          "sha256": "63b2ccd6be980977f3697b86213a87591d42c25d71756856f8996b4b360ee939",
+          "pixel_size": [
+            922,
+            1706
+          ],
+          "stage": "initial_ruin_variant"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-9a1a7972-7783-42ec-8698-b65f24f6f454.png",
+          "sha256": "8f78e28577090e861e128e67223ed12146a276bdc604bbb4dd93ff1030cc9cfb",
+          "pixel_size": [
+            897,
+            1752
+          ],
+          "stage": "initial_ruin_variant"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-ab99416f-0ce9-41d9-a0bf-2d240732ac95.png",
+          "sha256": "9168b6adaee0efdb44a5b1e23562d44e5fa584e05190c0b00c4df06212c1a0c6",
+          "pixel_size": [
+            783,
+            2009
+          ],
+          "stage": "initial_ruin_variant"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-3f5f8c9d-20fb-4a30-9b80-e467a7359234.png",
+          "sha256": "2d7111fae968e718573ce769f4290223d08fd7911b951243aa53a80e0149f06c",
+          "pixel_size": [
+            887,
+            1774
+          ],
+          "stage": "background_target_iteration"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-748efa48-ba93-480c-843d-509b5557b332.png",
+          "sha256": "20afc5d199bcf7885a43f2869721180df450829ff2afc48d680a8148fb8844ad",
+          "pixel_size": [
+            922,
+            1706
+          ],
+          "stage": "background_target_iteration"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-a57992e2-70ac-498f-90fc-84bbf4c8de03.png",
+          "sha256": "1a125c18a6df1ef32847f68d4a6f107f299e5163c222aed9781edbfeba7c8a8d",
+          "pixel_size": [
+            897,
+            1752
+          ],
+          "stage": "background_target_iteration"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-5da00742-ef95-488c-af4f-0b59cc48321a.png",
+          "sha256": "aeddddf490f3b8f590070b724b0a73a2da002f9c1b21d4c4397d7244e25bc228",
+          "pixel_size": [
+            790,
+            1989
+          ],
+          "stage": "c4_sparse_edit"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-b7089b8b-0d40-4793-ad74-c2e82b22ee82.png",
+          "sha256": "65477d7cbc8344dde8a51010c90902f8dc48ef61db7a8aa3472d27f230c12c8b",
+          "pixel_size": [
+            1983,
+            793
+          ],
+          "stage": "wide_approach_sheet"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-37d3f4ef-e2cd-43ed-abe5-4cd3d106f3e3.png",
+          "sha256": "47fbe66a66b3ce05786713f1cda16d03434278de0b0590f68780e2ee4a4b78e8",
+          "pixel_size": [
+            1983,
+            793
+          ],
+          "stage": "wide_archive_sheet"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-8dfb98c4-374e-4361-b017-90633a47679c.png",
+          "sha256": "9eb42c58b4eae1420bb20e38a401091a0e279ff5806ade4533269fe9606eb6bd",
+          "pixel_size": [
+            1983,
+            793
+          ],
+          "stage": "wide_r3_sheet"
+        },
+        {
+          "path": "imagegen://generated_images/01a04da1-9ac9-79c2-bc48-2613c6e1f57d/exec-a33129ba-189d-4a39-9dfe-a3f27c227de6.png",
+          "sha256": "c1076d083cfca09d6dcf8ecd53a66eff1f1159e3a61bf639a668826587b2acd5",
+          "pixel_size": [
+            1983,
+            793
+          ],
+          "stage": "wide_c4_sheet"
+        }
+      ],
+      "postprocess": {
+        "rule": "native_pixels_only_no_scaling_or_resampling",
+        "operation_order": [
+          "derive_binary_alpha_from_the_generated_checker_matte_with_a_luminance_threshold_between_78_and_85_percent_or_from_the_black_matte_with_a_luminance_threshold_above_3_percent",
+          "set_rgb_to_black_where_alpha_is_zero_without_changing_opaque_pixels",
+          "split_generated_sheets_into_separate_editable_silhouettes_using_integer_native_pixel_crop_rectangles",
+          "trim_only_transparent_bounds_without_resampling",
+          "losslessly_trim_five_bottom_rows_from_l01_ruin_archive_mass_and_one_bottom_row_from_l01_ruin_archive_spine_to_remove_noncanonical_matte_residue",
+          "write_noninterlaced_rgba8_at_each_native_cropped_dimension",
+          "do_not_resize_resample_scale_warp_rotate_or_flop_any_source_or_result"
+        ],
+        "implementation": "OpenAI built-in image_gen followed by deterministic ImageMagick native-pixel matte extraction and integer cropping; no geometric resampling"
+      },
+      "explicit_exclusions": [
+        {
+          "path": "session-temp://l01_final_cutout_candidates/l01_ruin_archive_low_c.png",
+          "reason": "rejected_for_noncanonical_bottom_opacity_and_not_copied_to_the_workspace"
+        },
+        {
+          "path": "session-temp://l01_final_cutout_candidates/c4_tall_full.png",
+          "reason": "source_sheet_or_full_cluster_only_and_not_copied_to_the_workspace"
+        }
+      ],
+      "result_assets": [
+        {
+          "id": "l01_ruin_approach_low_a",
+          "path": "assets/visual/l01_ruin_approach_low_a.png",
+          "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
+          "pixel_size": [
+            307,
+            705
+          ]
+        },
+        {
+          "id": "l01_ruin_approach_low_b",
+          "path": "assets/visual/l01_ruin_approach_low_b.png",
+          "sha256": "8391708cc10f0670610145ab378b8b7f95dc1863bf3bde1dd53d31189424d079",
+          "pixel_size": [
+            1000,
+            683
+          ]
+        },
+        {
+          "id": "l01_ruin_approach_low_c",
+          "path": "assets/visual/l01_ruin_approach_low_c.png",
+          "sha256": "4f36b808f1799f9ea41d345de1e2c1c8d9769e286470bb13d76c39f41ea9211c",
+          "pixel_size": [
+            400,
+            518
+          ]
+        },
+        {
+          "id": "l01_ruin_approach_spire",
+          "path": "assets/visual/l01_ruin_approach_spire.png",
+          "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
+          "pixel_size": [
+            341,
+            1696
+          ]
+        },
+        {
+          "id": "l01_ruin_archive_low_a",
+          "path": "assets/visual/l01_ruin_archive_low_a.png",
+          "sha256": "d5b20a3f82c65c7f36c0259111189790942a052a915e50bbaee4540e0608508b",
+          "pixel_size": [
+            418,
+            416
+          ]
+        },
+        {
+          "id": "l01_ruin_archive_low_b",
+          "path": "assets/visual/l01_ruin_archive_low_b.png",
+          "sha256": "2cf4cfd81d879f0220b65470b4aa26060c693d0771be9329381407919c49f685",
+          "pixel_size": [
+            470,
+            678
+          ]
+        },
+        {
+          "id": "l01_ruin_archive_low_d",
+          "path": "assets/visual/l01_ruin_archive_low_d.png",
+          "sha256": "2c7916a0070b346238b226084e7c9bfbaa654aca40d2743f9dde06cad52930f4",
+          "pixel_size": [
+            304,
+            201
+          ]
+        },
+        {
+          "id": "l01_ruin_archive_mass",
+          "path": "assets/visual/l01_ruin_archive_mass.png",
+          "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
+          "pixel_size": [
+            437,
+            1371
+          ]
+        },
+        {
+          "id": "l01_ruin_archive_spine",
+          "path": "assets/visual/l01_ruin_archive_spine.png",
+          "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
+          "pixel_size": [
+            234,
+            1635
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_low_a",
+          "path": "assets/visual/l01_ruin_c4_low_a.png",
+          "sha256": "c70868e5d31fc7d6eb3bd7dea2afc084ee364ef791d54e11f14ad9ac015c5b5d",
+          "pixel_size": [
+            261,
+            437
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_low_b",
+          "path": "assets/visual/l01_ruin_c4_low_b.png",
+          "sha256": "87c7493c19da42eaa10ac34686a7e080d98933fc2e6374283d8213e740e0d145",
+          "pixel_size": [
+            502,
+            328
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_low_c",
+          "path": "assets/visual/l01_ruin_c4_low_c.png",
+          "sha256": "3b733122ed8e30f879f62392eb30934e29fc708343e56fe3c02bdf87a7a917ca",
+          "pixel_size": [
+            454,
+            528
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_low_d",
+          "path": "assets/visual/l01_ruin_c4_low_d.png",
+          "sha256": "bb960297c6bdc9f8ce4b63e57a4e9aad9a386faab3f311f521906c38e453a93a",
+          "pixel_size": [
+            429,
+            339
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_spire_a",
+          "path": "assets/visual/l01_ruin_c4_spire_a.png",
+          "sha256": "886e68f0a9c0abd0a2cd08742be87e20f0ff8771a4ea462ef10f72a37b42cf25",
+          "pixel_size": [
+            140,
+            867
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_spire_b",
+          "path": "assets/visual/l01_ruin_c4_spire_b.png",
+          "sha256": "5fdb684c6ad643155c7e3a7aa07d6465147efb2cbbe50b1bd577e983825f197d",
+          "pixel_size": [
+            111,
+            492
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_spire_c",
+          "path": "assets/visual/l01_ruin_c4_spire_c.png",
+          "sha256": "ac3d9fac9d27c03801320ad5cd777d220facc06377446f70ba42429d3b7d95b7",
+          "pixel_size": [
+            64,
+            1593
+          ]
+        },
+        {
+          "id": "l01_ruin_c4_spire_d",
+          "path": "assets/visual/l01_ruin_c4_spire_d.png",
+          "sha256": "de9e2cdf362bfb3f532f0b706176c94dcd409716e7d659b24b33a13911ba61f5",
+          "pixel_size": [
+            107,
+            609
+          ]
+        },
+        {
+          "id": "l01_ruin_r3_crane",
+          "path": "assets/visual/l01_ruin_r3_crane.png",
+          "sha256": "12fc31eaa8c8869f2c715a5e7e4e0d0d8f0742e6d0918d3065a3de0b65d113fc",
+          "pixel_size": [
+            728,
+            1682
+          ]
+        },
+        {
+          "id": "l01_ruin_r3_low_a",
+          "path": "assets/visual/l01_ruin_r3_low_a.png",
+          "sha256": "9fa091a3dbe22d6b43adf11dccf5b426473005ca5834d7211eff718df8686305",
+          "pixel_size": [
+            719,
+            439
+          ]
+        },
+        {
+          "id": "l01_ruin_r3_low_b",
+          "path": "assets/visual/l01_ruin_r3_low_b.png",
+          "sha256": "0382d6d604a561f9c3c27156d10065cfcee3a6068726ff95af02f1f0fb7c8b45",
+          "pixel_size": [
+            570,
+            447
+          ]
+        },
+        {
+          "id": "l01_ruin_r3_low_c",
+          "path": "assets/visual/l01_ruin_r3_low_c.png",
+          "sha256": "ce90118f3de80528b8412dac4c75a21d939030c3b57d53e1e6c477f4784fce53",
+          "pixel_size": [
+            348,
+            224
+          ]
         }
       ]
     },

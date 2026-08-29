@@ -108,7 +108,7 @@ func _run() -> void:
 	if not await _test_reduced_motion_resize_and_zoom_reselect(spread[4]):
 		_finish()
 		return
-	if not await _test_production_parallax_extreme_cameras(unique_descriptors):
+	if not await _test_production_parallax_extreme_cameras(descriptors):
 		_finish()
 		return
 	if not await _test_sticky_failure(spread[5]):
@@ -892,8 +892,15 @@ func _test_production_parallax_extreme_cameras(
 			camera_position,
 			_visible_half_extent(fixture),
 		)
+		var expected_visible_asset_ids := _expected_visible_asset_ids_by_layer(
+			descriptors,
+			camera_position,
+			_visible_half_extent(fixture),
+		)
 		var expected_unique_paths := {}
+		var expected_unique_asset_ids := {}
 		var all_expected_visible_are_resident := true
+		var all_expected_visible_assets_are_resident := true
 		for layer_id in STREAMED_LAYER_IDS:
 			var layer_paths: PackedStringArray = expected_visible.get(
 				layer_id,
@@ -906,18 +913,34 @@ func _test_production_parallax_extreme_cameras(
 				var bitmap := _fixture_bitmap(fixture, path)
 				if bitmap == null or bitmap.texture == null:
 					all_expected_visible_are_resident = false
+			var layer_asset_ids: PackedStringArray = expected_visible_asset_ids.get(
+				layer_id,
+				PackedStringArray(),
+			)
+			if layer_asset_ids.is_empty():
+				all_expected_visible_assets_are_resident = false
+			for asset_id in layer_asset_ids:
+				expected_unique_asset_ids[asset_id] = true
+				var bitmap_by_asset_id := fixture["bitmap_by_asset_id"] as Dictionary
+				var asset_bitmap := bitmap_by_asset_id.get(asset_id) as TextureRect
+				if asset_bitmap == null or asset_bitmap.texture == null:
+					all_expected_visible_assets_are_resident = false
 		if snapshot.is_empty() or not _require(
-			int(snapshot.get("visible_required_texture_count", 0)) > 0
+			int(snapshot.get("tracked_asset_count", 0)) == descriptors.size()
+			and int(snapshot.get("visible_required_texture_count", 0)) > 0
 			and int(snapshot.get("visible_required_asset_count", 0)) > 0
 			and int(snapshot.get("visible_required_texture_count", -1))
 			== expected_unique_paths.size()
+			and int(snapshot.get("visible_required_asset_count", -1))
+			== expected_unique_asset_ids.size()
 			and int(snapshot.get("visible_missing_texture_count", -1)) == 0
 			and int(snapshot.get("visible_missing_asset_count", -1)) == 0
 			and int(snapshot.get("resident_texture_count", 0)) >= int(
 				snapshot.get("visible_required_texture_count", 0)
 			)
 			and not resident_paths.is_empty()
-			and all_expected_visible_are_resident,
+			and all_expected_visible_are_resident
+			and all_expected_visible_assets_are_resident,
 			(
 				"Skrajna kamera %d musi sklasyfikować i osadzić widoczne tekstury przy produkcyjnym parallax."
 				% edge_index
@@ -1153,6 +1176,7 @@ func _create_fixture(
 		groups[layer_id] = group
 
 	var bitmaps := {}
+	var bitmap_by_asset_id := {}
 	var nodes := {}
 	for index in range(descriptors.size()):
 		var descriptor_value: Variant = descriptors[index]
@@ -1162,9 +1186,16 @@ func _create_fixture(
 			return {}
 		var descriptor := descriptor_value as Dictionary
 		var source_node := descriptor.get("scene_node") as Node2D
+		var asset_id := str(descriptor.get("asset_id", ""))
 		var layer_id := str(descriptor.get("layer_id", ""))
 		var path := str(descriptor.get("path", ""))
-		if source_node == null or not groups.has(layer_id) or path.is_empty():
+		if (
+			source_node == null
+			or asset_id.is_empty()
+			or bitmap_by_asset_id.has(asset_id)
+			or not groups.has(layer_id)
+			or path.is_empty()
+		):
 			_fail("Fixture rezydencji otrzymał niepełny deskryptor stuba.")
 			viewport.free()
 			return {}
@@ -1187,6 +1218,7 @@ func _create_fixture(
 		bitmap.texture = null
 		(groups[layer_id] as Node).add_child(clone)
 		bitmaps[path] = bitmap
+		bitmap_by_asset_id[asset_id] = bitmap
 		nodes[path] = clone
 
 	var camera := Camera2D.new()
@@ -1202,6 +1234,7 @@ func _create_fixture(
 		"camera": camera,
 		"layers": layers,
 		"bitmaps": bitmaps,
+		"bitmap_by_asset_id": bitmap_by_asset_id,
 		"nodes": nodes,
 	}
 
@@ -1386,6 +1419,36 @@ func _expected_visible_paths_by_layer(
 		var paths := result[layer_id] as PackedStringArray
 		paths.sort()
 		result[layer_id] = paths
+	return result
+
+
+func _expected_visible_asset_ids_by_layer(
+	descriptors: Array[Dictionary],
+	camera_position: Vector2,
+	visible_half_extent: Vector2,
+) -> Dictionary:
+	var result := {
+		"L01": PackedStringArray(),
+		"L02": PackedStringArray(),
+	}
+	for descriptor in descriptors:
+		var layer_id := str(descriptor.get("layer_id", ""))
+		if not result.has(layer_id):
+			continue
+		var scale := descriptor.get("parallax_scale", Vector2.ONE) as Vector2
+		var source_viewport := Rect2(
+			camera_position * scale - visible_half_extent,
+			visible_half_extent * 2.0,
+		)
+		var world_rect := descriptor.get("world_rect", Rect2()) as Rect2
+		if source_viewport.intersects(world_rect, true):
+			var asset_ids := result[layer_id] as PackedStringArray
+			asset_ids.append(str(descriptor.get("asset_id", "")))
+			result[layer_id] = asset_ids
+	for layer_id in STREAMED_LAYER_IDS:
+		var asset_ids := result[layer_id] as PackedStringArray
+		asset_ids.sort()
+		result[layer_id] = asset_ids
 	return result
 
 
