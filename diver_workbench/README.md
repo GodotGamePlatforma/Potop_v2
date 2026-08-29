@@ -70,10 +70,10 @@ Lokalny smoke Mapy celowo nie ładuje ani nie sprawdza wnętrza sceny Nurka. Tes
 Natywny capture prezentacji:
 
 ```powershell
-..\tests\run_all_tests.ps1 -NativeTarget diver_workbench/tests/DiverPresentationCapture.tscn
+..\tests\run_all_tests.ps1 -NativeTarget diver_workbench/tests/DiverPresentationCapture.tscn -KeepWorkspace
 ```
 
-Capture zapisuje swoje artefakty w izolowanym workspace testu. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `105 × 60`, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*` z centralnym radialnym światłem, markerami kierunków oraz okluderami. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera, prześwitów produkcyjnej mapy ani odczucia sterowania.
+Capture zapisuje artefakty pod `diver_presentation_qa/capture` w izolowanym `user://`. Flaga `-KeepWorkspace` zachowuje wynik, a runner wypisuje jego katalog po etykiecie `Test user:// preserved:`. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `105 × 60`, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*` z centralnym radialnym światłem, markerami kierunków oraz okluderami. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera, prześwitów produkcyjnej mapy ani odczucia sterowania.
 
 Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head. `FAIL` pozostawia PR otwarty. Dopiero `PASS` pozwala merge queue utworzyć kandydat `aktualny main + PR`; pełny `integration-green` uruchamia się wyłącznie na tym kandydacie. Agent nie czeka na kolejkę ani nie aktualizuje starego PR po każdym cudzym merge. Konflikt wraca do root jako nowe zadanie dla nowego agenta startującego z aktualnego `main`.
 
