@@ -461,6 +461,7 @@ if ($godotChanged.Count -gt 0 -and $targets.Count -eq 0) {
 
 if ($godotChanged.Count -gt 0 -or $targets.Count -gt 0) {
     $godot = Resolve-GodotPath
+    $runner = Join-Path $script:RepositoryPath 'tests/run_all_tests.ps1'
     foreach ($target in @($targets | Sort-Object)) {
         $targetPath = Join-Path $script:RepositoryPath $target
         if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
@@ -468,11 +469,20 @@ if ($godotChanged.Count -gt 0 -or $targets.Count -gt 0) {
         }
         # The project runner owns the complete isolation boundary: immutable
         # snapshot, private .godot/user/temp directories, ports and ERROR scan.
-        & (Join-Path $script:RepositoryPath 'tests/run_all_tests.ps1') `
-            -GodotConsolePath $godot `
-            -SourceRepositoryPath $script:RepositoryPath `
-            -Target $target
-        if (-not $?) { throw "Targeted test failed: '$target'." }
+        # Each target also gets a fresh PowerShell process. This prevents Job
+        # Object/type state retained by one runner invocation from leaking into
+        # the next target in the same fast-check process.
+        $runnerOutput = Invoke-NativeChecked $PowerShellCommand @(
+            '-NoLogo', '-NoProfile', '-NonInteractive',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', $runner,
+            '-GodotConsolePath', $godot,
+            '-SourceRepositoryPath', $script:RepositoryPath,
+            '-Target', $target
+        )
+        if (-not [string]::IsNullOrWhiteSpace($runnerOutput)) {
+            Write-Host $runnerOutput
+        }
     }
 }
 
