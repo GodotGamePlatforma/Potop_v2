@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://bpl1dvxy5p701"]
+[gd_scene load_steps=15 format=3 uid="uid://bpl1dvxy5p701"]
 
 [ext_resource type="Script" uid="uid://h1dogxd7e64l" path="res://diver_workbench/runtime/DiverController.gd" id="1_diver_controller"]
 [ext_resource type="SpriteFrames" path="res://diver_workbench/assets/animation/diver_sprite_frames.tres" id="2_diver_frames"]
@@ -7,9 +7,21 @@
 [ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_socket_profile.tres" id="5_socket_profile"]
 [ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_frame_envelope_profile.tres" id="6_envelope_profile"]
 [ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_camera_profile.tres" id="7_camera_profile"]
+[ext_resource type="SpriteFrames" path="res://diver_workbench/assets/animation/diver_action_sprite_frames.tres" id="8_action_frames"]
+[ext_resource type="Resource" path="res://diver_workbench/assets/profiles/diver_suit_presentation_profile.tres" id="9_suit_profile"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_diver_readability"]
+resource_local_to_scene = true
 shader = ExtResource("4_readability_shader")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_diver_handoff"]
+resource_local_to_scene = true
+shader = ExtResource("4_readability_shader")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_diver_action"]
+resource_local_to_scene = true
+shader = ExtResource("4_readability_shader")
+shader_parameter/suit_treatment_enabled = false
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_diver"]
 radius = 30.0
@@ -23,6 +35,7 @@ script = ExtResource("1_diver_controller")
 socket_profile = ExtResource("5_socket_profile")
 frame_envelope_profile = ExtResource("6_envelope_profile")
 camera_profile = ExtResource("7_camera_profile")
+suit_presentation_profile = ExtResource("9_suit_profile")
 
 [node name="VisualEffects" type="Node2D" parent="." unique_id=1308266921]
 z_index = -1
@@ -37,6 +50,15 @@ sprite_frames = ExtResource("2_diver_frames")
 animation = &"idle"
 autoplay = "idle"
 
+[node name="HandoffSprite2D" type="AnimatedSprite2D" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_diver_handoff")
+texture_filter = 4
+position = Vector2(5.497, -3.2265)
+scale = Vector2(0.239, 0.239)
+sprite_frames = ExtResource("2_diver_frames")
+animation = &"idle"
+
 [node name="BreathSocket" type="Marker2D" parent="AnimatedSprite2D"]
 
 [node name="FinUpperSocket" type="Marker2D" parent="AnimatedSprite2D"]
@@ -44,6 +66,14 @@ autoplay = "idle"
 [node name="FinLowerSocket" type="Marker2D" parent="AnimatedSprite2D"]
 
 [node name="ToolHandSocket" type="Marker2D" parent="AnimatedSprite2D"]
+
+[node name="ActionSprite2D" type="AnimatedSprite2D" parent="AnimatedSprite2D/ToolHandSocket"]
+visible = false
+z_index = 2
+material = SubResource("ShaderMaterial_diver_action")
+texture_filter = 4
+sprite_frames = ExtResource("8_action_frames")
+animation = &"knife_swing"
 
 [node name="LampSocket" type="Marker2D" parent="AnimatedSprite2D"]
 
