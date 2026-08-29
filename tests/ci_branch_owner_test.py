@@ -27,6 +27,7 @@ class BranchOwnerResolutionTest(unittest.TestCase):
     def test_maps_every_registered_owner_branch(self) -> None:
         cases = {
             "codex/root/async-ci": "root",
+            "codex/base/settlement-ui": "base",
             "codex/map/authority-refresh": "map",
             "codex/diver/professional-105x60": "diver",
             "codex/integration/production-acceptance": "integration",

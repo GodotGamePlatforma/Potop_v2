@@ -35,6 +35,7 @@ if (@($parseErrors).Count -gt 0) {
 
 $requiredFunctions = @(
     "Get-StructurePackageTestTargets",
+    "Resolve-BaseManifestTestTarget",
     "Get-RunnerTestSelection",
     "Assert-RunnerInvocationMode",
     "Assert-TrackedLfEol",
@@ -90,6 +91,8 @@ $requiredFunctions = @(
     "Assert-GodotTestRunReceiptBinding",
     "Invoke-PublicationReceiptVerification",
     "Test-GodotTestRunReceipt"
+    "ConvertTo-TestProjectRelativePath"
+    "Resolve-TestTarget"
 )
 $functionDefinitions = @($runnerAst.FindAll({
     param($node)
@@ -305,6 +308,7 @@ try {
     [void](New-Item -ItemType Directory -Path $sourceRoot -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tests") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "tools") -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "base_workbench/tests") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/tools") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/structures/tower_local/generated") -Force)
     [void](New-Item -ItemType Directory -Path (Join-Path $sourceRoot "underwater_map_workbench/structures/unrelated_stale/generated") -Force)
@@ -319,6 +323,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "tracked.txt"), "tracked before`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "deleted.txt"), "staged then deleted`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $sourceRoot "tests/explicit_target.gd"), "extends SceneTree`n", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText((Join-Path $sourceRoot "base_workbench/tests/base_target.gd"), "extends SceneTree`n", [System.Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../tools/workbench_contract.py") -Destination (Join-Path $sourceRoot "tools/workbench_contract.py")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../tools/workbench_lock.py") -Destination (Join-Path $sourceRoot "tools/workbench_lock.py")
     $fakeBuilder = @'
@@ -378,6 +383,7 @@ generated.mkdir(parents=True, exist_ok=True)
         "tracked.txt",
         "deleted.txt",
         "tests/explicit_target.gd",
+        "base_workbench/tests/base_target.gd",
         "underwater_map_workbench/structures/inflight_package/runtime.gd",
         "diver_workbench/required_untracked.gd",
         "untracked with spaces/needed source.gd"
@@ -385,6 +391,32 @@ generated.mkdir(parents=True, exist_ok=True)
         Assert-RunnerInvariant ($paths -ccontains $requiredPath) "Git snapshot omitted required path '$requiredPath'."
     }
     Assert-RunnerInvariant (-not ($paths -ccontains "ignored/ignored.tmp")) "Git snapshot included an ignored file."
+
+    Assert-RunnerInvariant `
+        ((Resolve-BaseManifestTestTarget -ProjectRoot $sourceRoot -FileName "explicit_target.gd") -ceq "explicit_target.gd") `
+        "Legacy Base manifest target did not retain its pre-migration name."
+    Assert-RunnerInvariant `
+        ((Resolve-BaseManifestTestTarget -ProjectRoot $sourceRoot -FileName "base_target.gd") -ceq "base_workbench/tests/base_target.gd") `
+        "Base manifest target did not resolve to the workbench authority."
+    Assert-RunnerInvariant `
+        ((Resolve-TestTarget -RequestedTarget "base_workbench/tests/base_target.gd" -SourceProjectRoot $sourceRoot) -ceq "base_workbench/tests/base_target.gd") `
+        "Direct Base target did not retain its canonical workbench path."
+    Assert-RunnerInvariant `
+        ((ConvertTo-TestProjectRelativePath -TargetName "base_workbench/tests/base_target.gd") -ceq "base_workbench/tests/base_target.gd") `
+        "Base manifest path conversion rejected the workbench target."
+    $duplicateBasePath = Join-Path $sourceRoot "tests/base_target.gd"
+    [System.IO.File]::WriteAllText($duplicateBasePath, "extends SceneTree`n", [System.Text.UTF8Encoding]::new($false))
+    $duplicateBaseAuthorityRejected = $false
+    try {
+        [void](Resolve-BaseManifestTestTarget -ProjectRoot $sourceRoot -FileName "base_target.gd")
+    }
+    catch {
+        $duplicateBaseAuthorityRejected = $_.Exception.Message.Contains("exactly one authority")
+    }
+    finally {
+        Remove-Item -LiteralPath $duplicateBasePath -Force -ErrorAction SilentlyContinue
+    }
+    Assert-RunnerInvariant $duplicateBaseAuthorityRejected "Runner accepted duplicate Root and Base test authorities."
 
     $beforeMutation = Get-ProjectSnapshotFingerprint -ProjectRoot $sourceRoot
     Assert-RunnerInvariant ($beforeMutation.MissingCount -eq 1) "Deleted tracked paths must remain represented in the source fingerprint."
@@ -438,9 +470,13 @@ generated.mkdir(parents=True, exist_ok=True)
     Assert-RunnerInvariant `
         ($null -eq (Get-ExplicitStructureTestPackageId -ResolvedTarget "diver_workbench/tests/DiverPresentationTest.tscn")) `
         "Non-structure target incorrectly entered the structure overlay lane."
+    Assert-RunnerInvariant `
+        ($null -eq (Get-ExplicitStructureTestPackageId -ResolvedTarget "base_workbench/tests/base_target.gd")) `
+        "Base target incorrectly entered the structure overlay lane."
 
     $workspacePath = [string]$sourceSnapshotReceipt.WorkspacePath
     Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "diver_workbench/required_untracked.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Diver source."
+    Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "base_workbench/tests/base_target.gd") -PathType Leaf) "Isolated copy omitted the tracked Base target."
     Assert-RunnerInvariant (Test-Path -LiteralPath (Join-Path $workspacePath "underwater_map_workbench/structures/inflight_package/runtime.gd") -PathType Leaf) "Isolated copy omitted a nonignored untracked Map source."
     Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath "ignored/ignored.tmp"))) "Isolated copy included ignored content."
     Assert-RunnerInvariant (-not (Test-Path -LiteralPath (Join-Path $workspacePath ".git"))) "Isolated copy included Git metadata."

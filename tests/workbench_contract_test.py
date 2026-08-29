@@ -234,6 +234,7 @@ class WorkbenchOwnershipTest(unittest.TestCase):
     def test_owner_classification_and_generated_boundary(self) -> None:
         cases = {
             "scripts/diving/DiveController.gd": "root",
+            "base_workbench/runtime/BaseScene.tscn": "base",
             "underwater_map_workbench/map_manifest.json": "map",
             "diver_workbench/runtime/Diver.tscn": "diver",
             "underwater_map_workbench/structures/tower_a/runtime/controller.gd": (
@@ -274,12 +275,32 @@ class WorkbenchOwnershipTest(unittest.TestCase):
             ],
         )
 
+    def test_base_and_root_write_sets_are_disjoint(self) -> None:
+        self.assertEqual(
+            [
+                (item.path, item.actual_owner)
+                for item in contract.validate_paths(
+                    "root", ["scripts/core/GameRoot.gd", "base_workbench/ui/BaseHud.gd"]
+                )
+            ],
+            [("base_workbench/ui/BaseHud.gd", "base")],
+        )
+        self.assertEqual(
+            [
+                (item.path, item.actual_owner)
+                for item in contract.validate_paths(
+                    "base", ["base_workbench/ui/BaseHud.gd", "scripts/core/GameRoot.gd"]
+                )
+            ],
+            [("scripts/core/GameRoot.gd", "root")],
+        )
     def test_integration_may_validate_cross_owner_write_set(self) -> None:
         self.assertEqual(
             contract.validate_paths(
                 "integration",
                 [
                     "scripts/data/DiveSessionState.gd",
+                    "base_workbench/runtime/BaseScene.tscn",
                     "diver_workbench/runtime/Diver.tscn",
                     "underwater_map_workbench/map_manifest.json",
                 ],

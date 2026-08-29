@@ -9,7 +9,7 @@ param(
     [ValidateLength(1, 48)]
     [string]$TaskSlug,
 
-    [ValidatePattern('^(root|map|diver|integration|structure-[a-z][a-z0-9_-]*)$')]
+    [ValidatePattern('^(root|base|map|diver|integration|structure-[a-z][a-z0-9_-]*)$')]
     [string]$OwnerSegment = 'root',
 
     [string]$WorktreeRoot,

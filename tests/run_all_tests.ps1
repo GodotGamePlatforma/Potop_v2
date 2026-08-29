@@ -384,6 +384,30 @@ function Assert-ProjectGodotCacheAvailable {
     throw "This project is already open in Godot: $details. Close these processes before running tests, or use a separate full project copy with its own .godot cache."
 }
 
+function Resolve-BaseManifestTestTarget {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][string]$FileName
+    )
+
+    if ($FileName -notmatch '^[^/\\]+\.(?:gd|tscn)$') {
+        throw "Base manifest target must be one direct .gd/.tscn file: '$FileName'."
+    }
+
+    $legacyRelative = "tests/$FileName"
+    $workbenchRelative = "base_workbench/tests/$FileName"
+    $legacyExists = Test-Path -LiteralPath (Join-Path $ProjectRoot $legacyRelative) -PathType Leaf
+    $workbenchExists = Test-Path -LiteralPath (Join-Path $ProjectRoot $workbenchRelative) -PathType Leaf
+    if ($legacyExists -and $workbenchExists) {
+        throw "Base test must have exactly one authority, found both '$legacyRelative' and '$workbenchRelative'."
+    }
+    if (-not $legacyExists -and -not $workbenchExists) {
+        throw "Base manifest target does not exist in either supported layout: '$FileName'."
+    }
+    if ($workbenchExists) { return $workbenchRelative }
+    return $FileName
+}
+
 $quickHeadlessScriptTests = @(
     "campaign_map_contract_test.gd"
     "workbench_boundary_test.gd"
@@ -394,7 +418,7 @@ $quickHeadlessScriptTests = @(
     "interactable_visual_style_test.gd"
     "narrative_content_test.gd"
     "profession_talent_system_test.gd"
-    "production_system_test.gd"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "production_system_test.gd")
     "roster_rotation_skeleton_test.gd"
     "campaign_format_test.gd"
     "smoke_test.gd"
@@ -402,8 +426,8 @@ $quickHeadlessScriptTests = @(
 )
 
 $fullHeadlessScriptTests = @(
-    "base_environment_test.gd"
-    "building_system_test.gd"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "base_environment_test.gd")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "building_system_test.gd")
     "campaign_map_contract_test.gd"
     "workbench_boundary_test.gd"
     "underwater_map_workbench/tests/underwater_map_smoke_test.gd"
@@ -426,13 +450,13 @@ $fullHeadlessScriptTests = @(
     "interactable_visual_style_test.gd"
     "narrative_content_test.gd"
     "portrait_catalog_test.gd"
-    "production_system_test.gd"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "production_system_test.gd")
     "rescue_system_test.gd"
     "roster_rotation_skeleton_test.gd"
     "campaign_format_test.gd"
     "settings_manager_test.gd"
-    "settlement_event_balance_test.gd"
-    "settlement_event_system_test.gd"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "settlement_event_balance_test.gd")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "settlement_event_system_test.gd")
     "smoke_test.gd"
     "survival_dependencies_test.gd"
     "tutorial_flow_test.gd"
@@ -441,16 +465,16 @@ $fullHeadlessScriptTests = @(
 )
 
 $quickHeadlessFlowScenes = @(
-    "BaseMusicTest.tscn"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseMusicTest.tscn")
     "NarrativeDialogueFlowTest.tscn"
-    "WorkerCandidatePickerFlowTest.tscn"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "WorkerCandidatePickerFlowTest.tscn")
 )
 
 $fullHeadlessFlowScenes = @(
-    "BaseMusicTest.tscn"
-    "BaseOptionalPanelsFlowTest.tscn"
-    "BasePortraitBindingTest.tscn"
-    "BuildingSlotMotionTest.tscn"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseMusicTest.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseOptionalPanelsFlowTest.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BasePortraitBindingTest.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BuildingSlotMotionTest.tscn")
     "DayTransitionPerformanceTest.tscn"
     "diver_workbench/tests/DiverPresentationTest.tscn"
     "IntroFlowTest.tscn"
@@ -458,20 +482,20 @@ $fullHeadlessFlowScenes = @(
     "NarrativeDialogueFlowTest.tscn"
     "PauseMenuFlowTest.tscn"
     "SettingsUIFlowTest.tscn"
-    "SurvivorDevelopmentFlowTest.tscn"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "SurvivorDevelopmentFlowTest.tscn")
     "TutorialPartialLootFlowTest.tscn"
-    "WorkerCandidatePickerFlowTest.tscn"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "WorkerCandidatePickerFlowTest.tscn")
 )
 
 $headlessScriptTests = @(if ($Full) { $fullHeadlessScriptTests } else { $quickHeadlessScriptTests })
 $headlessFlowScenes = @(if ($Full) { $fullHeadlessFlowScenes } else { $quickHeadlessFlowScenes })
 
 $nativeSnapshotScenes = @(
-    "BaseBuildingsSnapshot.tscn"
-    "BaseManagementWorkspaceSnapshot.tscn"
-    "BaseUISnapshot.tscn"
-    "BaseWeatherSnapshot.tscn"
-    "BuildingOccupancyBadgesSnapshot.tscn"
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseBuildingsSnapshot.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseManagementWorkspaceSnapshot.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseUISnapshot.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BaseWeatherSnapshot.tscn")
+    (Resolve-BaseManifestTestTarget -ProjectRoot $sourceProjectRoot -FileName "BuildingOccupancyBadgesSnapshot.tscn")
     "CampaignOutcomesSnapshot.tscn"
     "DiveHudLayoutSnapshot.tscn"
     "IntroVisualSnapshot.tscn"
@@ -3407,6 +3431,9 @@ function ConvertTo-TestProjectRelativePath {
     if ($normalized.StartsWith("tests/", [StringComparison]::OrdinalIgnoreCase)) {
         return $normalized
     }
+    if ($normalized -match '(?i)^base_workbench/tests/[^/]+\.(?:gd|tscn)$') {
+        return $normalized
+    }
     if ($normalized -match '(?i)^underwater_map_workbench/tests/[^/]+\.gd$') {
         return $normalized
     }
@@ -3417,7 +3444,7 @@ function ConvertTo-TestProjectRelativePath {
         return $normalized
     }
     if ($normalized.Contains('/')) {
-        throw "Manifest test target must be a tests/ entry, a direct underwater_map_workbench/tests/*.gd script, a package-local underwater_map_workbench/structures/*/tests/*.gd script, or a direct diver_workbench/tests/*.(gd|tscn) target: '$TargetName'."
+        throw "Manifest test target must be a tests/ entry, a direct base_workbench/tests/*.(gd|tscn) target, a direct underwater_map_workbench/tests/*.gd script, a package-local underwater_map_workbench/structures/*/tests/*.gd script, or a direct diver_workbench/tests/*.(gd|tscn) target: '$TargetName'."
     }
     return "tests/$normalized"
 }
@@ -3438,10 +3465,11 @@ function Resolve-TestTarget {
     )
 
     if ([string]::IsNullOrWhiteSpace($RequestedTarget)) {
-        throw "$ParameterName requires a .gd script or .tscn scene from tests/, a direct .gd script from underwater_map_workbench/tests/, a package-local .gd script from underwater_map_workbench/structures/*/tests/, or a direct .gd/.tscn target from diver_workbench/tests/."
+        throw "$ParameterName requires a .gd script or .tscn scene from tests/, a direct .gd/.tscn target from base_workbench/tests/, a direct .gd script from underwater_map_workbench/tests/, a package-local .gd script from underwater_map_workbench/structures/*/tests/, or a direct .gd/.tscn target from diver_workbench/tests/."
     }
 
     $testsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "tests")).TrimEnd([char[]]"\/")
+    $baseWorkbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "base_workbench/tests")).TrimEnd([char[]]"\/")
     $workbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "underwater_map_workbench/tests")).TrimEnd([char[]]"\/")
     $structurePackagesRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "underwater_map_workbench/structures")).TrimEnd([char[]]"\/")
     $diverWorkbenchTestsRoot = [System.IO.Path]::GetFullPath((Join-Path $SourceProjectRoot "diver_workbench/tests")).TrimEnd([char[]]"\/")
@@ -3457,6 +3485,7 @@ function Resolve-TestTarget {
     else {
         $normalizedRelative = $targetText.Replace('\', '/')
         if ($normalizedRelative.StartsWith("tests/", [StringComparison]::OrdinalIgnoreCase) -or
+            $normalizedRelative.StartsWith("base_workbench/tests/", [StringComparison]::OrdinalIgnoreCase) -or
             $normalizedRelative.StartsWith("underwater_map_workbench/tests/", [StringComparison]::OrdinalIgnoreCase) -or
             $normalizedRelative.StartsWith("underwater_map_workbench/structures/", [StringComparison]::OrdinalIgnoreCase) -or
             $normalizedRelative.StartsWith("diver_workbench/tests/", [StringComparison]::OrdinalIgnoreCase)) {
@@ -3471,6 +3500,14 @@ function Resolve-TestTarget {
     $testsPrefix = $testsRoot + [System.IO.Path]::DirectorySeparatorChar
     $extension = [System.IO.Path]::GetExtension($absoluteTarget).ToLowerInvariant()
     $isTestsTarget = $absoluteTarget.StartsWith($testsPrefix, [StringComparison]::OrdinalIgnoreCase)
+    $isDirectBaseWorkbenchTarget = (
+        $extension -in @(".gd", ".tscn") -and
+        [string]::Equals(
+            [System.IO.Path]::GetDirectoryName($absoluteTarget).TrimEnd([char[]]"\/"),
+            $baseWorkbenchTestsRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    )
     $isDirectWorkbenchScript = (
         $extension -eq ".gd" -and
         [string]::Equals(
@@ -3493,8 +3530,8 @@ function Resolve-TestTarget {
             [StringComparison]::OrdinalIgnoreCase
         )
     )
-    if (-not $isTestsTarget -and -not $isDirectWorkbenchScript -and -not $isStructurePackageScript -and -not $isDirectDiverWorkbenchTarget) {
-        throw "Test target must stay inside '$testsRoot', be a direct .gd script inside '$workbenchTestsRoot', be a package-local .gd script inside '$structurePackagesRoot/*/tests', or be a direct .gd/.tscn target inside '$diverWorkbenchTestsRoot': '$RequestedTarget'."
+    if (-not $isTestsTarget -and -not $isDirectBaseWorkbenchTarget -and -not $isDirectWorkbenchScript -and -not $isStructurePackageScript -and -not $isDirectDiverWorkbenchTarget) {
+        throw "Test target must stay inside '$testsRoot', be a direct .gd/.tscn target inside '$baseWorkbenchTestsRoot', be a direct .gd script inside '$workbenchTestsRoot', be a package-local .gd script inside '$structurePackagesRoot/*/tests', or be a direct .gd/.tscn target inside '$diverWorkbenchTestsRoot': '$RequestedTarget'."
     }
     if (-not (Test-Path -LiteralPath $absoluteTarget -PathType Leaf)) {
         throw "Test target does not exist: '$RequestedTarget'."
@@ -3503,6 +3540,9 @@ function Resolve-TestTarget {
         throw "Test target must be a .gd script or .tscn scene: '$RequestedTarget'."
     }
 
+    if ($isDirectBaseWorkbenchTarget) {
+        return "base_workbench/tests/$([System.IO.Path]::GetFileName($absoluteTarget))"
+    }
     if ($isDirectWorkbenchScript) {
         return "underwater_map_workbench/tests/$([System.IO.Path]::GetFileName($absoluteTarget))"
     }

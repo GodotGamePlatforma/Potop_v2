@@ -107,6 +107,28 @@ Write-Host 'FAST-CHECK PASS fixture'
     }
 }
 
+function Advance-Main {
+    param(
+        [Parameter(Mandatory = $true)][object]$Fixture,
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    Git $Fixture.Repo checkout main | Out-Null
+    $absolutePath = Join-Path $Fixture.Repo $RelativePath
+    $parent = Split-Path -Parent $absolutePath
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    Write-Utf8Fixture $absolutePath $Value
+    Git $Fixture.Repo add -- $RelativePath | Out-Null
+    Git $Fixture.Repo commit -m 'advance main fixture' | Out-Null
+    $mainHead = (Git $Fixture.Repo rev-parse HEAD).Trim()
+    Git $Fixture.Repo push $Fixture.Remote 'main:main' | Out-Null
+    Git $Fixture.Repo checkout $Fixture.Branch | Out-Null
+    return $mainHead
+}
+
 function Initialize-GhState {
     param(
         [object]$Fixture,
@@ -148,6 +170,7 @@ function Run-Publish {
         [ValidateSet('pending', 'queued', 'both', 'none', 'foreign')][string]$QueueAcceptance = 'pending',
         [switch]$MissingQueue,
         [switch]$AdvanceBranchOnPush,
+        [switch]$MergeTreeFailure,
         [string]$PowerShellCommand = 'pwsh'
     )
     $statePath = Initialize-GhState `
@@ -190,6 +213,8 @@ function Run-Publish {
     else {
         Remove-Item Env:MOCK_ADVANCE_ON_PUSH,Env:MOCK_RACE_HEAD -ErrorAction SilentlyContinue
     }
+    if ($MergeTreeFailure) { $env:MOCK_MERGE_TREE_FAILURE = '1' }
+    else { Remove-Item Env:MOCK_MERGE_TREE_FAILURE -ErrorAction SilentlyContinue }
 
     $arguments = @(
         '-NoLogo', '-NoProfile', '-File', $helper,
@@ -213,7 +238,8 @@ function Run-Publish {
     foreach ($name in @(
         'MOCK_HEAD','MOCK_BRANCH','MOCK_BASE','MOCK_GH_LOG','MOCK_GH_STATE',
         'MOCK_FAST_LOG','MOCK_FAST_MODE','MOCK_HEAD_RACE','MOCK_REAL_GIT',
-        'MOCK_GIT_REMOTE','MOCK_GIT_TRANSPORT_LOG','MOCK_ADVANCE_ON_PUSH','MOCK_RACE_HEAD'
+        'MOCK_GIT_REMOTE','MOCK_GIT_TRANSPORT_LOG','MOCK_ADVANCE_ON_PUSH','MOCK_RACE_HEAD',
+        'MOCK_MERGE_TREE_FAILURE'
     )) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }
@@ -352,6 +378,9 @@ while index < len(args):
     break
 
 command = args[index] if index < len(args) else ""
+if command == "merge-tree" and os.environ.get("MOCK_MERGE_TREE_FAILURE") == "1":
+    print("injected merge-tree failure", file=sys.stderr)
+    raise SystemExit(2)
 if command in {"fetch", "push", "ls-remote"}:
     with open(os.environ["MOCK_GIT_TRANSPORT_LOG"], "a", encoding="utf-8") as handle:
         handle.write(" ".join(args[index:]) + "\n")
@@ -400,6 +429,37 @@ raise SystemExit(subprocess.run([real_git, *args]).returncode)
     $publishProof = "PUBLISH PASS LocalHead=$($ordinary.Head) RemoteHead=$($ordinary.Head) PullRequestHead=$($ordinary.Head) PullRequest=1"
     if ($ordinaryResult.Output -notmatch "(?m)^$([regex]::Escape($publishProof))\r?$") {
         throw "Successful publisher output omitted the exact three-SHA proof: $($ordinaryResult.Output)"
+    }
+
+    $conflictingMain = New-Fixture 'conflicting-main'
+    $conflictingBase = Advance-Main $conflictingMain 'game.txt' "main conflict`n"
+    $conflictingResult = Run-Publish $conflictingMain
+    if ($conflictingResult.ExitCode -eq 0 -or
+        $conflictingResult.Output -notmatch 'conflicts with freshly fetched origin/main' -or
+        $conflictingResult.Output -notmatch $conflictingBase -or
+        -not [string]::IsNullOrWhiteSpace($conflictingResult.FastLog) -or
+        -not [string]::IsNullOrWhiteSpace($conflictingResult.Log) -or
+        $conflictingResult.TransportLog -match '(?m)^push ' -or
+        (Git-Result $conflictingMain.Remote show-ref --verify --quiet "refs/heads/$($conflictingMain.Branch)").ExitCode -eq 0) {
+        throw "Conflicting fresh main was not rejected before fast-check/push/PR: $($conflictingResult.Output)"
+    }
+
+    $compatibleMain = New-Fixture 'compatible-main'
+    $compatibleBase = Advance-Main $compatibleMain 'main-only.txt' "main-only change`n"
+    $compatibleResult = Run-Publish $compatibleMain
+    if ($compatibleResult.ExitCode -ne 0 -or
+        $compatibleResult.FastLog -notmatch "base=$compatibleBase allow=False") {
+        throw "Non-conflicting stale branch was rejected or used the wrong fresh base: $($compatibleResult.Output) fast=$($compatibleResult.FastLog)"
+    }
+
+    $mergeTreeFailure = New-Fixture 'merge-tree-tool-failure'
+    $mergeTreeFailureResult = Run-Publish $mergeTreeFailure -MergeTreeFailure
+    if ($mergeTreeFailureResult.ExitCode -eq 0 -or
+        $mergeTreeFailureResult.Output -notmatch 'merge-tree preflight failed \(exit 2\)' -or
+        -not [string]::IsNullOrWhiteSpace($mergeTreeFailureResult.FastLog) -or
+        -not [string]::IsNullOrWhiteSpace($mergeTreeFailureResult.Log) -or
+        $mergeTreeFailureResult.TransportLog -match '(?m)^push ') {
+        throw "Merge-tree tool failure was not fail-closed before publication: $($mergeTreeFailureResult.Output)"
     }
 
     $queueReady = New-Fixture 'queue-ready'
@@ -667,6 +727,7 @@ print(json.dumps({"status":"PASS","base":a.base,"head":a.head,"protected_path_co
         "'remote', 'get-url', '--push', '--all', 'origin'",
         'isCrossRepository,headRepository,headRepositoryOwner',
         'mergeQueue(branch:$base)',
+        "'merge-tree', '--write-tree', '--quiet'",
         '"${head}:refs/heads/$branch"',
         'PUBLISH PASS LocalHead={0} RemoteHead={1} PullRequestHead={2}',
         'LocalHead = $head',
@@ -687,7 +748,8 @@ finally {
     foreach ($name in @(
         'MOCK_HEAD','MOCK_BRANCH','MOCK_BASE','MOCK_GH_LOG','MOCK_GH_STATE',
         'MOCK_FAST_LOG','MOCK_FAST_MODE','MOCK_HEAD_RACE','MOCK_REAL_GIT',
-        'MOCK_GIT_REMOTE','MOCK_GIT_TRANSPORT_LOG','MOCK_ADVANCE_ON_PUSH','MOCK_RACE_HEAD'
+        'MOCK_GIT_REMOTE','MOCK_GIT_TRANSPORT_LOG','MOCK_ADVANCE_ON_PUSH','MOCK_RACE_HEAD',
+        'MOCK_MERGE_TREE_FAILURE'
     )) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }
