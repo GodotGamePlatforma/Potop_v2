@@ -411,6 +411,17 @@ if ((Invoke-Checked git @('rev-parse', 'HEAD') $repo).Trim() -cne $head -or
     throw 'HEAD or worktree changed while fetching the base.'
 }
 
+$mergeTree = Invoke-CommandResult git @(
+    'merge-tree', '--write-tree', '--quiet', $base, $head
+) $repo
+if ($mergeTree.ExitCode -eq 1) {
+    throw ("Exact HEAD '$head' conflicts with freshly fetched origin/$BaseBranch " +
+        "'$base'. Create a replacement task from current origin/$BaseBranch.")
+}
+if ($mergeTree.ExitCode -ne 0) {
+    throw "git merge-tree preflight failed (exit $($mergeTree.ExitCode)): $($mergeTree.Output)"
+}
+
 $tempClassifierDirectory = Join-Path (
     [System.IO.Path]::GetTempPath()
 ) ("potop-base-classifier-" + [guid]::NewGuid().ToString('N'))

@@ -85,9 +85,16 @@ raise SystemExit(0)
     Git $tempRoot init -b main $repo | Out-Null
     Git $repo config user.email 'fast-test@example.invalid' | Out-Null
     Git $repo config user.name 'Fast Test' | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $repo 'tools'),(Join-Path $repo 'tests') | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $repo 'tools'),(Join-Path $repo 'tests'),(Join-Path $repo 'base_workbench') | Out-Null
     Copy-Item -LiteralPath (Join-Path $projectRoot 'tools/ci_protected_paths.py') -Destination (Join-Path $repo 'tools/ci_protected_paths.py')
-    Set-Content -LiteralPath (Join-Path $repo 'tools/workbench_contract.py') -Encoding UTF8 -Value 'print("EOL PASS")'
+    foreach ($toolName in @(
+        'ci_branch_owner.py',
+        'ci_python_entry.py',
+        'workbench_contract.py',
+        'workbench_lock.py'
+    )) {
+        Copy-Item -LiteralPath (Join-Path $projectRoot "tools/$toolName") -Destination (Join-Path $repo "tools/$toolName")
+    }
     Set-Content -LiteralPath (Join-Path $repo 'tests/run_all_tests.ps1') -Encoding UTF8 -Value @'
 param([string]$GodotConsolePath,[string]$SourceRepositoryPath,[string]$Target)
 if ($GodotConsolePath -like '*error*') { throw 'SCRIPT ERROR: parser failure' }
@@ -136,6 +143,7 @@ script = ExtResource("1")
 "@
     }
     Set-Content -LiteralPath (Join-Path $repo 'game.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'base_workbench/owned.gd') -Encoding UTF8 -Value 'extends Node'
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
     Git $repo worktree add -b codex/root/feature $worktree main | Out-Null
@@ -290,6 +298,27 @@ script = ExtResource("1")
     }
     Remove-Item -LiteralPath (Join-Path $worktree '.github') -Recurse -Force
 
+    Add-Content -LiteralPath (Join-Path $worktree 'base_workbench/owned.gd') -Value 'var root_must_not_write_here := true' -Encoding UTF8
+    $rootCrossOwner = Run-FastCheck $worktree $successGodot @('-TestTarget', 'tests/game_test.gd', '-AllowControlPlane')
+    if ($rootCrossOwner.ExitCode -eq 0 -or $rootCrossOwner.Output -notmatch 'CROSS_OWNER.*requested=root.*actual=base') {
+        throw "Root owner was allowed to write Base files: $($rootCrossOwner.Output)"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'base_workbench/owned.gd') -Encoding UTF8 -Value 'extends Node'
+
+    $baseWorktree = Join-Path $tempRoot 'base-worktree'
+    Git $repo worktree add -b codex/base/base-feature $baseWorktree refs/heads/main | Out-Null
+    Add-Content -LiteralPath (Join-Path $baseWorktree 'base_workbench/owned.gd') -Value 'var base_change := true' -Encoding UTF8
+    $baseOwnerPass = Run-FastCheck $baseWorktree $successGodot @('-TestTarget', 'tests/game_test.gd')
+    if ($baseOwnerPass.ExitCode -ne 0 -or $baseOwnerPass.Output -notmatch 'FAST-CHECK PASS') {
+        throw "Base owner could not validate its own workbench: $($baseOwnerPass.Output)"
+    }
+    Set-Content -LiteralPath (Join-Path $baseWorktree 'root-only.txt') -Encoding UTF8 -Value 'outside Base'
+    $baseCrossOwner = Run-FastCheck $baseWorktree $successGodot @('-TestTarget', 'tests/game_test.gd')
+    if ($baseCrossOwner.ExitCode -eq 0 -or $baseCrossOwner.Output -notmatch 'CROSS_OWNER.*requested=base.*actual=root') {
+        throw "Base owner was allowed to write Root files: $($baseCrossOwner.Output)"
+    }
+    Remove-Item -LiteralPath (Join-Path $baseWorktree 'root-only.txt')
+
     Git $worktree add game.gd | Out-Null
     Git $worktree commit -m 'feature for detached CI' | Out-Null
     $featureHead = (Git $worktree rev-parse HEAD).Trim()
@@ -303,6 +332,15 @@ script = ExtResource("1")
     if ($detachedPass.ExitCode -ne 0 -or $detachedPass.Output -notmatch 'FAST-CHECK PASS') {
         throw "Exact detached CI fast-check failed: $($detachedPass.Output)"
     }
+    $detachedWrongOwner = Run-FastCheck $worktree $successGodot @(
+        '-ExpectedHeadSha', $featureHead,
+        '-ExpectedBranch', 'codex/base/feature',
+        '-TestTarget', 'tests/game_test.gd',
+        '-AllowControlPlane'
+    )
+    if ($detachedWrongOwner.ExitCode -eq 0 -or $detachedWrongOwner.Output -notmatch 'CROSS_OWNER.*requested=base.*actual=root') {
+        throw "Detached CI ignored ExpectedBranch ownership: $($detachedWrongOwner.Output)"
+    }
     $baseHead = (Git $worktree rev-parse refs/heads/main).Trim()
     $detachedMismatch = Run-FastCheck $worktree $successGodot @(
         '-ExpectedHeadSha', $baseHead,
@@ -311,6 +349,13 @@ script = ExtResource("1")
     )
     if ($detachedMismatch.ExitCode -eq 0 -or $detachedMismatch.Output -notmatch 'HEAD mismatch') {
         throw 'Detached CI fast-check accepted a mismatched expected SHA.'
+    }
+    $detachedWithoutOwner = Run-FastCheck $worktree $successGodot @(
+        '-ExpectedHeadSha', $featureHead,
+        '-AllowControlPlane'
+    )
+    if ($detachedWithoutOwner.ExitCode -eq 0 -or $detachedWithoutOwner.Output -notmatch 'ExpectedBranch is required') {
+        throw 'Detached CI fast-check accepted exact HEAD without an owner branch.'
     }
 
     Git $worktree checkout -b feature/wrong $featureHead | Out-Null
@@ -357,7 +402,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check linked-worktree-only/scene-target-routing/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check linked-worktree-only/owner-write-set/scene-target-routing/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }

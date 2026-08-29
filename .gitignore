@@ -3,6 +3,8 @@
 *.import
 !assets/base_3d/start_platform_ruins.glb.import
 !assets/audio/base/oddech_przystani.ogg.import
+!base_workbench/assets/platform_3d/start_platform_ruins.glb.import
+!base_workbench/assets/audio/oddech_przystani.ogg.import
 !assets/audio/intro/intro_ambient.ogg.import
 !assets/audio/narrative/*.wav.import
 !underwater_map_workbench/assets/gameplay/**/*.import

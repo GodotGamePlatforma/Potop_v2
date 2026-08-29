@@ -31,6 +31,7 @@ from workbench_lock import InterprocessWorkspaceLock
 
 
 OWNER_ROOT = "root"
+OWNER_BASE = "base"
 OWNER_MAP = "map"
 OWNER_DIVER = "diver"
 OWNER_INTEGRATION = "integration"
@@ -208,19 +209,27 @@ def normalize_repo_path(path: str | os.PathLike[str]) -> str:
 
 def normalize_owner(owner: str) -> str:
     normalized = owner.strip().lower()
-    if normalized in {OWNER_ROOT, OWNER_MAP, OWNER_DIVER, OWNER_INTEGRATION}:
+    if normalized in {
+        OWNER_ROOT,
+        OWNER_BASE,
+        OWNER_MAP,
+        OWNER_DIVER,
+        OWNER_INTEGRATION,
+    }:
         return normalized
     match = STRUCTURE_OWNER_PATTERN.fullmatch(normalized)
     if match is not None:
         return f"structure:{match.group(1)}"
     raise ContractError(
-        "Owner must be root, map, diver, integration or structure:<id>."
+        "Owner must be root, base, map, diver, integration or structure:<id>."
     )
 
 
 def owner_for_path(path: str | os.PathLike[str]) -> str:
     normalized = normalize_repo_path(path)
     parts = PurePosixPath(normalized).parts
+    if parts[0] == "base_workbench":
+        return OWNER_BASE
     if parts[0] == "diver_workbench":
         return OWNER_DIVER
     if parts[0] != "underwater_map_workbench":

@@ -337,6 +337,9 @@ if ([string]::IsNullOrWhiteSpace($ExpectedHeadSha)) {
     }
 }
 else {
+    if ([string]::IsNullOrWhiteSpace($ExpectedBranch)) {
+        throw '-ExpectedBranch is required together with -ExpectedHeadSha.'
+    }
     if ($ExpectedHeadSha -cnotmatch '^[0-9a-f]{40}$') {
         throw '-ExpectedHeadSha must be one exact lowercase 40-character commit SHA.'
     }
@@ -362,6 +365,23 @@ $changedPaths = @($changed | Sort-Object)
 if ($changedPaths.Count -eq 0) {
     throw 'Fast-check found no changes relative to the selected base.'
 }
+
+$ownershipBranch = if ([string]::IsNullOrWhiteSpace($ExpectedHeadSha)) {
+    $branch
+}
+else {
+    $ExpectedBranch
+}
+$branchOwnerTool = Join-Path $script:RepositoryPath 'tools/ci_branch_owner.py'
+if (-not (Test-Path -LiteralPath $branchOwnerTool -PathType Leaf)) {
+    throw "Branch ownership validator is missing: '$branchOwnerTool'."
+}
+Invoke-NativeChecked python @(
+    '-B', $branchOwnerTool, 'validate',
+    '--repo', $script:RepositoryPath,
+    '--branch', $ownershipBranch,
+    '--base-ref', $BaseRef
+) | Out-Null
 
 if ($AllowedPath.Count -gt 0) {
     $outside = @($changedPaths | Where-Object { -not (Test-AllowedPath $_ $AllowedPath) })

@@ -20,6 +20,7 @@ foreach ($required in @(
     'cleanup_merged_worktrees.ps1',
     '-not `$PlanOnly',
     'setup_agent_worktree.ps1',
+    'root|base|map|diver|integration',
     '`$arguments.Create = `$true',
     'AGENT TASK READY'
 )) {

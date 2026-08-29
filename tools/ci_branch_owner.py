@@ -19,7 +19,7 @@ from typing import Sequence
 
 
 BRANCH_RE = re.compile(
-    r"^codex/(?P<token>root|map|diver|integration|structure-(?P<structure>[a-z0-9][a-z0-9_-]*))"
+    r"^codex/(?P<token>root|base|map|diver|integration|structure-(?P<structure>[a-z0-9][a-z0-9_-]*))"
     r"/(?P<slug>[a-z0-9][a-z0-9._-]*)$"
 )
 GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -46,7 +46,7 @@ def resolve_owner(branch: str) -> str:
     match = BRANCH_RE.fullmatch(branch)
     if match is None:
         raise BranchOwnerError(
-            "Branch must be codex/<root|map|diver|integration|structure-ID>/<task-slug>."
+            "Branch must be codex/<root|base|map|diver|integration|structure-ID>/<task-slug>."
         )
     token = match.group("token")
     structure = match.group("structure")

@@ -8,7 +8,7 @@ param(
     [ValidatePattern('^[a-z0-9][a-z0-9._-]*$')]
     [string]$TaskSlug,
 
-    [ValidatePattern('^(root|map|diver|integration|structure-[a-z][a-z0-9_-]*)$')]
+    [ValidatePattern('^(root|base|map|diver|integration|structure-[a-z][a-z0-9_-]*)$')]
     [string]$OwnerSegment = 'root',
 
     [Parameter(Mandatory = $true)]

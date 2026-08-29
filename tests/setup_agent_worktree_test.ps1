@@ -153,7 +153,7 @@ try {
     $second = Run-Helper @(
         '-Repository', $primary,
         '-TaskSlug', 'second-task',
-        '-OwnerSegment', 'map',
+        '-OwnerSegment', 'base',
         '-Destination', $secondDestination,
         '-Create'
     )
@@ -162,7 +162,7 @@ try {
     if ($expectedSecond -ceq $expectedFirst -or (Git $secondDestination rev-parse HEAD).Trim() -cne $expectedSecond) {
         throw 'Second worktree did not use the freshly fetched origin/main.'
     }
-    if ((Git $secondDestination branch --show-current).Trim() -cne 'codex/map/second-task') {
+    if ((Git $secondDestination branch --show-current).Trim() -cne 'codex/base/second-task') {
         throw 'Owner segment did not route to the expected codex/* branch.'
     }
     if ([System.Text.Encoding]::UTF8.GetString(
