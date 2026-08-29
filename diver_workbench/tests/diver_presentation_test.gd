@@ -48,6 +48,8 @@ const TRANSITION_ROUTES := [
 ]
 const KNIFE_SOURCE := "res://diver_workbench/assets/animation/diver_knife_swing_16f.png"
 const KNIFE_CONTACT_PROGRESS := 0.40
+const CAMERA_TEST_ORIGIN := Vector2(4000.0, 3000.0)
+const CAMERA_TICK_RATES := [30, 60, 120]
 
 var _failures: Array[String] = []
 
@@ -612,6 +614,7 @@ func _test_runtime_presentation_contract() -> void:
 	var diver_camera := diver.get_node("Camera2D") as Camera2D
 	_check(diver_camera.limit_right == 23040 and diver_camera.limit_bottom == 12960, "The public camera boundary should apply root-provided world bounds.")
 	_check(diver.visual_camera_anchor().is_finite(), "The public camera boundary should always return a finite presentation anchor.")
+	_test_camera_smoothing_contract(diver, diver_camera)
 	sprite.flip_h = false
 	diver._update_socket_markers()
 	diver._update_light_mount()
@@ -992,6 +995,153 @@ func _assert_core_presentation_invariants(diver: DiverController) -> void:
 	_check(diver.camera_profile != null and camera.process_callback == 0 and camera.zoom.is_equal_approx(Vector2(1.2, 1.2)), "Diver presentation features must preserve the approved v4 camera profile and physics follow mode.")
 
 
+func _test_camera_smoothing_contract(diver: DiverController, camera: Camera2D) -> void:
+	_check(camera.position_smoothing_enabled, "The production camera should retain the reduced-motion smoothing seam.")
+	_check(is_zero_approx(camera.position_smoothing_speed), "Camera2D must not stack its frame-dependent filter over the deterministic diver-camera filter.")
+	_check(diver.camera_profile.validation_errors().is_empty(), "The active camera profile should remain valid.")
+	_check(is_equal_approx(diver._camera_intent_weight(0.79, 0.8), 0.0), "Camera look-ahead should reject propulsion outside the intended movement cone.")
+	_check(is_equal_approx(diver._camera_intent_weight(0.8, 0.8), 0.0), "Camera look-ahead should enter its intent cone without a binary lead jump.")
+	_check(is_equal_approx(diver._camera_intent_weight(0.9, 0.8), 0.5), "Camera look-ahead should feather continuously through the intent cone.")
+	_check(is_equal_approx(diver._camera_intent_weight(1.0, 0.8), 1.0), "Camera look-ahead should retain full lead for aligned propulsion.")
+
+	var sprint_response := float(diver.camera_profile.get("sprint_response"))
+	var constant_target := Vector2(float(diver.camera_profile.get("sprint_lead_distance")), 0.0)
+	var fixed_target_samples: Array[Vector2] = []
+	var first_fixed_steps := {}
+	for ticks_per_second: int in CAMERA_TICK_RATES:
+		diver._camera_lead_world = Vector2.ZERO
+		diver._camera_lead_velocity_world = Vector2.ZERO
+		var previous := Vector2.ZERO
+		var monotonic := true
+		for tick in range(ticks_per_second):
+			diver._smooth_camera_lead(constant_target, sprint_response, 1.0 / float(ticks_per_second))
+			var current: Vector2 = diver._camera_lead_world
+			monotonic = monotonic and current.x >= previous.x - 0.0001 and current.x <= constant_target.x + 0.0001 and absf(current.y) <= 0.0001
+			if tick == 0:
+				first_fixed_steps[ticks_per_second] = current.length()
+			previous = current
+		fixed_target_samples.append(diver._camera_lead_world)
+		_check(monotonic, "Camera lead should approach a fixed target without overshoot at %d physics ticks per second." % ticks_per_second)
+	_check(float(first_fixed_steps.get(60, constant_target.length())) <= constant_target.length() * 0.02, "Camera lead should accelerate gently instead of jumping on its first 60 Hz step.")
+	_check(fixed_target_samples[0].distance_to(fixed_target_samples[1]) <= 0.001, "A fixed camera target should agree after one second at 30 and 60 physics ticks per second.")
+	_check(fixed_target_samples[1].distance_to(fixed_target_samples[2]) <= 0.001, "A fixed camera target should agree after one second at 60 and 120 physics ticks per second.")
+
+	var runtime_samples := {false: {}, true: {}}
+	for sprinting: bool in [false, true]:
+		for ticks_per_second: int in CAMERA_TICK_RATES:
+			var sample := _camera_start_trace(diver, ticks_per_second, sprinting)
+			runtime_samples[sprinting][ticks_per_second] = sample
+			var authored_distance := float(diver.camera_profile.get("sprint_lead_distance" if sprinting else "swim_lead_distance"))
+			_check(bool(sample.get("monotonic", false)), "%s camera lead should grow monotonically without overshoot at %d Hz." % ["Sprint" if sprinting else "Swim", ticks_per_second])
+			_check(float(sample.get("first_step", authored_distance)) <= authored_distance * 0.04, "%s camera lead should stay gentle on the first %d Hz movement step." % ["Sprint" if sprinting else "Swim", ticks_per_second])
+			_check(float(sample.get("final", 0.0)) > 10.0 and float(sample.get("final", authored_distance + 1.0)) <= authored_distance + 0.01, "%s camera lead should settle ahead without overshoot at %d Hz." % ["Sprint" if sprinting else "Swim", ticks_per_second])
+		var thirty_final := float((runtime_samples[sprinting][30] as Dictionary).get("final", 0.0))
+		var sixty_final := float((runtime_samples[sprinting][60] as Dictionary).get("final", 0.0))
+		var one_twenty_final := float((runtime_samples[sprinting][120] as Dictionary).get("final", 0.0))
+		_check(absf(thirty_final - sixty_final) <= 2.0, "%s camera result after one second should be comparable at 30 and 60 Hz." % ["Sprint" if sprinting else "Swim"])
+		_check(absf(sixty_final - one_twenty_final) <= 1.0, "%s camera result after one second should be comparable at 60 and 120 Hz." % ["Sprint" if sprinting else "Swim"])
+	for ticks_per_second: int in CAMERA_TICK_RATES:
+		var swim_final := float((runtime_samples[false][ticks_per_second] as Dictionary).get("final", 0.0))
+		var sprint_final := float((runtime_samples[true][ticks_per_second] as Dictionary).get("final", 0.0))
+		_check(sprint_final > swim_final + 10.0, "Sprint should retain a materially larger stable lead than swim at %d Hz." % ticks_per_second)
+
+	for sprinting: bool in [false, true]:
+		for ticks_per_second: int in CAMERA_TICK_RATES:
+			var reversal := _camera_reversal_trace(diver, ticks_per_second, sprinting)
+			_check(float(reversal.get("warm_velocity", 0.0)) > 1.0, "The %s reversal fixture at %d Hz must exercise retained camera velocity." % ["sprint" if sprinting else "swim", ticks_per_second])
+			_check(float(reversal.get("first", 0.0)) < float(reversal.get("before", 0.0)), "A %s 180-degree turn must retire the old lead on its first %d Hz tick." % ["sprint" if sprinting else "swim", ticks_per_second])
+			_check(bool(reversal.get("monotonic", false)) and bool(reversal.get("within_target", false)), "A %s 180-degree turn must not oscillate or overshoot at %d Hz." % ["sprint" if sprinting else "swim", ticks_per_second])
+			_check(float(reversal.get("final", 0.0)) < -10.0, "A %s 180-degree turn should settle ahead in the new direction at %d Hz." % ["sprint" if sprinting else "swim", ticks_per_second])
+			var release := _camera_release_trace(diver, ticks_per_second, sprinting)
+			_check(float(release.get("warm_velocity", 0.0)) > 1.0, "The %s release fixture at %d Hz must exercise retained camera velocity." % ["sprint" if sprinting else "swim", ticks_per_second])
+			_check(float(release.get("first", 0.0)) < float(release.get("before", 0.0)), "Releasing %s input must recenter on its first %d Hz tick." % ["sprint" if sprinting else "swim", ticks_per_second])
+			_check(bool(release.get("monotonic", false)) and float(release.get("final", 1.0)) <= 0.1 and float(release.get("final_speed", 1.0)) <= 0.5, "Releasing %s input must settle without overshoot, oscillation or residual drift at %d Hz." % ["sprint" if sprinting else "swim", ticks_per_second])
+
+	diver.reset_at(CAMERA_TEST_ORIGIN)
+	camera.force_update_scroll()
+	var screen_lead := camera.get_screen_center_position() - diver.global_position
+	_check(screen_lead.length() <= 0.1, "The real Camera2D screen center should share the controller-owned centered state after reset.")
+	_check(diver.scale.is_equal_approx(Vector2.ONE), "Camera traces must preserve the physical root scale; actual=%s." % diver.scale)
+
+
+func _camera_start_trace(diver: DiverController, ticks_per_second: int, sprinting: bool) -> Dictionary:
+	diver.reset_at(CAMERA_TEST_ORIGIN)
+	var delta := 1.0 / float(ticks_per_second)
+	var previous := 0.0
+	var first_step := 0.0
+	var monotonic := true
+	var authored_distance := float(diver.camera_profile.get("sprint_lead_distance" if sprinting else "swim_lead_distance"))
+	for tick in range(ticks_per_second):
+		diver.simulate_motion_tick(Vector2.RIGHT, sprinting, Vector2.ZERO, 1.0, delta, true)
+		var current := diver._camera_lead_world.x
+		if tick == 0:
+			first_step = current
+		monotonic = monotonic and current >= previous - 0.0001 and current <= authored_distance + 0.0001 and absf(diver._camera_lead_world.y) <= 0.0001
+		previous = current
+	return {
+		"first_step": first_step,
+		"final": diver._camera_lead_world.x,
+		"monotonic": monotonic,
+	}
+
+
+func _camera_reversal_trace(diver: DiverController, ticks_per_second: int, sprinting: bool) -> Dictionary:
+	diver.reset_at(CAMERA_TEST_ORIGIN)
+	var delta := 1.0 / float(ticks_per_second)
+	var warmup_ticks := maxi(1, roundi(float(ticks_per_second) * 0.3))
+	for _tick in range(warmup_ticks):
+		diver.simulate_motion_tick(Vector2.RIGHT, sprinting, Vector2.ZERO, 1.0, delta, true)
+	var before := diver._camera_lead_world.x
+	var warm_velocity := diver._camera_lead_velocity_world.x
+	diver.simulate_motion_tick(Vector2.LEFT, sprinting, Vector2.ZERO, 1.0, delta, true)
+	var first := diver._camera_lead_world.x
+	var previous := first
+	var monotonic := first < before
+	var authored_distance := float(diver.camera_profile.get("sprint_lead_distance" if sprinting else "swim_lead_distance"))
+	var within_target := first >= -authored_distance - 0.01
+	for _tick in range(maxi(1, roundi(float(ticks_per_second) * 1.7))):
+		diver.simulate_motion_tick(Vector2.LEFT, sprinting, Vector2.ZERO, 1.0, delta, true)
+		var current := diver._camera_lead_world.x
+		monotonic = monotonic and current <= previous + 0.0001
+		within_target = within_target and current >= -authored_distance - 0.01 and absf(diver._camera_lead_world.y) <= 0.0001
+		previous = current
+	return {
+		"before": before,
+		"first": first,
+		"final": diver._camera_lead_world.x,
+		"warm_velocity": warm_velocity,
+		"monotonic": monotonic,
+		"within_target": within_target,
+	}
+
+
+func _camera_release_trace(diver: DiverController, ticks_per_second: int, sprinting: bool) -> Dictionary:
+	diver.reset_at(CAMERA_TEST_ORIGIN)
+	var delta := 1.0 / float(ticks_per_second)
+	var warmup_ticks := maxi(1, roundi(float(ticks_per_second) * 0.3))
+	for _tick in range(warmup_ticks):
+		diver.simulate_motion_tick(Vector2.RIGHT, sprinting, Vector2.ZERO, 1.0, delta, true)
+	var before := diver._camera_lead_world.x
+	var warm_velocity := diver._camera_lead_velocity_world.x
+	diver.simulate_motion_tick(Vector2.ZERO, false, Vector2.ZERO, 1.0, delta, true)
+	var first := diver._camera_lead_world.x
+	var previous := first
+	var monotonic := first < before and first >= -0.0001
+	for _tick in range(maxi(1, roundi(float(ticks_per_second) * 2.0))):
+		diver.simulate_motion_tick(Vector2.ZERO, false, Vector2.ZERO, 1.0, delta, true)
+		var current := diver._camera_lead_world.x
+		monotonic = monotonic and current <= previous + 0.0001 and current >= -0.0001 and absf(diver._camera_lead_world.y) <= 0.0001
+		previous = current
+	return {
+		"before": before,
+		"first": first,
+		"final": diver._camera_lead_world.length(),
+		"final_speed": diver._camera_lead_velocity_world.length(),
+		"warm_velocity": warm_velocity,
+		"monotonic": monotonic,
+	}
+
+
 func _test_continuous_turn_sweeps(diver: DiverController, sprite: AnimatedSprite2D) -> void:
 	_run_turn_sweep(diver, sprite, 72, 109, 1, "downward right-to-left")
 	_run_turn_sweep(diver, sprite, 108, 71, -1, "downward left-to-right")
@@ -1011,7 +1161,7 @@ func _run_turn_sweep(diver: DiverController, sprite: AnimatedSprite2D, start_deg
 		var current_forward := _visual_forward(diver, sprite)
 		_check(current_forward.dot(command) >= 0.985, "%s turn sweep should keep the visible diver aligned at %d degrees." % [label, degrees])
 		_check(previous_forward.dot(current_forward) >= 0.95, "%s turn sweep should not reverse the visible heading when flip_h changes at %d degrees." % [label, degrees])
-		_check(diver.scale.is_equal_approx(Vector2.ONE), "%s turn sweep must keep the physical root unscaled." % label)
+		_check(diver.scale.is_equal_approx(Vector2.ONE), "%s turn sweep must keep the physical root unscaled; actual=%s." % [label, diver.scale])
 		previous_forward = current_forward
 
 
