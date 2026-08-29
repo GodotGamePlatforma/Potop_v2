@@ -769,6 +769,19 @@ func _test_transition_runtime_contract(diver: DiverController, sprite: AnimatedS
 	_check(is_equal_approx(diver._transition_duration, 0.36), "Idle-to-swim reversal should adopt the swim-to-idle duration.")
 
 	diver.reset_at(Vector2.ZERO)
+	var reset_state: Dictionary = diver.presentation_state()
+	_check(
+		reset_state.get("locomotion_state") == &"idle"
+		and reset_state.get("locomotion_target") == &"idle"
+		and reset_state.get("transition_clip") == &""
+		and is_zero_approx(float(reset_state.get("transition_progress", -1.0)))
+		and is_zero_approx(float(reset_state.get("transition_duration", -1.0)))
+		and reset_state.get("transition_forward") == true
+		and reset_state.get("handoff_active") == false
+		and not (diver.handoff_sprite as AnimatedSprite2D).visible
+		and sprite.animation == &"idle",
+		"reset_at should clear an in-flight locomotion transition and its handoff."
+	)
 	diver._locomotion_state = &"idle"
 	sprite.play(&"idle")
 	diver._begin_locomotion_transition(&"idle", &"swim")
