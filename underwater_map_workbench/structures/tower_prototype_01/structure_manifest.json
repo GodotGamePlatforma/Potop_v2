@@ -1159,7 +1159,7 @@
       "group_id": "TowerArtwork",
       "kind": "structure_interior_texture",
       "path": "assets/visual/tower_interior.png",
-      "sha256": "1cf7718b0e10b4b93dd87bdfed633441b5cc04d5b4ad11ac0142145765789058",
+      "sha256": "e0dde25393294d945b9f98fcb765179bd8f16add3b9ac00861e8f4d778bcd612",
       "pixel_size": [
         2240,
         3680
@@ -1179,7 +1179,7 @@
       "group_id": "TowerArtwork",
       "kind": "structure_owner_masked_texture",
       "path": "assets/visual/tower_structure.png",
-      "sha256": "41877ce15594b997cb0919289955d9d6cda4a9784fdc3e49909c622c9447ea11",
+      "sha256": "e655631fac32045f4d9aa8bf33d74812f2216d9eaf413e71a77d0cbfa55b4bcc",
       "pixel_size": [
         2240,
         3680

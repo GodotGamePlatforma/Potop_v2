@@ -28,7 +28,7 @@
     "solid": 0
   },
   "generated": true,
-  "manifest_sha256": "cd4a8e6ffb02cc1acae17a1cae782ea710ade2b10e373be339e93e0af97341be",
+  "manifest_sha256": "667851ee2025b21280cd156be9eda189db272dfecec643aa14216c2e2be001ba",
   "mapping": {
     "pixel_reference": "pixel_edge",
     "rounding": "floor",
@@ -112,7 +112,7 @@
             3680
           ],
           "path": "structures/tower_prototype_01/generated/panels/panel_0_0_2240_3680.json",
-          "sha256": "2800cd3160d65d6776945b9061810ecf289a99dbe29496e460acf81ee95f8269"
+          "sha256": "7a249c00fdf7c01b7cfd1df6daa882c99a6ca14bc2a7a4abc0ea339ef4f257cb"
         }
       ],
       "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
@@ -489,133 +489,133 @@
           "id": "entry_floor_12_broken_window",
           "kind": "entry_opening",
           "path": "structures/tower_prototype_01/generated/socket_cards/entry_floor_12_broken_window.json",
-          "sha256": "e0c1b405f1cd33048c9931e13ae3829268b5ba80f1a421549543858aa31f1887"
+          "sha256": "3e0144a7eaa747e08e653e82772b6ee17d4c25ded8363c5c5fd3acbf746125af"
         },
         {
           "id": "elevator_upper_travel",
           "kind": "moving_elevator",
           "path": "structures/tower_prototype_01/generated/socket_cards/elevator_upper_travel.json",
-          "sha256": "1884877f6a4440121e56471dd025b0f7d921b02532a9d037dedfb1136036292b"
+          "sha256": "a4ed6e92485b72f49b297f10083ba02173fc44f4b1f30074116f36d7307aee5b"
         },
         {
           "id": "gate_red_west",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_west.json",
-          "sha256": "5bbe6a4e86161a4f5ac40998bed080c06c0793f168d6ecdd59b5b323897b6511"
+          "sha256": "4d2d650b7112cdad11f03a4fd5fcbce3a38cf10cc14701626ce430190fbfc71b"
         },
         {
           "id": "gate_red_east",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_red_east.json",
-          "sha256": "60f9b0f0f57e698bb460363be2449e66183e4bd7e74688bb23ad103cd68212f8"
+          "sha256": "5e0ee3b3a2c2d132063be0c69a0bdfd585aa1af68b96e23e33972cd5cf908110"
         },
         {
           "id": "gate_blue_upper",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_upper.json",
-          "sha256": "54b19111b8dcf8e0d343b6a0878d4c74b61821ab3d3208890eebcac0bd340139"
+          "sha256": "653b3a33f9ab80bad865c9ff49938c92612065ea8ba36a9d3b51558ca30aec7c"
         },
         {
           "id": "gate_blue_lower",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_blue_lower.json",
-          "sha256": "6472133402de04ce2cddb0d561701dad727cd93cc4306d629a5d9b32824e50cc"
+          "sha256": "41dfb88195c1bf07af0141d71cc2cf7ea554a60afad282270420a8d618f6d5cc"
         },
         {
           "id": "gate_yellow",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/gate_yellow.json",
-          "sha256": "a1244426d55b134d04ed8fe3c633508adb90766ec06198ff320e23a6973fde79"
+          "sha256": "010a8cafd5ebb2fff8b8ac0cfae1a51a25f8861b7b601f5cac8686911320803a"
         },
         {
           "id": "hatch_d",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/hatch_d.json",
-          "sha256": "faf897747084405760946e4a24a2d69fa3c56bd361e19534c6f9a9565df511ca"
+          "sha256": "c0297307d923b7929541f8b456dd5eab0b6c7caa012d3e7191e064269ba4af9b"
         },
         {
           "id": "shortcut_b_upper",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_upper.json",
-          "sha256": "aacaa23f7e73bd097c76d02ef091670cd70c32e6eb77f04b29419a05bf5a97e8"
+          "sha256": "6fbc0a159fa2f40db95c765fb2d0144d4cedd3bc861eda1641f3f8651c3481d3"
         },
         {
           "id": "shortcut_b_lower",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_b_lower.json",
-          "sha256": "7a6e8d93ab0b212562187cc7aa29139b03b6efeec92aec5ae819e280d376698e"
+          "sha256": "3ca920820d634e6a63dbd3d87fdbac5e3d157d74148abbf84a3f0d7dfe73117d"
         },
         {
           "id": "shortcut_c_upper",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_upper.json",
-          "sha256": "8e539b0059d99b4712231e8dc6f65da5eeadfea0b30d3e43e9130b78b13ea56c"
+          "sha256": "636677b238017e88a7936b35ce23bb6a6dbd01561c1fb5d3b2194da380ade642"
         },
         {
           "id": "shortcut_c_middle",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_middle.json",
-          "sha256": "52307e597661df110feb618e634a2a1e8e3ce72f8485eab68a4b4487d084b139"
+          "sha256": "510b53004926d4fb192b4364ae5ba433a5b836c6ef63d4475cd6555f7865de19"
         },
         {
           "id": "shortcut_c_lower",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/shortcut_c_lower.json",
-          "sha256": "5bb12b8ad22b4772a4d1e24a63f715bb52873c0c5c915bf794e356c3da8880dd"
+          "sha256": "57441714dd6366b7b6b10d3b115a10802eb9c8e82185c499ddc73252ebb58dfb"
         },
         {
           "id": "hatch_basement",
           "kind": "dynamic_door",
           "path": "structures/tower_prototype_01/generated/socket_cards/hatch_basement.json",
-          "sha256": "5a47cfa0eeafef80ecda10f2594beedf95acce8b67a4dc8d90ddb50071fa72f8"
+          "sha256": "ca4fb1c2b1368731147635c71cf3e0e602a0a2d435f4060df739217e22d6ebec"
         },
         {
           "id": "control_a_distributor",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_a_distributor.json",
-          "sha256": "7c505bfaecea814a9f21b67736378b7a2db973798f09a9a677a89da5e712863e"
+          "sha256": "6a07d9c328a1318fbb68a6b34e0488b5d03eb1f68edded0f2704b723a7cc0c74"
         },
         {
           "id": "control_b_red_relay",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_b_red_relay.json",
-          "sha256": "f58c93c2f996536a813920e6344e9a7a85c94e269eb55117b21c23c1cbd7f8ca"
+          "sha256": "d6dd1beef47b85746aeec4b12d9da5853c103eed5b1ccbeba409dd1caf37f2ab"
         },
         {
           "id": "control_c_blue_lock",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_c_blue_lock.json",
-          "sha256": "3709caefdef4867c4c921170780bf58f91ff9806c824735bbb4289505a2900e0"
+          "sha256": "9c522df55682ae47530139c4e8692d339299c9e9f5ddfc27f5548e0d27eac544"
         },
         {
           "id": "control_d_valve_v1",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v1.json",
-          "sha256": "c7338fcf39e9b9aef91ba0e11e446162ce16782b18edc4ae4493dc062fae7bf8"
+          "sha256": "d4f60b7973fd144adfd4191fe93020cf1e5e7bdf9f724e8daf44355a04b49f77"
         },
         {
           "id": "control_d_valve_v2",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v2.json",
-          "sha256": "e90f808ad9d31dbbf4e1e1674a9560636abb857d5c80af47bb6c6acf4c59b423"
+          "sha256": "17fcda0f6057bfdaf1609053539d79daa2cfe358bb503d42fe715cd64a6651e6"
         },
         {
           "id": "control_d_valve_v3",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_valve_v3.json",
-          "sha256": "485545aad4f3371d054d395b8d8cdff136b5c63c66a85bf202333ef93bed3b4f"
+          "sha256": "14c7f1420c975d3fe7881f3c0e32ea0a77caaedba83cb7c8dd601d4ad1c98f60"
         },
         {
           "id": "control_d_reset",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_d_reset.json",
-          "sha256": "873a9e5fdf2af12b550980a980ca453b693ae1a9b45da2f4ade3caea53c1d5cd"
+          "sha256": "3d9396c423811c5c40586b0fb93071915e22f3d0390e3e664ae0fb154e1956ea"
         },
         {
           "id": "control_basement_hatch",
           "kind": "fixed_interactable",
           "path": "structures/tower_prototype_01/generated/socket_cards/control_basement_hatch.json",
-          "sha256": "157ecd4702944b56dfc242b2e42893f2020126098af7a409ea4eb67739a5391a"
+          "sha256": "8c4028f7a686c6bae492814d98ba6b7c64e014b13601305ba53c721b614a247c"
         }
       ],
       "sockets": [
@@ -842,7 +842,7 @@
       ],
       "structure_truth": {
         "path": "structures/tower_prototype_01/generated/structure_truth.json",
-        "sha256": "63ec8464f77c6c1fcd24bad1c83dba4f5cc9c2b3d4c82127a47de85fd0a8f853"
+        "sha256": "e4d9504c380a2aee0a1aedbda788d393ce228cc1be07236abb4421f2e7e77d62"
       },
       "template_id": "enterable_tower_v1",
       "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
