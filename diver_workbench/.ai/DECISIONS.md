@@ -11,6 +11,7 @@ Ten plik przechowuje wyłącznie trwałe decyzje authoringu i integracji avatara
 | DIVER-ARD-0005 | źródło aktywnej grafiki | Aktywne arkusze 2D i profile są jedynym authority; warsztat nie utrzymuje zatwierdzonego pipeline'u 3D/AI. |
 | DIVER-ARD-0006 | fizyczna koperta 105 × 60 | Stabilna kapsuła oraz mierzalna kalibracja aktywnej grafiki do większej, czytelnej koperty. |
 | DIVER-ARD-0007 | język ruchu i jakość rastra | Stabilny korpus oraz dwie anatomicznie połączone nogi pracują w mierzalnej antyfazie o amplitudzie właściwej dla stanu. |
+| DIVER-ARD-0008 | przejścia, kombinezony i akcja noża | Authored przejścia nie zmieniają fizyki; jakość kombinezonu jest wyłącznie prezentacją, a nożem i skutkiem trafienia zarządza Root. |
 
 Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga symetrycznej relacji w starym i nowym wpisie.
 
@@ -54,7 +55,7 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 - D1. `runtime/Diver.tscn` posiada dokładnie jeden gameplayowy `PointLight2D`, którego lokalna pozycja pozostaje `Vector2.ZERO` względem korzenia `CharacterBody2D`. Animacja, sockety, obrót, `flip_h`, profil jakości i `reduced_motion` nie mogą go przesuwać.
 - D2. Światło jest radialne i oświetla otoczenie dookoła nurka. Scena avatara nie rysuje kierunkowego stożka ani drugiego substytutu światła.
 - D3. Ogólny `LightSystem`, wyposażona definicja sprzętu i `DiveSessionState` pozostają jedynymi właścicielami tekstury radialnej, promienia, energii, koloru, jakości cieni i stanu włączenia. Latarnia I pozostaje słabszym wariantem startowym, a Latarnia II mocniejszym ulepszeniem z Warsztatu I; dokładne wartości należą do walidowanych zasobów root.
-- D4. Próbki `lamp` i `LampSocket` pozostają wizualnym punktem profilu oraz elementem zgodności jego bieżącego formatu 288 próbek. Nie sterują `DiveLight`, promieniem, ryzykiem ani inną mechaniką.
+- D4. Próbki `lamp` i `LampSocket` pozostają wizualnym punktem profilu oraz elementem zgodności jego bieżącego formatu 576 próbek. Nie sterują `DiveLight`, promieniem, ryzykiem ani inną mechaniką.
 - D5. Okluzja pozostaje odpowiedzialnością mapy, a wpływ włączonego światła na zagrożenia odpowiedzialnością systemów root. Zmiana prezentacji nie dodaje pola zapisu, migracji kampanii ani nowego stanu sesji.
 - D6. Lokalny test chroni pojedyncze centralne źródło i jego niezmienność przy zmianach prezentacji, natywny capture porównuje stan wyłączony oraz oba poziomy sprzętu, a test sprzętu root potwierdza monotoniczne zwiększenie zasięgu i energii ulepszenia.
 - Powód i skutek: centralne światło odpowiada graczowemu znaczeniu latarni jako kręgu widzenia, usuwa rozjazd 19-28 jednostek przed colliderem i zachowuje jednego właściciela parametrów sprzętu bez wpływu na fizykę avatara.
@@ -93,7 +94,7 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 - D3. Wszystkie 48 granic źródłowej alfy pozostaje wspólnym pomiarem runtime i testu. Unia `428 × 204 px` daje po kalibracji około `102.29 × 48.76` jednostki świata, pozostawiając kontrolowany margines na shader czytelności i zmiany pozy.
 - D4. Kontroler ogranicza wynikowy transform prezentacyjny wraz z `flip_h`, obrotem, stretch, cue, holowaniem i interakcją do aktywnej koperty bez animowania bryły fizycznej.
 - D5. `InteractionRange=112`, kamera `zoom=1.2`, parametry ruchu i publiczne API nie zmieniają się razem z kopertą. Ich znaczenie pozostaje globalnym kontraktem root.
-- D6. Profil 288 socketów dziedziczy dokładnie jeden transform grafiki. `LampSocket` pozostaje wyłącznie wizualny, a jedyny gameplayowy `DiveLight` pozostaje centralnie na originie zgodnie z DIVER-ARD-0003.
+- D6. Profil 576 socketów dziedziczy dokładnie jeden transform grafiki. `LampSocket` pozostaje wyłącznie wizualny, a jedyny gameplayowy `DiveLight` pozostaje centralnie na originie zgodnie z DIVER-ARD-0003.
 - D7. Aktywne arkusze 2D i czasy klipów pozostają authority. Retarget koperty zachowuje PNG, `SpriteFrames`, mipmapy i filtrowanie; krok rimu jest dostrojony do około jednego piksela ekranowego, a raster płetw realizuje naprzemienny rytm bez wpływu na gameplay.
 - D8. Odbiór lokalny wymaga pomiaru wszystkich klatek, obu kierunków, ośmiu kierunków ruchu, przejść `idle/swim/sprint`, rzeczywistego kontaktu z dwiema osiami przeszkód i obejrzanego capture'u latarni off/I/II. Lokalny PASS nie certyfikuje prześwitów ani pełnego przepłynięcia produkcyjnej mapy; sprawdzają je test integracyjny root i mapowy playtest.
 - Powód i skutek: poprzednia prezentacja miała zaledwie około `82.6 × 37.4 px` na ekranie 1280×720 i traciła czytelność detali. Wariant `105 × 60` przywraca ciężar i rozpoznawalność istniejącej, preferowanej grafiki 2D bez powrotu do dawnego rozjazdu sylwetki `146 × 65` z colliderem.
@@ -113,3 +114,19 @@ Obowiązują wyłącznie wpisy wymienione w tym indeksie. Zastąpienie wymaga sy
 - D7. Odbiór wymaga automatycznego pomiaru alfy, spójności klatka-klatka i szwu pętli, obecności socketów na rastrze, antyfazy kończyn oraz obejrzanego capture'u wszystkich stanów i obu kierunków. Lokalny odbiór nie zastępuje integracyjnego przepłynięcia mapy.
 - Powód i skutek: profesjonalna jakość ruchu wymaga spójnej tożsamości ciężkiego nurka i rzeczywistej pracy dwóch nóg w rastrze, a nie dekoracyjnego śladu VFX udającego brakującą fazę animacji.
 - Odwołania: DIVER-ARD-0005 i DIVER-ARD-0006; `assets/animation/diver_sprite_frames.tres`; `assets/profiles/diver_socket_profile.tres`; `tests/diver_presentation_test.gd`.
+
+## DIVER-ARD-0008 - Przejścia, wariant kombinezonu i akcja noża są warstwami prezentacji
+
+- Status / aktywny zakres: Obowiązuje; D1-D8
+- Zatwierdzenie: 2026-08-29
+- Relacje: Uszczegóławia DIVER-ARD-0001/D3-D8, DIVER-ARD-0005/D1-D4, DIVER-ARD-0006/D2-D8 i DIVER-ARD-0007/D1-D7 | Zastąpiona przez: brak
+- D1. Każda para stanów `idle`, `swim` i `sprint` posiada jeden niepętlony, 16-klatkowy klip przejściowy. Runtime odtwarza go do przodu albo wstecz, dzięki czemu sześć kierunków przejścia zachowuje wspólny raster, ciągłość pozy i właściwą kotwicę fazy klipu docelowego.
+- D2. Odwrócenie w trakcie przejścia zachowuje widoczną próbkę, a żądanie trzeciego stanu wybiera bezpośrednią krawędź grafu. Krótki, deterministyczny handoff dwóch warstw nie może powodować skoku skali, wyjścia korpusu poza kopertę `105 × 60`, zmiany collidera, parametrów ruchu, kamery, latarni ani `InteractionRange`.
+- D3. Profil kombinezonu mapuje kanoniczną jakość `1..4` na cztery lokalne warianty prezentacji: `Expedition`, `Sealed`, `Pressure` i `Abyss`. Poziom 1 zachowuje zatwierdzony raster v4, a kolejne poziomy różnią się czytelną masą koloru, materiałem, wzmocnieniami i prowadzeniem emisyjnym bez wymiany collidera lub animacji.
+- D4. Warsztat nie staje się właścicielem wyposażenia, balansu, odblokowania, zakupu ani zapisu jakości kombinezonu. Root przekazuje kanoniczną wartość przez publiczną metodę prezentacyjną; materiały głównej sylwetki, handoffu i akcji pozostają niezależne i lokalne dla instancji sceny.
+- D5. Wymach nożem jest osobną animowaną warstwą ręki i narzędzia przy `ToolHandSocket`. Może obracać się do celu w pełnym zakresie `360°` i ma własną mierzoną kopertę akcji, która nie jest dodawana do koperty ciała ani interpretowana jako hitbox.
+- D6. Publiczny lifecycle prezentacji ataku przyjmuje stabilny identyfikator ataku, typ broni, kierunek celu i moment kontaktu. Postęp jest monotoniczny, identyczne powtórzenie jest idempotentne, zmieniony duplikat odrzucany, a potwierdzenie oraz zakończenie występują najwyżej raz; reset sesji czyści lokalny serial prezentacji.
+- D7. Trafienie, pudło, zasięg, collider ataku, obrażenia, cooldown i zapis pozostają wyłącznie w systemach walki Root. Scena Nurka nie tworzy `CollisionObject2D` dla noża i nie rozstrzyga kontaktu; zgodnościowy cue `knife_attack` może pokazać ruch, lecz formalne zdarzenia Root są docelowym źródłem fazy oraz wyniku.
+- D8. Odbiór lokalny obejmuje endpointy i oba kierunki sześciu przejść, odwrócenie i przekierowanie, 576 próbek socketów, cztery materiały kombinezonu, pełny lifecycle noża, osiem kierunków celu oraz osobny capture koperty ciała i akcji. Integracyjne podłączenie kanonicznej jakości kombinezonu i zdarzeń walki pozostaje testem Root.
+- Powód i skutek: jawny graf przejść usuwa mechaniczne skoki między pętlami, warianty kombinezonu skalują czytelność bez duplikowania atlasów, a oddzielenie grafiki noża od reguł walki zapobiega drugiemu systemowi kolizji i obrażeń w scenie avatara.
+- Odwołania: DIVER-ARD-0001, DIVER-ARD-0005, DIVER-ARD-0006 i DIVER-ARD-0007; `runtime/DiverController.gd`; `assets/animation/diver_sprite_frames.tres`; `assets/animation/diver_action_sprite_frames.tres`; `assets/profiles/diver_suit_presentation_profile.tres`; `tests/diver_presentation_test.gd`.

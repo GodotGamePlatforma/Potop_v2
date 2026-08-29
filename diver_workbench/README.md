@@ -19,14 +19,15 @@ Rutynowy agent korzysta z krótkiego routingu w lokalnym `AGENTS.md`: czyta wła
 | Ścieżka | Odpowiedzialność |
 |---|---|
 | `runtime/Diver.tscn` | Jedyna scena gracza wraz z fizyczną bryłą, `InteractionRange`, kamerą, socketami i jednym centralnym `PointLight2D`. |
-| `runtime/DiverController.gd` | Adapter wejścia i ogólnego kroku ruchu oraz właściciel orientacji, animacji, socketów, prezentacyjnego look-ahead kamery i stałego wycentrowania źródła światła. |
+| `runtime/DiverController.gd` | Adapter wejścia i ogólnego kroku ruchu oraz właściciel orientacji, grafu przejść, socketów, wariantu kombinezonu, prezentacji akcji, look-ahead kamery i stałego wycentrowania źródła światła. |
 | `runtime/DiverVisualEffects.gd` | Prezentacyjne pęcherzyki, ślady płetw, przeciek, działanie i krótkie cue. |
 | `definitions/DiverSocketProfile.gd` | Walidowany typ dyskretnych socketów klatek. |
-| `definitions/DiverFrameEnvelope.gd` | Zmierzone granice alfy 48 klatek konsumowane przez runtime i test. |
+| `definitions/DiverFrameEnvelope.gd` | Zmierzone granice alfy 96 klatek ciała oraz osobna koperta 16 klatek noża, konsumowane przez runtime i test. |
+| `definitions/DiverSuitPresentationProfile.gd` | Walidowany typ mapowania kanonicznej jakości `1..4` na lokalne style wizualne kombinezonu. |
 | `definitions/DiverFrameEnvelopeProfile.gd` | Walidowany typ docelowej koperty, skali i wycentrowania grafiki. |
 | `definitions/DiverCameraProfile.gd` | Walidowany typ stożka zgodności, odległości i odpowiedzi prezentacyjnego look-ahead kamery. |
-| `assets/animation/` | Trzy aktywne arkusze 16-klatkowe i jeden zasób `SpriteFrames`. |
-| `assets/profiles/` | Aktywny profil 288 socketów, profil koperty `105 × 60` oraz profil kamery. |
+| `assets/animation/` | Sześć 16-klatkowych arkuszy ciała, osobny atlas noża oraz zasoby `SpriteFrames` ciała i akcji. |
+| `assets/profiles/` | Aktywny profil 576 socketów, profil koperty `105 × 60`, profil kamery i cztery style kombinezonu. |
 | `assets/shaders/` | Shader czytelności sylwetki; radialną teksturę latarni tworzy rootowy `LightSystem`. |
 | `tests/` | Lokalny test Godot oraz natywny capture prezentacji. |
 
@@ -35,6 +36,8 @@ W root pozostają między innymi `scenes/diving/DiveScene.tscn`, `scripts/diving
 Lokalne zadanie zapisuje tylko pliki pod bieżącym katalogiem. `../` i `../underwater_map_workbench/` są dla niego tylko do odczytu; zmiana wymagająca zapisu w root albo mapie jest zadaniem integracyjnym i przechodzi routing z `../AGENTS.md`.
 
 Root steruje ruchem avatara przez publiczne metody `DiverController`, a ruchome bariery rozpoznają go przez jeden token `DiverController.DIVE_PLAYER_GROUP`. Pola bieżącego wejścia, prądu i sprintu oraz nazwy dzieci sceny są prywatne dla pakietu.
+
+Root może przekazać jakość kombinezonu przez `set_suit_quality_presentation(quality_1_to_4)`. Formalna prezentacja ataku używa kolejno `begin_attack_presentation(...)`, `set_attack_presentation_progress(...)`, opcjonalnego `confirm_attack_presentation(...)` i `end_attack_presentation(...)`. Te metody animują wyłącznie avatara: collider, zasięg, trafienie, obrażenia i cooldown noża pozostają w rootowym systemie walki. Zgodnościowy `play_visual_cue("knife_attack", ...)` nadal pokazuje wymach dla obecnego konsumenta.
 
 ## Uruchamianie i testy
 
@@ -73,7 +76,7 @@ Natywny capture prezentacji:
 ..\tests\run_all_tests.ps1 -NativeTarget diver_workbench/tests/DiverPresentationCapture.tscn -KeepWorkspace
 ```
 
-Capture zapisuje artefakty pod `diver_presentation_qa/capture` w izolowanym `user://`. Flaga `-KeepWorkspace` zachowuje wynik, a runner wypisuje jego katalog po etykiecie `Test user:// preserved:`. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `105 × 60`, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*` z centralnym radialnym światłem, markerami kierunków oraz okluderami. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera, prześwitów produkcyjnej mapy ani odczucia sterowania.
+Capture zapisuje artefakty pod `diver_presentation_qa/capture` w izolowanym `user://`. Flaga `-KeepWorkspace` zachowuje wynik, a runner wypisuje jego katalog po etykiecie `Test user:// preserved:`. Oprócz ruchu, profili jakości i socketów tworzy macierz alfy na tle collidera `105 × 60`, niezależny kadr połowy opacity handoffu i fazy wszystkich przejść, Q1-Q4 w pozie neutralnej i z nożem, pięć faz wymachu, osiem kierunków celu, kadry po rzeczywistym kontakcie z pionową i poziomą ścianą oraz identyczne kadry `lantern_off`, `lantern_mk1_*` i `lantern_mk2_*`. Koperta akcji noża jest oznaczona osobno i nie jest hitboxem. Wynik trzeba obejrzeć; sam brak błędu nie potwierdza dopasowania grafiki do collidera, prześwitów produkcyjnej mapy ani odczucia sterowania.
 
 Po PR osobny wymagany GitHub `fast-check` sprawdza dokładny head. `FAIL` pozostawia PR otwarty. Dopiero `PASS` pozwala merge queue utworzyć kandydat `aktualny main + PR`; pełny `integration-green` uruchamia się wyłącznie na tym kandydacie. Agent nie czeka na kolejkę ani nie aktualizuje starego PR po każdym cudzym merge. Konflikt wraca do root jako nowe zadanie dla nowego agenta startującego z aktualnego `main`.
 
@@ -81,12 +84,12 @@ Runner odrzuca `-InPlace`; test Nurka zawsze działa w izolowanej kopii. `ERROR`
 
 ## Źródło grafiki
 
-Jedynym aktywnym authority wyglądu są trzy arkusze PNG, `assets/animation/diver_sprite_frames.tres` oraz profile pod `assets/profiles/`. Warsztat nie przechowuje roboczego modelu 3D, generatora AI ani odrzuconych renderów. Przyszła wymiana grafiki wymaga osobnego, kompletnego kandydata i jawnego odbioru przed atomową promocją do tych aktywnych ścieżek.
+Jedynym aktywnym authority wyglądu są sześć arkuszy ciała, atlas akcji noża, oba zasoby `SpriteFrames` oraz profile pod `assets/profiles/`. Warsztat nie przechowuje roboczego modelu 3D, generatora AI ani odrzuconych renderów. Przyszła wymiana grafiki wymaga osobnego, kompletnego kandydata i jawnego odbioru przed atomową promocją do tych aktywnych ścieżek.
 
 ## Aktualny przepływ kompozycji
 
 Aktywny runtime nadal składa się tak:
 
-`arkusze PNG + SpriteFrames + profile socketów/koperty -> runtime/Diver.tscn -> DiveScene -> mapa runtime`
+`arkusze ciała/akcji + SpriteFrames + profile socketów/koperty/kombinezonu -> runtime/Diver.tscn -> DiveScene -> mapa runtime`
 
 To jest kierunek własności i składania scen, nie pełny graf zależności runtime: lokalny adapter konsumuje rootowy system ruchu, a root instancjonuje i steruje publiczną sceną avatara. Zmiana organizacyjna powinna pozostawić obraz i fizykę identyczne. Zmiana grafiki lub animacji wymaga aktualizacji odpowiedniego źródła, zasobu klatek i socketów, a następnie testu i capture'u. `LampSocket` jest wizualnym punktem zgodności profilu, natomiast jedyny `DiveLight` pozostaje na originie nurka; promień, energia, kolor, cienie i stan radialnej latarni pochodzą z wyposażenia oraz systemów root. Zmiana skali, collidera, punktu emisji światła, parametrów ruchu albo `InteractionRange` jest zmianą produktu lub integracji i przechodzi globalną bramkę z `../AGENTS.md`.
