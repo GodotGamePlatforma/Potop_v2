@@ -14,6 +14,8 @@ const SettlementEventOfferSnapshotScript := preload("res://scripts/data/Settleme
 const SettlementEventStateScript := preload("res://scripts/data/SettlementEventState.gd")
 
 var _balance_validation_cache: Dictionary = {}
+var _survivor_definitions_cache: Dictionary = {}
+var _survivor_definitions_loaded := false
 
 func prepare_event_for_day(
 	state,
@@ -1078,6 +1080,8 @@ func _load_event_definitions() -> Dictionary:
 
 
 func _load_survivor_definitions() -> Dictionary:
+	if _survivor_definitions_loaded:
+		return _survivor_definitions_cache
 	var result: Dictionary = {}
 	var path := "res://data/survivor_templates"
 	for file_name in DirAccess.get_files_at(path):
@@ -1086,4 +1090,6 @@ func _load_survivor_definitions() -> Dictionary:
 		var definition = ResourceLoader.load(path.path_join(file_name))
 		if definition != null and "id" in definition:
 			result[str(definition.id)] = definition
-	return result
+	_survivor_definitions_cache = result
+	_survivor_definitions_loaded = true
+	return _survivor_definitions_cache
