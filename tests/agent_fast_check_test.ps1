@@ -91,11 +91,12 @@ raise SystemExit(0)
     Set-Content -LiteralPath (Join-Path $repo 'tests/run_all_tests.ps1') -Encoding UTF8 -Value @'
 param([string]$GodotConsolePath,[string]$SourceRepositoryPath,[string]$Target)
 if ($GodotConsolePath -like '*error*') { throw 'SCRIPT ERROR: parser failure' }
-Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value "GODOT=$GodotConsolePath TARGET=$Target"
+Add-Content -LiteralPath $env:FAST_TARGET_LOG -Value "PID=$PID GODOT=$GodotConsolePath TARGET=$Target"
 Write-Host "TARGET PASS $Target"
 '@
     Set-Content -LiteralPath (Join-Path $repo 'tests/game_test.gd') -Encoding UTF8 -Value 'extends Node'
     Set-Content -LiteralPath (Join-Path $repo 'tests/direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
+    Set-Content -LiteralPath (Join-Path $repo 'tests/second_direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
     Set-Content -LiteralPath (Join-Path $repo 'tests/explicit_scene_test.gd') -Encoding UTF8 -Value 'extends Node'
     Set-Content -LiteralPath (Join-Path $repo 'tests/ExplicitSceneTest.tscn') -Encoding UTF8 -Value @'
 [gd_scene load_steps=2 format=3]
@@ -158,6 +159,26 @@ script = ExtResource("1")
         throw "Changed SceneTree test did not run its .gd target exactly once: $($directSceneTree.Output) log=$($directSceneTreeLog -join '; ')"
     }
     Set-Content -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
+
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Add-Content -LiteralPath (Join-Path $worktree 'tests/second_direct_scene_tree_test.gd') -Value 'var changed := true' -Encoding UTF8
+    Clear-Content -LiteralPath $targetLog
+    $twoTargets = Run-FastCheck $worktree $successGodot
+    $twoTargetLog = @(Get-Content -LiteralPath $targetLog | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $twoTargetPids = @($twoTargetLog | ForEach-Object {
+        if ($_ -notmatch '^PID=(?<pid>[0-9]+) ') {
+            throw "Target runner log omitted its process id: $_"
+        }
+        $Matches['pid']
+    } | Sort-Object -Unique)
+    if ($twoTargets.ExitCode -ne 0 -or $twoTargets.Output -notmatch 'FAST-CHECK PASS' -or
+        $twoTargetLog.Count -ne 2 -or $twoTargetPids.Count -ne 2 -or
+        @($twoTargetLog | Where-Object { $_ -match 'TARGET=tests/direct_scene_tree_test\.gd$' }).Count -ne 1 -or
+        @($twoTargetLog | Where-Object { $_ -match 'TARGET=tests/second_direct_scene_tree_test\.gd$' }).Count -ne 1) {
+        throw "Fast-check targets did not use distinct child PowerShell processes: $($twoTargets.Output) log=$($twoTargetLog -join '; ')"
+    }
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
+    Set-Content -LiteralPath (Join-Path $worktree 'tests/second_direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
 
     Add-Content -LiteralPath (Join-Path $worktree 'tests/explicit_scene_test.gd') -Value 'var changed := true' -Encoding UTF8
     Clear-Content -LiteralPath $targetLog
@@ -336,7 +357,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check linked-worktree-only/scene-target-routing/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check linked-worktree-only/scene-target-routing/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
