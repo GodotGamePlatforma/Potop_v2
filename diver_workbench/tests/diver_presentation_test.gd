@@ -3,9 +3,12 @@ extends Node
 const DiverScene := preload("res://diver_workbench/runtime/Diver.tscn")
 const DiverSocketProfileScript := preload("res://diver_workbench/definitions/DiverSocketProfile.gd")
 const DiverFrameEnvelopeScript := preload("res://diver_workbench/definitions/DiverFrameEnvelope.gd")
+const DiverSuitPresentationProfileScript := preload("res://diver_workbench/definitions/DiverSuitPresentationProfile.gd")
 const SocketProfile := preload("res://diver_workbench/assets/profiles/diver_socket_profile.tres")
 const EnvelopeProfile := preload("res://diver_workbench/assets/profiles/diver_frame_envelope_profile.tres")
+const SuitProfile := preload("res://diver_workbench/assets/profiles/diver_suit_presentation_profile.tres")
 const ActiveSpriteFrames := preload("res://diver_workbench/assets/animation/diver_sprite_frames.tres")
+const ActionSpriteFrames := preload("res://diver_workbench/assets/animation/diver_action_sprite_frames.tres")
 const APPROVED_ENVELOPE := Vector2(105.0, 60.0)
 const APPROVED_SOURCE_UNION := Rect2(-188, -99, 428, 204)
 const APPROVED_WORLD_ALPHA_SIZE := Vector2(102.292, 48.756)
@@ -25,6 +28,26 @@ const ANIMATION_SOURCES := {
 	&"swim": "res://diver_workbench/assets/animation/diver_swim_16f.png",
 	&"sprint": "res://diver_workbench/assets/animation/diver_sprint_16f.png",
 }
+const TRANSITION_SOURCES := {
+	&"transition_idle_swim": "res://diver_workbench/assets/animation/diver_transition_idle_swim_16f.png",
+	&"transition_idle_sprint": "res://diver_workbench/assets/animation/diver_transition_idle_sprint_16f.png",
+	&"transition_swim_sprint": "res://diver_workbench/assets/animation/diver_transition_swim_sprint_16f.png",
+}
+const TRANSITION_ENDPOINTS := {
+	&"transition_idle_swim": [&"idle", 13, &"swim", 9],
+	&"transition_idle_sprint": [&"idle", 7, &"sprint", 0],
+	&"transition_swim_sprint": [&"swim", 11, &"sprint", 9],
+}
+const TRANSITION_ROUTES := [
+	[&"idle", &"swim", &"transition_idle_swim", 0.30, 9],
+	[&"swim", &"idle", &"transition_idle_swim", 0.36, 13],
+	[&"idle", &"sprint", &"transition_idle_sprint", 0.28, 0],
+	[&"sprint", &"idle", &"transition_idle_sprint", 0.40, 7],
+	[&"swim", &"sprint", &"transition_swim_sprint", 0.28, 9],
+	[&"sprint", &"swim", &"transition_swim_sprint", 0.32, 11],
+]
+const KNIFE_SOURCE := "res://diver_workbench/assets/animation/diver_knife_swing_16f.png"
+const KNIFE_CONTACT_PROGRESS := 0.40
 
 var _failures: Array[String] = []
 
@@ -32,6 +55,9 @@ var _failures: Array[String] = []
 func _ready() -> void:
 	_test_socket_resource_contract()
 	_test_sprite_frame_atlas_contract()
+	_test_transition_asset_contract()
+	_test_suit_profile_contract()
+	_test_knife_asset_contract()
 	_test_frame_envelope_contract()
 	_test_animation_timing_contract()
 	_test_pre_ready_quality_bridge()
@@ -59,7 +85,12 @@ func _test_socket_resource_contract() -> void:
 				var left: Vector2 = SocketProfile.position_for(animation_name, socket_id, frame, true)
 				_check(left.is_equal_approx(Vector2(-right.x, right.y)), "Socket %s/%s/%d should mirror only X." % [animation_name, socket_id, frame])
 				sample_count += 1
-	_check(sample_count == 288, "Diver socket profile should expose exactly 288 authored samples.")
+	var expected_samples := (
+		DiverSocketProfileScript.REQUIRED_ANIMATIONS.size()
+		* DiverSocketProfileScript.REQUIRED_SOCKETS.size()
+		* SocketProfile.frame_count
+	)
+	_check(sample_count == expected_samples, "Diver socket profile should expose exactly %d authored samples." % expected_samples)
 
 
 func _test_sprite_frame_atlas_contract() -> void:
@@ -76,6 +107,152 @@ func _test_sprite_frame_atlas_contract() -> void:
 			)
 			_check(texture.region == expected_region, "%s frame %d should map to its exact 4 x 4 atlas cell." % [animation_name, frame])
 			_check(texture.atlas != null and texture.atlas.resource_path == ANIMATION_SOURCES[animation_name], "%s frame %d should use the approved source sheet." % [animation_name, frame])
+
+
+func _test_transition_asset_contract() -> void:
+	for transition_name: StringName in TRANSITION_SOURCES:
+		_check(ActiveSpriteFrames.get_frame_count(transition_name) == 16, "%s should expose 16 authored transition frames." % transition_name)
+		_check(not ActiveSpriteFrames.get_animation_loop(transition_name), "%s must remain a one-shot transition clip." % transition_name)
+		var source_path: String = TRANSITION_SOURCES[transition_name]
+		var sheet := Image.new()
+		var load_error := sheet.load(ProjectSettings.globalize_path(source_path))
+		_check(load_error == OK, "%s source sheet should load." % transition_name)
+		if load_error != OK:
+			continue
+		if sheet.get_format() != Image.FORMAT_RGBA8:
+			sheet.convert(Image.FORMAT_RGBA8)
+		_check(sheet.get_size() == Vector2i(2048, 1024), "%s should retain the 4 x 4 atlas dimensions." % transition_name)
+		var previous_bounds := Rect2()
+		for frame in range(16):
+			var texture := ActiveSpriteFrames.get_frame_texture(transition_name, frame) as AtlasTexture
+			_check(texture != null, "%s frame %d should be an AtlasTexture." % [transition_name, frame])
+			if texture != null:
+				var expected_region := Rect2(
+					Vector2((frame % 4) * 512, (frame / 4) * 256),
+					Vector2(DiverFrameEnvelopeScript.FRAME_SIZE)
+				)
+				_check(texture.region == expected_region, "%s frame %d should map to its exact atlas cell." % [transition_name, frame])
+				_check(texture.atlas != null and texture.atlas.resource_path == source_path, "%s frame %d should use its reviewed transition sheet." % [transition_name, frame])
+			var frame_image := _atlas_frame_image(sheet, frame)
+			var used_rect := frame_image.get_used_rect()
+			var measured := Rect2(
+				Vector2(used_rect.position - DiverFrameEnvelopeScript.FRAME_SIZE / 2),
+				Vector2(used_rect.size)
+			)
+			_check(measured == DiverFrameEnvelopeScript.bounds_for(transition_name, frame), "%s frame %d should match its measured alpha bounds." % [transition_name, frame])
+			_check(_cell_has_padding(used_rect), "%s frame %d should keep transparent atlas padding." % [transition_name, frame])
+			for alpha_threshold: int in [1, 8]:
+				var components := _alpha_component_areas(frame_image, alpha_threshold)
+				_check(components.size() == 1, "%s frame %d should contain one connected silhouette at alpha %d." % [transition_name, frame, alpha_threshold])
+			for fin_socket: StringName in [&"fin_upper", &"fin_lower"]:
+				var authored_fin: Vector2 = SocketProfile.position_for(transition_name, fin_socket, frame, false)
+				_check(_has_alpha_near(frame_image, authored_fin, 14, 16), "%s/%s frame %d should stay attached to visible fin geometry." % [transition_name, fin_socket, frame])
+			if frame > 0:
+				var width_change := absf(measured.size.x - previous_bounds.size.x) / maxf(previous_bounds.size.x, 1.0)
+				var height_change := absf(measured.size.y - previous_bounds.size.y) / maxf(previous_bounds.size.y, 1.0)
+				_check(maxf(width_change, height_change) <= 0.18, "%s frame %d should not introduce a silhouette scale pop." % [transition_name, frame])
+			previous_bounds = measured
+		_test_transition_endpoints(transition_name, sheet)
+		_check(_import_mipmaps_enabled(source_path), "%s must generate mipmaps for runtime minification." % transition_name)
+
+
+func _test_transition_endpoints(transition_name: StringName, transition_sheet: Image) -> void:
+	var endpoints: Array = TRANSITION_ENDPOINTS[transition_name]
+	var source_animation: StringName = endpoints[0]
+	var source_frame: int = endpoints[1]
+	var target_animation: StringName = endpoints[2]
+	var target_frame: int = endpoints[3]
+	var source_sheet := Image.new()
+	var target_sheet := Image.new()
+	_check(source_sheet.load(ProjectSettings.globalize_path(ANIMATION_SOURCES[source_animation])) == OK, "%s source endpoint sheet should load." % transition_name)
+	_check(target_sheet.load(ProjectSettings.globalize_path(ANIMATION_SOURCES[target_animation])) == OK, "%s target endpoint sheet should load." % transition_name)
+	_check(_atlas_frame_image(transition_sheet, 0).get_data() == _atlas_frame_image(source_sheet, source_frame).get_data(), "%s frame 0 must exactly equal %s frame %d." % [transition_name, source_animation, source_frame])
+	_check(_atlas_frame_image(transition_sheet, 15).get_data() == _atlas_frame_image(target_sheet, target_frame).get_data(), "%s frame 15 must exactly equal %s frame %d." % [transition_name, target_animation, target_frame])
+	for socket_id: StringName in DiverSocketProfileScript.REQUIRED_SOCKETS:
+		_check(SocketProfile.position_for(transition_name, socket_id, 0, false).is_equal_approx(SocketProfile.position_for(source_animation, socket_id, source_frame, false)), "%s/%s frame 0 socket must equal its source-loop anchor." % [transition_name, socket_id])
+		_check(SocketProfile.position_for(transition_name, socket_id, 15, false).is_equal_approx(SocketProfile.position_for(target_animation, socket_id, target_frame, false)), "%s/%s frame 15 socket must equal its target-loop anchor." % [transition_name, socket_id])
+
+
+func _test_suit_profile_contract() -> void:
+	_check(SuitProfile != null, "The Diver suit presentation profile should load.")
+	_check(SuitProfile.get_script() == DiverSuitPresentationProfileScript, "The suit resource should use the local presentation profile type.")
+	if SuitProfile == null:
+		return
+	var errors: PackedStringArray = SuitProfile.validation_errors()
+	_check(errors.is_empty(), "Diver suit presentation profile should validate: %s" % errors)
+	var style_ids := {}
+	for quality in range(1, 5):
+		var style: Dictionary = SuitProfile.style_for(quality)
+		style_ids[int(style["style_id"])] = true
+		_check(float(style["outline_width"]) <= DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING - 0.5, "Suit Q%d outline must remain inside the reviewed rim allowance." % quality)
+	_check(style_ids.size() == 4, "Suit qualities Q1..Q4 must use four distinct construction styles.")
+	var baseline: Dictionary = SuitProfile.style_for(1)
+	_check(float(baseline["fabric_mix"]) == 0.0 and float(baseline["metal_mix"]) == 0.0 and float(baseline["pattern_strength"]) == 0.0, "Suit Q1 must reproduce the approved v4 appearance without recoloring.")
+	_check(float(SuitProfile.style_for(2)["pattern_strength"]) > 0.0, "Suit Q2 should add visible sealed construction bands.")
+	_check(float(SuitProfile.style_for(3)["plate_strength"]) > float(SuitProfile.style_for(2)["plate_strength"]), "Suit Q3 should add materially stronger pressure plating than Q2.")
+	_check(float(SuitProfile.style_for(4)["emissive_strength"]) > float(SuitProfile.style_for(3)["emissive_strength"]), "Suit Q4 should add the strongest abyss piping signal.")
+	_check(SuitProfile.normalized_quality(-10) == 1 and SuitProfile.normalized_quality(99) == 4, "Suit quality presentation should clamp to canonical levels 1..4.")
+
+
+func _test_knife_asset_contract() -> void:
+	_check(ActionSpriteFrames != null, "The knife action SpriteFrames resource should load.")
+	if ActionSpriteFrames == null:
+		return
+	_check(ActionSpriteFrames.get_frame_count(&"knife_swing") == 16, "Knife swing should expose 16 authored frames.")
+	_check(not ActionSpriteFrames.get_animation_loop(&"knife_swing"), "Knife swing must remain a one-shot action clip.")
+	var duration_weight := 0.0
+	for frame in range(16):
+		duration_weight += ActionSpriteFrames.get_frame_duration(&"knife_swing", frame)
+	var duration := duration_weight / ActionSpriteFrames.get_animation_speed(&"knife_swing")
+	_check(is_equal_approx(duration, 0.30), "Knife swing should retain the reviewed 0.30 second presentation duration.")
+	var sheet := Image.new()
+	var load_error := sheet.load(ProjectSettings.globalize_path(KNIFE_SOURCE))
+	_check(load_error == OK, "The knife source sheet should load.")
+	if load_error != OK:
+		return
+	if sheet.get_format() != Image.FORMAT_RGBA8:
+		sheet.convert(Image.FORMAT_RGBA8)
+	var previous_area := -1
+	var unique_frames := {}
+	for frame in range(16):
+		var texture := ActionSpriteFrames.get_frame_texture(&"knife_swing", frame) as AtlasTexture
+		_check(texture != null, "Knife frame %d should be an AtlasTexture." % frame)
+		if texture != null:
+			_check(texture.atlas != null and texture.atlas.resource_path == KNIFE_SOURCE, "Knife frame %d should use the approved action sheet." % frame)
+			_check(texture.region == Rect2(Vector2((frame % 4) * 512, (frame / 4) * 256), Vector2(512, 256)), "Knife frame %d should map to its exact atlas cell." % frame)
+		var frame_image := _atlas_frame_image(sheet, frame)
+		var used_rect := frame_image.get_used_rect()
+		var measured := Rect2(Vector2(used_rect.position - Vector2i(256, 128)), Vector2(used_rect.size))
+		_check(measured == DiverFrameEnvelopeScript.bounds_for(&"knife_swing", frame), "Knife frame %d should match its separate action envelope." % frame)
+		_check(_cell_has_padding(used_rect), "Knife frame %d should retain transparent atlas padding." % frame)
+		var components := _alpha_component_areas(frame_image, 8)
+		_check(components.size() == 1, "Knife frame %d should contain one connected glove-and-blade silhouette." % frame)
+		var area := int(components[0]) if components.size() == 1 else 0
+		if previous_area > 0:
+			_check(absf(float(area - previous_area)) / float(previous_area) <= 0.01, "Knife frame %d should preserve fixed-grip silhouette mass across the arc." % frame)
+		previous_area = area
+		unique_frames[hash(frame_image.get_data())] = true
+	_check(unique_frames.size() >= 12, "Knife swing should expose a real authored arc rather than repeated still frames.")
+	_check(_import_mipmaps_enabled(KNIFE_SOURCE), "Knife action sheet must generate mipmaps for runtime minification.")
+
+
+func _atlas_frame_image(sheet: Image, frame: int) -> Image:
+	var origin := Vector2i((frame % 4) * 512, (frame / 4) * 256)
+	return sheet.get_region(Rect2i(origin, DiverFrameEnvelopeScript.FRAME_SIZE))
+
+
+func _cell_has_padding(used_rect: Rect2i) -> bool:
+	return (
+		used_rect.position.x >= MINIMUM_CELL_PADDING
+		and used_rect.position.y >= MINIMUM_CELL_PADDING
+		and DiverFrameEnvelopeScript.FRAME_SIZE.x - used_rect.end.x >= MINIMUM_CELL_PADDING
+		and DiverFrameEnvelopeScript.FRAME_SIZE.y - used_rect.end.y >= MINIMUM_CELL_PADDING
+	)
+
+
+func _import_mipmaps_enabled(source_path: String) -> bool:
+	var import_path := source_path + ".import"
+	return FileAccess.file_exists(import_path) and "mipmaps/generate=true" in FileAccess.get_file_as_string(import_path)
 
 
 func _test_frame_envelope_contract() -> void:
@@ -511,6 +688,9 @@ func _test_runtime_presentation_contract() -> void:
 	for emitter_name: String in ["BreathEmitter", "WakeEmitterUpper", "WakeEmitterLower", "LeakEmitter", "ToolEmitter", "CueEmitter"]:
 		_check(not (visual_effects.get_node(emitter_name) as GPUParticles2D).emitting, "Presentation reset should stop and clear %s." % emitter_name)
 	_test_directional_motion_contract(diver, sprite)
+	_test_transition_runtime_contract(diver, sprite)
+	_test_suit_runtime_contract(diver)
+	_test_knife_runtime_contract(diver, sprite)
 	await _test_physical_contact_contract(diver)
 	diver.queue_free()
 
@@ -538,17 +718,265 @@ func _test_directional_motion_contract(diver: DiverController, sprite: AnimatedS
 		_check(diver.scale.is_equal_approx(Vector2.ONE), "Eight-way steering must keep the CharacterBody2D root unscaled.")
 	_test_continuous_turn_sweeps(diver, sprite)
 	diver.reset_at(Vector2.ZERO)
-	sprite.play(&"swim")
-	sprite.pause()
-	diver._set_animation_phase(sprite, 0.375)
-	var swim_phase := diver._animation_phase(sprite)
-	diver._switch_animation_preserving_phase(&"sprint", false)
-	var sprint_phase := diver._animation_phase(sprite)
-	_check(absf(swim_phase - sprint_phase) <= 0.001, "Swim-to-sprint transition should preserve normalized kick phase.")
-	diver._switch_animation_preserving_phase(&"idle", false)
-	var idle_phase := diver._animation_phase(sprite)
-	_check(absf(sprint_phase - idle_phase) <= 0.001, "Sprint-to-idle transition should preserve normalized kick phase.")
+
+
+func _test_transition_runtime_contract(diver: DiverController, sprite: AnimatedSprite2D) -> void:
+	diver.set_reduced_motion(false)
+	var half_target := APPROVED_ENVELOPE * 0.5
+	for route: Array in TRANSITION_ROUTES:
+		var from_state: StringName = route[0]
+		var to_state: StringName = route[1]
+		var clip: StringName = route[2]
+		var duration: float = route[3]
+		var target_anchor: int = route[4]
+		diver.reset_at(Vector2.ZERO)
+		diver._locomotion_state = from_state
+		diver._locomotion_target = from_state
+		sprite.play(from_state)
+		sprite.pause()
+		sprite.set_frame_and_progress(5, 0.0)
+		diver._begin_locomotion_transition(from_state, to_state)
+		_check(diver._transition_clip == clip, "%s>%s should select %s." % [from_state, to_state, clip])
+		_check(is_equal_approx(diver._transition_duration, duration), "%s>%s should last %.2f seconds." % [from_state, to_state, duration])
+		_check(diver._handoff_active and (diver.handoff_sprite as AnimatedSprite2D).visible, "%s>%s should begin with a short visual handoff." % [from_state, to_state])
+		diver._transition_progress = 0.5
+		diver._sample_transition_frame()
+		diver._update_presentation_pose(0.0)
+		diver._update_socket_markers()
+		var expected_frame := 7
+		_check(sprite.frame == expected_frame, "%s>%s midpoint should sample the authored transition direction." % [from_state, to_state])
+		var bounds: Rect2 = diver._current_visual_alpha_bounds()
+		_check(bounds.position.x >= -half_target.x - 0.01 and bounds.end.x <= half_target.x + 0.01, "%s>%s handoff union should remain in the horizontal body envelope." % [from_state, to_state])
+		_check(bounds.position.y >= -half_target.y - 0.01 and bounds.end.y <= half_target.y + 0.01, "%s>%s handoff union should remain in the vertical body envelope." % [from_state, to_state])
+		diver._transition_progress = 1.0
+		diver._sample_transition_frame()
+		diver._finish_locomotion_transition()
+		_check(diver._locomotion_state == to_state and sprite.animation == to_state, "%s>%s should finish in its target loop." % [from_state, to_state])
+		_check(sprite.frame == target_anchor, "%s>%s should land on target anchor frame %d." % [from_state, to_state, target_anchor])
+		_check(not diver._handoff_active and not (diver.handoff_sprite as AnimatedSprite2D).visible, "%s>%s should clear its handoff layer." % [from_state, to_state])
+
 	diver.reset_at(Vector2.ZERO)
+	diver._locomotion_state = &"idle"
+	sprite.play(&"idle")
+	diver._begin_locomotion_transition(&"idle", &"swim")
+	diver._transition_progress = 0.37
+	diver._sample_transition_frame()
+	var frame_before_reverse := sprite.frame
+	var frame_progress_before_reverse := sprite.frame_progress
+	diver._reverse_locomotion_transition()
+	_check(sprite.frame == frame_before_reverse and is_equal_approx(sprite.frame_progress, frame_progress_before_reverse), "Reversing a transition should preserve the currently visible authored sample.")
+	_check(diver._transition_from == &"swim" and diver._transition_to == &"idle", "Transition reversal should swap the directed route.")
+	_check(is_equal_approx(diver._transition_duration, 0.36), "Idle-to-swim reversal should adopt the swim-to-idle duration.")
+
+	diver.reset_at(Vector2.ZERO)
+	diver._locomotion_state = &"idle"
+	sprite.play(&"idle")
+	diver._begin_locomotion_transition(&"idle", &"swim")
+	diver._transition_progress = 0.65
+	diver._sample_transition_frame()
+	diver._redirect_locomotion_transition(&"sprint")
+	_check(diver._transition_from == &"swim" and diver._transition_to == &"sprint", "A third-state redirect should choose the direct edge from the dominant pose.")
+	_check(diver._transition_clip == &"transition_swim_sprint", "Idle-to-swim redirected to sprint should use the swim/sprint authored edge.")
+	_test_handoff_socket_blend(diver, sprite, false)
+	_test_handoff_socket_blend(diver, sprite, true)
+	_assert_core_presentation_invariants(diver)
+	diver.reset_at(Vector2.ZERO)
+
+
+func _test_handoff_socket_blend(
+	diver: DiverController,
+	sprite: AnimatedSprite2D,
+	flip_h: bool
+) -> void:
+	diver.reset_at(Vector2.ZERO)
+	diver._locomotion_state = &"idle"
+	diver._locomotion_target = &"idle"
+	sprite.play(&"idle")
+	sprite.pause()
+	sprite.flip_h = flip_h
+	sprite.set_frame_and_progress(5, 0.0)
+	var source_positions := {}
+	for socket_id: StringName in DiverSocketProfileScript.REQUIRED_SOCKETS:
+		source_positions[socket_id] = diver.socket_profile.position_for(
+			&"idle", socket_id, 5, flip_h
+		)
+	diver._begin_locomotion_transition(&"idle", &"swim")
+	diver._update_socket_markers()
+	for socket_id: StringName in DiverSocketProfileScript.REQUIRED_SOCKETS:
+		var marker := diver._marker_for_socket(socket_id)
+		_check(marker.position.is_equal_approx(source_positions[socket_id]), "Handoff start must retain %s on the visible source pose when flip_h=%s." % [socket_id, flip_h])
+
+	diver._handoff_elapsed = DiverController.TRANSITION_HANDOFF_DURATION * 0.5
+	diver._update_socket_markers()
+	for socket_id: StringName in DiverSocketProfileScript.REQUIRED_SOCKETS:
+		var marker := diver._marker_for_socket(socket_id)
+		var target_position: Vector2 = diver.socket_profile.position_for(
+			sprite.animation, socket_id, sprite.frame, flip_h
+		)
+		var expected_half: Vector2 = (source_positions[socket_id] as Vector2).lerp(
+			target_position,
+			0.5
+		)
+		_check(marker.position.is_equal_approx(expected_half), "Handoff midpoint must blend %s between source and target when flip_h=%s." % [socket_id, flip_h])
+
+	diver._advance_handoff(DiverController.TRANSITION_HANDOFF_DURATION * 0.5)
+	diver._update_socket_markers()
+	_check(not diver._handoff_active and not diver.handoff_sprite.visible, "Handoff end should retire the source layer when flip_h=%s." % flip_h)
+	for socket_id: StringName in DiverSocketProfileScript.REQUIRED_SOCKETS:
+		var marker := diver._marker_for_socket(socket_id)
+		var target_position: Vector2 = diver.socket_profile.position_for(
+			sprite.animation, socket_id, sprite.frame, flip_h
+		)
+		_check(marker.position.is_equal_approx(target_position), "Handoff end must land %s on the target pose when flip_h=%s." % [socket_id, flip_h])
+
+
+func _test_suit_runtime_contract(diver: DiverController) -> void:
+	var main_sprite := diver.get_node("AnimatedSprite2D") as AnimatedSprite2D
+	var handoff := diver.get_node("HandoffSprite2D") as AnimatedSprite2D
+	var action := diver.get_node("AnimatedSprite2D/ToolHandSocket/ActionSprite2D") as AnimatedSprite2D
+	var materials: Array[ShaderMaterial] = [
+		main_sprite.material as ShaderMaterial,
+		handoff.material as ShaderMaterial,
+		action.material as ShaderMaterial,
+	]
+	_check(materials[0] != materials[1] and materials[0] != materials[2] and materials[1] != materials[2], "Main, handoff and action layers require independent scene-local materials.")
+	for material in materials:
+		_check(material != null and material.resource_local_to_scene, "Every Diver readability material should be scene-local.")
+	_check(materials[2].get_shader_parameter(&"suit_treatment_enabled") == false, "The knife action layer must preserve its authored steel and gauntlet materials.")
+	var suit_materials: Array[ShaderMaterial] = [materials[0], materials[1]]
+	for quality in range(1, 5):
+		diver.set_suit_quality_presentation(quality)
+		var expected: Dictionary = SuitProfile.style_for(quality)
+		for material in suit_materials:
+			_check(is_equal_approx(float(material.get_shader_parameter(&"suit_style")), float(expected["style_id"])), "Suit Q%d style id should reach both body layers." % quality)
+			_check((material.get_shader_parameter(&"suit_pattern_color") as Color).is_equal_approx(expected["pattern_color"] as Color), "Suit Q%d pattern color should reach both body layers." % quality)
+			_check(is_equal_approx(float(material.get_shader_parameter(&"suit_plate_strength")), float(expected["plate_strength"])), "Suit Q%d plate treatment should reach both body layers." % quality)
+			_check(is_equal_approx(float(material.get_shader_parameter(&"suit_emissive_strength")), float(expected["emissive_strength"])), "Suit Q%d emissive treatment should reach both body layers." % quality)
+	var second := DiverScene.instantiate() as DiverController
+	add_child(second)
+	diver.set_suit_quality_presentation(4)
+	var second_material := (second.get_node("AnimatedSprite2D") as AnimatedSprite2D).material as ShaderMaterial
+	_check(is_equal_approx(float(second_material.get_shader_parameter(&"suit_style")), 0.0), "A second Diver instance should retain independent Q1 presentation state.")
+	second.queue_free()
+	diver.set_suit_quality_presentation(1)
+	_assert_core_presentation_invariants(diver)
+
+
+func _test_knife_runtime_contract(diver: DiverController, sprite: AnimatedSprite2D) -> void:
+	diver.reset_at(Vector2.ZERO)
+	diver.set_reduced_motion(false)
+	var action := diver.get_node("AnimatedSprite2D/ToolHandSocket/ActionSprite2D") as AnimatedSprite2D
+	var collision_children := diver.find_children("*", "CollisionObject2D", true, false)
+	var interaction_range := diver.get_node("InteractionRange") as Area2D
+	_check(collision_children.size() == 1 and collision_children[0] == interaction_range, "Diver may contain only its approved InteractionRange child; knife presentation must not add a hitbox anywhere in the scene.")
+	var body_shape_node := diver.get_node("CollisionShape2D") as CollisionShape2D
+	var interaction_shape_node := diver.get_node("InteractionRange/CollisionShape2D") as CollisionShape2D
+	var collision_shapes := diver.find_children("*", "CollisionShape2D", true, false)
+	_check(collision_shapes.size() == 2 and body_shape_node in collision_shapes and interaction_shape_node in collision_shapes, "Diver may contain exactly the approved body and InteractionRange shapes; knife presentation must not add a shape under an existing collision object.")
+	_check(diver.find_children("*", "CollisionPolygon2D", true, false).is_empty(), "Knife presentation must not hide a collision polygon anywhere in the Diver scene.")
+	_check(not diver.begin_attack_presentation(0, &"knife", Vector2(80.0, 0.0), 0.4), "Attack presentation should reject a non-positive serial.")
+	_check(not diver.begin_attack_presentation(1, &"harpoon_pistol", Vector2(80.0, 0.0), 0.4), "Knife presentation should reject unsupported weapons.")
+	_check(not diver.begin_attack_presentation(1, &"knife", diver.global_position, 0.4), "Attack presentation should reject a zero aim vector.")
+	_check(not diver.begin_attack_presentation(1, &"knife", Vector2(INF, 0.0), 0.4), "Attack presentation should reject non-finite targets.")
+	_check(not diver.begin_attack_presentation(1, &"knife", Vector2(80.0, 0.0), NAN), "Attack presentation should reject non-finite impact timing.")
+	_check(not diver.begin_attack_presentation(1, &"knife", Vector2(80.0, 0.0), 0.01), "Attack presentation should reject impact timing outside the authored window.")
+
+	var target := diver.global_position + Vector2(80.0, -20.0)
+	var body_before := diver._current_visual_alpha_bounds()
+	_check(diver.begin_attack_presentation(101, &"knife", target, KNIFE_CONTACT_PROGRESS), "A valid root-resolved knife presentation should begin.")
+	_check(diver.begin_attack_presentation(101, &"knife", target, KNIFE_CONTACT_PROGRESS), "An identical duplicate begin should be idempotent.")
+	_check(not diver.begin_attack_presentation(101, &"knife", target + Vector2.ONE, KNIFE_CONTACT_PROGRESS), "A duplicate serial with a changed target must be rejected.")
+	_check(not diver.begin_attack_presentation(101, &"knife", target, 0.45), "A duplicate serial with changed timing must be rejected.")
+	_check(not diver.begin_attack_presentation(102, &"knife", target, KNIFE_CONTACT_PROGRESS), "A new serial must not replace an active presentation.")
+	diver._update_presentation_pose(0.0)
+	_check(diver._current_visual_alpha_bounds().is_equal_approx(body_before), "The separate action layer must not expand the body envelope at zero progress.")
+	_check(diver.set_attack_presentation_progress(101, 0.20), "Knife presentation progress should advance monotonically.")
+	_check(not diver.set_attack_presentation_progress(101, 0.19), "Knife presentation progress must reject reversal.")
+	_check(diver.confirm_attack_presentation(101, true, target, false), "Root should be able to confirm one hit result.")
+	_check(not diver.confirm_attack_presentation(101, true, target, false), "A hit result must be accepted exactly once.")
+	diver._update_readability_material()
+	var action_material := action.material as ShaderMaterial
+	_check((action_material.get_shader_parameter(&"action_color") as Color).is_equal_approx(Color("79ded4")), "A confirmed hit must not be revealed before its contact phase.")
+	_check(diver.set_attack_presentation_progress(101, KNIFE_CONTACT_PROGRESS), "Knife presentation should reach its contact phase.")
+	_check(action.frame == 6, "Root impact progress 0.40 should map exactly to authored knife frame 6.")
+	_check((action_material.get_shader_parameter(&"action_color") as Color).is_equal_approx(Color("f0c56b")), "Confirmed contact should receive the authored hit emphasis.")
+	_check(not diver.action_visual_alpha_bounds().size.is_zero_approx(), "A visible knife should expose a separate non-empty action envelope.")
+	var formal_pose: Dictionary = diver._action_pose_for(sprite)
+	diver.play_visual_cue(&"knife_attack", target, 1.0)
+	_check(not diver._legacy_knife_action_active, "Compatibility cue playback must not create a second legacy action during a formal attack.")
+	diver._cue_elapsed = diver._cue_duration * 0.5
+	var combined_pose: Dictionary = diver._action_pose_for(sprite)
+	_check((combined_pose["offset"] as Vector2).is_equal_approx(formal_pose["offset"] as Vector2), "Compatibility cue must not double the formal knife body lunge.")
+	_check(is_equal_approx(float(combined_pose["rotation"]), float(formal_pose["rotation"])), "Compatibility cue must not double the formal knife body roll.")
+	_check((combined_pose["scale"] as Vector2).is_equal_approx(formal_pose["scale"] as Vector2), "Compatibility cue must not double the formal knife body scale impulse.")
+	_check(diver.end_attack_presentation(101), "Knife presentation should end once.")
+	_check(not diver.end_attack_presentation(101), "Knife presentation must reject duplicate end callbacks.")
+	diver._update_action_sprite()
+	_check(not action.visible and diver.presentation_state()["cue"] == &"", "Ending a formal knife action must not resurrect a still-running legacy cue.")
+	_check(not diver.begin_attack_presentation(101, &"knife", target, KNIFE_CONTACT_PROGRESS), "A completed serial must never replay.")
+
+	_check(diver.begin_attack_presentation(102, &"knife", target, KNIFE_CONTACT_PROGRESS), "A later miss presentation should begin.")
+	_check(diver.confirm_attack_presentation(102, false, Vector2(INF, INF), false), "A root-confirmed miss may omit a finite contact point.")
+	_check(diver.end_attack_presentation(102), "A root-confirmed miss should end normally.")
+	_check(diver.begin_attack_presentation(103, &"knife", target, KNIFE_CONTACT_PROGRESS), "A later defeat presentation should begin.")
+	_check(not diver.confirm_attack_presentation(103, false, target, true), "Defeated presentation must imply a confirmed hit.")
+	_check(diver.confirm_attack_presentation(103, true, target, true), "A root-confirmed defeating hit should be accepted once.")
+	_check(diver.end_attack_presentation(103), "A defeating hit presentation should end normally.")
+
+	var directions := PackedVector2Array([
+		Vector2.RIGHT,
+		Vector2(1.0, -1.0).normalized(),
+		Vector2.UP,
+		Vector2(-1.0, -1.0).normalized(),
+		Vector2.LEFT,
+		Vector2(-1.0, 1.0).normalized(),
+		Vector2.DOWN,
+		Vector2(1.0, 1.0).normalized(),
+	])
+	var serial := 104
+	for direction in directions:
+		var aim_target := diver.global_position + direction * 80.0
+		_check(diver.begin_attack_presentation(serial, &"knife", aim_target, KNIFE_CONTACT_PROGRESS), "Knife direction sample %s should begin." % direction)
+		_check(diver.set_attack_presentation_progress(serial, KNIFE_CONTACT_PROGRESS), "Knife direction sample %s should reach contact." % direction)
+		var displayed_forward := Vector2.RIGHT.rotated(action.global_rotation)
+		_check(displayed_forward.dot(direction) >= 0.995, "Knife action should visually aim in the full root-supplied direction %s." % direction)
+		_check(not diver.action_visual_alpha_bounds().size.is_zero_approx(), "Knife direction %s should retain a measurable action envelope." % direction)
+		_check(diver.end_attack_presentation(serial), "Knife direction sample %s should end once." % direction)
+		serial += 1
+
+	diver.reset_at(Vector2.ZERO)
+	diver.play_visual_cue(&"knife_attack", Vector2(80.0, 0.0), 1.0)
+	diver._cue_elapsed = diver._cue_duration * 0.5
+	diver.rotation = PI * 0.5
+	diver._update_action_sprite()
+	var legacy_displayed_forward := Vector2.RIGHT.rotated(action.global_rotation)
+	_check(legacy_displayed_forward.dot(Vector2.RIGHT) >= 0.995, "Legacy knife cue must keep aiming at its immutable root-supplied world target while the diver turns.")
+	var legacy_pose: Dictionary = diver._action_pose_for(sprite)
+	var legacy_lunge_global := (legacy_pose["offset"] as Vector2).rotated(diver.rotation).normalized()
+	_check(legacy_lunge_global.dot(Vector2.RIGHT) >= 0.995, "Legacy knife body lunge must remain aligned with the immutable world-space attack target while the diver turns.")
+	diver._clear_visual_cue()
+	diver.rotation = 0.0
+
+	diver.reset_at(Vector2.ZERO)
+	_check(diver.begin_attack_presentation(1, &"knife", Vector2(80.0, 0.0), KNIFE_CONTACT_PROGRESS), "reset_at should deliberately begin a fresh attack-serial epoch.")
+	_check(diver.end_attack_presentation(1, true), "A reset-epoch presentation should support a single canceled end.")
+	_assert_core_presentation_invariants(diver)
+	diver.reset_at(Vector2.ZERO)
+	sprite.flip_h = false
+
+
+func _assert_core_presentation_invariants(diver: DiverController) -> void:
+	var capsule := (diver.get_node("CollisionShape2D") as CollisionShape2D).shape as CapsuleShape2D
+	var interaction := (diver.get_node("InteractionRange/CollisionShape2D") as CollisionShape2D).shape as CircleShape2D
+	var camera := diver.get_node("Camera2D") as Camera2D
+	var light := diver.get_node("DiveLight") as PointLight2D
+	_check(diver.scale.is_equal_approx(Vector2.ONE), "Diver presentation features must keep the CharacterBody2D root unscaled.")
+	_check(is_equal_approx(capsule.height, 105.0) and is_equal_approx(capsule.radius, 30.0), "Diver presentation features must preserve the 105 x 60 gameplay capsule.")
+	_check(is_equal_approx(interaction.radius, 112.0), "Diver presentation features must preserve InteractionRange 112.")
+	_check(is_equal_approx(diver.swim_speed, 175.0) and is_equal_approx(diver.sprint_speed, 265.0), "Diver presentation features must preserve movement speeds.")
+	_check(is_equal_approx(diver.acceleration, 620.0) and is_equal_approx(diver.drag, 760.0) and is_equal_approx(diver.turn_speed, 10.0), "Diver presentation features must preserve movement response values.")
+	_check(light.get_parent() == diver and light.position.is_zero_approx(), "Diver presentation features must preserve one central radial light.")
+	_check(diver.camera_profile != null and camera.process_callback == 0 and camera.zoom.is_equal_approx(Vector2(1.2, 1.2)), "Diver presentation features must preserve the approved v4 camera profile and physics follow mode.")
 
 
 func _test_continuous_turn_sweeps(diver: DiverController, sprite: AnimatedSprite2D) -> void:
@@ -580,7 +1008,7 @@ func _visual_forward(diver: DiverController, sprite: AnimatedSprite2D) -> Vector
 
 func _test_runtime_visual_envelope(diver: DiverController, sprite: AnimatedSprite2D) -> void:
 	var half_target: Vector2 = EnvelopeProfile.target_size * 0.5
-	for animation_name: StringName in [&"idle", &"swim", &"sprint"]:
+	for animation_name: StringName in DiverFrameEnvelopeScript.BODY_ANIMATIONS:
 		for frame in range(16):
 			for flip_h: bool in [false, true]:
 				sprite.play(animation_name)
