@@ -465,6 +465,11 @@ func _verify_reset_attempt(controller, initial_dynamic_positions: Dictionary) ->
 	_assert(controller.cabinet_reached_target(), "reset_attempt musi odstawić cabinet_d do pozycji początkowej bez checkpointu.")
 	if cabinet != null:
 		_assert(cabinet.position.is_equal_approx(initial_dynamic_positions.get("cabinet_d", Vector2.INF)), "reset_attempt musi przywrócić dokładną pozycję startową cabinet_d.")
+	var first_reset_state := _progression_snapshot(controller.state_snapshot())
+	var first_reset_positions := _dynamic_positions(controller)
+	controller.reset_attempt()
+	_assert(_progression_snapshot(controller.state_snapshot()) == first_reset_state, "Powtórny reset_attempt w już wyzerowanej próbie musi być logicznie idempotentny.")
+	_assert(_dynamic_positions(controller) == first_reset_positions, "Powtórny reset_attempt nie może przemieścić żadnej bariery ani cabinet_d.")
 	_assert(controller.control("inlet_b").can_interact(), "Po reset_attempt B musi znów być dostępne.")
 	_assert(not controller.control("inlet_c").can_interact() and not controller.control("d_v1").can_interact() and not controller.control("inlet_d").can_interact(), "Po reset_attempt C i D muszą pozostać niedostępne do swojej kolejności.")
 
