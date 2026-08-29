@@ -245,6 +245,8 @@ func _run() -> void:
 	_assert(power_panel.circuit_visual_state("red") == "ready" and power_panel.circuit_visual_state("yellow") == "locked", "Reset musi odświeżyć lampy panelu A.")
 	_assert(str(reset_state.get("power_status", "")) == "ready" and not bool(reset_state.get("d_complete", true)), "reset_attempt musi wyzerować sekwencję i feedback fault bez checkpointu.")
 	_assert(not controller.is_public_gate_open(&"attempt_complete"), "reset_attempt musi wyzerować publiczne attempt_complete.")
+	controller.reset_attempt()
+	_assert(controller.state_snapshot() == reset_state, "Powtórzony reset_attempt musi być idempotentny dla całego publicznego stanu próby.")
 
 	await _verify_safety_envelopes(controller, structure_root)
 	_finish()
