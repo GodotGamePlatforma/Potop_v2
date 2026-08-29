@@ -134,6 +134,16 @@ func _test_diver_portrait_selection(state) -> void:
 		_assert(str(survivor.current_assignment).is_empty(), "Selecting %s as the diver must not create a worker assignment." % survivor_id)
 		_assert_diver_portrait(base, survivor, "selected diver %s" % survivor_id)
 
+	var clear_selection := base.find_child("DiverSelectionClear", true, false) as Button
+	_assert(clear_selection != null and not clear_selection.disabled, "The selected diver profile must expose its enabled clear command.")
+	if clear_selection != null and not clear_selection.disabled:
+		clear_selection.pressed.emit()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_assert(str(state.current_day_plan.selected_diver_id).is_empty() and str(state.preferred_diver_id).is_empty(), "Clearing the selected diver through Base must also forget the remembered preference.")
+		_assert(station.assigned_survivor_ids.is_empty(), "Clearing the diver selection must leave the independent Station staffing roster unchanged.")
+		_assert(base.find_child("DiverSelectionClear", true, false) == null and base.find_child("DiverPortrait", true, false) == null, "Clearing the diver selection must rerender the Station without a stale clear command or portrait.")
+
 	base.queue_free()
 	await get_tree().process_frame
 	await get_tree().process_frame
