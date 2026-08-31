@@ -1371,6 +1371,14 @@ func _assert_streamed_backdrops_are_scene_stubs(manifest: Dictionary) -> void:
 	if scene_file == null:
 		return
 	var scene_text := scene_file.get_as_text()
+	for scene_line: String in scene_text.split("\n"):
+		_assert(
+			not (
+				scene_line.begins_with("[connection ")
+				and scene_line.contains("VisualLayers/L03/Landmarks")
+			),
+			"Landmarki prezentacyjne nie mogą deklarować połączeń sygnałów w scenie.",
+		)
 	var visual: Dictionary = manifest.get("visual", {})
 	for asset_value in visual.get("assets", []):
 		if not asset_value is Dictionary:
@@ -3444,6 +3452,7 @@ func _assert_visual_content_matches_manifest(
 				landmark_node is Node2D and (landmark_node as Node2D).position == _vector(source_landmark.get("position", [])),
 				"%s landmark musi zachować pozycję manifestu." % owner_label,
 			)
+			_assert_landmark_marker(landmark_node, source_landmark, manifest, owner_label)
 
 	var expected_groups_by_layer := _expected_visual_groups_by_layer(manifest["visual"] as Dictionary)
 	for layer_id in EXPECTED_LAYER_IDS:
@@ -3469,6 +3478,117 @@ func _assert_visual_content_matches_manifest(
 				expected_group.get("assets", []) as Array,
 				owner_label,
 			)
+
+
+func _assert_landmark_marker(
+	marker_node: Node,
+	source_landmark: Dictionary,
+	manifest: Dictionary,
+	owner_label: String,
+) -> void:
+	var landmark_id := str(source_landmark.get("id", ""))
+	var region_id := str(source_landmark.get("region_id", ""))
+	var display_name := str(source_landmark.get("display_name", "")).strip_edges()
+	var short_name := str(source_landmark.get("short_name", "")).strip_edges()
+	var expected_label := (short_name if not short_name.is_empty() else display_name).to_upper()
+	var region := _record_by_id(manifest.get("regions", []) as Array, region_id)
+	var expected_accent := Color.from_string(
+		"#%s" % str(region.get("accent_color", "")),
+		Color.TRANSPARENT,
+	)
+	_assert(
+		str(marker_node.get_meta("affordance", "")) == "nonblocking_world_annotation",
+		"%s landmark %s musi być neutralną adnotacją świata." % [owner_label, landmark_id],
+	)
+	_assert(
+		str(marker_node.get_meta("geometry_role", "")) == "none",
+		"%s landmark %s nie może publikować geometrii." % [owner_label, landmark_id],
+	)
+	_assert(
+		str(marker_node.get_meta("display_name", "")) == display_name
+		and str(marker_node.get_meta("short_name", "")) == short_name,
+		"%s landmark %s musi zachować display_name i short_name manifestu."
+		% [owner_label, landmark_id],
+	)
+	_assert(
+		marker_node.get_meta("accent_color", Color.TRANSPARENT) is Color
+		and (marker_node.get_meta("accent_color") as Color).is_equal_approx(expected_accent),
+		"%s landmark %s musi używać akcentu swojego regionu." % [owner_label, landmark_id],
+	)
+
+	var marker_outline := marker_node.get_node_or_null("MarkerOutline") as Line2D
+	var center_dot := marker_node.get_node_or_null("CenterDot") as Polygon2D
+	var leader := marker_node.get_node_or_null("Leader") as Line2D
+	var label := marker_node.get_node_or_null("Label") as Label
+	_assert(
+		marker_node.get_child_count() == 4
+		and marker_outline != null
+		and center_dot != null
+		and leader != null
+		and label != null,
+		"%s landmark %s musi zawierać wyłącznie zwarty outline, punkt, leader i label."
+		% [owner_label, landmark_id],
+	)
+	if marker_outline != null:
+		_assert(
+			marker_outline.points.size() >= 4
+			and marker_outline.points.size() <= 6
+			and marker_outline.points[0] == marker_outline.points[-1]
+			and _points_fit_extent(marker_outline.points, 20.0),
+			"%s landmark %s musi mieć zwarty rombowy outline." % [owner_label, landmark_id],
+		)
+		_assert(
+			marker_outline.default_color.is_equal_approx(expected_accent),
+			"%s landmark %s outline musi używać akcentu regionu." % [owner_label, landmark_id],
+		)
+	if center_dot != null:
+		_assert(
+			center_dot.polygon.size() >= 3
+			and center_dot.polygon.size() <= 6
+			and _points_fit_extent(center_dot.polygon, 6.0),
+			"%s landmark %s musi mieć zwarty punkt centralny." % [owner_label, landmark_id],
+		)
+		_assert(
+			center_dot.color.is_equal_approx(expected_accent),
+			"%s landmark %s punkt musi używać akcentu regionu." % [owner_label, landmark_id],
+		)
+	if leader != null:
+		_assert(
+			leader.points.size() == 2
+			and _points_fit_extent(leader.points, 36.0)
+			and leader.points[0].distance_to(leader.points[1]) <= 18.0
+			and leader.default_color.is_equal_approx(expected_accent),
+			"%s landmark %s musi mieć krótki neutralny leader w akcencie regionu."
+			% [owner_label, landmark_id],
+		)
+	if label != null:
+		_assert(
+			label.mouse_filter == Control.MOUSE_FILTER_IGNORE
+			and label.focus_mode == Control.FOCUS_NONE,
+			"%s landmark %s label nie może przechwytywać inputu ani focusu."
+			% [owner_label, landmark_id],
+		)
+		_assert(
+			label.text == expected_label,
+			"%s landmark %s musi wyświetlać short_name z fallbackiem do display_name."
+			% [owner_label, landmark_id],
+		)
+		_assert(
+			not label.text.to_lower().contains(landmark_id.to_lower()),
+			"%s landmark %s nie może pokazywać stable ID w widocznym copy."
+			% [owner_label, landmark_id],
+		)
+		_assert(
+			label.get_theme_color("font_color").is_equal_approx(expected_accent),
+			"%s landmark %s label musi używać akcentu regionu." % [owner_label, landmark_id],
+		)
+
+
+func _points_fit_extent(points: PackedVector2Array, max_extent: float) -> bool:
+	for point: Vector2 in points:
+		if absf(point.x) > max_extent or absf(point.y) > max_extent:
+			return false
+	return true
 
 
 func _expected_visual_groups_by_layer(visual: Dictionary) -> Dictionary:

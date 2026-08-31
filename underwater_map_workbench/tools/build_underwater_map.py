@@ -5431,8 +5431,10 @@ def _append_portal_backdrop_clearances(
 
 
 def _append_landmarks(lines: list[str], manifest: dict[str, Any]) -> None:
-    visual = manifest["visual"]
-    marker_color = _color(visual["station_color"], "visual.station_color")
+    regions_by_id = {
+        str(region["id"]): region
+        for region in manifest["regions"]
+    }
     lines.extend(
         (
             "",
@@ -5441,44 +5443,65 @@ def _append_landmarks(lines: list[str], manifest: dict[str, Any]) -> None:
     )
     for index, landmark in enumerate(manifest["landmarks"]):
         node_name = f"Landmark{index:04d}_{_safe_node_name(str(landmark['id']))}"
-        label_text = f"{landmark['id']}  {str(landmark['display_name']).upper()}"
+        region_id = str(landmark["region_id"])
+        region = regions_by_id[region_id]
+        accent_color = _color(
+            region["accent_color"],
+            f"regions.{region_id}.accent_color",
+        )
+        short_name = str(landmark["short_name"]).strip()
+        display_name = str(landmark["display_name"]).strip()
+        label_text = (short_name or display_name).upper()
         lines.extend(
             (
                 "",
                 f'[node name="{node_name}" type="Node2D" parent="VisualLayers/L03/Landmarks"]',
                 f"position = {_gd_vector(landmark['position'], f'landmarks[{index}].position')}",
                 f"metadata/landmark_id = {_gd_string(landmark['id'])}",
-                f"metadata/region_id = {_gd_string(landmark['region_id'])}",
+                f"metadata/region_id = {_gd_string(region_id)}",
                 f"metadata/role = {_gd_string(landmark['role'])}",
-                'metadata/affordance = "nonblocking_marker"',
+                f"metadata/display_name = {_gd_string(display_name)}",
+                f"metadata/short_name = {_gd_string(short_name)}",
+                f"metadata/accent_color = {_gd_color(accent_color, f'regions.{region_id}.accent_color')}",
+                'metadata/affordance = "nonblocking_world_annotation"',
+                'metadata/geometry_role = "none"',
                 "",
-                f'[node name="HorizontalMarker" type="Line2D" parent="VisualLayers/L03/Landmarks/{node_name}"]',
-                f"points = {_gd_points([(-20.0, 0.0), (20.0, 0.0)])}",
-                "width = 4",
-                f'default_color = {_gd_color(marker_color, "visual.station_color")}',
+                f'[node name="MarkerOutline" type="Line2D" parent="VisualLayers/L03/Landmarks/{node_name}"]',
+                f"points = {_gd_points([(0.0, -16.0), (16.0, 0.0), (0.0, 16.0), (-16.0, 0.0), (0.0, -16.0)])}",
+                "width = 3",
+                f'default_color = {_gd_color(accent_color, f"regions.{region_id}.accent_color")}',
                 "antialiased = true",
-                'metadata/affordance = "nonblocking_marker"',
+                'metadata/affordance = "nonblocking_world_annotation"',
                 "",
-                f'[node name="VerticalMarker" type="Line2D" parent="VisualLayers/L03/Landmarks/{node_name}"]',
-                f"points = {_gd_points([(0.0, -20.0), (0.0, 20.0)])}",
-                "width = 4",
-                f'default_color = {_gd_color(marker_color, "visual.station_color")}',
+                f'[node name="CenterDot" type="Polygon2D" parent="VisualLayers/L03/Landmarks/{node_name}"]',
+                f"polygon = {_gd_points([(0.0, -4.0), (4.0, 0.0), (0.0, 4.0), (-4.0, 0.0)])}",
+                f'color = {_gd_color(accent_color, f"regions.{region_id}.accent_color")}',
                 "antialiased = true",
-                'metadata/affordance = "nonblocking_marker"',
+                'metadata/affordance = "nonblocking_world_annotation"',
+                "",
+                f'[node name="Leader" type="Line2D" parent="VisualLayers/L03/Landmarks/{node_name}"]',
+                f"points = {_gd_points([(18.0, 0.0), (30.0, 0.0)])}",
+                "width = 2",
+                f'default_color = {_gd_color(accent_color, f"regions.{region_id}.accent_color")}',
+                "antialiased = true",
+                'metadata/affordance = "nonblocking_world_annotation"',
             )
         )
         lines.extend(
             (
                 "",
                 f'[node name="Label" type="Label" parent="VisualLayers/L03/Landmarks/{node_name}"]',
-                "offset_left = -210",
-                "offset_top = 28",
-                "offset_right = 210",
-                "offset_bottom = 72",
+                "offset_left = 36",
+                "offset_top = -16",
+                "offset_right = 260",
+                "offset_bottom = 18",
+                "mouse_filter = 2",
                 f"text = {_gd_string(label_text)}",
-                "horizontal_alignment = 1",
-                "theme_override_font_sizes/font_size = 20",
-                'metadata/affordance = "nonblocking_marker"',
+                f'theme_override_colors/font_color = {_gd_color(accent_color, f"regions.{region_id}.accent_color")}',
+                "theme_override_colors/font_outline_color = Color(0.01, 0.04, 0.06, 0.95)",
+                "theme_override_constants/outline_size = 5",
+                "theme_override_font_sizes/font_size = 18",
+                'metadata/affordance = "nonblocking_world_annotation"',
             )
         )
 
