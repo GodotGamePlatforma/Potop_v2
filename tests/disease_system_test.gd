@@ -1,6 +1,6 @@
 extends SceneTree
 
-const DiseaseSystemScript := preload("res://scripts/base/DiseaseSystem.gd")
+const DiseaseSystemScript := preload("res://scripts/survivors/DiseaseSystem.gd")
 const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd")
 const DiseaseExposureStateScript := preload("res://scripts/data/DiseaseExposureState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
@@ -8,7 +8,7 @@ const GameStateScript := preload("res://scripts/data/GameState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
-const InfirmaryDefinition := preload("res://data/buildings/infirmary.tres")
+const InfirmaryDefinition := preload("res://base_workbench/data/buildings/infirmary.tres")
 
 const DIVE_HAZARD_SOURCE_ID := "contaminated_salvage"
 

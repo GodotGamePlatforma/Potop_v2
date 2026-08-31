@@ -1,16 +1,16 @@
 extends SceneTree
 
-const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
+const CompetencySystemScript := preload("res://scripts/survivors/CompetencySystem.gd")
 
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const BuildingStateScript := preload("res://scripts/data/BuildingState.gd")
 const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
-const BuildingWorkSystemScript := preload("res://scripts/base/BuildingWorkSystem.gd")
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
-const WorkerAssignmentSystemScript := preload("res://scripts/base/WorkerAssignmentSystem.gd")
-const WorkPaceSystemScript := preload("res://scripts/base/WorkPaceSystem.gd")
-const ProductionSystemScript := preload("res://scripts/base/ProductionSystem.gd")
+const BuildingWorkSystemScript := preload("res://base_workbench/systems/BuildingWorkSystem.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
+const WorkerAssignmentSystemScript := preload("res://base_workbench/systems/WorkerAssignmentSystem.gd")
+const WorkPaceSystemScript := preload("res://base_workbench/systems/WorkPaceSystem.gd")
+const ProductionSystemScript := preload("res://base_workbench/systems/ProductionSystem.gd")
 const PolicyStateScript := preload("res://scripts/data/PolicyState.gd")
 const ReportStateScript := preload("res://scripts/data/ReportState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
@@ -125,7 +125,7 @@ func _initialize() -> void:
 	var integrity_state = _state()
 	var integrity_workshop = _add_building(integrity_state, "integrity_workshop", "workshop", "bottom_left", 1, ["anka"])
 	var work_system = BuildingWorkSystemScript.new()
-	var workshop_definition = ResourceLoader.load("res://data/buildings/workshop.tres")
+	var workshop_definition = ResourceLoader.load("res://base_workbench/data/buildings/workshop.tres")
 	var workshop_capabilities: Dictionary = workshop_definition.get_level_definition(1).capabilities
 	var workshop_workforce: Dictionary = work_system.workforce_from_capable_ids(
 		integrity_state,
@@ -170,7 +170,7 @@ func _initialize() -> void:
 	var production_state = _state()
 	var workshop = _add_building(production_state, "workshop", "workshop", "bottom_left", 1, ["anka"])
 	var production = ProductionSystemScript.new()
-	var recipe = ResourceLoader.load("res://data/workshop_recipes/diving_lantern_mk2.tres")
+	var recipe = ResourceLoader.load("res://base_workbench/data/workshop_recipes/diving_lantern_mk2.tres")
 	_assert(production.queue_recipe(production_state, workshop, recipe), "A capable staffed workshop should queue a craft.")
 	production_state.find_survivor("anka").fatigue = 95
 	var exhausted_result: Dictionary = production.resolve_workshop_queue(production_state, report)

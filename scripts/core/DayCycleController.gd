@@ -1,7 +1,7 @@
 class_name DayCycleController
 extends RefCounted
 
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
 
 func resolve_day(state, dive_result, persist: bool = true):
 	var resolver = EndOfDayResolverScript.new()

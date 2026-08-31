@@ -3,7 +3,7 @@ extends Resource
 
 const OutcomeSnapshotScript := preload("res://scripts/data/BoatExpeditionOutcomeSnapshot.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
-const RosterRotationSystemScript := preload("res://scripts/base/RosterRotationSystem.gd")
+const RosterRotationSystemScript := preload("res://scripts/survivors/RosterRotationSystem.gd")
 
 @export var instance_id: String = ""
 @export var route_id: String = ""

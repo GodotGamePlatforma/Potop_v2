@@ -52,6 +52,31 @@ Pełny zestaw eksportowanych pól zawsze definiuje wskazany skrypt. Lista w tym 
     .ai/
         PROJECT_CONTEXT.md
         DECISIONS.md
+    base_workbench/
+        AGENTS.md
+        README.md
+        .ai/
+            PROJECT_CONTEXT.md
+            DECISIONS.md
+        runtime/
+        ui/
+        systems/
+            inactive/
+        definitions/
+        data/
+            balance/
+            buildings/
+            events/
+            workshop_recipes/
+        assets/
+            audio/
+            building_blueprints/
+            environment/
+            environment_3d/
+            platform_3d/
+            ui/
+        tools/
+        tests/
     underwater_map_workbench/
         AGENTS.md
         README.md
@@ -95,50 +120,44 @@ Pełny zestaw eksportowanych pól zawsze definiuje wskazany skrypt. Lista w tym 
         tests/
     assets/
         audio/
-        base/
-            building_blueprints/
-            environment_3d/
-        base_3d/
-            source/
         intro/
         ui/
     data/
         balance/
-        buildings/
         diseases/
         difficulty/
         diving_gear/
-        events/
         items/
         missions/
         professions/
         survivor_templates/
         survivors/
         threats/
-        workshop_recipes/
     docs/
         OgolnyZarys.txt
         Ostatni_Pomost_architektura_Godot.txt
     scenes/
-        base/
         diving/
         main/
         ui/
     scripts/
-        base/
+        campaign/
         core/
         data/
         definitions/
         diving/
+        survivors/
         ui/
     tests/
     tools/
+
+`base_workbench/` jest jedynym właścicielem lokalnej domeny i prezentacji Przystani: `runtime/BaseScene.tscn`, kontrolera i środowiska, scen oraz skryptów UI, systemów budynków i zarządzania, definicji i danych Bazy, grafiki, audio, narzędzi authoringu oraz lokalnych testów i capture'ów. Nie jest drugim projektem Godot; korzysta z nadrzędnego `project.godot`, publicznych typów Rootu i wspólnego runnera. Root zachowuje `GameState`, persistence, atomowy koniec dnia, kampanię, misje, difficulty, pogodę, rozwój i choroby ocaleńców oraz ogólne systemy nurkowania. Publicznym wejściem jest bezpośrednio montowana `res://base_workbench/runtime/BaseScene.tscn`; dawne katalogi Bazy w Root są zabronionymi kopiami. Kontrakt globalny: ARD-0114; szczegół lokalny: BASE-ARD-0001 i BASE-ARD-0002.
 
 `underwater_map_workbench/` jest właścicielem całego aktywnego pakietu konkretnej mapy: `map_manifest.json`, deterministycznie generowanej `UnderwaterMap.tscn`, lokalnego kompilatora i cienkiego hosta w `runtime/`, buildera, lokalnego smoke testu, shaderów środowiska, grafiki świata, worldowych assetów pod `assets/gameplay/` oraz podrzędnych pakietów `structures/<structure_id>/`. Nie jest drugim projektem Godot; scena jest ładowana przez projekt nadrzędny, a ogólne mechaniki nurkowania, avatar gracza, dane domenowe, integracja Godot, persistence i runner testów nie należą do pakietu mapy. `map_manifest.json` zachowuje jedyny rejestr i globalny placement, natomiast zarejestrowany `structure_manifest.json` posiada wyłącznie lokalną topologię, sockety, grafikę, skrypty i runtime jednego budynku. Zadania dotyczące całej mapy są routowane do mapowego `AGENTS.md`, a prywatne zadanie jednej struktury dalej do najbliższego `structures/<id>/AGENTS.md`; plików pakietu nie wolno dublować pod `res://scenes/diving` ani `res://assets/diving`. Kontrakty globalne: ARD-0102 i ARD-0106; właścicielem bieżącego schema, osi rewizji i prezentacyjnego stosu `L00-L10` są aktywne lokalne MAP-ARD.
 
 `diver_workbench/` jest jedynym właścicielem aktywnego avatara gracza: jednej sceny `runtime/Diver.tscn`, jej adaptera `DiverController`, fizycznej bryły `CharacterBody2D`, `DiverVisualEffects`, definicji i profilu socketów, arkuszy i zasobu animacji, shaderów oraz lokalnych testów i capture'u. Także nie jest drugim projektem Godot: używa `project.godot`, InputMap i ogólnych systemów z katalogu nadrzędnego. `DiveScene` instancjonuje tę scenę bezpośrednio, bez kopii albo wrappera pod `scenes/diving`. Root zachowuje zasady ruchu, sesję, ryzyko, interakcje, UI, zapis i integrację mapy. Kontrakt globalny: ARD-0105; szczegół lokalny: DIVER-ARD-0001.
 
-Warsztaty są granicami authority i zapisu, nie niezależnymi bibliotekami ani osobnymi grafami uruchomieniowymi. Pakiet struktury jest węższą granicą wewnątrz Mapy, nie trzecim warsztatem. Root może składać publiczne sceny i zasoby warsztatów, a lokalny adapter może korzystać z ogólnych systemów root; zależność kodu może więc być dwukierunkowa przez jawny kontrakt bez przenoszenia właściciela pliku. Zadanie zmieniające więcej niż jedną domenę jest prowadzone jako integracja root. Mieszana zmiana prywatnych źródeł pakietu wraz z jego mapowym pinem albo placementem także jest integracją root: jedno zadanie, worktree, branch i PR obejmują oba zakresy. Wyłącznie rejestracja albo zmiana originu lub placementu bez modyfikacji prywatnych źródeł pakietu pozostaje zadaniem Mapy. `DiverController` publikuje dla root deterministyczny krok i reset ruchu, bramkę wejścia, ustawienie prądu oraz mnożnika ruchu, zapytania o intencję i sprint, sygnały dystansu oraz kontaktu, dostęp do źródła światła, ustawienia prezentacji, kotwicę kamery i token `DIVE_PLAYER_GROUP`. Bieżące pola wejścia, prądu i sprintu oraz nazwy i hierarchia `AnimatedSprite2D`, `VisualEffects`, `Camera2D`, socketów i emiterów pozostają prywatne; root nie zapisuje ich ani nie odwołuje się do dzieci ścieżkami węzłów.
+Warsztaty są granicami authority i zapisu, nie niezależnymi bibliotekami ani osobnymi grafami uruchomieniowymi. Pakiet struktury jest węższą granicą wewnątrz Mapy, nie osobnym warsztatem. Root może składać publiczne sceny i zasoby warsztatów, a lokalny adapter może korzystać z ogólnych systemów root; zależność kodu może więc być dwukierunkowa przez jawny kontrakt bez przenoszenia właściciela pliku. Zadanie zmieniające więcej niż jedną domenę jest prowadzone jako integracja root. Mieszana zmiana prywatnych źródeł pakietu wraz z jego mapowym pinem albo placementem także jest integracją root: jedno zadanie, worktree, branch i PR obejmują oba zakresy. Wyłącznie rejestracja albo zmiana originu lub placementu bez modyfikacji prywatnych źródeł pakietu pozostaje zadaniem Mapy. `DiverController` publikuje dla root deterministyczny krok i reset ruchu, bramkę wejścia, ustawienie prądu oraz mnożnika ruchu, zapytania o intencję i sprint, sygnały dystansu oraz kontaktu, dostęp do źródła światła, ustawienia prezentacji, kotwicę kamery i token `DIVE_PLAYER_GROUP`. Bieżące pola wejścia, prądu i sprintu oraz nazwy i hierarchia `AnimatedSprite2D`, `VisualEffects`, `Camera2D`, socketów i emiterów pozostają prywatne; root nie zapisuje ich ani nie odwołuje się do dzieci ścieżkami węzłów.
 
 Root lub koordynator przydziela jedno proste, niezależne zadanie jednemu agentowi. Granice authority są egzekwowane przez osobny pełny Git worktree i gałąź `codex/<owner>/<task-slug>` dla każdego zadania. Agent pracuje wyłącznie w allowliście domeny i kończy zwykłą drogę po sekwencji `implementacja -> lokalne testy zadania -> lokalny fast-check`; po `PASS` wykonuje `commit -> push + PR -> KONIEC`, bez pollingu. Lokalne testy zmienianego zachowania i fast-check są odrębnymi etapami. Ręczny Edytor, playtest i równoległe procesy Godota nie współdzielą zapisywalnego workspace, `.godot`, `user://`, logów, temp ani portów. Szczegóły procesu należą do `AGENTS.md`; architektura zachowuje wyłącznie granice techniczne.
 
@@ -150,17 +169,19 @@ Automatyczna ścieżka publikacji klasyfikuje workflowy, narzędzia CI, konfigur
 
 Znaczenie warstw kodu:
 
+- `base_workbench` — scena, prezentacja, lokalne systemy, definicje, dane, assety, narzędzia i testy Bazy;
 - `scripts/core` — orkiestracja aplikacji, fazy, sceny, zapis, baza definicji, deterministyczne próbki i tutorial;
-- `scripts/base` — planowanie Przystani, gospodarka, wydarzenia, kariera, misje i resolver;
+- `scripts/campaign` — kampania, misje, difficulty, pogoda i atomowy resolver dnia;
 - `scripts/diving` — lokalna sesja czasu rzeczywistego, świat, ogólne reguły ruchu, ryzyko, interakcje i wynik; adapter avatara znajduje się w `diver_workbench/runtime`;
+- `scripts/survivors` — wspólna kariera, kompetencje, talenty, choroby, urazy i nieaktywny szkielet rotacji;
 - `scripts/ui` — współdzielone kontrolki powłoki, podpowiedzi wejścia i panel ustawień;
 - `scripts/data` — zapisywalny stan i obiekty kontraktowe;
-- `scripts/definitions` oraz `data` — niemutowalne definicje i wartości strojalne;
+- `scripts/definitions` oraz `data` — niemutowalne definicje i wartości strojalne należące do domen Rootu;
 - `scenes` — kompozycja węzłów i UI;
-- `tests` — testy domenowe, sceniczne, integracyjne, e2e i snapshoty.
+- `tests` — testy Rootu, persistence, granic, integracji i przekrojowych przepływów;
 - `tools` — samodzielne, deterministyczne raporty diagnostyczne poza domyślnym runnerem.
 
-Lokalne `diver_workbench/tests` chronią wewnętrzny kontrakt sceny avatara. Rootowy runner może uruchamiać je jako bezpośrednie cele, natomiast rootowe testy ogólnych mechanik zachowują granicę integracji `DiveScene -> res://diver_workbench/runtime/Diver.tscn` przez publiczne metody i sygnały, bez asercji nazw klipów, liczby klatek albo prywatnych dzieci prezentacji. Nie powstaje drugi runner ani osobny cache projektu.
+Lokalne `base_workbench/tests` chronią systemy, scenę, UI i prezentację Bazy, a `diver_workbench/tests` wewnętrzny kontrakt sceny avatara. Rootowy runner uruchamia je jako bezpośrednie cele; testy Rootu zachowują publiczne granice złożenia bez zamrażania prywatnej hierarchii UI Bazy, nazw klipów, liczby klatek ani dzieci prezentacji Nurka. Nie powstaje drugi runner ani osobny cache projektu.
 
 Główna scena: `res://scenes/main/GameRoot.tscn`.
 
@@ -242,7 +263,9 @@ Plan jest edytowalny podczas planowania. `WorkerAssignmentSystem` synchronizuje 
 
 [AKTYWNE]
 
-Główne odpowiedzialności:
+`base_workbench/runtime`, `ui`, `systems`, `definitions`, `data`, `assets`, `tools` i `tests` są lokalnym authority Bazy. Root zachowuje stan kampanii oraz systemy przekrojowe, które Baza wyłącznie konsumuje przez publiczne typy i komendy.
+
+Odpowiedzialności warsztatu Bazy:
 
 - `BaseController` — wiązanie UI z systemami i intencjami gracza;
 - `BuildingSystem` — atomowa, natychmiastowa budowa lub rozbudowa wraz z ich kosztami;
@@ -252,12 +275,15 @@ Główne odpowiedzialności:
 - `BuildingWorkSystem` — czyste projekcje połowu, automatycznej naprawy i pracy Domu, z jednym adapterem obsady dla podglądu i resolvera;
 - `WorkPaceSystem` — ID, mnożniki, zmęczenie, lokalne przejścia Napięcia i progi agregacji Nadziei;
 - `ProductionSystem` — kolejka i wytwarzanie sprzętu;
-- `InjuryRecoverySystem` — wspólna projekcja i mutujący krok gojenia;
 - `MedicalCareSystem` — jedna projekcja kwalifikacji, triage, pojemności, kosztu i efektu aktywnej opieki nad zdrowiem, urazami oraz chorobami;
+- `SettlementEventSystem` — poranny wybór i atomowy skutek.
+
+Przekrojowe odpowiedzialności Rootu używane przez Bazę:
+
+- `InjuryRecoverySystem` — wspólna projekcja i mutujący krok gojenia;
 - `DiseaseSystem` — ekspozycja, transmisja, progresja, rekonwalescencja, odporność i stan epidemii;
 - `CareerProgressionSystem` — rangi, naliczanie, kanoniczna bramka wydawania punktów wymagająca aktywnego Domu Wspólnoty I, druga specjalizacja i trwały wybór talentu wymagające poziomu II;
 - `ProfessionTalentSystem` — walidowany katalog dwóch talentów dla każdej wykonywalnej profesji oraz wspólne zapytania o zamrożony wybór;
-- `SettlementEventSystem` — poranny wybór i atomowy skutek;
 - `DifficultyDirector` — migawka `PressureState`;
 - `MissionSystem` — prowadzenie i rekonsyliacja misji;
 - `CampaignProgressionSystem` — jedyny pion Wspólnej Linii, kryzys, game over, trzy zakończenia energii i Kronika;
@@ -310,12 +336,12 @@ Nie ma aktywnego przenoszenia, sąsiedztwa, dzielnic, segmentów ani uszkodzeń 
 
 Jedynymi źródłami aktywnych, strojalnych tabel sześciu budynków są walidowane zasoby:
 
-- `data/buildings/diving_station.tres`;
-- `data/buildings/fishing_hut.tres`;
-- `data/buildings/kitchen.tres`;
-- `data/buildings/workshop.tres`;
-- `data/buildings/infirmary.tres`;
-- `data/buildings/community_house.tres`.
+- `base_workbench/data/buildings/diving_station.tres`;
+- `base_workbench/data/buildings/fishing_hut.tres`;
+- `base_workbench/data/buildings/kitchen.tres`;
+- `base_workbench/data/buildings/workshop.tres`;
+- `base_workbench/data/buildings/infirmary.tres`;
+- `base_workbench/data/buildings/community_house.tres`.
 
 `GameDatabase` wymaga dokładnie zamkniętego katalogu tych sześciu definicji. Waliduje właściwy typ i ID zasobu, niepuste oraz wzajemnie unikalne nazwy i opisy, dokładnie cztery poziomy 1–4, dodatnią liczbę stanowisk, obecność wymaganych capabilities od poziomu odblokowania do IV wraz z typem i logicznym zakresem oraz komplet premii specjalisty. Walidacja kosztów i zgodności zawodu pozostaje częścią istniejących granic bazy definicji. Widoczne dla gracza znaczenie oraz bieżące tabele poziomów należą do `docs/OgolnyZarys.txt`, sekcja 5; ten dokument nie utrzymuje ich drugiej kopii.
 
@@ -631,7 +657,7 @@ Migawka przechowuje liczbę osób z aktywnym przypadkiem, liczbę osób zakaźny
 7.3. `SettlementEventSystem`
 --------------------------------------------------------------------------------
 
-Wydarzenie powstaje po `AdvanceDay`, a przed raportem i autosave. Dwa niezależne deterministyczne rzuty wybierają najpierw wydarzenie/spokój, potem kartę. Definicje i wybory są `Resource`; progi, krzywe i bezpieczniki należą do `data/balance/settlement_events.tres`.
+Wydarzenie powstaje po `AdvanceDay`, a przed raportem i autosave. Dwa niezależne deterministyczne rzuty wybierają najpierw wydarzenie/spokój, potem kartę. Definicje i wybory są `Resource`; progi, krzywe i bezpieczniki należą do `base_workbench/data/balance/settlement_events.tres`.
 
 Selektor zużywa gotowe `active_pressure_tags`, `recovery_roles`, preferencje i blokady. `reason_codes` są diagnostyczne i nie są interpretowane jako logika.
 
@@ -1010,7 +1036,7 @@ Dokładnie trzy niewidoczne `Marker3D` są bezpośrednimi dziećmi `PlatformRig3
 
 Test środowiska sprawdza dokładnie trzy markery, trzy rozbłyski oraz trzy wiązki, zgodność kotwic i kierunku, brak lokalnego `Light3D`, fizycznej geometrii opraw i cieni VFX oraz zerową emisję `M_AmberLamp`. Chroni również stan zerowy przed J-7, aktywność na `low/medium/high` i przy `reduced_motion`, niezmienność materiałów platformy i parametrów pogody oraz jedno wspólne światło kierunkowe; natywny zrzut porównuje bazę przed i po J-7 w tym samym sztormowym kadrze i odrzuca nowe plamy lub odbicia na pokładzie.
 
-[AKTYWNE] `BaseScene` posiada jeden lokalny `AudioStreamPlayer` odtwarzający historyczny `res://assets/audio/base/oddech_przystani.ogg` przez istniejącą magistralę `Master`. Import Ogg ma `loop = true`, `loop_offset = 0`, tempo 64 BPM, 240 uderzeń, cztery uderzenia w takcie i wynikowy czas pętli 225 s. Repozytorium nie utrzymuje generatora ani drugiego źródłowego miksu tego utworu; aktywnym źródłem jest finalny Ogg. Player korzysta z `autoplay`, dziedziczy pauzę drzewa i nie ma `PROCESS_MODE_ALWAYS`. Jest niszczony razem z `BaseScene` przy każdej wymianie `SceneMount`, dlatego opuszczenie Bazy kończy muzykę, a ponowne utworzenie sceny rozpoczyna ją od początku. Nie istnieje autoload audio, trwała pozycja odtwarzania, osobna magistrala Muzyka, adaptacja do `WeatherState`, stan kampanii ani wpływ na zapis. Kontrakt decyzji: ARD-0093.
+[AKTYWNE] `BaseScene` posiada jeden lokalny `AudioStreamPlayer` odtwarzający historyczny `res://base_workbench/assets/audio/oddech_przystani.ogg` przez istniejącą magistralę `Master`. Import Ogg ma `loop = true`, `loop_offset = 0`, tempo 64 BPM, 240 uderzeń, cztery uderzenia w takcie i wynikowy czas pętli 225 s. Repozytorium nie utrzymuje generatora ani drugiego źródłowego miksu tego utworu; aktywnym źródłem jest finalny Ogg. Player korzysta z `autoplay`, dziedziczy pauzę drzewa i nie ma `PROCESS_MODE_ALWAYS`. Jest niszczony razem z `BaseScene` przy każdej wymianie `SceneMount`, dlatego opuszczenie Bazy kończy muzykę, a ponowne utworzenie sceny rozpoczyna ją od początku. Nie istnieje autoload audio, trwała pozycja odtwarzania, osobna magistrala Muzyka, adaptacja do `WeatherState`, stan kampanii ani wpływ na zapis. Kontrakt decyzji: ARD-0093.
 
 Pokrycie muzyki Bazy sprawdza produkcyjny przepływ `GameRoot -> BaseScene`, dokładnie jeden player, stream `oddech_przystani.ogg`, `Master`, autoplay, importową pętlę 225 s / 64 BPM / 240 uderzeń z offsetem 0, pauzę/wznowienie oraz usunięcie przy wymianie sceny. Test sceny nie zastępuje odsłuchu szwu ani pełnego miksu z efektami UI i cue narracji.
 
@@ -1042,17 +1068,17 @@ Pokład ma jeden dedykowany materiał `M_MeshyPlatformPBR`, używany wyłącznie
 
 Aktywne assety:
 
-- model bazy: `assets/base_3d/start_platform_ruins.glb`;
+- model bazy: `base_workbench/assets/platform_3d/start_platform_ruins.glb`;
 - ustawienie importu `gltf/embedded_image_handling=3` zachowuje 40 używanych obrazów bezstratnie wewnątrz samodzielnego zasobu GLB;
-- edytowalne źródło: `assets/base_3d/source/start_platform_ruins.blend` oraz dokładny zestaw jego zależności pod `assets/base_3d/source/textures`, wyłączone z importu przez `.gdignore`;
-- odtwarzalny authoring ruin i walidacja eksportu: `assets/base_3d/source/rebuild_start_ruins.py`;
-- świat 3D: `scripts/base/BaseWorld3D.gd`;
-- shader oceanu: `assets/base/environment_3d/ocean_surface_3d.gdshader`;
-- shader nośnika i kontaktu deszczu: `assets/base/environment_3d/rain_collision_carrier.gdshader`;
-- shader dalekiego deszczu: `assets/base/environment_3d/rain_far_veil.gdshader`;
-- poziomy przebieg rozmycia maski budynku: `assets/base/environment_3d/building_highlight_blur_horizontal.gdshader`;
-- pionowy przebieg i kompozyt miękkiej poświaty budynku: `assets/base/environment_3d/building_highlight_outline.gdshader`;
-- historyczne assety sylwetek budowy i rozbudowy, bez aktywnego stanu oczekiwania: `assets/base/building_blueprints`;
+- edytowalne źródło: `base_workbench/assets/platform_3d/source/start_platform_ruins.blend` oraz dokładny zestaw jego zależności pod `base_workbench/assets/platform_3d/source/textures`, wyłączone z importu przez `.gdignore`;
+- odtwarzalny authoring ruin i walidacja eksportu: `base_workbench/assets/platform_3d/source/rebuild_start_ruins.py`;
+- świat 3D: `base_workbench/runtime/BaseWorld3D.gd`;
+- shader oceanu: `base_workbench/assets/environment_3d/ocean_surface_3d.gdshader`;
+- shader nośnika i kontaktu deszczu: `base_workbench/assets/environment_3d/rain_collision_carrier.gdshader`;
+- shader dalekiego deszczu: `base_workbench/assets/environment_3d/rain_far_veil.gdshader`;
+- poziomy przebieg rozmycia maski budynku: `base_workbench/assets/environment_3d/building_highlight_blur_horizontal.gdshader`;
+- pionowy przebieg i kompozyt miękkiej poświaty budynku: `base_workbench/assets/environment_3d/building_highlight_outline.gdshader`;
+- historyczne assety sylwetek budowy i rozbudowy, bez aktywnego stanu oczekiwania: `base_workbench/assets/building_blueprints`;
 - interakcja 2D: `PlatformBoard`, `BuildingSlots`, `BuildingPanel` i HUD bazy.
 
 Model `start_platform_ruins.glb` musi zachować kontrakt nazw: `Ruin_<slot>`, `Ruin_<slot>_Geometry`, `SlotAnchor_<slot>` oraz `Built_<slot>_L1..L4` dla sześciu slotów `top_left`, `top_center`, `top_right`, `bottom_left`, `center`, `bottom_right`. Każda początkowa ruina jest jednym triangulowanym meshem PBR złożonym z celowo uszkodzonego podzbioru odpowiadającego wariantu L1 oraz kilku prostych elementów identyfikujących funkcję; nie korzysta z projekcji kamery, przezroczystego szkła ani współpłaszczyznowej płyty pokładu. Skrypt authoringu zachowuje nody, anchory i 24 warianty `Built_*`, kontroluje UV, materiały, obrys, dodatnią wysokość oraz wspólny budżet do 7000 trójkątów. `BaseWorld3D` indeksuje nody po nazwie, ukrywa ruiny po wybudowaniu budynku i pokazuje wyłącznie wariant odpowiadający aktywnemu poziomowi. Gdy GLB nie zostanie załadowany, istnieje prosty fallback proceduralny, ale nie jest docelową prezentacją produktu.
@@ -1162,7 +1188,7 @@ Powiązania: `docs/OgolnyZarys.txt`, sekcje 1 i 4; ARD-0001, ARD-0040, ARD-0047,
 
 Rootowy `diver_clearance_integration_test.gd` jest kontraktem złożenia rzeczywistego avatara, `DiveScene`, Mapy i zarejestrowanych struktur. Wyprowadza kopertę z aktywnych `CollisionShape2D`, używa `PhysicsDirectSpaceState2D` do sprawdzenia pozycji i `cast_motion`, a przejazd wykonuje przez produkcyjne `DiverController.simulate_motion_tick()` i `CharacterBody2D.move_and_slide()`. Dynamicznie enumeruje zamontowane `StructureRoot` oraz manifestowe operacje kolizji; nie utrzymuje prywatnych ID sterowań, socketów, stanów ani ścieżek dzieci pakietu. Replay obejmuje wejście tutorialu, poziome i pionowe gardła obu bieżących struktur, przejazd w obu kierunkach i orientacjach, wejście po skosie, stop, cofnięcie, obrót o 90 stopni w komorze, dokładne gardło 80×80, aktywny prąd, sterowania dostępne przez publiczne capability, ruchome bariery i kadr z rzeczywistej `Camera2D`; osobne przypadki kamery obejmują bezruch, zwykłe pływanie, sprint i ciągłe zwolnienie po sprincie oraz potwierdzają stały zoom, różnicę wyprzedzenia, powrót do środka, bierny prąd, respektowanie limitów świata i ekranowe zakotwiczenie wskaźnika tutoriala na avatarze. Porównanie kwadratowego rastra nawigacji dla 35 i 52,5 jednostki jest wyłącznie raportem A/B: nie zmienia `DEFAULT_DIVER_CLEARANCE`, nie blokuje buildera i nie zastępuje fizycznego replayu ani ręcznej oceny sterowania.
 
-Rootowy `workbench_boundary_test.gd` jest statyczną bramką authority warsztatów i podrzędnych pakietów struktur. Chroni pojedynczy `project.godot`, `map_manifest.json`, scenę Mapy i scenę Nurka, brak dawnych kopii, lokalnych projektów oraz cache, komplet czterech dokumentów każdego warsztatu i dokładnie `AGENTS.md` oraz `README.md` zarejestrowanej struktury. Dynamicznie enumeruje bezpośrednie katalogi `structures/<id>/`, wymaga jednego `structure_manifest.json`, zgodności folderu z dokładnie jedną mapową referencją, ścieżki bez `..`, braku mapowego placementu i niedozwolonej persistence w pakiecie, braku globalnego `class_name` w zadeklarowanych skryptach oraz braku prywatnej zawartości pakietu w rekordzie mapowym. Odrzuca też dodatkową dokumentację niezależnie od rozszerzenia; jedynym wyjątkiem jest hash-pinned materiał provenance zadeklarowany jako `authority=false`. Prywatne ID, klasy, nazwy skryptów, typy runtime i sockety z manifestów pakietów nie mogą występować w generycznych źródłach Rootu ani Mapy. Test sprawdza również publiczne referencje `res://`, jawne indeksy aktywnych MAP-ARD i DIVER-ARD, brak bezpośredniego zapisu prywatnych pól ruchu Nurka przez root oraz dynamiczne odkrywanie testów każdego zarejestrowanego pakietu przez wspólny runner. Nie preloaduje kontrolera konkretnego wieżowca ani nie zamraża jego socketów, kontraktu czy originu. Test nie zastępuje lokalnego smoke, testu pakietu, prezentacji ani integracji runtime; jest wykonywany w szybkim i pełnym zestawie wspólnego runnera.
+Rootowy `workbench_boundary_test.gd` jest statyczną bramką authority trzech warsztatów i podrzędnych pakietów struktur. Chroni pojedynczy `project.godot`, aktywne sceny Bazy, Mapy i Nurka, brak dawnych kopii, lokalnych projektów oraz cache, komplet czterech dokumentów każdego warsztatu i dokładnie `AGENTS.md` oraz `README.md` zarejestrowanej struktury. Dla Bazy wymaga `runtime/BaseScene.tscn`, lokalnych scen `ui/`, indeksu BASE-ARD oraz braku dawnych authority pod `scenes/base`, `scripts/base`, bazowymi katalogami assetów i danych oraz dawnych testów Bazy w root. Dynamicznie enumeruje bezpośrednie katalogi `structures/<id>/`, wymaga jednego `structure_manifest.json`, zgodności folderu z dokładnie jedną mapową referencją, ścieżki bez `..`, braku mapowego placementu i niedozwolonej persistence w pakiecie, braku globalnego `class_name` w zadeklarowanych skryptach oraz braku prywatnej zawartości pakietu w rekordzie mapowym. Odrzuca też dodatkową dokumentację niezależnie od rozszerzenia; jedynym wyjątkiem jest hash-pinned materiał provenance zadeklarowany jako `authority=false`. Prywatne ID, klasy, nazwy skryptów, typy runtime i sockety z manifestów pakietów nie mogą występować w generycznych źródłach Rootu ani Mapy. Test sprawdza również publiczne referencje `res://`, jawne indeksy aktywnych BASE-ARD, MAP-ARD i DIVER-ARD, brak bezpośredniego zapisu prywatnych pól ruchu Nurka przez root oraz dynamiczne odkrywanie testów każdego zarejestrowanego pakietu przez wspólny runner. Nie preloaduje kontrolera konkretnego wieżowca ani nie zamraża jego socketów, kontraktu czy originu. Test nie zastępuje lokalnych testów warsztatów, testu pakietu, prezentacji ani integracji runtime; jest wykonywany w szybkim i pełnym zestawie wspólnego runnera.
 
 Test granicy persistence sprawdza nowy podpis, atomowe odrzucenie każdej starszej wersji lub podpisu bez mutacji `WorldDelta` i brak ścieżki migracji pozycyjnej. Ogólne testy tlenu, ruchu, lootu, interakcji, ekwipunku, powrotu, tutorialu i kampanii pozostają w korzeniu, ale nie powielają fixture'ów pozycji ani topologii manifestu.
 
@@ -1192,7 +1218,7 @@ Ten przepływ chroni także strzałkę na okręgu wokół nurka: obecność od p
 
 Manifest korzeniowego runnera obejmuje ogólne domeny, sceniczne przepływy, lane natywnego okna oraz dokładnie jeden test graniczny kampania-manifest bez fixture'u układu mapy. Techniczną spójność formatu manifestu, sceny pochodnej, kompilatora i runtime sprawdza wyłącznie lokalny smoke warsztatu; root chroni wymagane semantyczne spięcie kampanii, tutorial, persistence i pozostałe mechaniki. Dokładny bieżący skład runnera należy do `README.md`, a wynik ostatniego uruchomienia do `.ai/PROJECT_CONTEXT.md`.
 
-Snapshoty bazy przechwytują prawdziwy przepływ `GameRoot -> BaseScene`, pełny HUD i reprezentatywne stany pogody, jakości oraz poziomów budynków przy deterministycznej osi prezentacji. Tryb startowy `BaseWeatherSnapshot` wymusza realny stan dnia pierwszego z sześcioma pustymi slotami i sprawdza import GLB, dokładnie sześć widocznych ruin, brak widocznych wariantów zbudowanych oraz żądany profil w macierzy `low/medium/high` × `1280×720/1280×1024`; zapisane kadry nadal wymagają kontroli wzrokowej, nie są automatycznym golden diffem. Zamknięty tryb ma chronić czytelność planszy, zgodność wariantów 3D, wspólny model światła z ARD-0071, zastąpioną historię J-7 z ARD-0094, aktywny kierunkowy wyjątek J-7 z ARD-0095 i czytelność niepodświetlonych części platformy w sztormie. Osobny stan otwartego Trybu Zarządzania Bazą chroni pełne przykrycie świata, dokładnie sześć kafelków szyny, szybkie przełączanie kontekstu, stałą widoczność nagłówka i głównej akcji, ciemno-morską ramę HUD-u i szyn oraz jasną, ciepłą powierzchnię centralnego `BuildingPanel`, a także fokus przy 1280×720 i 1280×1024. `base_environment_test.gd` chroni ponadto inwarianty opadu: przestrzeń świata near/mid, ruch w dół i zakres terminalny, konserwatywny zasięg życia z uwzględnieniem spreadu i najniższej doliny fali, odwrócenie dryfu z wiatrem, synchronizację i okluzję projekcji far, footprint kontaktu kamery dla 16:9 i 5:4, wejście emitterów z górnej części kadru, pełne wyłączenie dla zera, liniową gęstość i monotoniczny budżet jakości, co najmniej 25% zapasu dwóch niezależnych pul, kontrakt custom shadera punktu/normalnej oraz maski i koszt geometrii heightfieldu, udział wszystkich wariantów budynków i shaderowe mikrokregi na deformowanym oceanie. Dokładne fixture, progi obrazu i synchronizacja renderera należą do harnessów oraz wykonywalnych testów, nie do dokumentacji.
+Snapshoty pod `base_workbench/tests/` przechwytują prawdziwy przepływ `GameRoot -> BaseScene`, pełny HUD i reprezentatywne stany pogody, jakości oraz poziomów budynków przy deterministycznej osi prezentacji. Tryb startowy `BaseWeatherSnapshot` wymusza realny stan dnia pierwszego z sześcioma pustymi slotami i sprawdza import GLB, dokładnie sześć widocznych ruin, brak widocznych wariantów zbudowanych oraz żądany profil w macierzy `low/medium/high` × `1280×720/1280×1024`; zapisane kadry nadal wymagają kontroli wzrokowej, nie są automatycznym golden diffem. Zamknięty tryb ma chronić czytelność planszy, zgodność wariantów 3D, wspólny model światła z ARD-0071, zastąpioną historię J-7 z ARD-0094, aktywny kierunkowy wyjątek J-7 z ARD-0095 i czytelność niepodświetlonych części platformy w sztormie. Osobny stan otwartego Trybu Zarządzania Bazą chroni pełne przykrycie świata, dokładnie sześć kafelków szyny, szybkie przełączanie kontekstu, stałą widoczność nagłówka i głównej akcji, ciemno-morską ramę HUD-u i szyn oraz jasną, ciepłą powierzchnię centralnego `BuildingPanel`, a także fokus przy 1280×720 i 1280×1024. `base_workbench/tests/base_environment_test.gd` chroni ponadto inwarianty opadu: przestrzeń świata near/mid, ruch w dół i zakres terminalny, konserwatywny zasięg życia z uwzględnieniem spreadu i najniższej doliny fali, odwrócenie dryfu z wiatrem, synchronizację i okluzję projekcji far, footprint kontaktu kamery dla 16:9 i 5:4, wejście emitterów z górnej części kadru, pełne wyłączenie dla zera, liniową gęstość i monotoniczny budżet jakości, co najmniej 25% zapasu dwóch niezależnych pul, kontrakt custom shadera punktu/normalnej oraz maski i koszt geometrii heightfieldu, udział wszystkich wariantów budynków i shaderowe mikrokregi na deformowanym oceanie. Dokładne fixture, progi obrazu i synchronizacja renderera należą do harnessów oraz wykonywalnych testów, nie do dokumentacji.
 
 Osobny harness ruchu oceanu porównuje deterministyczne profile pogody i jakości w prawdziwym przepływie bazy. Udostępnia zwykły widok gry, wariant diagnostyczny bez deszczu, HUD-u oraz warstwy hitboxów, a także pełny zestaw zbudowanych wariantów do inspekcji kontaktu na dachach. Opcje `--wind=x,z`, `--scattering=on/off` i `--camera=production/topdown` pozwalają przy tej samej fazie potwierdzić stronę napływu, transmisję po zawietrznej, obrót efektu po zmianie wiatru oraz brak wpływu warstwy prezentacyjnej na ruch platformy. Test bazy dodatkowo chroni zakresy niezerowej transmisji, odbicia i retencji, integrację fazowej piany wyłącznie z nieemisyjną warstwą świeżą oraz identyczny wynik pełnego próbkowania ruchu w macierzy jakości, przeciwnych wiatrów i faz. Po natywnym rozgrzaniu harness odczytuje testowo `capture_aabb()` obu dormant impact-pools i kończy się błędem, jeżeli którakolwiek nie otrzymała rzeczywistych kolizji; odczyt bufora GPU pozostaje wyłącznie bramką harnessu, nie metryką runtime. Movie Maker przy stałych 60 FPS służy ocenie rytmu ruchu i porównaniu zsynchronizowanych klipów. Wydajność mierzy wyłącznie oddzielny natywny przebieg: harness włącza `RenderingServer.viewport_set_measure_render_time()` dla głównego viewportu i izolowanego świata Bazy, sumuje ich czasy GPU/CPU oraz raportuje percentyle wraz z draw callami, prymitywami i VRAM. Tych dwóch rodzajów dowodu nie wolno utożsamiać.
 
@@ -1234,6 +1260,6 @@ Lista zatwierdzonych, niezrealizowanych pionów należy wyłącznie do `docs/Ogo
 15. PODSUMOWANIE
 ================================================================================
 
-Aktywna architektura to `GameRoot + GameState`, rozdzielone moduły bazy i nurkowania, wejście `ExpeditionSetup`, lokalny `DiveSessionState`, atomowy `DiveResult`, jeden `EndOfDayResolver`, walidowane definicje i wersjonowany zapis.
+Aktywna architektura to `GameRoot + GameState`, lokalna domena i prezentacja Przystani w `base_workbench`, osobny moduł nurkowania, wejście `ExpeditionSetup`, lokalny `DiveSessionState`, atomowy `DiveResult`, jeden rootowy `EndOfDayResolver`, walidowane definicje i wersjonowany zapis.
 
 Granice techniczne aktywnego i docelowego zakresu pozostają rozdzielone: ten dokument mapuje wyłącznie systemy potwierdzone w `.ai/PROJECT_CONTEXT.md` albo jawnie oznaczone jako docelowe i nie ustanawia samodzielnie stanu wdrożenia.

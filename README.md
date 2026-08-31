@@ -166,6 +166,20 @@ Automatyczna ścieżka publikacji rozpoznaje między innymi:
 
 Jeżeli diff je zawiera, `publish_agent_pr.ps1` publikuje PR bez auto-merge i bez automatycznego enqueue. Właściciel podejmuje jawną ręczną decyzję; pozytywna decyzja nie omija GitHub `fast-check` ani pełnego `integration-green` merge group. Bieżący plan GitHub i wspólna tożsamość konta nie zapewniają twardego rozdzielenia autora od zatwierdzającego. Pełna separacja wymagałaby osobnej GitHub App lub tożsamości i nie jest wdrażana teraz.
 
+## Warsztat Bazy
+
+Jedyne aktywne źródła lokalnej domeny i prezentacji Przystani znajdują się w `base_workbench/`: scena i runtime Bazy, lokalne UI, systemy budynków i zarządzania, definicje, dane, assety, narzędzia oraz testy. Katalog korzysta z nadrzędnego `project.godot`, publicznych stanów i usług Rootu oraz wspólnego runnera; nie jest osobnym projektem.
+
+Na tej maszynie:
+
+```powershell
+Set-Location .\base_workbench
+Test-Path ..\project.godot
+git -C .. status --short --branch
+```
+
+Agent Bazy zaczyna od lokalnego `AGENTS.md`, krótkiego `.ai/PROJECT_CONTEXT.md` i odpowiedniej części `README.md`. Zwykłe zadanie Bazy zapisuje wyłącznie `base_workbench/**`. `GameState`, persistence, atomowy koniec dnia, kampania, misje, difficulty, pogoda, rozwój i choroby ocaleńców, ogólne systemy nurkowania oraz integracja pozostają w Root; zmiana tej granicy wymaga zadania integracyjnego.
+
 ## Mapa podwodna
 
 Cały aktywny pakiet konkretnej mapy i jej grafik świata znajduje się w `underwater_map_workbench/`: jedyny `map_manifest.json`, generowana `UnderwaterMap.tscn`, lokalny kompilator i cienki host runtime, pojedynczy builder i smoke test, shadery środowiska, mapowe `assets/` oraz podrzędne `structures/<id>/`. Manifest mapy zachowuje rejestr i globalny placement, a każdy zarejestrowany `structure_manifest.json` skupia wyłącznie lokalną topologię, grafikę, skrypty i testy jednego budynku. Avatar gracza nie należy do tego pakietu. Root repozytorium zawiera ogólne mechaniki nurkowania, dane domenowe, integrację Godot i runner testów, ale nie drugą kopię mapy ani katalog `assets/diving`.
@@ -228,6 +242,7 @@ Pojedynczy cel headless uruchamiaj przez `-Target`:
 .\tests\run_all_tests.ps1 -Target underwater_map_workbench/tests/underwater_map_smoke_test.gd
 .\tests\run_all_tests.ps1 -Target underwater_map_workbench/structures/<id>/tests/<test>.gd
 .\tests\run_all_tests.ps1 -Target diver_workbench/tests/DiverPresentationTest.tscn
+.\tests\run_all_tests.ps1 -Target base_workbench/tests/building_system_test.gd
 .\tests\run_all_tests.ps1 -Target tests/workbench_boundary_test.gd
 ```
 
@@ -240,7 +255,7 @@ Pojedynczy cel wymagający prawdziwego okna uruchamiaj przez `-NativeTarget`:
 
 `-KeepWorkspace` zachowuje izolowaną kopię do diagnozy. Runner celowo odrzuca `-InPlace`; test zawsze korzysta z pełnej kopii, aby odseparować cache, `user://` i snapshot źródeł. Ścieżkę do Godot można podać przez `-GodotConsolePath`; runner preferuje windowsowy wariant `*_console.exe`. `-AllowNativeSkip` służy wyłącznie środowisku, które jawnie nie obsługuje natywnego okna.
 
-Mapowy smoke jest jedynym testem technicznym całej złożonej mapy: sprawdza rejestr, pakiety, aktualność i ładowanie sceny oraz integrację kompilatora z runtime. Nie zawiera drugiej kopii ID, pozycji, liczby obiektów ani kolejności zawartości. Prywatny loop jednego `structures/<id>/` korzysta z celowanych trybów refresh/build/check opisanych w mapowym README oraz z testów kontraktu pakietu i jego runtime, bez globalnego placementu i persistence. Pełny mapowy build/check i smoke są bramką rejestracji, zmiany originu, publicznego montażu lub odbioru integracyjnego, a nie każdej prywatnej iteracji. `workbench_boundary_test.gd` pilnuje pojedynczych authority Root–Mapa–Struktury–Nurek, jednoznacznych pakietów struktur, zatwierdzonych dokumentów i indeksów lokalnych decyzji. Runner odkrywa testy wszystkich zarejestrowanych pakietów dynamicznie; Root nie prowadzi listy nazw budynków ani ich testów. Pozostałe testy nurkowania sprawdzają ogólne mechaniki, a nie topologię. Runner traktuje niezerowy kod procesu, timeout, `ERROR` i `SCRIPT ERROR` jako porażkę.
+Mapowy smoke jest jedynym testem technicznym całej złożonej mapy: sprawdza rejestr, pakiety, aktualność i ładowanie sceny oraz integrację kompilatora z runtime. Nie zawiera drugiej kopii ID, pozycji, liczby obiektów ani kolejności zawartości. Prywatny loop jednego `structures/<id>/` korzysta z celowanych trybów refresh/build/check opisanych w mapowym README oraz z testów kontraktu pakietu i jego runtime, bez globalnego placementu i persistence. Pełny mapowy build/check i smoke są bramką rejestracji, zmiany originu, publicznego montażu lub odbioru integracyjnego, a nie każdej prywatnej iteracji. `workbench_boundary_test.gd` pilnuje pojedynczych authority Root–Baza–Mapa–Struktury–Nurek, jednoznacznych pakietów struktur, zatwierdzonych dokumentów i indeksów lokalnych decyzji. Runner odkrywa testy Bazy oraz wszystkich zarejestrowanych pakietów we właściwych katalogach; Root nie prowadzi drugiej kopii lokalnych źródeł. Pozostałe testy nurkowania sprawdzają ogólne mechaniki, a nie topologię. Runner traktuje niezerowy kod procesu, timeout, `ERROR` i `SCRIPT ERROR` jako porażkę.
 
 ## Domyślne sterowanie
 

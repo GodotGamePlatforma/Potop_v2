@@ -20,11 +20,11 @@ const DivingEquipmentStateScript := preload("res://scripts/data/DivingEquipmentS
 const DayPlanStateScript := preload("res://scripts/data/DayPlanState.gd")
 const UnderwaterMapSceneCompilerScript := preload("res://underwater_map_workbench/runtime/UnderwaterMapSceneCompiler.gd")
 const WeatherStateScript := preload("res://scripts/data/WeatherState.gd")
-const WeatherSystemScript := preload("res://scripts/base/WeatherSystem.gd")
+const WeatherSystemScript := preload("res://scripts/campaign/WeatherSystem.gd")
 const MissionProgressStateScript := preload("res://scripts/data/MissionProgressState.gd")
 const PressureStateScript := preload("res://scripts/data/PressureState.gd")
 const DiseaseCampaignStateScript := preload("res://scripts/data/DiseaseCampaignState.gd")
-const DifficultyDirectorScript := preload("res://scripts/base/DifficultyDirector.gd")
+const DifficultyDirectorScript := preload("res://scripts/campaign/DifficultyDirector.gd")
 const PersistenceValidatorScript := preload("res://scripts/data/GameStatePersistenceValidator.gd")
 const TutorialDirectorScript := preload("res://scripts/core/TutorialDirector.gd")
 

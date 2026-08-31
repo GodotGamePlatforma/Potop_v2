@@ -5,8 +5,8 @@ const MAX_CANDIDATES := 2
 const VALID_RESULT_TIERS: Array[String] = ["failed", "lean", "standard", "rich"]
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd")
-const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
-const RosterRotationSystemScript := preload("res://scripts/base/RosterRotationSystem.gd")
+const CompetencySystemScript := preload("res://scripts/survivors/CompetencySystem.gd")
+const RosterRotationSystemScript := preload("res://scripts/survivors/RosterRotationSystem.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 
 @export var result_tier: String = ""

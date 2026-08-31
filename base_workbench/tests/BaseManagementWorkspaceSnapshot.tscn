@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/tests/base_management_workspace_snapshot.gd" id="1_workspace"]
+
+[node name="BaseManagementWorkspaceSnapshot" type="Node"]
+script = ExtResource("1_workspace")

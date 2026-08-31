@@ -5,7 +5,7 @@ const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const SettlementEventStateScript := preload("res://scripts/data/SettlementEventState.gd")
-const SettlementEventSystemScript := preload("res://scripts/base/SettlementEventSystem.gd")
+const SettlementEventSystemScript := preload("res://base_workbench/systems/SettlementEventSystem.gd")
 
 var _failed: bool = false
 

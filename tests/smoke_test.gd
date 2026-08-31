@@ -3,7 +3,7 @@ extends SceneTree
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const GameDatabaseScript := preload("res://scripts/core/GameDatabase.gd")
 const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")

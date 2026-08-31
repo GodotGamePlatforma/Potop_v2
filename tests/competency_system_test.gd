@@ -1,6 +1,6 @@
 extends SceneTree
 
-const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
+const CompetencySystemScript := preload("res://scripts/survivors/CompetencySystem.gd")
 const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 

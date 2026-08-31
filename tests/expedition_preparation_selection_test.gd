@@ -4,12 +4,12 @@ const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const BuildingStateScript := preload("res://scripts/data/BuildingState.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
-const ExpeditionPreparationSystemScript := preload("res://scripts/base/ExpeditionPreparationSystem.gd")
-const WorkerAssignmentSystemScript := preload("res://scripts/base/WorkerAssignmentSystem.gd")
-const BuildingEffectSystemScript := preload("res://scripts/base/BuildingEffectSystem.gd")
-const DivingStationHudScript := preload("res://scripts/base/DivingStationHud.gd")
+const ExpeditionPreparationSystemScript := preload("res://scripts/diving/ExpeditionPreparationSystem.gd")
+const WorkerAssignmentSystemScript := preload("res://base_workbench/systems/WorkerAssignmentSystem.gd")
+const BuildingEffectSystemScript := preload("res://base_workbench/systems/BuildingEffectSystem.gd")
+const DivingStationHudScript := preload("res://base_workbench/ui/DivingStationHud.gd")
 
-const STATION_DEFINITION := preload("res://data/buildings/diving_station.tres")
+const STATION_DEFINITION := preload("res://base_workbench/data/buildings/diving_station.tres")
 const SCOUT_TALENT := "nurek_zwiadowca"
 const TECHNICIAN_TALENT := "nurek_technik_glebinowy"
 

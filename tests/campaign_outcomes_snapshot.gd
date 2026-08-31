@@ -4,7 +4,7 @@ const EndingScene := preload("res://scenes/main/EndingScene.tscn")
 const GameOverScene := preload("res://scenes/main/GameOverScene.tscn")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
-const CampaignProgressionSystemScript := preload("res://scripts/base/CampaignProgressionSystem.gd")
+const CampaignProgressionSystemScript := preload("res://scripts/campaign/CampaignProgressionSystem.gd")
 
 func _ready() -> void:
 	var state = GameStateScript.new()

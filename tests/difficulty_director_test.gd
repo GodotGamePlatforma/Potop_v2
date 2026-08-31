@@ -1,6 +1,6 @@
 extends SceneTree
 
-const DifficultyDirectorScript := preload("res://scripts/base/DifficultyDirector.gd")
+const DifficultyDirectorScript := preload("res://scripts/campaign/DifficultyDirector.gd")
 const PressureStateScript := preload("res://scripts/data/PressureState.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
