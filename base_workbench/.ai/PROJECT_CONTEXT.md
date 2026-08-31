@@ -4,9 +4,9 @@ Rola tego pliku: krótka, datowana migawka potwierdzonego stanu lokalnego warszt
 
 ## Stan na 2026-08-31
 
-- `[KANDYDAT]` `base_workbench/` skupia jedyne źródła runtime, UI, systemów, definicji, danych, assetów, narzędzi i testów Bazy; relokacja została lokalnie odtworzona i zweryfikowana, ale oczekuje na publikację i merge.
+- `[AKTYWNE]` `base_workbench/` skupia jedyne źródła runtime, UI, systemów, definicji, danych, assetów, narzędzi i testów Bazy; relokację scalono po pełnej weryfikacji.
 - `[AKTYWNE]` Baza nadal konsumuje nadrzędny `GameState`, plan dnia i usługi integracyjne; warsztat nie posiada persistence ani osobnego projektu. Kontrakt: ARD-0114.
-- `[KANDYDAT]` `runtime/BaseScene.tscn` jest publicznym wejściem Bazy, a `ui/BuildingPanel.tscn` i `ui/BuildingSlot.tscn` jej lokalnymi składnikami.
+- `[AKTYWNE]` `runtime/BaseScene.tscn` jest publicznym wejściem Bazy, a `ui/BuildingPanel.tscn` i `ui/BuildingSlot.tscn` jej lokalnymi składnikami.
 - `[AKTYWNE]` Systemy kampanii, misji, difficulty, pogody, ocaleńców, nurkowania i atomowego końca dnia pozostają w root; lokalne UI może je wyłącznie konsumować.
 - `[AKTYWNE]` `systems/inactive/BuildingBlueprintSystem.gd` pozostaje nieaktywnym reliktem i nie jest podstawą nowej funkcji.
 
@@ -18,6 +18,7 @@ Rola tego pliku: krótka, datowana migawka potwierdzonego stanu lokalnego warszt
 
 ## Ostatnia weryfikacja
 
-- Kandydat oparty na `origin/main` `57fbdd52c1d1c6f329dbc40786e85b43f779c1a1`.
+- Finalny `origin/main` `df43057c72c84c9517d0f08dae506fd91ba30ba9` po squash merge PR #63; jego drzewo jest identyczne z przetestowanym headem PR `00db6417f50beb6e080b3d68640a57ef4855b415`.
 - PASS: 17 lokalnych celów Bazy — pięć testów systemów, sześć scenicznych flow, pięć wymaganych snapshotów natywnych oraz `BaseOceanMotionCapture.tscn`; obejmuje `BasePortraitBindingTest.tscn` i `BuildingOccupancyBadgesSnapshot.tscn`.
 - PASS: rootowe `workbench_boundary_test.gd`, `smoke_test.gd`, `worker_assignment_persistence_test.gd` i `campaign_map_contract_test.gd`.
+- PASS: lokalny fast-check 33/33, GitHub PR fast-check oraz merge group: oba shardy headless, wymagany test natywny, `integration-green` i kolejowy `fast-check`.
