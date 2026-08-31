@@ -82,6 +82,19 @@ function Assert-LfsHydrated {
     }
     try { $lfsEntries = @($listing.files) | Where-Object { $null -ne $_ } }
     catch { throw 'git lfs ls-files --json omitted the files collection.' }
+    $trackedPaths = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    $rawTrackedPaths = Invoke-NativeChecked git @(
+        '-C', $script:RepositoryPath,
+        '-c', 'core.quotePath=false',
+        'ls-files', '--cached'
+    )
+    foreach ($trackedPath in @($rawTrackedPaths -split "`r?`n")) {
+        if (-not [string]::IsNullOrWhiteSpace($trackedPath)) {
+            [void]$trackedPaths.Add((Normalize-RepoPath $trackedPath))
+        }
+    }
     $pointerHeader = [System.Text.Encoding]::ASCII.GetBytes(
         'version https://git-lfs.github.com/spec/v1'
     )
@@ -93,6 +106,9 @@ function Assert-LfsHydrated {
             throw 'git lfs ls-files --json returned an entry without a path.'
         }
         $path = Normalize-RepoPath $entryName
+        if (-not $trackedPaths.Contains($path)) {
+            continue
+        }
         $checkout = $false
         try { $checkout = [bool]$entry.checkout } catch { $checkout = $false }
         if (-not $checkout) {
@@ -458,6 +474,8 @@ foreach ($target in $TestTarget) {
 $trackedScenePaths = $null
 foreach ($path in $changedPaths) {
     if ($path -notmatch '(^|/)tests/.+_test\.gd$') { continue }
+    $absolute = Join-Path $script:RepositoryPath $path
+    if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) { continue }
     if (Test-StandaloneGodotTestScript -Path $path) {
         [void]$targets.Add($path)
         continue
