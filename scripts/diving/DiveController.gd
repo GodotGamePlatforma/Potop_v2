@@ -39,6 +39,8 @@ const MOVEMENT_TUTORIAL_DISTANCE := 180.0
 const STATIONARY_VELOCITY_EPSILON_SQUARED := 1.0
 const TUTORIAL_CABLE_BLOCKAGE_ID := "SC-01"
 const TUTORIAL_CABLE_BLOCKAGE_SEEN_DISTANCE := 200.0
+const KNIFE_PRESENTATION_DURATION := 0.30
+const KNIFE_PRESENTATION_CONTACT_PROGRESS := 0.40
 
 @onready var dive_map: ContinuousDiveWorld = $World
 @onready var diver: DiverController = $Diver
@@ -87,6 +89,9 @@ var _risk_warning: String = ""
 var _discovered_landmarks_this_dive: Array[String] = []
 var _graphics_quality := "high"
 var _reduced_motion := false
+var _next_knife_presentation_id := 1
+var _active_knife_presentation_id := -1
+var _knife_presentation_elapsed := 0.0
 
 var _oxygen_bar: ProgressBar
 var _oxygen_label: Label
@@ -145,6 +150,7 @@ func bind(root: Node, state) -> void:
 	setup = state.current_expedition_setup if state != null else null
 	if setup == null:
 		return
+	diver.set_suit_quality_presentation(int(setup.suit_quality))
 	session = DiveSessionStateScript.new()
 	session.begin(setup)
 	_configure_lighting()
@@ -221,6 +227,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if setup == null or session == null:
 		return
+	_advance_knife_attack_presentation(delta)
 	if _ending:
 		_clear_interaction_target_presentation()
 		_sync_diver_visual_context(true)
@@ -309,6 +316,8 @@ func _process(delta: float) -> void:
 	_update_ui()
 
 func _start_attempt(is_retry: bool) -> void:
+	_cancel_knife_attack_presentation()
+	_next_knife_presentation_id = 1
 	if is_retry:
 		session.reset_attempt()
 		dive_map.reset_attempt()
@@ -382,12 +391,13 @@ func _handle_combat_input() -> void:
 	if _rescue_system.is_towing(session):
 		_show_status("Nie można atakować podczas holowania.", 1.8)
 		return
+	var requested_target := get_global_mouse_position()
 	var weapon_definition = GameDatabase.diving_gear.get("harpoon_pistol") if GameDatabase != null else null
 	var attack: Dictionary = _combat_system.try_attack(
 		session,
 		setup,
 		diver.global_position,
-		get_global_mouse_position(),
+		requested_target,
 		dive_map.threats,
 		weapon_definition
 	)
@@ -397,13 +407,96 @@ func _handle_combat_input() -> void:
 			_show_status(failure_message, 1.6)
 		return
 	_risk_runtime.emit_action_noise(session, setup, str(attack.get("noise_action", "")), diver.global_position)
-	var attack_end: Vector2 = attack.get("end_position", diver.global_position)
 	var weapon_id := str(session.selected_combat_tool)
-	diver.play_visual_cue(&"harpoon_attack" if weapon_id == "harpoon_pistol" else &"knife_attack", attack_end)
-	_show_attack_trace(diver.visual_socket_global(&"tool_hand"), attack_end, weapon_id)
+	_present_resolved_attack(attack, weapon_id, requested_target)
 	var message := str(attack.get("message", ""))
 	if not message.is_empty():
 		_show_status(message, 2.0)
+
+
+func _present_resolved_attack(attack: Dictionary, weapon_id: String, requested_target: Vector2) -> bool:
+	if not bool(attack.get("success", false)):
+		return false
+	var attack_end: Vector2 = attack.get("end_position", diver.global_position)
+	if weapon_id == "knife":
+		if not _begin_knife_attack_presentation(attack, requested_target):
+			return false
+	elif weapon_id == "harpoon_pistol":
+		diver.play_visual_cue(&"harpoon_attack", attack_end)
+	else:
+		return false
+	_show_attack_trace(diver.visual_socket_global(&"tool_hand"), attack_end, weapon_id)
+	return true
+
+
+func _begin_knife_attack_presentation(attack: Dictionary, requested_target: Vector2) -> bool:
+	if _active_knife_presentation_id > 0 or not bool(attack.get("success", false)):
+		return false
+	var attack_end: Vector2 = attack.get("end_position", diver.global_position)
+	var presentation_target := attack_end
+	if not presentation_target.is_finite() or diver.global_position.distance_squared_to(presentation_target) <= 0.000001:
+		var fallback_direction := requested_target - diver.global_position
+		if not fallback_direction.is_finite() or fallback_direction.length_squared() <= 0.000001:
+			fallback_direction = Vector2.RIGHT.rotated(diver.global_rotation)
+		presentation_target = (
+			diver.global_position
+			+ fallback_direction.normalized() * DiveCombatSystemScript.KNIFE_RANGE
+		)
+	var attack_id := _next_knife_presentation_id
+	_next_knife_presentation_id += 1
+	if not diver.begin_attack_presentation(
+		attack_id,
+		&"knife",
+		presentation_target,
+		KNIFE_PRESENTATION_CONTACT_PROGRESS
+	):
+		return false
+	if not diver.set_attack_presentation_progress(attack_id, 0.0):
+		diver.end_attack_presentation(attack_id, true)
+		return false
+	if not diver.confirm_attack_presentation(
+		attack_id,
+		bool(attack.get("hit", false)),
+		attack_end,
+		bool(attack.get("defeated", false))
+	):
+		diver.end_attack_presentation(attack_id, true)
+		return false
+	_active_knife_presentation_id = attack_id
+	_knife_presentation_elapsed = 0.0
+	# Formal begin must precede the compatibility cue so it can retain particles
+	# without creating a second legacy swing or a duplicate body impulse.
+	diver.play_visual_cue(&"knife_attack", presentation_target)
+	return true
+
+
+func _advance_knife_attack_presentation(delta: float) -> void:
+	if _active_knife_presentation_id <= 0:
+		return
+	_knife_presentation_elapsed = minf(
+		_knife_presentation_elapsed + maxf(delta, 0.0),
+		KNIFE_PRESENTATION_DURATION
+	)
+	var progress := _knife_presentation_elapsed / KNIFE_PRESENTATION_DURATION
+	if not diver.set_attack_presentation_progress(_active_knife_presentation_id, progress):
+		_cancel_knife_attack_presentation()
+		return
+	if progress >= 1.0:
+		_end_knife_attack_presentation(false)
+
+
+func _end_knife_attack_presentation(canceled: bool) -> bool:
+	if _active_knife_presentation_id <= 0:
+		return false
+	var attack_id := _active_knife_presentation_id
+	_active_knife_presentation_id = -1
+	_knife_presentation_elapsed = 0.0
+	return diver.end_attack_presentation(attack_id, canceled)
+
+
+func _cancel_knife_attack_presentation() -> bool:
+	return _end_knife_attack_presentation(true)
+
 
 func _show_attack_trace(origin: Vector2, end_position: Vector2, weapon_id: String) -> void:
 	var trace := Line2D.new()

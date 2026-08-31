@@ -21,6 +21,8 @@ const CAMERA_CENTER_TOLERANCE := 1.5
 const QUERY_MARGIN := 0.05
 const THROAT_SIDE_MARGIN := 92.0
 const DIAGONAL_OFFSET := 18.0
+const KNIFE_PRESENTATION_DURATION := 0.30
+const KNIFE_CONTACT_PROGRESS := 0.40
 
 var _failed := false
 var _dive: Node
@@ -36,6 +38,7 @@ var _report := {
 	"dynamic_barriers": [],
 	"currents": [],
 	"camera": {},
+	"presentation_bridge": {},
 	"structure_runtime_states": [],
 	"clearance_ab": {},
 	"captures": [],
@@ -68,6 +71,8 @@ func _run() -> void:
 	setup.target_sector = setup.start_entry_point
 	setup.selected_objective = "basic_scavenge"
 	setup.item_weights = {"food": 1.0, "planks": 1.2, "scrap": 1.5}
+	setup.selected_gear.append("knife")
+	setup.suit_quality = 1
 	setup.tutorial_mode = true
 	setup.tutorial_baseline_step = TutorialStateScript.Step.DIVE_MOVEMENT
 	state.current_expedition_setup = setup
@@ -95,9 +100,6 @@ func _run() -> void:
 	_dive.set_physics_process(false)
 	_diver.set_physics_process(false)
 	_diver.call("set_input_enabled", false)
-	if not _capture_real_collider_contract():
-		_finish()
-		return
 	_camera = _find_gameplay_camera(_diver)
 	_assert(_camera != null, "Live DiveScene musi publikować jedną Camera2D należącą do fizycznego Nurka.")
 	if _camera == null:
@@ -109,6 +111,38 @@ func _run() -> void:
 	_camera.make_current()
 
 	var entry_position: Vector2 = state.underwater_world.blueprint.entry_position
+	_map.call("update_streaming", entry_position, true, Vector2(900.0, 600.0))
+	await process_frame
+	await physics_frame
+	var q1_state := _diver.call("presentation_state") as Dictionary
+	_assert(int(q1_state.get("suit_quality", 0)) == 1, "Produkcyjny bind Q1 musi zachować bazowy wariant kombinezonu.")
+	_clear_tutorial_indicator_for_capture()
+	await _capture_checkpoint("presentation_suit_q1", false)
+
+	setup.suit_quality = 4
+	_dive.call("bind", null, state)
+	await process_frame
+	await physics_frame
+	_diver.set_physics_process(false)
+	_diver.call("set_input_enabled", false)
+	_diver.call("configure_camera_world_bounds", world_size)
+	_camera.enabled = true
+	_camera.make_current()
+	_map.call("update_streaming", entry_position, true, Vector2(900.0, 600.0))
+	await process_frame
+	await physics_frame
+	var q4_state := _diver.call("presentation_state") as Dictionary
+	_assert(int(q4_state.get("suit_quality", 0)) == 4, "Produkcyjny bind musi przekazać kanoniczną jakość kombinezonu Q4.")
+	_clear_tutorial_indicator_for_capture()
+	await _capture_checkpoint("presentation_suit_q4", false)
+
+	if not _capture_real_collider_contract():
+		_finish()
+		return
+	await _audit_root_presentation_bridge(entry_position)
+	if _failed:
+		_finish()
+		return
 	await _audit_camera_world_limits(world_size, entry_position)
 	if _failed:
 		_finish()
@@ -201,6 +235,169 @@ func _capture_real_collider_contract() -> bool:
 		"collision_mask": _diver.collision_mask,
 	}
 	return not _failed
+
+
+func _audit_root_presentation_bridge(entry_position: Vector2) -> void:
+	_diver.call("reset_at", entry_position)
+	_camera.force_update_scroll()
+	await process_frame
+	var root_position := _diver.global_position
+	var root_rotation := _diver.rotation
+	var root_scale := _diver.scale
+	var shape_count := _owned_physical_shapes(_diver).size()
+	var hit_end := entry_position + Vector2(72.0, -18.0)
+	var hit_attack := {
+		"success": true,
+		"hit": true,
+		"defeated": false,
+		"end_position": hit_end,
+	}
+	_assert(
+		bool(_dive.call("_present_resolved_attack", hit_attack, "knife", hit_end)),
+		"Root musi rozpocząć formalną prezentację już rozstrzygniętego trafienia nożem.",
+	)
+	var state := _diver.call("presentation_state") as Dictionary
+	_assert(bool(state.get("attack_active", false)), "Formalna prezentacja noża musi być aktywna po begin.")
+	_assert(int(state.get("attack_id", -1)) == 1, "Pierwszy atak próby musi otrzymać nietrwały ID 1.")
+	_assert(is_zero_approx(float(state.get("attack_progress", -1.0))), "Formalny begin musi jawnie ustawić progress 0.")
+	_assert(is_equal_approx(float(state.get("attack_impact_progress", 0.0)), KNIFE_CONTACT_PROGRESS), "Root musi przekazać contact_progress 0.40.")
+	_assert(bool(state.get("attack_confirmed", false)) and bool(state.get("attack_hit", false)), "Natychmiastowy wynik hit musi zostać potwierdzony przed animacją kontaktu.")
+	_assert(not bool(state.get("attack_defeated", true)), "Zwykłe trafienie nie może zostać przedstawione jako defeated.")
+	var contact_position := state.get("attack_contact_global", Vector2.ZERO) as Vector2
+	_assert(contact_position.is_equal_approx(hit_end), "Formalny hit musi zachować rozstrzygnięty punkt kontaktu.")
+	_assert(StringName(state.get("cue", &"")) == &"knife_attack", "Kompatybilny cue musi pozostać dodatkiem do aktywnego formalnego ataku.")
+	_assert(not bool(_dive.call("_present_resolved_attack", hit_attack, "knife", hit_end)), "Aktywna prezentacja musi odrzucić nakładający się drugi begin bez zużycia ID.")
+	_clear_tutorial_indicator_for_capture()
+	await _capture_checkpoint("presentation_knife_00", false)
+
+	_dive.set("_ending", true)
+	_dive.call("_process", KNIFE_PRESENTATION_DURATION * KNIFE_CONTACT_PROGRESS)
+	_dive.set("_ending", false)
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(is_equal_approx(float(state.get("attack_progress", 0.0)), KNIFE_CONTACT_PROGRESS), "Prezentacja noża musi osiągnąć fazę kontaktu 0.40 przed early return procesu Root.")
+	_assert(bool(state.get("attack_active", false)) and bool(state.get("attack_confirmed", false)), "Potwierdzony wynik musi pozostać aktywny w fazie kontaktu.")
+	_assert(_diver.global_position.is_equal_approx(root_position), "Prezentacja noża nie może przesunąć fizycznego korzenia Nurka.")
+	_assert(is_equal_approx(_diver.rotation, root_rotation) and _diver.scale.is_equal_approx(root_scale), "Prezentacja noża nie może zmienić obrotu ani skali fizycznego korzenia.")
+	_assert(_owned_physical_shapes(_diver).size() == shape_count, "Warstwa noża nie może dodać collidera ani Shape2D.")
+	_clear_tutorial_indicator_for_capture()
+	await _capture_checkpoint("presentation_knife_40_contact", false)
+
+	_dive.call("_advance_knife_attack_presentation", KNIFE_PRESENTATION_DURATION * (1.0 - KNIFE_CONTACT_PROGRESS))
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(not bool(state.get("attack_active", true)), "Prezentacja noża musi zakończyć się przy progress 1.0.")
+	_assert(int(state.get("attack_last_completed_id", -1)) == 1, "Pierwszy formalny end musi zostać zapisany dokładnie raz.")
+	_assert(not bool(state.get("attack_canceled", true)), "Naturalnie ukończony wymach nie może być oznaczony jako anulowany.")
+	_dive.call("_advance_knife_attack_presentation", KNIFE_PRESENTATION_DURATION)
+	var repeated_end_state := _diver.call("presentation_state") as Dictionary
+	_assert(int(repeated_end_state.get("attack_last_completed_id", -1)) == 1, "Kolejna klatka po końcu nie może wykonać drugiego end.")
+	_clear_tutorial_indicator_for_capture()
+	await _capture_checkpoint("presentation_knife_100_end", false)
+
+	var miss_end := entry_position + Vector2(58.0, 30.0)
+	var miss_attack := {
+		"success": true,
+		"hit": false,
+		"defeated": false,
+		"end_position": miss_end,
+	}
+	_assert(bool(_dive.call("_present_resolved_attack", miss_attack, "knife", miss_end)), "Root musi przedstawić rozstrzygnięte pudło noża.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(int(state.get("attack_id", -1)) == 2 and bool(state.get("attack_confirmed", false)), "Pudło musi otrzymać rosnący ID 2 i dokładnie jedno potwierdzenie.")
+	_assert(not bool(state.get("attack_hit", true)) and not bool(state.get("attack_defeated", true)), "Pudło nie może przedstawiać hit ani defeated.")
+	_dive.call("_advance_knife_attack_presentation", KNIFE_PRESENTATION_DURATION)
+
+	var defeated_end := entry_position + Vector2(-64.0, 12.0)
+	var defeated_attack := {
+		"success": true,
+		"hit": true,
+		"defeated": true,
+		"end_position": defeated_end,
+	}
+	_assert(bool(_dive.call("_present_resolved_attack", defeated_attack, "knife", defeated_end)), "Root musi przedstawić już rozstrzygnięte defeated.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(int(state.get("attack_id", -1)) == 3 and bool(state.get("attack_hit", false)) and bool(state.get("attack_defeated", false)), "Defeated musi zachować wynik hit i rosnący ID 3.")
+	_dive.call("_advance_knife_attack_presentation", KNIFE_PRESENTATION_DURATION)
+
+	var failed_attack := {
+		"success": false,
+		"hit": false,
+		"defeated": false,
+		"end_position": entry_position,
+	}
+	_assert(not bool(_dive.call("_present_resolved_attack", failed_attack, "knife", hit_end)), "Nieudany gameplayowy atak nie może uruchomić prezentacji.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(not bool(state.get("attack_active", true)) and int(state.get("attack_last_completed_id", -1)) == 3, "Odrzucony atak nie może zmienić formalnego seriala Nurka.")
+
+	var zero_endpoint_attack := {
+		"success": true,
+		"hit": true,
+		"defeated": false,
+		"end_position": entry_position,
+	}
+	_assert(bool(_dive.call("_present_resolved_attack", zero_endpoint_attack, "knife", hit_end)), "Zerowy endpoint trafienia musi użyć niezerowego kierunku fallback prezentacji.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(bool(state.get("attack_active", false)) and int(state.get("attack_id", -1)) == 4, "Fallback endpointu musi zachować rosnący ID 4.")
+	_dive.call("_advance_knife_attack_presentation", KNIFE_PRESENTATION_DURATION)
+
+	var harpoon_end := entry_position + Vector2(120.0, 0.0)
+	var harpoon_attack := {
+		"success": true,
+		"hit": false,
+		"defeated": false,
+		"end_position": harpoon_end,
+	}
+	_assert(bool(_dive.call("_present_resolved_attack", harpoon_attack, "harpoon_pistol", harpoon_end)), "Istniejąca prezentacja harpunu musi pozostać dostępna.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(not bool(state.get("attack_active", true)) and StringName(state.get("cue", &"")) == &"harpoon_attack", "Harpun musi nadal korzystać wyłącznie ze zgodnościowego cue.")
+	_diver.call("reset_at", entry_position)
+
+	var cancel_end := entry_position + Vector2(70.0, 8.0)
+	var cancel_attack := {
+		"success": true,
+		"hit": false,
+		"defeated": false,
+		"end_position": cancel_end,
+	}
+	_assert(bool(_dive.call("_present_resolved_attack", cancel_attack, "knife", cancel_end)), "Fixture anulowania musi rozpocząć formalny atak.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(int(state.get("attack_id", -1)) == 5, "Atak anulowany musi kontynuować serial ID 5.")
+	_assert(bool(_dive.call("_cancel_knife_attack_presentation")), "Anulowanie musi wywołać formalny end dokładnie raz.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(not bool(state.get("attack_active", true)) and bool(state.get("attack_canceled", false)) and int(state.get("attack_last_completed_id", -1)) == 5, "Formalne anulowanie musi zachować canceled i ukończony ID 5.")
+	_assert(not bool(_dive.call("_cancel_knife_attack_presentation")), "Powtórne anulowanie nie może wywołać drugiego end.")
+
+	_assert(bool(_dive.call("_present_resolved_attack", cancel_attack, "knife", cancel_end)), "Fixture retry musi rozpocząć kolejny formalny atak.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(int(state.get("attack_id", -1)) == 6, "Atak przed retry musi otrzymać ID 6.")
+	_dive.call("_start_attempt", true)
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(not bool(state.get("attack_active", true)) and int(state.get("attack_id", 0)) == -1 and int(state.get("attack_last_completed_id", 0)) == -1, "Retry musi wyczyścić lokalną epokę prezentacji Nurka.")
+	_assert(bool(_dive.call("_present_resolved_attack", miss_attack, "knife", miss_end)), "Pierwszy atak po retry musi rozpocząć świeżą epokę.")
+	state = _diver.call("presentation_state") as Dictionary
+	_assert(int(state.get("attack_id", -1)) == 1, "Pierwszy atak po retry musi ponownie otrzymać ID 1.")
+	_dive.call("_advance_knife_attack_presentation", KNIFE_PRESENTATION_DURATION)
+	_diver.call("reset_at", entry_position)
+	_map.call("update_streaming", entry_position, true, Vector2(900.0, 600.0))
+	await process_frame
+	await physics_frame
+
+	_report["presentation_bridge"] = {
+		"suit_quality_q1_bound": true,
+		"suit_quality_q4_bound": true,
+		"knife_duration": KNIFE_PRESENTATION_DURATION,
+		"knife_contact_progress": KNIFE_CONTACT_PROGRESS,
+		"completed_ids_before_retry": [1, 2, 3, 4, 5],
+		"retry_first_id": 1,
+		"zero_endpoint_fallback": true,
+		"harpoon_compatibility_cue": true,
+		"physical_shape_count": shape_count,
+	}
+
+
+func _clear_tutorial_indicator_for_capture() -> void:
+	var indicator := _dive.find_child("TutorialDirectionIndicator", true, false)
+	if indicator != null and indicator.has_method("clear"):
+		indicator.call("clear")
 
 
 func _prepare_structure_runtime_for_clearance(structure_root: Node2D, current_record: Dictionary, safe_position: Vector2) -> bool:
@@ -581,19 +778,37 @@ func _audit_tutorial_indicator_tracks_diver(case: Dictionary) -> void:
 	_dive.call("_update_ui")
 
 	var state := indicator.call("state_for_tests") as Dictionary
+	_assert(is_equal_approx(float(state.get("ring_radius", 0.0)), 72.0), "Stylistyczna korekta nie może zmienić promienia pierścienia 72.")
+	_assert(is_equal_approx(float(state.get("arrow_length", 0.0)), 20.0), "Strzałka musi mieć zatwierdzoną długość 20.")
+	_assert(is_equal_approx(float(state.get("arrow_half_width", 0.0)), 9.0), "Strzałka musi mieć zatwierdzoną połowę szerokości 9.")
+	_assert(is_equal_approx(float(state.get("target_reached_distance", 0.0)), 36.0), "Stylistyczna korekta nie może zmienić reguły osiągnięcia celu 36.")
+	_assert((state.get("indicator_size", Vector2.ZERO) as Vector2).is_equal_approx(Vector2(220.0, 220.0)), "Stylistyczna korekta nie może zmienić rozmiaru wskaźnika.")
+	_assert((state.get("ring_color", Color.TRANSPARENT) as Color).is_equal_approx(Color("f2bd5518")), "Pierścień musi używać zatwierdzonej alfy 0x18.")
+	_assert(is_equal_approx(float(state.get("ring_width", 0.0)), 1.0), "Pierścień musi mieć szerokość 1.")
+	_assert((state.get("shadow_color", Color.TRANSPARENT) as Color).is_equal_approx(Color("06101470")), "Cień strzałki musi używać osłabionej alfy 0x70.")
+	_assert((state.get("shadow_offset", Vector2.ZERO) as Vector2).is_equal_approx(Vector2(1.0, 2.0)), "Cień strzałki musi mieć offset (1, 2).")
+	_assert(is_equal_approx(float(state.get("outline_width", 0.0)), 1.0), "Obrys strzałki musi mieć szerokość 1.")
+	_assert(indicator.mouse_filter == Control.MOUSE_FILTER_IGNORE, "Wskaźnik tutoriala nie może przejmować wejścia GUI.")
 	var diver_screen_position: Vector2 = _diver.get_global_transform_with_canvas().origin
 	var ring_center := indicator.get_global_rect().get_center()
 	var viewport_center := Vector2(root.get_visible_rect().size) * 0.5
 	var shifted_distance := diver_screen_position.distance_to(viewport_center)
 	var shifted_alignment := ring_center.distance_to(diver_screen_position)
+	var navigation_target := _dive.call("_tutorial_navigation_target") as Dictionary
+	var expected_direction := (
+		(navigation_target.get("position", _diver.global_position) as Vector2)
+		- _diver.global_position
+	).normalized()
 	_assert(bool(state.get("visible", false)), "Wskaźnik tutoriala musi być widoczny podczas pierwszego zejścia.")
 	_assert(str(state.get("target_label", "")) == "ZASOBY", "Próba kamery nie może zmienić semantycznego celu wskaźnika tutoriala.")
+	_assert((state.get("direction", Vector2.ZERO) as Vector2).is_equal_approx(expected_direction), "Strzałka musi zachować kierunek rzeczywistego celu tutoriala.")
 	_assert(shifted_distance > 20.0, "Fixture wskaźnika musi rzeczywiście przesunąć Nurka poza środek viewportu.")
 	_assert(
 		shifted_alignment <= 1.0,
 		"Pierścień tutoriala musi pozostać wycentrowany na Nurku przy aktywnym look-ahead; diver=%s ring=%s delta=%.3f."
 		% [diver_screen_position, ring_center, shifted_alignment],
 	)
+	await _capture_checkpoint("tutorial_indicator_lookahead")
 
 	_diver.call("reset_at", start)
 	_camera.force_update_scroll()
@@ -607,6 +822,19 @@ func _audit_tutorial_indicator_tracks_diver(case: Dictionary) -> void:
 		"Pierścień tutoriala musi pozostać na Nurku po powrocie kamery do centrum; diver=%s ring=%s delta=%.3f."
 		% [diver_screen_position, ring_center, centered_alignment],
 	)
+	await _capture_checkpoint("tutorial_indicator_centered")
+
+	indicator.call("present", Vector2.RIGHT, "PRÓG", 36.0)
+	var reached_state := indicator.call("state_for_tests") as Dictionary
+	_assert(not bool(reached_state.get("visible", true)), "Cel dokładnie w progu 36 musi ukryć wskaźnik.")
+	_assert(str(reached_state.get("target_label", "")) == "PRÓG", "Próg osiągnięcia nie może zgubić semantycznego celu.")
+	indicator.call("present", Vector2.RIGHT, "PRÓG", 36.01)
+	var beyond_state := indicator.call("state_for_tests") as Dictionary
+	_assert(bool(beyond_state.get("visible", false)), "Cel tuż poza progiem 36 musi pokazać wskaźnik.")
+	_assert((beyond_state.get("direction", Vector2.ZERO) as Vector2).is_equal_approx(Vector2.RIGHT), "Próg widoczności nie może zmienić kierunku celu.")
+	indicator.call("present", Vector2.ZERO, "ZEROWY KIERUNEK", 100.0)
+	_assert(not bool((indicator.call("state_for_tests") as Dictionary).get("visible", true)), "Zerowy kierunek musi ukryć wskaźnik niezależnie od dystansu.")
+	_dive.call("_update_ui")
 	_diver.set_block_signals(original_signal_blocking)
 
 	var camera_report := _report.get("camera", {}) as Dictionary
@@ -1207,7 +1435,7 @@ func _prepare_report_root() -> bool:
 	return true
 
 
-func _capture_checkpoint(label: String) -> void:
+func _capture_checkpoint(label: String, refresh_ui: bool = true) -> void:
 	if not _native_capture or _camera == null:
 		return
 	_camera.make_current()
@@ -1216,7 +1444,8 @@ func _capture_checkpoint(label: String) -> void:
 	# The harness disables the production controller's process loop so route replay
 	# stays deterministic; refresh its derived HUD once against the final camera
 	# transform before recording the visual proof.
-	_dive.call("_update_ui")
+	if refresh_ui:
+		_dive.call("_update_ui")
 	for _frame in range(4):
 		await process_frame
 	await RenderingServer.frame_post_draw
