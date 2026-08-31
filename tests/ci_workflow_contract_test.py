@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -30,6 +31,7 @@ def job_block(workflow: str, job_id: str) -> str:
 def violations(validation: str, integration: str) -> list[str]:
     findings: list[str] = []
     combined = validation + "\n" + integration
+    validation_fast_check = job_block(validation, "fast-check")
     integration_shards = job_block(integration, "integration-shards")
     integration_green = job_block(integration, "integration-green")
     fast_check = job_block(integration, "fast-check")
@@ -57,6 +59,9 @@ def violations(validation: str, integration: str) -> list[str]:
         findings.append("PR fast-check must bind the event branch")
     if "./tools/agent_fast_check.ps1" not in validation:
         findings.append("PR workflow must use the canonical fast-check")
+    timeout = re.search(r"(?m)^    timeout-minutes:\s*(\d+)\s*$", validation_fast_check)
+    if timeout is None or int(timeout.group(1)) < 60:
+        findings.append("PR fast-check timeout must allow the canonical changed-target lane")
     if "  merge_group:\n" not in integration:
         findings.append("integration workflow must use merge_group")
     if "  integration-shards:\n" not in integration:
@@ -196,6 +201,18 @@ class WorkflowContractTest(unittest.TestCase):
         findings = violations(mutated, self.integration)
         self.assertIn("validation must use pull_request", findings)
         self.assertIn("PR workflow must check out the exact head", findings)
+
+    def test_short_pr_timeout_is_detected(self) -> None:
+        mutated = re.sub(
+            r"(?m)^    timeout-minutes:\s*\d+\s*$",
+            "    timeout-minutes: 20",
+            self.validation,
+            count=1,
+        )
+        self.assertIn(
+            "PR fast-check timeout must allow the canonical changed-target lane",
+            violations(mutated, self.integration),
+        )
 
     def test_detached_sha_binding_and_lfs_regressions_are_detected(self) -> None:
         detached = self.validation.replace("-ExpectedHeadSha $env:EXPECTED_HEAD", "")
