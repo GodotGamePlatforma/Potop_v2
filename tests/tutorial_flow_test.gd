@@ -3,10 +3,10 @@ extends SceneTree
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const GameFormatScript := preload("res://scripts/data/GameFormat.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
-const BuildingSystemScript := preload("res://scripts/base/BuildingSystem.gd")
-const WorkerAssignmentSystemScript := preload("res://scripts/base/WorkerAssignmentSystem.gd")
-const ExpeditionPreparationSystemScript := preload("res://scripts/base/ExpeditionPreparationSystem.gd")
-const EndOfDayResolverScript := preload("res://scripts/base/EndOfDayResolver.gd")
+const BuildingSystemScript := preload("res://base_workbench/systems/BuildingSystem.gd")
+const WorkerAssignmentSystemScript := preload("res://base_workbench/systems/WorkerAssignmentSystem.gd")
+const ExpeditionPreparationSystemScript := preload("res://scripts/diving/ExpeditionPreparationSystem.gd")
+const EndOfDayResolverScript := preload("res://scripts/campaign/EndOfDayResolver.gd")
 const TutorialStateScript := preload("res://scripts/data/TutorialState.gd")
 const TutorialDirectorScript := preload("res://scripts/core/TutorialDirector.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
@@ -47,7 +47,7 @@ func _initialize() -> void:
 
 	_assert(_build(state, buildings, director, "workshop"), "Pakiet tutorialowy powinien finansować Warsztat przed nurkowaniem.")
 	var station = state.find_building_by_definition("diving_station")
-	var station_definition = ResourceLoader.load("res://data/buildings/diving_station.tres")
+	var station_definition = ResourceLoader.load("res://base_workbench/data/buildings/diving_station.tres")
 	_assert(ExpeditionPreparationSystemScript.new().select_diver(state, station, station_definition, "igor"), "Igor powinien móc zostać wybranym nurkiem niezależnie od obsady Stacji.")
 	_assert(director.reconcile_base_progress(state), "Wybór Igora powinien odblokować pierwsze zejście.")
 	for event_id in [TutorialDirectorScript.DIVE_STARTED, TutorialDirectorScript.MOVEMENT_COMPLETED, TutorialDirectorScript.OXYGEN_EXPLAINED, TutorialDirectorScript.MANDATORY_CONTAINER_OPENED, TutorialDirectorScript.MANDATORY_LOOT_COMPLETED, TutorialDirectorScript.BLOCKED_PASSAGE_SEEN, TutorialDirectorScript.FIRST_DIVE_COMPLETED]:
@@ -95,7 +95,7 @@ func _initialize() -> void:
 	quit(0)
 
 func _build(state, system, director, definition_id: String) -> bool:
-	var definition = ResourceLoader.load("res://data/buildings/%s.tres" % definition_id)
+	var definition = ResourceLoader.load("res://base_workbench/data/buildings/%s.tres" % definition_id)
 	var slot_id := ""
 	for candidate in state.platform.slot_states:
 		if str(state.platform.slot_states[candidate].get("definition_id", "")) == definition_id:

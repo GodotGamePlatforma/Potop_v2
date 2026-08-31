@@ -4,7 +4,7 @@ extends PanelContainer
 const DiverHudPortraitScript := preload("res://scripts/diving/DiverHudPortrait.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
-const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
+const ProfessionTalentSystemScript := preload("res://scripts/survivors/ProfessionTalentSystem.gd")
 
 var oxygen_bar: ProgressBar
 var oxygen_label: Label

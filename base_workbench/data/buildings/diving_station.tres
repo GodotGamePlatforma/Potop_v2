@@ -1,0 +1,46 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/definitions/BuildingDefinition.gd" id="1_building"]
+[ext_resource type="Script" path="res://base_workbench/definitions/BuildingLevelDefinition.gd" id="2_level"]
+
+[sub_resource type="Resource" id="Level1"]
+script = ExtResource("2_level")
+level = 1
+display_name = "Drabina i lina"
+worker_slots = 1
+capabilities = {"backpack_slots": 6, "can_dive": true, "staffed_diver_carry_multiplier": 1.05}
+build_cost = {"fabric_rubber": 2, "planks": 6, "scrap": 4}
+
+[sub_resource type="Resource" id="Level2"]
+script = ExtResource("2_level")
+level = 2
+display_name = "Sprężarka i wyciągarka"
+worker_slots = 2
+capabilities = {"backpack_slots": 10, "can_dive": true, "operator_rescue_enabled": true, "staffed_diver_carry_multiplier": 1.05}
+upgrade_cost = {"planks": 8, "scrap": 7, "tech_parts": 2}
+
+[sub_resource type="Resource" id="Level3"]
+script = ExtResource("2_level")
+level = 3
+display_name = "Sonar i komora ciśnieniowa"
+worker_slots = 2
+capabilities = {"backpack_slots": 14, "buoy_enabled": true, "can_dive": true, "operator_rescue_enabled": true, "staffed_diver_carry_multiplier": 1.05}
+upgrade_cost = {"fabric_rubber": 4, "planks": 12, "scrap": 12, "tech_parts": 6}
+
+[sub_resource type="Resource" id="Level4"]
+script = ExtResource("2_level")
+level = 4
+display_name = "Dzwon głębinowy"
+worker_slots = 3
+capabilities = {"backpack_slots": 16, "buoy_enabled": true, "buoy_start_enabled": true, "can_dive": true, "heavy_marking_enabled": true, "operator_rescue_enabled": true, "staffed_diver_carry_multiplier": 1.05, "technician_support_enabled": true, "technician_suit_damage_multiplier": 0.9}
+upgrade_cost = {"fabric_rubber": 8, "planks": 18, "scrap": 20, "tech_parts": 12}
+
+[resource]
+script = ExtResource("1_building")
+id = "diving_station"
+display_name = "Stacja Nurkowa"
+description = "Umożliwia wyprawy po wybraniu wolnego Nurka; obsada Stacji daje mu +5% udźwigu. Kolejne poziomy zwiększają plecak, jakość kombinezonu i wsparcie ekspedycji."
+max_level = 4
+requires_edge = true
+levels = Array[Resource]([SubResource("Level1"), SubResource("Level2"), SubResource("Level3"), SubResource("Level4")])
+specialist_bonus = {"oxygen_bonus": 15, "oxygen_capacity_multiplier": 1.1, "profession": "nurek"}

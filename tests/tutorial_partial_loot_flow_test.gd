@@ -6,7 +6,7 @@ const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const TutorialDirectorScript := preload("res://scripts/core/TutorialDirector.gd")
 const TutorialStateScript := preload("res://scripts/data/TutorialState.gd")
 const GamePhaseScript := preload("res://scripts/core/GamePhase.gd")
-const BuildingSystemScript := preload("res://scripts/base/BuildingSystem.gd")
+const BuildingSystemScript := preload("res://base_workbench/systems/BuildingSystem.gd")
 
 var _failed := false
 
@@ -24,7 +24,7 @@ func _run() -> void:
 	game.game_state.day = 2
 	game.game_state.begin_new_day_plan()
 	game.game_state.tutorial.step = TutorialStateScript.Step.BUILD_WORKSHOP
-	var workshop_definition = ResourceLoader.load("res://data/buildings/workshop.tres")
+	var workshop_definition = ResourceLoader.load("res://base_workbench/data/buildings/workshop.tres")
 	_assert(BuildingSystemScript.new().queue_construction(game.game_state, "bottom_left", workshop_definition), "Fixture dnia 2 musi legalnie odbudować Warsztat przed pierwszym zejściem.")
 	game.game_state.tutorial.step = TutorialStateScript.Step.START_FIRST_DIVE
 	_assert_tutorial_mode_asymmetries_are_rejected(game)

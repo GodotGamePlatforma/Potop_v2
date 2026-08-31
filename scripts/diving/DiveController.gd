@@ -32,7 +32,7 @@ const SectorPersistenceSystemScript := preload("res://scripts/diving/SectorPersi
 const RescueSystemScript := preload("res://scripts/diving/RescueSystem.gd")
 const RescueSurvivorScript := preload("res://scripts/diving/DiveRescueSurvivor.gd")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
-const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
+const ProfessionTalentSystemScript := preload("res://scripts/survivors/ProfessionTalentSystem.gd")
 
 const INTERACTION_DISTANCE := DiveInteractionRulesScript.INTERACTION_DISTANCE
 const MOVEMENT_TUTORIAL_DISTANCE := 180.0

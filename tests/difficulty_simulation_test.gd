@@ -6,8 +6,8 @@ const CRISIS_SAMPLE_COUNT := 150
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const WeatherStateScript := preload("res://scripts/data/WeatherState.gd")
-const DifficultyDirectorScript := preload("res://scripts/base/DifficultyDirector.gd")
-const SettlementEventSystemScript := preload("res://scripts/base/SettlementEventSystem.gd")
+const DifficultyDirectorScript := preload("res://scripts/campaign/DifficultyDirector.gd")
+const SettlementEventSystemScript := preload("res://base_workbench/systems/SettlementEventSystem.gd")
 
 var _failed: bool = false
 
@@ -145,7 +145,7 @@ func _load_event_definitions() -> Dictionary:
 		"torn_mooring.tres",
 		"trader_at_dawn.tres",
 	]:
-		var definition = ResourceLoader.load("res://data/events/%s" % file_name)
+		var definition = ResourceLoader.load("res://base_workbench/data/events/%s" % file_name)
 		if definition != null:
 			result[str(definition.id)] = definition
 	return result

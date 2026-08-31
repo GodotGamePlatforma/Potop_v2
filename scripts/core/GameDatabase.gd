@@ -1,17 +1,17 @@
 extends Node
 
-const BuildingDefinitionScript := preload("res://scripts/definitions/BuildingDefinition.gd")
-const BuildingLevelDefinitionScript := preload("res://scripts/definitions/BuildingLevelDefinition.gd")
+const BuildingDefinitionScript := preload("res://base_workbench/definitions/BuildingDefinition.gd")
+const BuildingLevelDefinitionScript := preload("res://base_workbench/definitions/BuildingLevelDefinition.gd")
 const DiseaseDefinitionScript := preload("res://scripts/definitions/DiseaseDefinition.gd")
 const DiveLightingDefinitionScript := preload("res://scripts/definitions/DiveLightingDefinition.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const MissionObjectiveDefinitionScript := preload("res://scripts/definitions/MissionObjectiveDefinition.gd")
-const SettlementEventChoiceDefinitionScript := preload("res://scripts/definitions/SettlementEventChoiceDefinition.gd")
-const SettlementEventDefinitionScript := preload("res://scripts/definitions/SettlementEventDefinition.gd")
-const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
+const SettlementEventChoiceDefinitionScript := preload("res://base_workbench/definitions/SettlementEventChoiceDefinition.gd")
+const SettlementEventDefinitionScript := preload("res://base_workbench/definitions/SettlementEventDefinition.gd")
+const ProfessionTalentSystemScript := preload("res://scripts/survivors/ProfessionTalentSystem.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
 const UnderwaterMapSceneCompilerScript := preload("res://underwater_map_workbench/runtime/UnderwaterMapSceneCompiler.gd")
-const SETTLEMENT_EVENT_BALANCE_PATH := "res://data/balance/settlement_events.tres"
+const SETTLEMENT_EVENT_BALANCE_PATH := "res://base_workbench/data/balance/settlement_events.tres"
 const DIVE_LIGHTING_PATH := "res://data/balance/dive_lighting.tres"
 
 
@@ -112,13 +112,13 @@ func load_definitions() -> void:
 	difficulty_profiles = _load_resource_map("res://data/difficulty", "profile_name")
 	_rebuild_difficulty_profile_index()
 	diseases = _load_resource_map("res://data/diseases", "id")
-	buildings = _load_resource_map("res://data/buildings", "id")
+	buildings = _load_resource_map("res://base_workbench/data/buildings", "id")
 	items = _load_resource_map("res://data/items", "id")
 	diving_gear = _load_resource_map("res://data/diving_gear", "id")
-	workshop_recipes = _load_resource_map("res://data/workshop_recipes", "id")
+	workshop_recipes = _load_resource_map("res://base_workbench/data/workshop_recipes", "id")
 	threats = _load_resource_map("res://data/threats", "id")
 	rescue_encounters = _load_resource_map("res://data/survivors", "id")
-	settlement_events = _load_resource_map("res://data/events", "id")
+	settlement_events = _load_resource_map("res://base_workbench/data/events", "id")
 	settlement_event_balance = _load_required_resource(SETTLEMENT_EVENT_BALANCE_PATH)
 	dive_lighting = _load_required_resource(DIVE_LIGHTING_PATH)
 	survivor_templates = _load_resource_map("res://data/survivor_templates", "id")

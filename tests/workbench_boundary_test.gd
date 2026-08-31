@@ -1,6 +1,7 @@
 extends SceneTree
 
 const MAP_WORKBENCH_PATH := "res://underwater_map_workbench"
+const BASE_WORKBENCH_PATH := "res://base_workbench"
 const MAP_MANIFEST_PATH := MAP_WORKBENCH_PATH + "/map_manifest.json"
 const STRUCTURE_PACKAGES_PATH := MAP_WORKBENCH_PATH + "/structures"
 const STRUCTURE_MANIFEST_FILE := "structure_manifest.json"
@@ -74,6 +75,20 @@ const DOCUMENTATION_EXTENSIONS := {
 
 const UNIQUE_AUTHORITY_PATHS := {
 	"project.godot": "res://project.godot",
+	"BaseScene.tscn": "res://base_workbench/runtime/BaseScene.tscn",
+	"BaseController.gd": "res://base_workbench/runtime/BaseController.gd",
+	"BaseEnvironment.gd": "res://base_workbench/runtime/BaseEnvironment.gd",
+	"BaseWorld3D.gd": "res://base_workbench/runtime/BaseWorld3D.gd",
+	"BuildingPanel.tscn": "res://base_workbench/ui/BuildingPanel.tscn",
+	"BuildingSlot.tscn": "res://base_workbench/ui/BuildingSlot.tscn",
+	"BuildingSystem.gd": "res://base_workbench/systems/BuildingSystem.gd",
+	"ProductionSystem.gd": "res://base_workbench/systems/ProductionSystem.gd",
+	"SettlementEventSystem.gd": "res://base_workbench/systems/SettlementEventSystem.gd",
+	"BuildingDefinition.gd": "res://base_workbench/definitions/BuildingDefinition.gd",
+	"WorkshopRecipeDefinition.gd": "res://base_workbench/definitions/WorkshopRecipeDefinition.gd",
+	"settlement_events.tres": "res://base_workbench/data/balance/settlement_events.tres",
+	"start_platform_ruins.glb": "res://base_workbench/assets/platform_3d/start_platform_ruins.glb",
+	"oddech_przystani.ogg": "res://base_workbench/assets/audio/oddech_przystani.ogg",
 	"map_manifest.json": "res://underwater_map_workbench/map_manifest.json",
 	"UnderwaterMap.tscn": "res://underwater_map_workbench/UnderwaterMap.tscn",
 	"UnderwaterMapRuntime.gd": "res://underwater_map_workbench/runtime/UnderwaterMapRuntime.gd",
@@ -91,6 +106,7 @@ const UNIQUE_AUTHORITY_PATHS := {
 }
 
 const WORKBENCH_PATHS := [
+	BASE_WORKBENCH_PATH,
 	"res://underwater_map_workbench",
 	"res://diver_workbench",
 ]
@@ -103,6 +119,82 @@ const REQUIRED_WORKBENCH_DOCUMENTS := [
 ]
 
 const FORBIDDEN_LEGACY_PATHS := [
+	"res://scenes/base",
+	"res://scripts/base",
+	"res://assets/base",
+	"res://assets/base_3d",
+	"res://assets/audio/base",
+	"res://data/buildings",
+	"res://data/events",
+	"res://data/workshop_recipes",
+	"res://data/balance/settlement_events.tres",
+	"res://assets/ui/building_rebuild_indicator.png",
+	"res://assets/ui/building_rebuild_indicator_source.png",
+	"res://tools/audio",
+	"res://scripts/definitions/BuildingDefinition.gd",
+	"res://scripts/definitions/BuildingDefinition.gd.uid",
+	"res://scripts/definitions/BuildingLevelDefinition.gd",
+	"res://scripts/definitions/BuildingLevelDefinition.gd.uid",
+	"res://scripts/definitions/WorkshopRecipeDefinition.gd",
+	"res://scripts/definitions/WorkshopRecipeDefinition.gd.uid",
+	"res://scripts/definitions/SettlementEventDefinition.gd",
+	"res://scripts/definitions/SettlementEventDefinition.gd.uid",
+	"res://scripts/definitions/SettlementEventChoiceDefinition.gd",
+	"res://scripts/definitions/SettlementEventChoiceDefinition.gd.uid",
+	"res://scripts/definitions/SettlementEventBalanceDefinition.gd",
+	"res://scripts/definitions/SettlementEventBalanceDefinition.gd.uid",
+	"res://scripts/definitions/SettlementEventWeightBandDefinition.gd",
+	"res://scripts/definitions/SettlementEventWeightBandDefinition.gd.uid",
+	"res://scripts/definitions/SettlementEventWeightCurveDefinition.gd",
+	"res://scripts/definitions/SettlementEventWeightCurveDefinition.gd.uid",
+	"res://scripts/definitions/SettlementEventWeightRuleDefinition.gd",
+	"res://scripts/definitions/SettlementEventWeightRuleDefinition.gd.uid",
+	"res://tests/base_environment_test.gd",
+	"res://tests/base_environment_test.gd.uid",
+	"res://tests/building_system_test.gd",
+	"res://tests/building_system_test.gd.uid",
+	"res://tests/production_system_test.gd",
+	"res://tests/production_system_test.gd.uid",
+	"res://tests/settlement_event_balance_test.gd",
+	"res://tests/settlement_event_balance_test.gd.uid",
+	"res://tests/settlement_event_system_test.gd",
+	"res://tests/settlement_event_system_test.gd.uid",
+	"res://tests/base_buildings_snapshot.gd",
+	"res://tests/base_buildings_snapshot.gd.uid",
+	"res://tests/base_management_workspace_snapshot.gd",
+	"res://tests/base_management_workspace_snapshot.gd.uid",
+	"res://tests/base_music_test.gd",
+	"res://tests/base_music_test.gd.uid",
+	"res://tests/base_ocean_motion_capture.gd",
+	"res://tests/base_ocean_motion_capture.gd.uid",
+	"res://tests/base_optional_panels_flow_test.gd",
+	"res://tests/base_optional_panels_flow_test.gd.uid",
+	"res://tests/base_portrait_binding_test.gd",
+	"res://tests/base_portrait_binding_test.gd.uid",
+	"res://tests/base_ui_snapshot.gd",
+	"res://tests/base_ui_snapshot.gd.uid",
+	"res://tests/base_weather_snapshot.gd",
+	"res://tests/base_weather_snapshot.gd.uid",
+	"res://tests/building_occupancy_badges_snapshot.gd",
+	"res://tests/building_occupancy_badges_snapshot.gd.uid",
+	"res://tests/building_slot_motion_test.gd",
+	"res://tests/building_slot_motion_test.gd.uid",
+	"res://tests/survivor_development_flow_test.gd",
+	"res://tests/survivor_development_flow_test.gd.uid",
+	"res://tests/worker_candidate_picker_flow_test.gd",
+	"res://tests/worker_candidate_picker_flow_test.gd.uid",
+	"res://tests/BaseBuildingsSnapshot.tscn",
+	"res://tests/BaseManagementWorkspaceSnapshot.tscn",
+	"res://tests/BaseMusicTest.tscn",
+	"res://tests/BaseOceanMotionCapture.tscn",
+	"res://tests/BaseOptionalPanelsFlowTest.tscn",
+	"res://tests/BasePortraitBindingTest.tscn",
+	"res://tests/BaseUISnapshot.tscn",
+	"res://tests/BaseWeatherSnapshot.tscn",
+	"res://tests/BuildingOccupancyBadgesSnapshot.tscn",
+	"res://tests/BuildingSlotMotionTest.tscn",
+	"res://tests/SurvivorDevelopmentFlowTest.tscn",
+	"res://tests/WorkerCandidatePickerFlowTest.tscn",
 	"res://scenes/diving/UnderwaterMap.tscn",
 	"res://scenes/diving/Diver.tscn",
 	"res://scripts/diving/DiverController.gd",
@@ -133,6 +225,13 @@ const FORBIDDEN_LEGACY_PATHS := [
 
 const REFERENCE_SOURCE_PATHS := [
 	"res://project.godot",
+	"res://scripts/core/GameRoot.gd",
+	"res://base_workbench/runtime/BaseScene.tscn",
+	"res://base_workbench/runtime/BaseController.gd",
+	"res://base_workbench/runtime/BaseEnvironment.gd",
+	"res://base_workbench/runtime/BaseWorld3D.gd",
+	"res://base_workbench/ui/BuildingPanel.tscn",
+	"res://base_workbench/ui/BuildingSlot.tscn",
 	"res://scenes/diving/DiveScene.tscn",
 	"res://scripts/diving/DiveController.gd",
 	"res://scripts/diving/ContinuousDiveWorld.gd",
@@ -161,6 +260,10 @@ const MAP_STRUCTURE_INTEGRATION_SOURCE_PATHS := [
 	"res://underwater_map_workbench/tests/underwater_map_proxy_capture_test.gd",
 ]
 const GENERIC_STRUCTURE_DOCUMENT_PATHS := [
+	"res://base_workbench/AGENTS.md",
+	"res://base_workbench/README.md",
+	"res://base_workbench/.ai/PROJECT_CONTEXT.md",
+	"res://base_workbench/.ai/DECISIONS.md",
 	"res://underwater_map_workbench/AGENTS.md",
 	"res://underwater_map_workbench/README.md",
 	"res://underwater_map_workbench/.ai/PROJECT_CONTEXT.md",
@@ -199,6 +302,7 @@ const FORBIDDEN_DIVER_ROOT_FRAGMENTS := [
 ]
 
 const DECISION_REGISTRIES := {
+	"res://base_workbench/.ai/DECISIONS.md": "BASE-ARD",
 	"res://underwater_map_workbench/.ai/DECISIONS.md": "MAP-ARD",
 	"res://diver_workbench/.ai/DECISIONS.md": "DIVER-ARD",
 }
@@ -229,6 +333,21 @@ const REQUIRED_AGENT_DELIVERY_FRAGMENTS := {
 		"exact final main SHA",
 		"builds/current tylko po PASS",
 		"Błąd builda albo smoke pozostawia poprzednie `builds/current` bez zmian",
+	],
+	"res://base_workbench/AGENTS.md": [
+		"pełny checkout z `../project.godot`",
+		"Prywatne zadanie Bazy zapisuje wyłącznie `base_workbench/**`",
+		"implementacja -> lokalne testy zadania -> lokalny fast-check",
+		"tools/finish_agent_task.ps1",
+		"Nie pushuj do `main`, nie polluj i nie babysituj kolejki",
+		"LocalHead = RemoteHead = PullRequestHead",
+	],
+	"res://base_workbench/README.md": [
+		"Nie jest osobnym projektem ani biblioteką",
+		"bezpośredni cel we wspólnym, izolowanym runnerze",
+		"Zwykły autor nie uruchamia pełnej regresji",
+		"tools/finish_agent_task.ps1",
+		"identycznych `LocalHead`, `RemoteHead` i `PullRequestHead`",
 	],
 	"res://underwater_map_workbench/AGENTS.md": [
 		"jedno proste zadanie jednemu agentowi",
@@ -1485,6 +1604,6 @@ func _finish() -> void:
 		quit(1)
 		return
 	print(
-		"Workbench boundary test passed: Root, Map, nested Structure packages and Diver keep one authority and valid references."
+		"Workbench boundary test passed: Root, Base, Map, nested Structure packages and Diver keep one authority and valid references."
 	)
 	quit(0)

@@ -6,8 +6,8 @@ const TemperatureSystemScript := preload("res://scripts/diving/TemperatureSystem
 const NoiseSystemScript := preload("res://scripts/diving/NoiseSystem.gd")
 const ThreatSystemScript := preload("res://scripts/diving/ThreatSystem.gd")
 const InputPromptScript := preload("res://scripts/ui/InputPrompt.gd")
-const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
-const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
+const CompetencySystemScript := preload("res://scripts/survivors/CompetencySystem.gd")
+const ProfessionTalentSystemScript := preload("res://scripts/survivors/ProfessionTalentSystem.gd")
 
 const REPAIR_MODE_STANDARD := "standard"
 const REPAIR_MODE_QUIET := "quiet"

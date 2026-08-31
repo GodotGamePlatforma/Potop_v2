@@ -16,8 +16,8 @@ const DIVE_MAX_HUNGER_EXCLUSIVE := 65
 const DIVE_MAX_FATIGUE_EXCLUSIVE := 85
 const DIVE_MIN_MORALE := 20
 const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd")
-const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
-const ProfessionTalentSystemScript := preload("res://scripts/base/ProfessionTalentSystem.gd")
+const CompetencySystemScript := preload("res://scripts/survivors/CompetencySystem.gd")
+const ProfessionTalentSystemScript := preload("res://scripts/survivors/ProfessionTalentSystem.gd")
 
 enum Status {
 	AVAILABLE,

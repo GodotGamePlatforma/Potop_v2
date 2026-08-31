@@ -1,7 +1,7 @@
 class_name GameOverController
 extends Control
 
-const CampaignProgressionSystemScript := preload("res://scripts/base/CampaignProgressionSystem.gd")
+const CampaignProgressionSystemScript := preload("res://scripts/campaign/CampaignProgressionSystem.gd")
 
 var game_root: Node
 var game_state
