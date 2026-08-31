@@ -144,6 +144,7 @@ script = ExtResource("1")
     }
     Set-Content -LiteralPath (Join-Path $repo 'game.gd') -Encoding UTF8 -Value 'extends Node'
     Set-Content -LiteralPath (Join-Path $repo 'base_workbench/owned.gd') -Encoding UTF8 -Value 'extends Node'
+    Set-Content -LiteralPath (Join-Path $repo 'deleted_lfs_asset.bin') -Encoding ASCII -Value 'hydrated base asset'
     Git $repo add . | Out-Null
     Git $repo commit -m base | Out-Null
     Git $repo worktree add -b codex/root/feature $worktree main | Out-Null
@@ -187,6 +188,22 @@ script = ExtResource("1")
     }
     Set-Content -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
     Set-Content -LiteralPath (Join-Path $worktree 'tests/second_direct_scene_tree_test.gd') -Encoding UTF8 -Value 'extends SceneTree'
+
+    Move-Item -LiteralPath (Join-Path $worktree 'tests/direct_scene_tree_test.gd') `
+        -Destination (Join-Path $worktree 'tests/relocated_direct_scene_tree_test.gd')
+    Clear-Content -LiteralPath $targetLog
+    $relocatedTest = Run-FastCheck $worktree $successGodot
+    $relocatedTestLog = @(
+        Get-Content -LiteralPath $targetLog |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    if ($relocatedTest.ExitCode -ne 0 -or $relocatedTest.Output -notmatch 'FAST-CHECK PASS' -or
+        $relocatedTestLog.Count -ne 1 -or
+        $relocatedTestLog[0] -notmatch 'TARGET=tests/relocated_direct_scene_tree_test\.gd$') {
+        throw "Relocated test did not ignore its deleted path and run the new path exactly once: $($relocatedTest.Output) log=$($relocatedTestLog -join '; ')"
+    }
+    Move-Item -LiteralPath (Join-Path $worktree 'tests/relocated_direct_scene_tree_test.gd') `
+        -Destination (Join-Path $worktree 'tests/direct_scene_tree_test.gd')
 
     Add-Content -LiteralPath (Join-Path $worktree 'tests/explicit_scene_test.gd') -Value 'var changed := true' -Encoding UTF8
     Clear-Content -LiteralPath $targetLog
@@ -369,11 +386,32 @@ script = ExtResource("1")
         throw 'Fast-check accepted an empty branch.'
     }
 
+    Remove-Item -LiteralPath (Join-Path $worktree 'deleted_lfs_asset.bin')
+    Git $worktree add -u -- deleted_lfs_asset.bin | Out-Null
+    $oldGitExecPath = $env:GIT_EXEC_PATH
+    try {
+        $env:GIT_EXEC_PATH = $mockBin
+        $env:FAST_LFS_LISTING = '{"files":[{"name":"deleted_lfs_asset.bin","checkout":false}]}'
+        $deletedPointer = Run-FastCheck $worktree $successGodot @('-AllowControlPlane')
+    }
+    finally {
+        if ($null -eq $oldGitExecPath) { Remove-Item Env:GIT_EXEC_PATH -ErrorAction SilentlyContinue }
+        else { $env:GIT_EXEC_PATH = $oldGitExecPath }
+        Remove-Item Env:FAST_LFS_LISTING -ErrorAction SilentlyContinue
+    }
+    if ($deletedPointer.ExitCode -ne 0 -or $deletedPointer.Output -notmatch 'FAST-CHECK PASS') {
+        throw "Fast-check rejected a deleted LFS path that is absent from the index: $($deletedPointer.Output)"
+    }
+    Copy-Item -LiteralPath (Join-Path $repo 'deleted_lfs_asset.bin') `
+        -Destination (Join-Path $worktree 'deleted_lfs_asset.bin')
+    Git $worktree add -- deleted_lfs_asset.bin | Out-Null
+
     Set-Content -LiteralPath (Join-Path $worktree 'asset.bin') -Encoding ASCII -Value @'
 version https://git-lfs.github.com/spec/v1
 oid sha256:0000000000000000000000000000000000000000000000000000000000000000
 size 1
 '@
+    Git $worktree add -- asset.bin | Out-Null
     $oldGitExecPath = $env:GIT_EXEC_PATH
     try {
         $env:GIT_EXEC_PATH = $mockBin
@@ -388,6 +426,7 @@ size 1
     if ($pointer.ExitCode -eq 0 -or $pointer.Output -notmatch 'LFS pointers remain unhydrated') {
         throw "Fast-check accepted a tracked LFS pointer in the working tree: $($pointer.Output)"
     }
+    Git $worktree rm --cached -- asset.bin | Out-Null
     Remove-Item -LiteralPath (Join-Path $worktree 'asset.bin')
 
     $pathBeforeMissingTool = $env:PATH
@@ -402,7 +441,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check linked-worktree-only/owner-write-set/scene-target-routing/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check linked-worktree-only/owner-write-set/scene-target-routing/relocated-test/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/deleted-LFS/LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
