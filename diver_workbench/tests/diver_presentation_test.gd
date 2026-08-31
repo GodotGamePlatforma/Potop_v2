@@ -7,6 +7,7 @@ const DiverSuitPresentationProfileScript := preload("res://diver_workbench/defin
 const SocketProfile := preload("res://diver_workbench/assets/profiles/diver_socket_profile.tres")
 const EnvelopeProfile := preload("res://diver_workbench/assets/profiles/diver_frame_envelope_profile.tres")
 const SuitProfile := preload("res://diver_workbench/assets/profiles/diver_suit_presentation_profile.tres")
+const ReadabilityShader := preload("res://diver_workbench/assets/shaders/diver_readability.gdshader")
 const ActiveSpriteFrames := preload("res://diver_workbench/assets/animation/diver_sprite_frames.tres")
 const ActionSpriteFrames := preload("res://diver_workbench/assets/animation/diver_action_sprite_frames.tres")
 const APPROVED_ENVELOPE := Vector2(105.0, 60.0)
@@ -58,6 +59,7 @@ func _ready() -> void:
 	_test_socket_resource_contract()
 	_test_sprite_frame_atlas_contract()
 	_test_transition_asset_contract()
+	_test_readability_shader_contract()
 	_test_suit_profile_contract()
 	_test_knife_asset_contract()
 	_test_frame_envelope_contract()
@@ -187,13 +189,68 @@ func _test_suit_profile_contract() -> void:
 		var style: Dictionary = SuitProfile.style_for(quality)
 		style_ids[int(style["style_id"])] = true
 		_check(float(style["outline_width"]) <= DiverFrameEnvelopeScript.READABILITY_RIM_SOURCE_PADDING - 0.5, "Suit Q%d outline must remain inside the reviewed rim allowance." % quality)
+		_check(is_equal_approx(float(style["outline_width"]), 3.5), "Suit Q%d must retain the reviewed 3.5 px outline radius." % quality)
 	_check(style_ids.size() == 4, "Suit qualities Q1..Q4 must use four distinct construction styles.")
 	var baseline: Dictionary = SuitProfile.style_for(1)
-	_check(float(baseline["fabric_mix"]) == 0.0 and float(baseline["metal_mix"]) == 0.0 and float(baseline["pattern_strength"]) == 0.0, "Suit Q1 must reproduce the approved v4 appearance without recoloring.")
-	_check(float(SuitProfile.style_for(2)["pattern_strength"]) > 0.0, "Suit Q2 should add visible sealed construction bands.")
-	_check(float(SuitProfile.style_for(3)["plate_strength"]) > float(SuitProfile.style_for(2)["plate_strength"]), "Suit Q3 should add materially stronger pressure plating than Q2.")
-	_check(float(SuitProfile.style_for(4)["emissive_strength"]) > float(SuitProfile.style_for(3)["emissive_strength"]), "Suit Q4 should add the strongest abyss piping signal.")
+	_check(
+		float(baseline["fabric_mix"]) == 0.0
+		and float(baseline["metal_mix"]) == 0.0
+		and float(baseline["pattern_strength"]) == 0.0
+		and float(baseline["plate_strength"]) == 0.0
+		and float(baseline["emissive_strength"]) == 0.0,
+		"Suit Q1 must reproduce the approved v4 appearance without recoloring or construction overlays."
+	)
+	var baseline_fabric: Color = baseline["fabric_color"]
+	var baseline_metal: Color = baseline["metal_color"]
+	var baseline_pattern: Color = baseline["pattern_color"]
+	var baseline_rim: Color = baseline["rim_color"]
+	_check(
+		baseline_fabric.is_equal_approx(Color("263b48"))
+		and baseline_metal.is_equal_approx(Color("876036"))
+		and baseline_pattern.is_equal_approx(Color("4dc7d1"))
+		and baseline_rim.is_equal_approx(Color("4dc7d1"))
+		and is_equal_approx(float(baseline["accent_strength"]), 0.32),
+		"Suit Q1 palette and accent data must remain the approved baseline."
+	)
+	var previous_treatment := 0.0
+	var previous_style: Dictionary = {}
+	for quality in range(2, 5):
+		var current_style: Dictionary = SuitProfile.style_for(quality)
+		var treatment := (
+			float(current_style["fabric_mix"])
+			+ float(current_style["metal_mix"])
+			+ float(current_style["pattern_strength"])
+			+ float(current_style["plate_strength"])
+			+ float(current_style["emissive_strength"])
+		)
+		_check(treatment > previous_treatment, "Suit Q%d should increase the total presentation treatment over the previous upgrade." % quality)
+		if not previous_style.is_empty():
+			for scalar_key in ["fabric_mix", "metal_mix", "pattern_strength", "emissive_strength", "accent_strength"]:
+				_check(float(current_style[scalar_key]) > float(previous_style[scalar_key]), "Suit Q%d %s should progress monotonically." % [quality, scalar_key])
+		previous_treatment = treatment
+		previous_style = current_style
+	var sealed: Dictionary = SuitProfile.style_for(2)
+	var pressure: Dictionary = SuitProfile.style_for(3)
+	var abyss: Dictionary = SuitProfile.style_for(4)
+	_check(float(sealed["pattern_strength"]) > 0.0, "Suit Q2 should add visible sealed construction bands.")
+	_check(float(pressure["plate_strength"]) > float(abyss["plate_strength"]) and float(abyss["plate_strength"]) > float(sealed["plate_strength"]), "Suit Q3 should remain the strongest pressure-plating profile while Q4 retains more plating than Q2.")
+	_check(float(abyss["emissive_strength"]) > float(pressure["emissive_strength"]), "Suit Q4 should add the strongest abyss piping signal.")
 	_check(SuitProfile.normalized_quality(-10) == 1 and SuitProfile.normalized_quality(99) == 4, "Suit quality presentation should clamp to canonical levels 1..4.")
+
+
+func _test_readability_shader_contract() -> void:
+	_check(ReadabilityShader != null, "The Diver readability shader should load.")
+	if ReadabilityShader == null:
+		return
+	var shader_code: String = ReadabilityShader.code
+	_check(shader_code.count("texture(TEXTURE") == 9, "The readability shader should cache one base and eight neighbor texture samples instead of fetching alpha and luma separately.")
+	_check("return vec3(source_luma);" in shader_code, "A black suit tint should fall back to neutral source luminance instead of crushing modeled volume.")
+	_check(
+		"float readability_polish = 0.0;" in shader_code
+		and "float inner_rim_scale = 0.46;" in shader_code
+		and "float outer_rim_scale = 0.62;" in shader_code,
+		"The shader should retain an explicit legacy Q1 rim path before applying upgraded-suit polish."
+	)
 
 
 func _test_knife_asset_contract() -> void:
@@ -573,20 +630,44 @@ func _test_runtime_presentation_contract() -> void:
 	var low_reduced: Dictionary = visual_effects.graphics_quality_state()
 	_check(low_reduced.get("emitter_count") == 6, "Diver should allocate the six contextual presentation emitters.")
 	_check(low_reduced.get("bubble_count") == 3, "Cold-start low/reduced should allocate the reduced bubble budget directly.")
-	_check(low_reduced.get("wake_upper_count") == 1 and low_reduced.get("wake_lower_count") == 1, "Cold-start low/reduced should allocate one wake particle per fin.")
-	_check(low_reduced.get("leak_count") == 1 and low_reduced.get("tool_count") == 1, "Cold-start low/reduced should allocate reduced contextual budgets.")
+	_check(low_reduced.get("wake_upper_count") == 2 and low_reduced.get("wake_lower_count") == 2, "Cold-start low/reduced should retain a small two-fin wake signal.")
+	_check(low_reduced.get("leak_count") == 1 and low_reduced.get("tool_count") == 2 and low_reduced.get("cue_count") == 4, "Cold-start low/reduced should allocate reduced contextual budgets.")
+
+	diver.set_reduced_motion(false)
+	var low: Dictionary = visual_effects.graphics_quality_state()
+	_check(low.get("bubble_count") == 4 and low.get("wake_upper_count") == 3 and low.get("wake_lower_count") == 3, "Low profile should retain the authored breath and two-fin wake budgets.")
+	_check(low.get("leak_count") == 2 and low.get("tool_count") == 3 and low.get("cue_count") == 5, "Low profile should retain readable contextual budgets.")
+
+	diver.set_graphics_quality("medium")
+	var medium: Dictionary = visual_effects.graphics_quality_state()
+	_check(medium.get("bubble_count") == 8 and medium.get("wake_upper_count") == 5 and medium.get("wake_lower_count") == 6, "Medium profile should increase breath and wake density monotonically.")
+	_check(medium.get("leak_count") == 4 and medium.get("tool_count") == 5 and medium.get("cue_count") == 8, "Medium profile should increase contextual density monotonically.")
 
 	diver.set_graphics_quality("high")
-	diver.set_reduced_motion(false)
 	var high: Dictionary = visual_effects.graphics_quality_state()
-	_check(high.get("bubble_count") == 10, "High profile should expose the authored breath budget.")
-	_check(high.get("wake_count") == 16, "High profile should split the authored wake budget across both fins.")
-	_check(high.get("leak_count") == 6 and high.get("tool_count") == 6 and high.get("cue_count") == 10, "High profile should expose all contextual VFX budgets.")
+	_check(high.get("bubble_count") == 12, "High profile should expose the authored breath budget.")
+	_check(high.get("wake_count") == 20, "High profile should split the authored wake budget across both fins.")
+	_check(high.get("leak_count") == 7 and high.get("tool_count") == 7 and high.get("cue_count") == 12, "High profile should expose all contextual VFX budgets.")
 	_check(float(high.get("bubble_lifetime", 99.0)) < 1.05, "A sprint breath pulse should finish before the next authored breath interval instead of restarting live particles.")
 	_check(is_equal_approx(
 		float(high.get("visual_retarget_scale", 0.0)),
 		APPROVED_SPRITE_SCALE.x / PREVIOUS_AUTHORED_SPRITE_SCALE
 	), "Diver VFX dimensions should follow the same visual retarget ratio as the sprite.")
+	var bubble_material := (visual_effects.get_node("BreathEmitter") as GPUParticles2D).process_material as ParticleProcessMaterial
+	var tool_material := (visual_effects.get_node("ToolEmitter") as GPUParticles2D).process_material as ParticleProcessMaterial
+	var cue_material := (visual_effects.get_node("CueEmitter") as GPUParticles2D).process_material as ParticleProcessMaterial
+	var retarget_scale := APPROVED_SPRITE_SCALE.x / PREVIOUS_AUTHORED_SPRITE_SCALE
+	_check(is_equal_approx(bubble_material.scale_min, 0.30 * retarget_scale) and is_equal_approx(bubble_material.scale_max, 0.82 * retarget_scale), "Breath bubbles should retain the reviewed readable scale range.")
+	_check(is_equal_approx(tool_material.scale_min, 0.24 * retarget_scale) and is_equal_approx(tool_material.scale_max, 0.62 * retarget_scale), "Tool glints should retain the reviewed readable scale range.")
+	_check(is_equal_approx(cue_material.scale_min, 0.28 * retarget_scale) and is_equal_approx(cue_material.scale_max, 0.82 * retarget_scale), "Action cues should retain the reviewed readable scale range.")
+
+	diver.set_reduced_motion(true)
+	var high_reduced: Dictionary = visual_effects.graphics_quality_state()
+	_check(high_reduced.get("bubble_count") == 8 and high_reduced.get("wake_count") == 10, "Reduced motion should lower high-profile breath and wake density.")
+	_check(high_reduced.get("leak_count") == 4 and high_reduced.get("tool_count") == 4 and high_reduced.get("cue_count") == 8, "Reduced motion should lower all high-profile contextual budgets.")
+	_check(float(high_reduced.get("bubble_lifetime", 99.0)) < float(high.get("bubble_lifetime", 0.0)) and float(high_reduced.get("wake_lifetime", 99.0)) < float(high.get("wake_lifetime", 0.0)), "Reduced motion should shorten the breath and wake trails.")
+	_check(float(high_reduced.get("bubble_speed_scale", 99.0)) < float(high.get("bubble_speed_scale", 0.0)) and float(high_reduced.get("wake_speed_scale", 99.0)) < float(high.get("wake_speed_scale", 0.0)), "Reduced motion should slow the breath and wake particles.")
+	diver.set_reduced_motion(false)
 
 	var sprite := diver.get_node("AnimatedSprite2D") as AnimatedSprite2D
 	diver.reset_at(diver.global_position)
