@@ -268,12 +268,12 @@ func graphics_quality_state() -> Dictionary:
 
 func _quality_budget() -> Dictionary:
 	var budget := {
-		"bubble": 4 if _graphics_quality == "low" else 7 if _graphics_quality == "medium" else 10,
-		"wake_upper": 2 if _graphics_quality == "low" else 4 if _graphics_quality == "medium" else 8,
-		"wake_lower": 2 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 8,
-		"leak": 2 if _graphics_quality == "low" else 4 if _graphics_quality == "medium" else 6,
-		"tool": 2 if _graphics_quality == "low" else 4 if _graphics_quality == "medium" else 6,
-		"cue": 4 if _graphics_quality == "low" else 7 if _graphics_quality == "medium" else 10,
+		"bubble": 4 if _graphics_quality == "low" else 8 if _graphics_quality == "medium" else 12,
+		"wake_upper": 3 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 10,
+		"wake_lower": 3 if _graphics_quality == "low" else 6 if _graphics_quality == "medium" else 10,
+		"leak": 2 if _graphics_quality == "low" else 4 if _graphics_quality == "medium" else 7,
+		"tool": 3 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 7,
+		"cue": 5 if _graphics_quality == "low" else 8 if _graphics_quality == "medium" else 12,
 	}
 	if _reduced_motion:
 		budget["bubble"] = maxi(ceili(float(budget["bubble"]) * 0.60), 1)
@@ -308,12 +308,12 @@ func _apply_graphics_quality() -> void:
 	_leak_emitter.speed_scale = 0.78 if _reduced_motion else 1.0
 	_tool_emitter.speed_scale = 0.82 if _reduced_motion else 1.0
 	_cue_emitter.speed_scale = 0.86 if _reduced_motion else 1.0
-	_bubble_emitter.modulate = Color(1.0, 1.0, 1.0, 0.72 if _reduced_motion else 0.90)
-	_wake_upper_emitter.modulate = Color(1.0, 1.0, 1.0, 0.54 if _reduced_motion else 0.82)
-	_wake_lower_emitter.modulate = Color(1.0, 1.0, 1.0, 0.54 if _reduced_motion else 0.82)
+	_bubble_emitter.modulate = Color(1.0, 1.0, 1.0, 0.74 if _reduced_motion else 0.94)
+	_wake_upper_emitter.modulate = Color(1.0, 1.0, 1.0, 0.58 if _reduced_motion else 0.88)
+	_wake_lower_emitter.modulate = Color(1.0, 1.0, 1.0, 0.58 if _reduced_motion else 0.88)
 	_leak_emitter.modulate = Color(1.0, 1.0, 1.0, 0.62 if _reduced_motion else 0.84)
-	_tool_emitter.modulate = Color(1.0, 1.0, 1.0, 0.58 if _reduced_motion else 0.82)
-	_cue_emitter.modulate = Color(1.0, 1.0, 1.0, 0.72 if _reduced_motion else 0.92)
+	_tool_emitter.modulate = Color(1.0, 1.0, 1.0, 0.62 if _reduced_motion else 0.88)
+	_cue_emitter.modulate = Color(1.0, 1.0, 1.0, 0.76 if _reduced_motion else 0.96)
 	_bubble_material.spread = 11.0 if _reduced_motion else 17.0
 	_wake_upper_material.spread = 20.0 if _reduced_motion else 32.0
 	_wake_lower_material.spread = 20.0 if _reduced_motion else 32.0
@@ -429,8 +429,8 @@ func _create_bubble_material() -> ParticleProcessMaterial:
 	material.gravity = Vector3(0.0, -7.0, 0.0)
 	material.initial_velocity_min = 22.0
 	material.initial_velocity_max = 43.0
-	material.scale_min = 0.28 * _visual_retarget_scale
-	material.scale_max = 0.78 * _visual_retarget_scale
+	material.scale_min = 0.30 * _visual_retarget_scale
+	material.scale_max = 0.82 * _visual_retarget_scale
 	material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
 	material.emission_sphere_radius = 2.8 * _visual_retarget_scale
 	material.color_ramp = _create_bubble_fade()
@@ -474,11 +474,11 @@ func _create_tool_material() -> ParticleProcessMaterial:
 	material.gravity = Vector3(0.0, 12.0, 0.0)
 	material.initial_velocity_min = 10.0
 	material.initial_velocity_max = 24.0
-	material.scale_min = 0.20 * _visual_retarget_scale
-	material.scale_max = 0.52 * _visual_retarget_scale
+	material.scale_min = 0.24 * _visual_retarget_scale
+	material.scale_max = 0.62 * _visual_retarget_scale
 	material.damping_min = 8.0
 	material.damping_max = 16.0
-	material.color = Color(0.90, 0.70, 0.34, 0.56)
+	material.color = Color(0.90, 0.70, 0.34, 0.64)
 	return material
 
 
@@ -489,11 +489,11 @@ func _create_cue_material() -> ParticleProcessMaterial:
 	material.gravity = Vector3(0.0, 10.0, 0.0)
 	material.initial_velocity_min = 20.0
 	material.initial_velocity_max = 48.0
-	material.scale_min = 0.24 * _visual_retarget_scale
-	material.scale_max = 0.72 * _visual_retarget_scale
+	material.scale_min = 0.28 * _visual_retarget_scale
+	material.scale_max = 0.82 * _visual_retarget_scale
 	material.damping_min = 10.0
 	material.damping_max = 22.0
-	material.color = Color(0.74, 0.90, 0.76, 0.72)
+	material.color = Color(0.74, 0.90, 0.76, 0.76)
 	return material
 
 
@@ -502,8 +502,8 @@ func _create_bubble_fade() -> GradientTexture1D:
 	gradient.offsets = PackedFloat32Array([0.0, 0.12, 0.72, 1.0])
 	gradient.colors = PackedColorArray([
 		Color(0.62, 0.9, 1.0, 0.0),
-		Color(0.7, 0.94, 1.0, 0.62),
-		Color(0.76, 0.96, 1.0, 0.46),
+		Color(0.7, 0.94, 1.0, 0.68),
+		Color(0.76, 0.96, 1.0, 0.50),
 		Color(0.82, 0.98, 1.0, 0.0),
 	])
 	var ramp := GradientTexture1D.new()
@@ -516,8 +516,8 @@ func _create_wake_fade() -> GradientTexture1D:
 	gradient.offsets = PackedFloat32Array([0.0, 0.12, 0.62, 1.0])
 	gradient.colors = PackedColorArray([
 		Color(0.56, 0.86, 0.88, 0.0),
-		Color(0.58, 0.88, 0.90, 0.46),
-		Color(0.42, 0.70, 0.74, 0.24),
+		Color(0.58, 0.88, 0.90, 0.54),
+		Color(0.42, 0.70, 0.74, 0.28),
 		Color(0.30, 0.54, 0.60, 0.0),
 	])
 	var ramp := GradientTexture1D.new()

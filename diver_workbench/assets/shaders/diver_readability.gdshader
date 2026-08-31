@@ -41,20 +41,78 @@ float style_selector(float expected) {
 }
 
 
+vec3 luma_preserving_tint(vec3 tint, float source_luma) {
+	float tint_luma = dot(tint, vec3(0.2126, 0.7152, 0.0722));
+	if (tint_luma <= 0.0001) {
+		// A black/degenerate authored tint has no chroma direction. Neutral gray
+		// is the only fallback that keeps the source luminance exactly intact.
+		return vec3(source_luma);
+	}
+	vec3 chromatic_target = tint * (source_luma / tint_luma);
+	float peak = max(max(chromatic_target.r, chromatic_target.g), chromatic_target.b);
+	if (peak <= 1.0) {
+		return chromatic_target;
+	}
+	// Pull an out-of-gamut tint towards neutral at the same luminance instead
+	// of clipping its highlights and flattening the authored volume.
+	float chroma_limit = clamp(
+		(1.0 - source_luma) / max(peak - source_luma, 0.001),
+		0.0,
+		1.0
+	);
+	return mix(vec3(source_luma), chromatic_target, chroma_limit);
+}
+
+
 void fragment() {
 	vec4 base = texture(TEXTURE, UV) * COLOR;
 	base.a *= handoff_visibility(UV, TEXTURE_PIXEL_SIZE);
 	vec2 pixel = TEXTURE_PIXEL_SIZE * outline_width;
+	// The diagonal vector has the same radius as a cardinal sample. Eight-way
+	// coverage therefore closes corner gaps without exceeding the reviewed
+	// source padding or expanding the visual envelope.
+	vec2 diagonal_pixel = pixel * 0.70710678;
 	vec2 right_uv = UV + vec2(pixel.x, 0.0);
 	vec2 left_uv = UV - vec2(pixel.x, 0.0);
 	vec2 down_uv = UV + vec2(0.0, pixel.y);
 	vec2 up_uv = UV - vec2(0.0, pixel.y);
-	float right_alpha = texture(TEXTURE, right_uv).a * COLOR.a * handoff_visibility(right_uv, TEXTURE_PIXEL_SIZE);
-	float left_alpha = texture(TEXTURE, left_uv).a * COLOR.a * handoff_visibility(left_uv, TEXTURE_PIXEL_SIZE);
-	float down_alpha = texture(TEXTURE, down_uv).a * COLOR.a * handoff_visibility(down_uv, TEXTURE_PIXEL_SIZE);
-	float up_alpha = texture(TEXTURE, up_uv).a * COLOR.a * handoff_visibility(up_uv, TEXTURE_PIXEL_SIZE);
-	float nearby_alpha = max(max(right_alpha, left_alpha), max(down_alpha, up_alpha));
-	float inner_alpha = min(min(right_alpha, left_alpha), min(down_alpha, up_alpha));
+	vec2 down_right_uv = UV + diagonal_pixel;
+	vec2 up_left_uv = UV - diagonal_pixel;
+	vec2 up_right_uv = UV + vec2(diagonal_pixel.x, -diagonal_pixel.y);
+	vec2 down_left_uv = UV + vec2(-diagonal_pixel.x, diagonal_pixel.y);
+	vec4 right_sample = texture(TEXTURE, right_uv);
+	vec4 left_sample = texture(TEXTURE, left_uv);
+	vec4 down_sample = texture(TEXTURE, down_uv);
+	vec4 up_sample = texture(TEXTURE, up_uv);
+	vec4 down_right_sample = texture(TEXTURE, down_right_uv);
+	vec4 up_left_sample = texture(TEXTURE, up_left_uv);
+	vec4 up_right_sample = texture(TEXTURE, up_right_uv);
+	vec4 down_left_sample = texture(TEXTURE, down_left_uv);
+	float right_alpha = right_sample.a * COLOR.a * handoff_visibility(right_uv, TEXTURE_PIXEL_SIZE);
+	float left_alpha = left_sample.a * COLOR.a * handoff_visibility(left_uv, TEXTURE_PIXEL_SIZE);
+	float down_alpha = down_sample.a * COLOR.a * handoff_visibility(down_uv, TEXTURE_PIXEL_SIZE);
+	float up_alpha = up_sample.a * COLOR.a * handoff_visibility(up_uv, TEXTURE_PIXEL_SIZE);
+	float down_right_alpha = down_right_sample.a * COLOR.a * handoff_visibility(down_right_uv, TEXTURE_PIXEL_SIZE);
+	float up_left_alpha = up_left_sample.a * COLOR.a * handoff_visibility(up_left_uv, TEXTURE_PIXEL_SIZE);
+	float up_right_alpha = up_right_sample.a * COLOR.a * handoff_visibility(up_right_uv, TEXTURE_PIXEL_SIZE);
+	float down_left_alpha = down_left_sample.a * COLOR.a * handoff_visibility(down_left_uv, TEXTURE_PIXEL_SIZE);
+	float cardinal_max_alpha = max(max(right_alpha, left_alpha), max(down_alpha, up_alpha));
+	float diagonal_max_alpha = max(max(down_right_alpha, up_left_alpha), max(up_right_alpha, down_left_alpha));
+	float cardinal_min_alpha = min(min(right_alpha, left_alpha), min(down_alpha, up_alpha));
+	float diagonal_min_alpha = min(min(down_right_alpha, up_left_alpha), min(up_right_alpha, down_left_alpha));
+	// Q1 is the exact approved v4 baseline. Only upgraded suit treatments may
+	// opt into the new diagonal coverage and stronger rim response. The action
+	// layer also stays on the legacy path because its treatment is disabled.
+	float readability_polish = 0.0;
+	if (suit_treatment_enabled && style_selector(0.0) < 0.5) {
+		readability_polish = 1.0;
+	}
+	float nearby_alpha = cardinal_max_alpha;
+	float inner_alpha = cardinal_min_alpha;
+	if (readability_polish > 0.5) {
+		nearby_alpha = max(cardinal_max_alpha, diagonal_max_alpha);
+		inner_alpha = min(cardinal_min_alpha, diagonal_min_alpha);
+	}
 	float outer_edge = clamp(nearby_alpha - base.a, 0.0, 1.0);
 	float inner_edge = base.a * (1.0 - smoothstep(0.08, 0.94, inner_alpha));
 	float source_luma = dot(base.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -72,21 +130,33 @@ void fragment() {
 	// broad, readable fabric mass. Restricting this to midtones made all suits
 	// collapse back to the same brass silhouette at the gameplay camera scale.
 	float fabric_mask = base.a * (1.0 - metal_mask * 0.94);
-	vec3 fabric_target = suit_fabric_color.rgb * (0.42 + source_luma * 1.50);
-	vec3 metal_target = suit_metal_color.rgb * (0.28 + source_luma * 1.30);
+	vec3 fabric_target = luma_preserving_tint(suit_fabric_color.rgb, source_luma);
+	vec3 metal_target = luma_preserving_tint(suit_metal_color.rgb, source_luma);
 	base.rgb = mix(base.rgb, fabric_target, fabric_mask * suit_fabric_mix * suit_enabled);
 	base.rgb = mix(base.rgb, metal_target, metal_mask * suit_metal_mix * suit_enabled);
 
 	// Construction accents follow real luminance detail and the silhouette edge.
 	// Frame-space stripes and boxes read as scanlines or flat decals on animation.
-	float right_luma = dot(texture(TEXTURE, right_uv).rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
-	float left_luma = dot(texture(TEXTURE, left_uv).rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
-	float down_luma = dot(texture(TEXTURE, down_uv).rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
-	float up_luma = dot(texture(TEXTURE, up_uv).rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
-	float detail_delta = max(
+	float right_luma = dot(right_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float left_luma = dot(left_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float down_luma = dot(down_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float up_luma = dot(up_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float cardinal_detail_delta = max(
 		max(abs(source_luma - right_luma), abs(source_luma - left_luma)),
 		max(abs(source_luma - down_luma), abs(source_luma - up_luma))
 	);
+	float down_right_luma = dot(down_right_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float up_left_luma = dot(up_left_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float up_right_luma = dot(up_right_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float down_left_luma = dot(down_left_sample.rgb * COLOR.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float diagonal_detail_delta = max(
+		max(abs(source_luma - down_right_luma), abs(source_luma - up_left_luma)),
+		max(abs(source_luma - up_right_luma), abs(source_luma - down_left_luma))
+	);
+	float detail_delta = cardinal_detail_delta;
+	if (readability_polish > 0.5) {
+		detail_delta = max(cardinal_detail_delta, diagonal_detail_delta);
+	}
 	float detail_edge = smoothstep(0.035, 0.18, detail_delta) * base.a;
 	float sealed_style = style_selector(1.0);
 	float pressure_style = style_selector(2.0);
@@ -113,12 +183,18 @@ void fragment() {
 	lifted += vec3(0.24, 0.105, 0.018) * warm_accent * accent_strength;
 	lifted += rim_color.rgb * cool_accent * accent_strength * 0.12;
 	lifted += rim_color.rgb * base.a * 0.018;
-	lifted += rim_color.rgb * inner_edge * rim_strength * 0.46;
+	float inner_rim_scale = 0.46;
+	float outer_rim_scale = 0.62;
+	if (readability_polish > 0.5) {
+		inner_rim_scale = 0.48;
+		outer_rim_scale = 0.68;
+	}
+	lifted += rim_color.rgb * inner_edge * rim_strength * inner_rim_scale;
 	lifted += suit_pattern_color.rgb * max(detail_edge * 0.26, inner_edge * 0.44)
 		* abyss_style * suit_emissive_strength * fabric_mask * suit_enabled;
 	lifted = mix(lifted, lifted + action_color.rgb * (0.18 + inner_edge * 0.28), action_glow * base.a);
 	lifted = mix(lifted, damage_color.rgb, damage_flash * base.a * (0.42 + inner_edge * 0.24));
-	float outline_alpha = outer_edge * rim_strength * 0.62;
+	float outline_alpha = outer_edge * rim_strength * outer_rim_scale;
 	vec3 final_color = mix(lifted, rim_color.rgb, outline_alpha);
 	COLOR = vec4(final_color, max(base.a, outline_alpha));
 }

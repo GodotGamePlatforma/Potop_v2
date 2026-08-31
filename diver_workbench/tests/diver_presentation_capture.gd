@@ -579,6 +579,10 @@ func _capture_suit_matrix() -> bool:
 		await RenderingServer.frame_post_draw
 		if not _save_viewport_png("%s/suit_q%d_idle.png" % [CAPTURE_ROOT, quality]):
 			return false
+		if quality == 1:
+			var q1_image := get_viewport().get_texture().get_image()
+			if not await _capture_q1_baseline_reference(q1_image):
+				return false
 
 		var target := _diver.global_position + Vector2.RIGHT * 110.0
 		if not _diver.begin_attack_presentation(1, &"knife", target, 0.40):
@@ -600,6 +604,33 @@ func _capture_suit_matrix() -> bool:
 	if _visual_effects != null:
 		_visual_effects.visible = true
 	queue_redraw()
+	return true
+
+
+func _capture_q1_baseline_reference(q1_image: Image) -> bool:
+	var body_material := _diver.animated_sprite.material as ShaderMaterial
+	var handoff_sprite := _diver.get_node("HandoffSprite2D") as AnimatedSprite2D
+	var handoff_material := handoff_sprite.material as ShaderMaterial
+	if body_material == null or handoff_material == null:
+		push_error("Q1 baseline comparison requires both scene-local readability materials.")
+		return false
+	body_material.set_shader_parameter(&"suit_treatment_enabled", false)
+	handoff_material.set_shader_parameter(&"suit_treatment_enabled", false)
+	queue_redraw()
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var baseline_image := get_viewport().get_texture().get_image()
+	var baseline_saved := _save_viewport_png("%s/suit_q1_baseline_reference.png" % CAPTURE_ROOT)
+	body_material.set_shader_parameter(&"suit_treatment_enabled", true)
+	handoff_material.set_shader_parameter(&"suit_treatment_enabled", true)
+	queue_redraw()
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	if not baseline_saved:
+		return false
+	if q1_image.get_format() != baseline_image.get_format() or q1_image.get_data() != baseline_image.get_data():
+		push_error("Suit Q1 must render pixel-identically to the treatment-disabled approved v4 baseline.")
+		return false
 	return true
 
 
