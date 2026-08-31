@@ -1,7 +1,7 @@
 class_name EndingController
 extends Control
 
-const CampaignProgressionSystemScript := preload("res://scripts/base/CampaignProgressionSystem.gd")
+const CampaignProgressionSystemScript := preload("res://scripts/campaign/CampaignProgressionSystem.gd")
 const NarrativeContentScript := preload("res://scripts/ui/NarrativeContent.gd")
 
 var game_root: Node

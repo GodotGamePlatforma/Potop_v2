@@ -1,11 +1,11 @@
 extends SceneTree
 
-const CampaignProgressionSystemScript := preload("res://scripts/base/CampaignProgressionSystem.gd")
+const CampaignProgressionSystemScript := preload("res://scripts/campaign/CampaignProgressionSystem.gd")
 const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
-const ExpeditionPreparationSystemScript := preload("res://scripts/base/ExpeditionPreparationSystem.gd")
+const ExpeditionPreparationSystemScript := preload("res://scripts/diving/ExpeditionPreparationSystem.gd")
 const GameDatabaseScript := preload("res://scripts/core/GameDatabase.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
-const MissionSystemScript := preload("res://scripts/base/MissionSystem.gd")
+const MissionSystemScript := preload("res://scripts/campaign/MissionSystem.gd")
 
 var _failed := false
 

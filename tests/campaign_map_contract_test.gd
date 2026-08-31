@@ -1,6 +1,6 @@
 extends SceneTree
 
-const CampaignProgressionSystemScript := preload("res://scripts/base/CampaignProgressionSystem.gd")
+const CampaignProgressionSystemScript := preload("res://scripts/campaign/CampaignProgressionSystem.gd")
 const MapCompilerScript := preload("res://underwater_map_workbench/runtime/UnderwaterMapSceneCompiler.gd")
 
 const CAMPAIGN_SEED := 73_337

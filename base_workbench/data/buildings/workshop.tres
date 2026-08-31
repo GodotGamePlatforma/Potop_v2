@@ -1,0 +1,45 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/definitions/BuildingDefinition.gd" id="1_building"]
+[ext_resource type="Script" path="res://base_workbench/definitions/BuildingLevelDefinition.gd" id="2_level"]
+
+[sub_resource type="Resource" id="Level1"]
+script = ExtResource("2_level")
+level = 1
+display_name = "Stół odzysku"
+worker_slots = 1
+capabilities = {"platform_repair_per_worker": 3, "production_queue_capacity": 1, "production_slots_per_day": 1, "repair_scrap_cost": 1}
+build_cost = {"planks": 5, "scrap": 5}
+
+[sub_resource type="Resource" id="Level2"]
+script = ExtResource("2_level")
+level = 2
+display_name = "Kuźnia odzysku"
+worker_slots = 1
+capabilities = {"platform_repair_per_worker": 5, "production_queue_capacity": 2, "production_slots_per_day": 1, "repair_scrap_cost": 1}
+upgrade_cost = {"planks": 7, "scrap": 8}
+
+[sub_resource type="Resource" id="Level3"]
+script = ExtResource("2_level")
+level = 3
+display_name = "Wyciągarka"
+worker_slots = 2
+capabilities = {"heavy_recovery_enabled": true, "platform_repair_per_worker": 7, "production_queue_capacity": 3, "production_slots_per_day": 2, "repair_scrap_cost": 1}
+upgrade_cost = {"planks": 10, "scrap": 12, "tech_parts": 3}
+
+[sub_resource type="Resource" id="Level4"]
+script = ExtResource("2_level")
+level = 4
+display_name = "Ciężki warsztat"
+worker_slots = 3
+capabilities = {"heavy_recovery_enabled": true, "platform_repair_per_worker": 10, "production_queue_capacity": 4, "production_slots_per_day": 3, "repair_scrap_cost": 1}
+upgrade_cost = {"planks": 14, "scrap": 18, "tech_parts": 6}
+
+[resource]
+script = ExtResource("1_building")
+id = "workshop"
+display_name = "Warsztat Odzysku"
+description = "Produkuje sprzęt nurkowy, naprawia integralność platformy za złom i od poziomu III wydobywa oznaczone ciężkie obiekty."
+max_level = 4
+levels = Array[Resource]([SubResource("Level1"), SubResource("Level2"), SubResource("Level3"), SubResource("Level4")])
+specialist_bonus = {"profession": "mechanik", "repair_bonus": 1}

@@ -1,0 +1,51 @@
+[gd_resource type="Resource" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/definitions/SettlementEventDefinition.gd" id="1_event"]
+[ext_resource type="Script" path="res://base_workbench/definitions/SettlementEventChoiceDefinition.gd" id="2_choice"]
+
+[sub_resource type="Resource" id="ChoiceMedicine"]
+script = ExtResource("2_choice")
+id = "trade_for_medicine"
+label = "KUP LEKI ZA ŻYWNOŚĆ"
+preview = "Jedzenie -6  •  Leki +2"
+result_text = "Handlarz zostawia dwie suche paczki leków i odpływa z workiem racji."
+resource_deltas = {"food": -6, "meds_chemicals": 2}
+impact_tags = Array[String](["medicine_relief", "food_cost", "resource_exchange"])
+
+[sub_resource type="Resource" id="ChoiceFabric"]
+script = ExtResource("2_choice")
+id = "trade_for_fabric"
+label = "KUP TKANINY ZA ZŁOM"
+preview = "Złom -4  •  Tkaniny i guma +3"
+result_text = "Zwinięte płachty i guma przechodzą na pomost, a złom znika pod pokładem łodzi."
+resource_deltas = {"fabric_rubber": 3, "scrap": -4}
+impact_tags = Array[String](["material_cost", "resource_exchange"])
+
+[sub_resource type="Resource" id="ChoiceRefuse"]
+script = ExtResource("2_choice")
+id = "refuse_trade"
+label = "ODEŚLIJ HANDLARZA"
+preview = "Bez zmian"
+result_text = "Łódź odpływa. Przystań zachowuje swoje zapasy, ale traci rzadką okazję do handlu."
+
+[resource]
+script = ExtResource("1_event")
+id = "trader_at_dawn"
+history_key = "trader_at_dawn"
+category = "trade"
+title = "ŁÓDŹ HANDLARZA"
+body = "Samotna łódź przybija do zewnętrznej kładki. Jej właściciel ma leki i impregnowane płachty, lecz przyjmuje tylko zapasy potrzebne w drodze."
+base_weight = 9.0
+tone = "opportunity"
+severity = 1
+pressure_cost = 0.0
+minimum_day = 4
+cooldown_days = 5
+cooldown_group = "supply_opportunity"
+allow_during_crisis = true
+trigger_tags = Array[String](["medicine_need"])
+impact_tags = Array[String](["medicine_relief", "food_cost", "material_cost", "resource_exchange"])
+exclusive_tags = Array[String](["storm_today"])
+recovery_role = "medicine"
+fallback_choice_id = "refuse_trade"
+choices = Array[Resource]([SubResource("ChoiceMedicine"), SubResource("ChoiceFabric"), SubResource("ChoiceRefuse")])

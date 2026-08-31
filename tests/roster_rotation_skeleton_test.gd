@@ -7,7 +7,7 @@ const BoatExpeditionStateScript := preload("res://scripts/data/BoatExpeditionSta
 const CrewDepartureRecordScript := preload("res://scripts/data/CrewDepartureRecord.gd")
 const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
-const RosterRotationSystemScript := preload("res://scripts/base/RosterRotationSystem.gd")
+const RosterRotationSystemScript := preload("res://scripts/survivors/RosterRotationSystem.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 const FloodFever := preload("res://data/diseases/flood_fever.tres")
 

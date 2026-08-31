@@ -1,6 +1,6 @@
 extends SceneTree
 
-const WeatherSystemScript := preload("res://scripts/base/WeatherSystem.gd")
+const WeatherSystemScript := preload("res://scripts/campaign/WeatherSystem.gd")
 const WeatherStateScript := preload("res://scripts/data/WeatherState.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")

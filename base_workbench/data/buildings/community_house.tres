@@ -1,0 +1,45 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/definitions/BuildingDefinition.gd" id="1_building"]
+[ext_resource type="Script" path="res://base_workbench/definitions/BuildingLevelDefinition.gd" id="2_level"]
+
+[sub_resource type="Resource" id="Level1"]
+script = ExtResource("2_level")
+level = 1
+display_name = "Wspólny dach"
+worker_slots = 1
+capabilities = {"hope_per_worker": 1, "shelter_capacity": 4}
+build_cost = {"fabric_rubber": 2, "planks": 8, "scrap": 2}
+
+[sub_resource type="Resource" id="Level2"]
+script = ExtResource("2_level")
+level = 2
+display_name = "Sala zgromadzeń"
+worker_slots = 1
+capabilities = {"hope_per_worker": 2, "shelter_capacity": 7}
+upgrade_cost = {"fabric_rubber": 3, "planks": 11, "scrap": 5}
+
+[sub_resource type="Resource" id="Level3"]
+script = ExtResource("2_level")
+level = 3
+display_name = "Radiostacja"
+worker_slots = 2
+capabilities = {"hope_per_worker": 3, "shelter_capacity": 11}
+upgrade_cost = {"fabric_rubber": 5, "planks": 15, "scrap": 8, "tech_parts": 3}
+
+[sub_resource type="Resource" id="Level4"]
+script = ExtResource("2_level")
+level = 4
+display_name = "Latarnia Przystani"
+worker_slots = 3
+capabilities = {"hope_per_worker": 5, "shelter_capacity": 16}
+upgrade_cost = {"fabric_rubber": 8, "planks": 20, "scrap": 12, "tech_parts": 6}
+
+[resource]
+script = ExtResource("1_building")
+id = "community_house"
+display_name = "Dom Wspólnoty"
+description = "Zapewnia bierne miejsca schronienia, pozwala rozwijać mieszkańców, a zdolna obsada podtrzymuje Nadzieję."
+max_level = 4
+levels = Array[Resource]([SubResource("Level1"), SubResource("Level2"), SubResource("Level3"), SubResource("Level4")])
+specialist_bonus = {"profession": "organizator", "hope_bonus": 2}

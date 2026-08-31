@@ -3,9 +3,9 @@ extends Resource
 
 const VALID_REASON_IDS: Array[String] = ["player_dismissal", "candidate_replacement", "chronicle_departure"]
 const DiseaseCaseStateScript := preload("res://scripts/data/DiseaseCaseState.gd")
-const CompetencySystemScript := preload("res://scripts/base/CompetencySystem.gd")
+const CompetencySystemScript := preload("res://scripts/survivors/CompetencySystem.gd")
 const ResourceIdsScript := preload("res://scripts/data/ResourceIds.gd")
-const RosterRotationSystemScript := preload("res://scripts/base/RosterRotationSystem.gd")
+const RosterRotationSystemScript := preload("res://scripts/survivors/RosterRotationSystem.gd")
 const SurvivorStateScript := preload("res://scripts/data/SurvivorState.gd")
 
 @export var survivor_id: String = ""

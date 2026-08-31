@@ -1,0 +1,47 @@
+[gd_resource type="Resource" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://base_workbench/definitions/SettlementEventDefinition.gd" id="1_event"]
+[ext_resource type="Script" path="res://base_workbench/definitions/SettlementEventChoiceDefinition.gd" id="2_choice"]
+
+[sub_resource type="Resource" id="ChoiceAccept"]
+script = ExtResource("2_choice")
+id = "accept"
+label = "PRZYJMIJ ICH DO PRZYSTANI"
+preview = "+ Zofia i Paweł  •  Nadzieja +5"
+result_text = "Zofia i Paweł wspinają się na pomost. Są wyczerpani, ale od dziś należą do Przystani."
+resource_deltas = {"hope": 5}
+survivor_definition_ids = Array[String](["zofia_kruk", "pawel_mazur"])
+impact_tags = Array[String](["workforce_relief", "population_gain", "food_demand", "hope_relief"])
+
+[sub_resource type="Resource" id="ChoiceReject"]
+script = ExtResource("2_choice")
+id = "reject"
+label = "NIE POMAGAJ"
+preview = "Nadzieja -8"
+result_text = "Tratwę szybko zasłania mgła. Nikt na pomoście nie ma odwagi patrzeć w tamtą stronę."
+resource_deltas = {"hope": -8}
+impact_tags = Array[String](["hope_change"])
+
+[resource]
+script = ExtResource("1_event")
+id = "survivors_on_horizon"
+history_key = "survivors_on_horizon"
+category = "population"
+title = "DWOJE NA HORYZONCIE"
+body = "Tuż po świcie na szarej wodzie pojawia się mała tratwa. Są na niej dwie osoby. Machają kawałkiem czerwonej tkaniny i proszą o miejsce w Przystani."
+base_weight = 12.0
+tone = "opportunity"
+severity = 1
+pressure_cost = 0.0
+minimum_day = 3
+cooldown_days = 9999
+cooldown_group = "population_arrivals"
+once_per_campaign = true
+allow_during_crisis = true
+maximum_population = 5
+trigger_tags = Array[String](["population_need"])
+impact_tags = Array[String](["workforce_relief", "population_gain", "food_demand", "hope_relief", "hope_change"])
+exclusive_tags = Array[String](["food_critical", "no_shelter", "storm_today"])
+recovery_role = "workforce"
+fallback_choice_id = "reject"
+choices = Array[Resource]([SubResource("ChoiceAccept"), SubResource("ChoiceReject")])
