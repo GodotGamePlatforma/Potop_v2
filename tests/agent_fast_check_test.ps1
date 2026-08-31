@@ -441,7 +441,7 @@ size 1
         throw 'Missing git was not reported as a nonzero command-start failure.'
     }
 
-    Write-Host 'PASS agent_fast_check linked-worktree-only/owner-write-set/scene-target-routing/relocated-test/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/deleted-LFS/LFS/missing-tool contract'
+    Write-Host 'PASS agent_fast_check linked-worktree-only/owner-write-set/scene-target-routing/relocated-test/per-target-process-isolation/Godot-explicit/fallback/missing-guidance/local-branch/detached-SHA/diff/LFS/deleted-LFS/missing-tool contract'
 }
 finally {
     if (Get-Variable oldPath -ErrorAction SilentlyContinue) { $env:PATH = $oldPath }
