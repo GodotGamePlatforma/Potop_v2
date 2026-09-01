@@ -2007,7 +2007,9 @@ func _spatial_gameplay_record(source: Dictionary) -> Dictionary:
 		if source.has(vector_key):
 			result[vector_key] = _json_vector(source.get(vector_key, []))
 	if source.has("bounds"):
-		result["bounds"] = _json_rect(source.get("bounds", []))
+		var bounds := _json_rect(source.get("bounds", []))
+		result["bounds"] = bounds
+		result["rect"] = bounds
 	if source.has("path_points"):
 		result["path_points"] = _json_vector_array(source["path_points"])
 	return result

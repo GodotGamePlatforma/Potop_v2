@@ -1,9 +1,9 @@
 {
   "schema_version": 6,
   "revision": {
-    "revision_id": "center-station-right-city-two-tower-runtime-v13",
-    "topology_revision": "l05-owned-two-tower-route-v5",
-    "presentation_revision": "drowned-world-regional-depth-v27"
+    "revision_id": "s-loop-gameplay-world-v14",
+    "topology_revision": "l05-owned-s-loop-route-v6",
+    "presentation_revision": "drowned-world-s-loop-depth-v28"
   },
   "map": {
     "id": "underwater_map_clean_12x12",
@@ -210,8 +210,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [54, 220, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          54,
+          220,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -223,8 +231,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [514, 0, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          514,
+          0,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -236,8 +252,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [1292, 2512, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          1292,
+          2512,
+          437,
+          1371
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -249,8 +273,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_spire.png",
         "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
-        "pixel_size": [341, 1696],
-        "world_rect": [214, 4764, 341, 1696],
+        "pixel_size": [
+          341,
+          1696
+        ],
+        "world_rect": [
+          214,
+          4764,
+          341,
+          1696
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -262,8 +294,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [2024, 5605, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          2024,
+          5605,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -275,8 +315,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [1552, 7056, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          1552,
+          7056,
+          437,
+          1371
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -288,8 +336,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [1867, 6825, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          1867,
+          6825,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -301,8 +357,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [54, 9164, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          54,
+          9164,
+          234,
+          1635
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -314,8 +378,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [564, 11525, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          564,
+          11525,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -327,8 +399,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_spire.png",
         "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
-        "pixel_size": [341, 1696],
-        "world_rect": [1440, 11264, 341, 1696],
+        "pixel_size": [
+          341,
+          1696
+        ],
+        "world_rect": [
+          1440,
+          11264,
+          341,
+          1696
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -340,8 +420,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [3974, 300, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          3974,
+          300,
+          234,
+          1635
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -353,8 +441,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [5413, 2490, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          5413,
+          2490,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -366,8 +462,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [3962, 5104, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          3962,
+          5104,
+          437,
+          1371
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -379,8 +483,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [5402, 7102, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          5402,
+          7102,
+          437,
+          1371
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -392,8 +504,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [3913, 9250, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          3913,
+          9250,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -405,8 +525,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [5252, 11589, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          5252,
+          11589,
+          437,
+          1371
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -418,8 +546,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [5920, 475, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          5920,
+          475,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -431,8 +567,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [7506, 2744, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          7506,
+          2744,
+          437,
+          1371
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -444,8 +588,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [5814, 4844, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          5814,
+          4844,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -457,8 +609,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [7200, 7035, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          7200,
+          7035,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -470,8 +630,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [5746, 9338, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          5746,
+          9338,
+          437,
+          1371
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -483,8 +651,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_spire.png",
         "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
-        "pixel_size": [341, 1696],
-        "world_rect": [7040, 11264, 341, 1696],
+        "pixel_size": [
+          341,
+          1696
+        ],
+        "world_rect": [
+          7040,
+          11264,
+          341,
+          1696
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -496,8 +672,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [9787, 1498, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          9787,
+          1498,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -509,8 +693,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [11264, 3193, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          11264,
+          3193,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -522,8 +714,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [9572, 5634, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          9572,
+          5634,
+          437,
+          1371
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -535,8 +735,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [11077, 8126, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          11077,
+          8126,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -548,8 +756,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [9794, 9438, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          9794,
+          9438,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -561,8 +777,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [11132, 11589, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          11132,
+          11589,
+          437,
+          1371
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -574,8 +798,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_approach_low_a.png",
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
-        "pixel_size": [307, 705],
-        "world_rect": [6420, 81, 307, 705],
+        "pixel_size": [
+          307,
+          705
+        ],
+        "world_rect": [
+          6420,
+          81,
+          307,
+          705
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -587,8 +819,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [8360, 1731, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          8360,
+          1731,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -600,8 +840,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [3376, 3187, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          3376,
+          3187,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -613,8 +861,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [10512, 4403, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          10512,
+          4403,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -626,8 +882,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_spine.png",
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [6176, 7395, 234, 1635],
+        "pixel_size": [
+          234,
+          1635
+        ],
+        "world_rect": [
+          6176,
+          7395,
+          234,
+          1635
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -639,8 +903,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_archive_mass.png",
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
-        "pixel_size": [437, 1371],
-        "world_rect": [1834, 8199, 437, 1371],
+        "pixel_size": [
+          437,
+          1371
+        ],
+        "world_rect": [
+          1834,
+          8199,
+          437,
+          1371
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -652,8 +924,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_c4_spire_c.png",
         "sha256": "ac3d9fac9d27c03801320ad5cd777d220facc06377446f70ba42429d3b7d95b7",
-        "pixel_size": [64, 1593],
-        "world_rect": [10493, 11367, 64, 1593],
+        "pixel_size": [
+          64,
+          1593
+        ],
+        "world_rect": [
+          10493,
+          11367,
+          64,
+          1593
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -665,8 +945,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_c4_spire_a.png",
         "sha256": "886e68f0a9c0abd0a2cd08742be87e20f0ff8771a4ea462ef10f72a37b42cf25",
-        "pixel_size": [140, 867],
-        "world_rect": [7823, 12093, 140, 867],
+        "pixel_size": [
+          140,
+          867
+        ],
+        "world_rect": [
+          7823,
+          12093,
+          140,
+          867
+        ],
         "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -678,8 +966,16 @@
         "kind": "texture_rect",
         "path": "assets/visual/l01_ruin_c4_spire_d.png",
         "sha256": "de9e2cdf362bfb3f532f0b706176c94dcd409716e7d659b24b33a13911ba61f5",
-        "pixel_size": [107, 609],
-        "world_rect": [11112, 4580, 107, 609],
+        "pixel_size": [
+          107,
+          609
+        ],
+        "world_rect": [
+          11112,
+          4580,
+          107,
+          609
+        ],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -913,7 +1209,7 @@
         ],
         "enabled": true,
         "affordance": "exact_solid_surface",
-        "topology_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e"
+        "topology_digest": "topology-v1:30f3e100435df8733be7c1ac14735e3d6b80a4e1b56f1db085e13e546dfdedc3"
       }
     ]
   },
@@ -995,9 +1291,9 @@
     "collision_source": {
       "format": "l05_owned_rect_ops_v2",
       "path": "assets/topology/l05_ground_mask_source.json",
-      "sha256": "75b8bf49fdb01934b40eff429c5f8c29bb6a5f40cecdf4755507b7c6f923533d",
-      "canonical_digest": "topology-v1:18aba970c19919d020259e7967e17f97a9b8822bc45898450093904b77c9f44e",
-      "partition_digest": "partition-v1:5a9b33333e1eae7bcae4d54d9690a4350c97e1e9837df41bb4fb64f9599d3ded",
+      "sha256": "a34159b0c14b098ac6c7134aec4cb741c857fe18fede042606e8bd8437159676",
+      "canonical_digest": "topology-v1:30f3e100435df8733be7c1ac14735e3d6b80a4e1b56f1db085e13e546dfdedc3",
+      "partition_digest": "partition-v1:1851a8f7cc4135161873d355cfe46a8ca84a2997564cbd44667b887779a0b22a",
       "pixel_size": [
         576,
         324
@@ -1209,6 +1505,78 @@
         "interaction_action": "open",
         "interaction_seconds": 1.15,
         "difficulty_scaled_contents": true
+      },
+      {
+        "id": "archive_medical_cache",
+        "display_name": "Apteczka Archiwum",
+        "position": [
+          7000,
+          4920
+        ],
+        "landmark_id": "flooded_archive",
+        "contents": {
+          "fabric_rubber": 1,
+          "meds_chemicals": 1
+        },
+        "mandatory_order": -1,
+        "required_tool": "",
+        "interaction_action": "open",
+        "interaction_seconds": 1.15,
+        "difficulty_scaled_contents": false
+      },
+      {
+        "id": "r3_maintenance_crate",
+        "display_name": "Skrzynia utrzymania R-3",
+        "position": [
+          15480,
+          7040
+        ],
+        "landmark_id": "generator_r3",
+        "contents": {
+          "scrap": 4,
+          "tech_parts": 1
+        },
+        "mandatory_order": -1,
+        "required_tool": "",
+        "interaction_action": "open",
+        "interaction_seconds": 1.15,
+        "difficulty_scaled_contents": true
+      },
+      {
+        "id": "c4_lifeline_cache",
+        "display_name": "Zapas ratunkowy C-4",
+        "position": [
+          16960,
+          8880
+        ],
+        "landmark_id": "switchboard_c4",
+        "contents": {
+          "food": 2,
+          "meds_chemicals": 1
+        },
+        "mandatory_order": -1,
+        "required_tool": "",
+        "interaction_action": "open",
+        "interaction_seconds": 1.15,
+        "difficulty_scaled_contents": false
+      },
+      {
+        "id": "salvage_basin_cache",
+        "display_name": "Zasobnik z dna",
+        "position": [
+          18240,
+          11680
+        ],
+        "landmark_id": "switchboard_c4",
+        "contents": {
+          "planks": 3,
+          "scrap": 5
+        },
+        "mandatory_order": -1,
+        "required_tool": "",
+        "interaction_action": "open",
+        "interaction_seconds": 1.15,
+        "difficulty_scaled_contents": false
       }
     ],
     "shortcut_spawns": [
@@ -1225,6 +1593,34 @@
         "required_tool": "knife",
         "interaction_action": "cut",
         "interaction_seconds": 1.4
+      },
+      {
+        "id": "shortcut_central_return",
+        "connection_id": "",
+        "display_name": "Zapieczona krata powrotna",
+        "position": [
+          12520,
+          5200
+        ],
+        "rotation": 0.0,
+        "width": 800.0,
+        "required_tool": "crowbar",
+        "interaction_action": "pry",
+        "interaction_seconds": 2.1
+      },
+      {
+        "id": "shortcut_c4_service",
+        "connection_id": "",
+        "display_name": "Właz serwisowy C-4",
+        "position": [
+          17760,
+          9680
+        ],
+        "rotation": 0.0,
+        "width": 560.0,
+        "required_tool": "crowbar",
+        "interaction_action": "pry",
+        "interaction_seconds": 2.1
       }
     ],
     "fixed_device_spawns": [
@@ -1330,12 +1726,167 @@
       }
     ],
     "connections": [],
-    "pickups": [],
-    "current_zones": [],
-    "threat_spawns": [],
-    "heavy_object_spawns": [],
-    "rescue_spawns": [],
-    "buoy_spawns": [],
+    "pickups": [
+      {
+        "id": "pickup_archive_food",
+        "display_name": "Zaplombowana racja",
+        "position": [
+          7440,
+          2520
+        ],
+        "landmark_id": "flooded_archive",
+        "contents": {
+          "food": 1
+        }
+      },
+      {
+        "id": "pickup_archive_scrap",
+        "display_name": "Oderwany wspornik",
+        "position": [
+          6800,
+          6600
+        ],
+        "landmark_id": "flooded_archive",
+        "contents": {
+          "scrap": 1
+        }
+      },
+      {
+        "id": "pickup_r3_planks",
+        "display_name": "Pakiet desek",
+        "position": [
+          13280,
+          7240
+        ],
+        "landmark_id": "generator_r3",
+        "contents": {
+          "planks": 1
+        }
+      },
+      {
+        "id": "pickup_c4_scrap",
+        "display_name": "Cewka z rozdzielni",
+        "position": [
+          19600,
+          8880
+        ],
+        "landmark_id": "switchboard_c4",
+        "contents": {
+          "scrap": 1
+        }
+      }
+    ],
+    "current_zones": [
+      {
+        "id": "current_archive_descent",
+        "position": [
+          6800,
+          5800
+        ],
+        "bounds": [
+          6320,
+          5440,
+          960,
+          720
+        ],
+        "velocity": [
+          0,
+          92
+        ]
+      },
+      {
+        "id": "current_c4_risk_crossing",
+        "position": [
+          17700,
+          10480
+        ],
+        "bounds": [
+          17200,
+          10120,
+          1000,
+          720
+        ],
+        "velocity": [
+          105,
+          0
+        ]
+      }
+    ],
+    "threat_spawns": [
+      {
+        "id": "eel_c4_risk",
+        "definition_id": "noise_eel",
+        "position": [
+          19000,
+          10480
+        ],
+        "landmark_id": "switchboard_c4"
+      },
+      {
+        "id": "eel_salvage_basin",
+        "definition_id": "noise_eel",
+        "position": [
+          15200,
+          11680
+        ],
+        "landmark_id": "switchboard_c4"
+      }
+    ],
+    "heavy_object_spawns": [
+      {
+        "id": "sunken_transformer",
+        "display_name": "Zatopiony transformator",
+        "position": [
+          16960,
+          11680
+        ],
+        "landmark_id": "switchboard_c4",
+        "rewards": {
+          "scrap": 10,
+          "tech_parts": 2
+        },
+        "required_tool": "lift_bag",
+        "interaction_action": "mark",
+        "interaction_seconds": 1.6
+      }
+    ],
+    "rescue_spawns": [
+      {
+        "id": "rescue_leon",
+        "definition_id": "leon_wrona",
+        "position": [
+          18000,
+          8880
+        ],
+        "landmark_id": "switchboard_c4"
+      }
+    ],
+    "buoy_spawns": [
+      {
+        "id": "buoy_archive_return",
+        "display_name": "Boja powrotna Archiwum",
+        "position": [
+          7200,
+          6800
+        ],
+        "entry_landmark_id": "flooded_archive",
+        "required_tool": "",
+        "interaction_action": "deploy",
+        "interaction_seconds": 1.25
+      },
+      {
+        "id": "buoy_c4_return",
+        "display_name": "Boja powrotna C-4",
+        "position": [
+          20400,
+          8880
+        ],
+        "entry_landmark_id": "switchboard_c4",
+        "required_tool": "",
+        "interaction_action": "deploy",
+        "interaction_seconds": 1.25
+      }
+    ],
     "obstacle_spawns": [],
     "decoration_spawns": []
   }
