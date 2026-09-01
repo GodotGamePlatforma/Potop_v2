@@ -108,6 +108,46 @@
   ],
   "rejected_outputs": [
     {
+      "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-72096e75-7315-4ddc-9c17-8e75b1e54b8c.png",
+      "sha256": "3dd0835171b1f41c072d8c8c46362455bf972121ac43cc4e16ea7ea805e4e04c",
+      "pixel_size": [1536, 1024],
+      "channels": "RGBA",
+      "status": "rejected_excessive_collapse_and_three_quarter_mass",
+      "reason": "Odrzucone po oględzinach: przechylone, mocno zawalone wieżowce i bryły trzy czwarte są zbyt rozległą ruiną dla miasta zalewanego przez pięć lat oraz zbyt bliskim językiem fałszywej geometrii dla nieblokującego tła."
+    },
+    {
+      "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-46318b77-8ac5-4ad5-be38-fe69702e95d3.png",
+      "sha256": "982a188fc2d89c8f6305b99db1db840c442ff66fa3820c042fc12d1836a795e9",
+      "pixel_size": [1536, 1024],
+      "channels": "RGBA",
+      "status": "rejected_false_entry_and_excessive_heritage_ruin",
+      "reason": "Odrzucone po oględzinach: monumentalna kopuła, kolumnady i otwarte arkady czytają się jak konkretne wejście lub przechodnie wnętrze, a skala zniszczeń oraz jawny emblemat odciągają uwagę od prawdziwego world-locked Archiwum."
+    },
+    {
+      "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-c5091d5c-2cb7-473a-93f2-fdf00820a635.png",
+      "sha256": "e8122f83cea8c7899fab898461e34dacd54d1e2e5f4fbd5f95f142de6c018b88",
+      "pixel_size": [1536, 1024],
+      "channels": "RGBA",
+      "status": "rejected_perspective_crane_and_excessive_collapse",
+      "reason": "Odrzucone po oględzinach: perspektywiczny żuraw, gantry i czytelne poziome pomosty sugerują bliską, używalną konstrukcję, a ciężka ruina konkuruje z właściwym generatorem R-3."
+    },
+    {
+      "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-2bfa9489-f378-4093-beff-3a6fbd79371e.png",
+      "sha256": "3e8c9908b8ce4d3730eff79895e0a144288029a8a47299d94e884a486359038e",
+      "pixel_size": [1536, 1024],
+      "channels": "RGBA",
+      "status": "rejected_map_backdrop_alpha_contract",
+      "reason": "Odrzucone przez kanoniczny builder przed publikacją: mniej niż 95 procent widocznych pikseli jest nieprzezroczyste; szeroka półprzezroczysta poświata i padding nie spełniają kontraktu bitmapy tła. Źródło zachowano wyłącznie poza repo i nie progowano ani nie przeskalowano go."
+    },
+    {
+      "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-e26d0873-09ec-4642-bcca-c3bd5f99f80f.png",
+      "sha256": "42e23621199c35bdfcbd2587130313d5209d45813c28791abe313333ae908594",
+      "pixel_size": [1536, 1024],
+      "channels": "RGBA",
+      "status": "rejected_map_backdrop_alpha_contract_and_false_platform_risk",
+      "reason": "Odrzucone przed publikacją: źródło ma ten sam szeroki półprzezroczysty sposób alfy niezgodny z kontraktem bitmapy tła, a czytelne pomosty i przewody niosą ryzyko fałszywej używalnej konstrukcji. Źródło zachowano wyłącznie poza repo i nie progowano ani nie przeskalowano go."
+    },
+    {
       "path": "imagegen://generated_images/01a035a4-baae-7342-9624-1b84cc6f520d/exec-e96c435a-6d4a-4d83-88fc-bfab20ba5c93.png",
       "sha256": "5082c810f2e563d919bf2019d62605c2efe6050d210a44d7629209e97e9e2e02",
       "reason": "Odrzucone: zbyt rozlegle ruiny i zniszczenia dla niedawno zatopionego miasta; plik nie jest zrodlem aktywnego assetu."
@@ -168,6 +208,59 @@
     }
   ],
   "entries": [
+    {
+      "id": "drowned_world_regional_dominants_v27",
+      "status": "inactive_rejected_review_batch_not_referenced_by_manifest",
+      "role": "reviewed_nonblocking_far_and_mid_depth_regional_silhouette_candidates",
+      "generated_at": "2026-09-01",
+      "tool": "OpenAI built-in image_gen",
+      "model": "not_exposed_by_tool",
+      "seed": "not_exposed_by_tool",
+      "style_research_urls": [
+        "https://store.steampowered.com/app/3590290/",
+        "https://www.youtube.com/watch?v=NmyQ_Yv5AWs"
+      ],
+      "style_research_role": "STYLE_ONLY_HIGH_LEVEL_ATMOSPHERE_AND_SILHOUETTE",
+      "style_research_authority": false,
+      "originality_constraint": "Use only high-level principles of strong silhouette, deep negative space, restrained warm accents and layered underwater atmosphere; do not imitate another game's exact asset, layout, character, composition or branding.",
+      "source_outputs": [
+        {
+          "asset_id": "l01_approach_maritime_cluster",
+          "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-2bfa9489-f378-4093-beff-3a6fbd79371e.png",
+          "sha256": "3e8c9908b8ce4d3730eff79895e0a144288029a8a47299d94e884a486359038e",
+          "pixel_size": [1536, 1024],
+          "channels": "RGBA",
+          "prompt_capture": "verbatim",
+          "prompt": "Create one original production-ready 2D game environment cutout for \"Ostatni Pomost\", a Polish post-flood underwater survival game whose city has been progressively flooded for five years. Asset: a large but mostly intact drowned coastal-city landmark for a far parallax layer — three late-modern Baltic apartment slabs, a maritime radio mast, an elevated service bridge and a small ferry-terminal control room. Damage is limited and believable after five years: some broken windows, corrosion, bent rails and hanging cables, but no ancient ruins, no collapsed city, no overgrown fantasy temple. Strict orthographic side-view silhouette, smooth painterly realistic 2D, strong readable large shapes, restrained detail. Palette: dark navy concrete and steel, blue-green corrosion, very sparse muted amber emergency points. It must read as distant non-colliding scenery, never as a traversable floor, doorway, tunnel or usable platform. Transparent background with clean alpha, no water rectangle, no fog plate, no vignette, no beams, no caustics, no particles. No diver, people, creatures, vehicles, HUD, text, labels, logo, national emblem, border, grid, arrows, or UI. Do not imitate any existing game's exact asset or composition. Center the single cutout with generous transparent padding; full object visible, no crop."
+        },
+        {
+          "asset_id": "l02_c4_power_grid_cluster",
+          "path": "imagegen://generated_images/01a04dbe-3b8f-7813-878e-8a4191602f8d/exec-e26d0873-09ec-4642-bcca-c3bd5f99f80f.png",
+          "sha256": "42e23621199c35bdfcbd2587130313d5209d45813c28791abe313333ae908594",
+          "pixel_size": [1536, 1024],
+          "channels": "RGBA",
+          "prompt_capture": "verbatim_prompt_unavailable",
+          "prompt_summary": "Original C-4 power-grid silhouette candidate: a frontal drowned switchyard cluster with pylons, insulators, suspended cables, dark navy steel, blue-green corrosion and sparse muted amber/cyan accents on a transparent background; nonblocking parallax scenery without text, UI, diver or copied composition."
+        }
+      ],
+      "technical_acceptance": {
+        "required_pixel_size": [1536, 1024],
+        "required_channels": "RGBA",
+        "observed_alpha": "real_alpha_with_transparent_corners_but_excessive_partial_canvas_share",
+        "builder_result": "rejected_less_than_95_percent_of_visible_pixels_opaque",
+        "world_mapping": "native_1_to_1_world_rect_equals_pixel_size",
+        "node_scale": [1.0, 1.0]
+      },
+      "postprocess": {
+        "operation_order": [
+          "no_production_postprocess",
+          "no_resize_resampling_crop_warp_rotation_alpha_edit_or_color_bake"
+        ],
+        "implementation": "none_rejected_before_integration"
+      },
+      "result_assets": [],
+      "review": "All five candidates were rejected before production integration: three at artistic review for excessive collapse, perspective or false-entry language and two at the canonical builder alpha gate. The active presentation pass therefore uses only existing validated assets, a darker layer hierarchy and a reduced repetition count."
+    },
     {
       "id": "l01_distant_city_native_panels",
       "status": "inactive_rejected_visual_not_referenced_by_manifest",
