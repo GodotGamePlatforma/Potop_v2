@@ -30,12 +30,12 @@ const MAX_QUALITY := 4
 @export var quality_2_metal := Color("b8733f")
 @export var quality_2_pattern := Color("62d2ca")
 @export var quality_2_rim := Color("5dc9c6")
-@export_range(0.0, 1.0, 0.01) var quality_2_fabric_mix := 0.50
-@export_range(0.0, 1.0, 0.01) var quality_2_metal_mix := 0.36
-@export_range(0.0, 1.0, 0.01) var quality_2_pattern_strength := 0.45
-@export_range(0.0, 1.0, 0.01) var quality_2_plate_strength := 0.15
-@export_range(0.0, 1.0, 0.01) var quality_2_emissive_strength := 0.04
-@export_range(0.0, 1.0, 0.01) var quality_2_accent_strength := 0.36
+@export_range(0.0, 1.0, 0.01) var quality_2_fabric_mix := 0.58
+@export_range(0.0, 1.0, 0.01) var quality_2_metal_mix := 0.44
+@export_range(0.0, 1.0, 0.01) var quality_2_pattern_strength := 0.52
+@export_range(0.0, 1.0, 0.01) var quality_2_plate_strength := 0.18
+@export_range(0.0, 1.0, 0.01) var quality_2_emissive_strength := 0.06
+@export_range(0.0, 1.0, 0.01) var quality_2_accent_strength := 0.38
 @export_range(0.0, 3.5, 0.1) var quality_2_outline_width := 3.5
 
 @export_group("Quality 3 - Pressure")
@@ -45,12 +45,12 @@ const MAX_QUALITY := 4
 @export var quality_3_metal := Color("c4a66b")
 @export var quality_3_pattern := Color("e0d5b8")
 @export var quality_3_rim := Color("72d3dc")
-@export_range(0.0, 1.0, 0.01) var quality_3_fabric_mix := 0.55
-@export_range(0.0, 1.0, 0.01) var quality_3_metal_mix := 0.50
-@export_range(0.0, 1.0, 0.01) var quality_3_pattern_strength := 0.35
-@export_range(0.0, 1.0, 0.01) var quality_3_plate_strength := 0.65
-@export_range(0.0, 1.0, 0.01) var quality_3_emissive_strength := 0.08
-@export_range(0.0, 1.0, 0.01) var quality_3_accent_strength := 0.40
+@export_range(0.0, 1.0, 0.01) var quality_3_fabric_mix := 0.66
+@export_range(0.0, 1.0, 0.01) var quality_3_metal_mix := 0.60
+@export_range(0.0, 1.0, 0.01) var quality_3_pattern_strength := 0.60
+@export_range(0.0, 1.0, 0.01) var quality_3_plate_strength := 0.72
+@export_range(0.0, 1.0, 0.01) var quality_3_emissive_strength := 0.14
+@export_range(0.0, 1.0, 0.01) var quality_3_accent_strength := 0.44
 @export_range(0.0, 3.5, 0.1) var quality_3_outline_width := 3.5
 
 @export_group("Quality 4 - Abyss")
@@ -60,12 +60,12 @@ const MAX_QUALITY := 4
 @export var quality_4_metal := Color("d2a84f")
 @export var quality_4_pattern := Color("71f3e4")
 @export var quality_4_rim := Color("91e5df")
-@export_range(0.0, 1.0, 0.01) var quality_4_fabric_mix := 0.68
-@export_range(0.0, 1.0, 0.01) var quality_4_metal_mix := 0.62
-@export_range(0.0, 1.0, 0.01) var quality_4_pattern_strength := 0.75
-@export_range(0.0, 1.0, 0.01) var quality_4_plate_strength := 0.40
-@export_range(0.0, 1.0, 0.01) var quality_4_emissive_strength := 0.35
-@export_range(0.0, 1.0, 0.01) var quality_4_accent_strength := 0.45
+@export_range(0.0, 1.0, 0.01) var quality_4_fabric_mix := 0.76
+@export_range(0.0, 1.0, 0.01) var quality_4_metal_mix := 0.72
+@export_range(0.0, 1.0, 0.01) var quality_4_pattern_strength := 0.82
+@export_range(0.0, 1.0, 0.01) var quality_4_plate_strength := 0.48
+@export_range(0.0, 1.0, 0.01) var quality_4_emissive_strength := 0.46
+@export_range(0.0, 1.0, 0.01) var quality_4_accent_strength := 0.52
 @export_range(0.0, 3.5, 0.1) var quality_4_outline_width := 3.5
 
 

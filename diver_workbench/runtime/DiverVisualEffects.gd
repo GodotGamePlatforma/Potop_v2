@@ -4,6 +4,7 @@ const BUBBLE_TEXTURE_SIZE := 18
 const WAKE_TEXTURE_SIZE := 14
 const GLINT_TEXTURE_SIZE := 16
 const WAKE_MIN_SPEED := 22.0
+const WAKE_FULL_SPEED := 210.0
 const PREVIOUS_AUTHORED_SPRITE_SCALE := 0.34
 
 @onready var diver_sprite: AnimatedSprite2D = get_parent().get_node("AnimatedSprite2D")
@@ -33,6 +34,9 @@ var _interaction_progress := 0.0
 var _is_towing := false
 var _breath_clock := 1.85
 var _visual_retarget_scale := 1.0
+var _water_relative_speed := 0.0
+var _wake_density := 0.0
+var _active_cue: StringName = &""
 
 
 func _ready() -> void:
@@ -58,8 +62,8 @@ func _ready() -> void:
 		true,
 		41031
 	)
-	_bubble_emitter.explosiveness = 0.48
-	_bubble_emitter.randomness = 0.74
+	_bubble_emitter.explosiveness = 0.72
+	_bubble_emitter.randomness = 0.34
 	_bubble_emitter.visibility_rect = Rect2(-120, -190, 240, 260)
 	_bubble_emitter.z_index = 2
 
@@ -186,6 +190,9 @@ func reset_presentation() -> void:
 	_interaction_progress = 0.0
 	_is_towing = false
 	_breath_clock = 1.85
+	_water_relative_speed = 0.0
+	_wake_density = 0.0
+	_active_cue = &""
 	for emitter in [
 		_bubble_emitter,
 		_wake_upper_emitter,
@@ -212,28 +219,38 @@ func play_cue(cue: StringName, target_global_position: Vector2, strength: float 
 	_cue_emitter.global_rotation = 0.0
 	_cue_material.direction = Vector3(direction.x, direction.y, 0.0)
 	var clamped_strength := clampf(strength, 0.25, 1.5)
+	_active_cue = cue
+	_cue_emitter.amount_ratio = 1.0
 	match cue:
 		&"harpoon_attack":
+			_cue_emitter.lifetime = 0.30 if _reduced_motion else 0.42
 			_cue_material.color = Color(0.95, 0.70, 0.28, 0.84)
 			_cue_material.spread = 12.0
 			_cue_material.initial_velocity_min = 38.0 * clamped_strength
 			_cue_material.initial_velocity_max = 76.0 * clamped_strength
 		&"knife_attack":
-			_cue_material.color = Color(0.48, 0.92, 0.86, 0.76)
-			_cue_material.spread = 38.0
-			_cue_material.initial_velocity_min = 24.0 * clamped_strength
-			_cue_material.initial_velocity_max = 52.0 * clamped_strength
+			# A short, narrow edge flash reads as the authored knife rather than a
+			# generic cloud around the hand. It remains a presentation-only cue.
+			_cue_emitter.lifetime = 0.15 if _reduced_motion else 0.22
+			_cue_emitter.amount_ratio = 0.72
+			_cue_material.color = Color(0.78, 0.98, 0.96, 0.96)
+			_cue_material.spread = 11.0 if _reduced_motion else 15.0
+			_cue_material.initial_velocity_min = 46.0 * clamped_strength
+			_cue_material.initial_velocity_max = 82.0 * clamped_strength
 		&"repair":
+			_cue_emitter.lifetime = 0.26 if _reduced_motion else 0.42
 			_cue_material.color = Color(0.42, 0.88, 0.82, 0.72)
 			_cue_material.spread = 68.0
 			_cue_material.initial_velocity_min = 18.0 * clamped_strength
 			_cue_material.initial_velocity_max = 42.0 * clamped_strength
 		&"hit":
+			_cue_emitter.lifetime = 0.30 if _reduced_motion else 0.48
 			_cue_material.color = Color(0.98, 0.31, 0.16, 0.78)
 			_cue_material.spread = 54.0
 			_cue_material.initial_velocity_min = 32.0 * clamped_strength
 			_cue_material.initial_velocity_max = 68.0 * clamped_strength
 		_:
+			_cue_emitter.lifetime = 0.26 if _reduced_motion else 0.40
 			_cue_material.color = Color(0.72, 0.90, 0.76, 0.66)
 			_cue_material.spread = 46.0
 			_cue_material.initial_velocity_min = 18.0 * clamped_strength
@@ -261,6 +278,10 @@ func graphics_quality_state() -> Dictionary:
 		"leak_lifetime": _leak_emitter.lifetime if _leak_emitter != null else 0.0,
 		"bubble_speed_scale": _bubble_emitter.speed_scale if _bubble_emitter != null else 0.0,
 		"wake_speed_scale": _wake_upper_emitter.speed_scale if _wake_upper_emitter != null else 0.0,
+		"water_relative_speed": _water_relative_speed,
+		"wake_density": _wake_density,
+		"active_cue": _active_cue,
+		"cue_lifetime": _cue_emitter.lifetime if _cue_emitter != null else 0.0,
 		"visual_retarget_scale": _visual_retarget_scale,
 		"emitter_count": 6 if _bubble_emitter != null else 0,
 	}
@@ -268,9 +289,9 @@ func graphics_quality_state() -> Dictionary:
 
 func _quality_budget() -> Dictionary:
 	var budget := {
-		"bubble": 4 if _graphics_quality == "low" else 8 if _graphics_quality == "medium" else 12,
+		"bubble": 3 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 7,
 		"wake_upper": 3 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 10,
-		"wake_lower": 3 if _graphics_quality == "low" else 6 if _graphics_quality == "medium" else 10,
+		"wake_lower": 3 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 10,
 		"leak": 2 if _graphics_quality == "low" else 4 if _graphics_quality == "medium" else 7,
 		"tool": 3 if _graphics_quality == "low" else 5 if _graphics_quality == "medium" else 7,
 		"cue": 5 if _graphics_quality == "low" else 8 if _graphics_quality == "medium" else 12,
@@ -296,12 +317,13 @@ func _apply_graphics_quality() -> void:
 	_tool_emitter.amount = int(budget["tool"])
 	_cue_emitter.amount = int(budget["cue"])
 
-	_bubble_emitter.lifetime = 0.62 if _reduced_motion else 0.92
-	_wake_upper_emitter.lifetime = 0.62 if _reduced_motion else 1.1
-	_wake_lower_emitter.lifetime = 0.62 if _reduced_motion else 1.1
+	_bubble_emitter.lifetime = 0.50 if _reduced_motion else 0.78
+	_wake_upper_emitter.lifetime = 0.56 if _reduced_motion else 0.96
+	_wake_lower_emitter.lifetime = 0.56 if _reduced_motion else 0.96
 	_leak_emitter.lifetime = 0.72 if _reduced_motion else 1.15
 	_tool_emitter.lifetime = 0.24 if _reduced_motion else 0.42
-	_cue_emitter.lifetime = 0.30 if _reduced_motion else 0.48
+	if _active_cue.is_empty():
+		_cue_emitter.lifetime = 0.30 if _reduced_motion else 0.48
 	_bubble_emitter.speed_scale = 0.78 if _reduced_motion else 1.0
 	_wake_upper_emitter.speed_scale = 0.72 if _reduced_motion else 1.0
 	_wake_lower_emitter.speed_scale = 0.72 if _reduced_motion else 1.0
@@ -314,9 +336,9 @@ func _apply_graphics_quality() -> void:
 	_leak_emitter.modulate = Color(1.0, 1.0, 1.0, 0.62 if _reduced_motion else 0.84)
 	_tool_emitter.modulate = Color(1.0, 1.0, 1.0, 0.62 if _reduced_motion else 0.88)
 	_cue_emitter.modulate = Color(1.0, 1.0, 1.0, 0.76 if _reduced_motion else 0.96)
-	_bubble_material.spread = 11.0 if _reduced_motion else 17.0
-	_wake_upper_material.spread = 20.0 if _reduced_motion else 32.0
-	_wake_lower_material.spread = 20.0 if _reduced_motion else 32.0
+	_bubble_material.spread = 5.0 if _reduced_motion else 9.0
+	_wake_upper_material.spread = 14.0 if _reduced_motion else 22.0
+	_wake_lower_material.spread = 14.0 if _reduced_motion else 22.0
 	_leak_material.spread = 10.0 if _reduced_motion else 17.0
 	_tool_material.spread = 18.0 if _reduced_motion else 30.0
 
@@ -359,6 +381,7 @@ func _update_wake() -> void:
 	_wake_lower_emitter.amount_ratio = lerpf(1.0 - kick_depth, 1.0, (1.0 - kick_wave) * 0.5)
 	var water_relative_velocity := diver.velocity - diver._current_velocity
 	var speed := water_relative_velocity.length()
+	_water_relative_speed = speed
 	_wake_upper_emitter.global_position = _socket_global(&"fin_upper")
 	_wake_lower_emitter.global_position = _socket_global(&"fin_lower")
 	_wake_upper_emitter.global_rotation = 0.0
@@ -367,13 +390,23 @@ func _update_wake() -> void:
 	_wake_upper_emitter.emitting = should_emit
 	_wake_lower_emitter.emitting = should_emit
 	if not should_emit:
+		_wake_density = 0.0
+		_wake_upper_emitter.amount_ratio = 0.0
+		_wake_lower_emitter.amount_ratio = 0.0
 		return
 	var wake_direction := (-water_relative_velocity.normalized() + Vector2.UP * 0.12).normalized()
-	var normalized_speed := clampf(speed / 265.0, 0.0, 1.0)
+	var normalized_speed := smoothstep(WAKE_MIN_SPEED, WAKE_FULL_SPEED, speed)
+	_wake_density = normalized_speed
+	var upper_kick := lerpf(1.0 - kick_depth, 1.0, (kick_wave + 1.0) * 0.5)
+	var lower_kick := lerpf(1.0 - kick_depth, 1.0, (1.0 - kick_wave) * 0.5)
+	var density_floor := 0.24 if _reduced_motion else 0.32
+	var density := lerpf(density_floor, 1.0, normalized_speed)
+	_wake_upper_emitter.amount_ratio = density * upper_kick
+	_wake_lower_emitter.amount_ratio = density * lower_kick
 	for material in [_wake_upper_material, _wake_lower_material]:
 		material.direction = Vector3(wake_direction.x, wake_direction.y, 0.0)
-		material.initial_velocity_min = lerpf(12.0, 20.0, normalized_speed)
-		material.initial_velocity_max = lerpf(22.0, 40.0, normalized_speed)
+		material.initial_velocity_min = lerpf(9.0, 22.0, normalized_speed)
+		material.initial_velocity_max = lerpf(18.0, 44.0, normalized_speed)
 
 
 func _update_leak() -> void:
@@ -427,12 +460,12 @@ func _create_bubble_material() -> ParticleProcessMaterial:
 	material.direction = Vector3(0.0, -1.0, 0.0)
 	material.spread = 17.0
 	material.gravity = Vector3(0.0, -7.0, 0.0)
-	material.initial_velocity_min = 22.0
-	material.initial_velocity_max = 43.0
-	material.scale_min = 0.30 * _visual_retarget_scale
-	material.scale_max = 0.82 * _visual_retarget_scale
+	material.initial_velocity_min = 26.0
+	material.initial_velocity_max = 44.0
+	material.scale_min = 0.24 * _visual_retarget_scale
+	material.scale_max = 0.70 * _visual_retarget_scale
 	material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	material.emission_sphere_radius = 2.8 * _visual_retarget_scale
+	material.emission_sphere_radius = 1.5 * _visual_retarget_scale
 	material.color_ramp = _create_bubble_fade()
 	return material
 
@@ -440,12 +473,12 @@ func _create_bubble_material() -> ParticleProcessMaterial:
 func _create_wake_material() -> ParticleProcessMaterial:
 	var material := ParticleProcessMaterial.new()
 	material.direction = Vector3(-1.0, -0.1, 0.0)
-	material.spread = 32.0
+	material.spread = 22.0
 	material.gravity = Vector3(0.0, -1.4, 0.0)
 	material.initial_velocity_min = 12.0
 	material.initial_velocity_max = 26.0
-	material.scale_min = 0.34 * _visual_retarget_scale
-	material.scale_max = 0.92 * _visual_retarget_scale
+	material.scale_min = 0.28 * _visual_retarget_scale
+	material.scale_max = 0.78 * _visual_retarget_scale
 	material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
 	material.emission_sphere_radius = 4.2 * _visual_retarget_scale
 	material.color_ramp = _create_wake_fade()
