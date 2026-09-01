@@ -4,6 +4,7 @@ const ExpeditionSetupScript := preload("res://scripts/data/ExpeditionSetup.gd")
 const GameStateScript := preload("res://scripts/data/GameState.gd")
 const DifficultyProfileScript := preload("res://scripts/definitions/DifficultyProfile.gd")
 const TutorialStateScript := preload("res://scripts/data/TutorialState.gd")
+const SLoopRealDiverHarnessScript := preload("res://tests/s_loop_real_diver_integration_harness.gd")
 
 const DIVE_SCENE_PATH := "res://scenes/diving/DiveScene.tscn"
 const DIVER_SCENE_PATH := "res://diver_workbench/runtime/Diver.tscn"
@@ -67,9 +68,11 @@ func _run() -> void:
 	state.setup_new_campaign(105_060, DifficultyProfileScript.new())
 	var setup = ExpeditionSetupScript.new()
 	setup.capture_diver(state.find_survivor("igor"), 100.0)
+	setup.day = 4
 	setup.start_entry_point = str(state.underwater_world.blueprint.entry_landmark_id)
 	setup.target_sector = setup.start_entry_point
 	setup.selected_objective = "basic_scavenge"
+	setup.can_place_buoys = true
 	setup.item_weights = {"food": 1.0, "planks": 1.2, "scrap": 1.5}
 	setup.selected_gear.append("knife")
 	setup.suit_quality = 1
@@ -207,6 +210,12 @@ func _run() -> void:
 	_assert(exact_eighty_count >= 1, "Bieżąca integracja musi fizycznie przejść co najmniej jedno dokładne gardło 80×80.")
 	_assert(current_count >= 1, "Live DiveScene musi przepchnąć realnego Nurka przez co najmniej jeden prąd struktury.")
 	_record_clearance_ab(sampled_points)
+	var s_loop_result := await SLoopRealDiverHarnessScript.new().run(self, _map, _diver)
+	_report["s_loop_real_diver"] = s_loop_result.get("report", {})
+	_assert(
+		bool(s_loop_result.get("success", false)),
+		"Real-Diver S-loop integration failed: %s" % "; ".join(s_loop_result.get("errors", PackedStringArray())),
+	)
 	_save_report()
 	_finish()
 
