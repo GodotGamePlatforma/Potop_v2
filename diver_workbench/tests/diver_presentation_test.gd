@@ -232,6 +232,9 @@ func _test_suit_profile_contract() -> void:
 	var sealed: Dictionary = SuitProfile.style_for(2)
 	var pressure: Dictionary = SuitProfile.style_for(3)
 	var abyss: Dictionary = SuitProfile.style_for(4)
+	_check(float(sealed["fabric_mix"]) >= 0.55 and float(sealed["pattern_strength"]) >= 0.50, "Suit Q2 should establish a broad sealed-material mass at gameplay scale.")
+	_check(float(pressure["fabric_mix"]) >= 0.65 and float(pressure["plate_strength"]) >= 0.70, "Suit Q3 should establish a broad pressure-shell mass at gameplay scale.")
+	_check(float(abyss["fabric_mix"]) >= 0.75 and float(abyss["emissive_strength"]) >= 0.45, "Suit Q4 should establish a broad abyss fabric mass with the strongest emissive guide.")
 	_check(float(sealed["pattern_strength"]) > 0.0, "Suit Q2 should add visible sealed construction bands.")
 	_check(float(pressure["plate_strength"]) > float(abyss["plate_strength"]) and float(abyss["plate_strength"]) > float(sealed["plate_strength"]), "Suit Q3 should remain the strongest pressure-plating profile while Q4 retains more plating than Q2.")
 	_check(float(abyss["emissive_strength"]) > float(pressure["emissive_strength"]), "Suit Q4 should add the strongest abyss piping signal.")
@@ -251,6 +254,8 @@ func _test_readability_shader_contract() -> void:
 		and "float outer_rim_scale = 0.62;" in shader_code,
 		"The shader should retain an explicit legacy Q1 rim path before applying upgraded-suit polish."
 	)
+	_check("broad_panel_mask" in shader_code, "Upgraded suits should use a broad luminance-preserving material mass, not only thin edge accents.")
+	_check("uniform float lantern_glint" in shader_code and "uniform vec4 lantern_color" in shader_code, "The existing lantern presentation seam should drive a material glint without another Light2D.")
 
 
 func _test_knife_asset_contract() -> void:
@@ -629,23 +634,23 @@ func _test_runtime_presentation_contract() -> void:
 
 	var low_reduced: Dictionary = visual_effects.graphics_quality_state()
 	_check(low_reduced.get("emitter_count") == 6, "Diver should allocate the six contextual presentation emitters.")
-	_check(low_reduced.get("bubble_count") == 3, "Cold-start low/reduced should allocate the reduced bubble budget directly.")
+	_check(low_reduced.get("bubble_count") == 2, "Cold-start low/reduced should allocate the focused breath budget directly.")
 	_check(low_reduced.get("wake_upper_count") == 2 and low_reduced.get("wake_lower_count") == 2, "Cold-start low/reduced should retain a small two-fin wake signal.")
 	_check(low_reduced.get("leak_count") == 1 and low_reduced.get("tool_count") == 2 and low_reduced.get("cue_count") == 4, "Cold-start low/reduced should allocate reduced contextual budgets.")
 
 	diver.set_reduced_motion(false)
 	var low: Dictionary = visual_effects.graphics_quality_state()
-	_check(low.get("bubble_count") == 4 and low.get("wake_upper_count") == 3 and low.get("wake_lower_count") == 3, "Low profile should retain the authored breath and two-fin wake budgets.")
+	_check(low.get("bubble_count") == 3 and low.get("wake_upper_count") == 3 and low.get("wake_lower_count") == 3, "Low profile should retain the focused breath and two-fin wake budgets.")
 	_check(low.get("leak_count") == 2 and low.get("tool_count") == 3 and low.get("cue_count") == 5, "Low profile should retain readable contextual budgets.")
 
 	diver.set_graphics_quality("medium")
 	var medium: Dictionary = visual_effects.graphics_quality_state()
-	_check(medium.get("bubble_count") == 8 and medium.get("wake_upper_count") == 5 and medium.get("wake_lower_count") == 6, "Medium profile should increase breath and wake density monotonically.")
+	_check(medium.get("bubble_count") == 5 and medium.get("wake_upper_count") == 5 and medium.get("wake_lower_count") == 5, "Medium profile should increase breath and keep a balanced two-fin wake density.")
 	_check(medium.get("leak_count") == 4 and medium.get("tool_count") == 5 and medium.get("cue_count") == 8, "Medium profile should increase contextual density monotonically.")
 
 	diver.set_graphics_quality("high")
 	var high: Dictionary = visual_effects.graphics_quality_state()
-	_check(high.get("bubble_count") == 12, "High profile should expose the authored breath budget.")
+	_check(high.get("bubble_count") == 7, "High profile should expose the focused authored breath budget.")
 	_check(high.get("wake_count") == 20, "High profile should split the authored wake budget across both fins.")
 	_check(high.get("leak_count") == 7 and high.get("tool_count") == 7 and high.get("cue_count") == 12, "High profile should expose all contextual VFX budgets.")
 	_check(float(high.get("bubble_lifetime", 99.0)) < 1.05, "A sprint breath pulse should finish before the next authored breath interval instead of restarting live particles.")
@@ -657,13 +662,14 @@ func _test_runtime_presentation_contract() -> void:
 	var tool_material := (visual_effects.get_node("ToolEmitter") as GPUParticles2D).process_material as ParticleProcessMaterial
 	var cue_material := (visual_effects.get_node("CueEmitter") as GPUParticles2D).process_material as ParticleProcessMaterial
 	var retarget_scale := APPROVED_SPRITE_SCALE.x / PREVIOUS_AUTHORED_SPRITE_SCALE
-	_check(is_equal_approx(bubble_material.scale_min, 0.30 * retarget_scale) and is_equal_approx(bubble_material.scale_max, 0.82 * retarget_scale), "Breath bubbles should retain the reviewed readable scale range.")
+	_check(is_equal_approx(bubble_material.scale_min, 0.24 * retarget_scale) and is_equal_approx(bubble_material.scale_max, 0.70 * retarget_scale), "Breath bubbles should retain the focused readable scale range.")
+	_check(is_equal_approx(bubble_material.emission_sphere_radius, 1.5 * retarget_scale) and bubble_material.spread <= 9.0, "Breathing should remain a focused regulator pulse instead of a cloud around the helmet.")
 	_check(is_equal_approx(tool_material.scale_min, 0.24 * retarget_scale) and is_equal_approx(tool_material.scale_max, 0.62 * retarget_scale), "Tool glints should retain the reviewed readable scale range.")
 	_check(is_equal_approx(cue_material.scale_min, 0.28 * retarget_scale) and is_equal_approx(cue_material.scale_max, 0.82 * retarget_scale), "Action cues should retain the reviewed readable scale range.")
 
 	diver.set_reduced_motion(true)
 	var high_reduced: Dictionary = visual_effects.graphics_quality_state()
-	_check(high_reduced.get("bubble_count") == 8 and high_reduced.get("wake_count") == 10, "Reduced motion should lower high-profile breath and wake density.")
+	_check(high_reduced.get("bubble_count") == 5 and high_reduced.get("wake_count") == 10, "Reduced motion should lower high-profile breath and wake density.")
 	_check(high_reduced.get("leak_count") == 4 and high_reduced.get("tool_count") == 4 and high_reduced.get("cue_count") == 8, "Reduced motion should lower all high-profile contextual budgets.")
 	_check(float(high_reduced.get("bubble_lifetime", 99.0)) < float(high.get("bubble_lifetime", 0.0)) and float(high_reduced.get("wake_lifetime", 99.0)) < float(high.get("wake_lifetime", 0.0)), "Reduced motion should shorten the breath and wake trails.")
 	_check(float(high_reduced.get("bubble_speed_scale", 99.0)) < float(high.get("bubble_speed_scale", 0.0)) and float(high_reduced.get("wake_speed_scale", 99.0)) < float(high.get("wake_speed_scale", 0.0)), "Reduced motion should slow the breath and wake particles.")
@@ -709,6 +715,11 @@ func _test_runtime_presentation_contract() -> void:
 	var radial_color := dive_light.color
 	diver.set_lantern_presentation(true, Color(0.72, 0.9, 1.0, 1.0), 350.0, 1.0)
 	_check(dive_light.position.is_zero_approx() and is_equal_approx(dive_light.texture_scale, radial_scale), "The compatibility presentation seam must not replace the root-configured radial rig.")
+	var body_material := sprite.material as ShaderMaterial
+	var high_lantern_glint := float(body_material.get_shader_parameter(&"lantern_glint"))
+	var lantern_state: Dictionary = diver.presentation_state()
+	_check(bool(lantern_state.get("lantern_glint_enabled")) and high_lantern_glint > 0.0, "An enabled canonical lantern should produce a restrained local material glint.")
+	_check((body_material.get_shader_parameter(&"lantern_color") as Color).is_equal_approx(Color(0.72, 0.9, 1.0, 1.0)), "The glint should derive its color from the canonical lantern presentation seam.")
 	sprite.flip_h = true
 	diver._update_socket_markers()
 	diver._update_light_mount()
@@ -719,8 +730,14 @@ func _test_runtime_presentation_contract() -> void:
 	diver.set_reduced_motion(true)
 	_check(dive_light.position.is_zero_approx(), "Reduced motion must not offset the radial light.")
 	_check(is_equal_approx(dive_light.texture_scale, radial_scale) and is_equal_approx(dive_light.energy, radial_energy) and dive_light.color.is_equal_approx(radial_color), "Presentation settings must not change root-owned lantern range, energy or color.")
+	diver.set_graphics_quality("low")
+	var low_reduced_glint := float(body_material.get_shader_parameter(&"lantern_glint"))
+	_check(low_reduced_glint > 0.0 and low_reduced_glint < high_lantern_glint, "Low/reduced presentation should retain the lantern cue with a smaller shader budget.")
 	diver.set_lantern_presentation(false, Color.WHITE, 350.0, 0.0)
 	_check(dive_light.enabled and is_equal_approx(dive_light.texture_scale, radial_scale), "The avatar compatibility seam must not override the root-owned on/off state or radius.")
+	_check(is_zero_approx(float(body_material.get_shader_parameter(&"lantern_glint"))), "Disabling the presentation seam should remove only the local glint.")
+	diver.set_graphics_quality("high")
+	diver.set_reduced_motion(false)
 	diver.rotation = 0.0
 
 	var wake_upper := visual_effects.get_node("WakeEmitterUpper") as GPUParticles2D
@@ -736,6 +753,14 @@ func _test_runtime_presentation_contract() -> void:
 	diver._set_animation_phase(sprite, 0.25)
 	visual_effects._update_wake()
 	_check(wake_upper.emitting and wake_lower.emitting, "Water-relative propulsion should create wakes at both fin sockets.")
+	var low_speed_density := float(visual_effects.graphics_quality_state().get("wake_density"))
+	var low_speed_amount := wake_upper.amount_ratio + wake_lower.amount_ratio
+	diver.velocity = Vector2(230.0, 0.0)
+	diver._current_velocity = Vector2(20.0, 0.0)
+	visual_effects._update_wake()
+	var high_speed_state: Dictionary = visual_effects.graphics_quality_state()
+	_check(float(high_speed_state.get("water_relative_speed")) >= 209.0 and float(high_speed_state.get("wake_density")) > low_speed_density, "Wake density should rise with speed relative to water, not world drift.")
+	_check(wake_upper.amount_ratio + wake_lower.amount_ratio > low_speed_amount, "Faster propulsion should strengthen both-fin particulate wake output.")
 	var upper_push_ratio := wake_upper.amount_ratio
 	var lower_recovery_ratio := wake_lower.amount_ratio
 	diver._set_animation_phase(sprite, 0.75)
@@ -1001,6 +1026,12 @@ func _test_knife_runtime_contract(diver: DiverController, sprite: AnimatedSprite
 	var formal_pose: Dictionary = diver._action_pose_for(sprite)
 	diver.play_visual_cue(&"knife_attack", target, 1.0)
 	_check(not diver._legacy_knife_action_active, "Compatibility cue playback must not create a second legacy action during a formal attack.")
+	var visual_effects := diver.get_node("VisualEffects")
+	var knife_cue_state: Dictionary = visual_effects.graphics_quality_state()
+	var knife_cue_emitter := visual_effects.get_node("CueEmitter") as GPUParticles2D
+	var knife_cue_material := knife_cue_emitter.process_material as ParticleProcessMaterial
+	_check(knife_cue_state.get("active_cue") == &"knife_attack", "The formal knife bridge should produce the authored short hand cue.")
+	_check(float(knife_cue_state.get("cue_lifetime")) <= 0.22 and knife_cue_material.spread <= 15.0, "Knife cue particles should form a short, narrow blade-edge flash.")
 	diver._cue_elapsed = diver._cue_duration * 0.5
 	var combined_pose: Dictionary = diver._action_pose_for(sprite)
 	_check((combined_pose["offset"] as Vector2).is_equal_approx(formal_pose["offset"] as Vector2), "Compatibility cue must not double the formal knife body lunge.")

@@ -24,6 +24,8 @@ uniform float action_glow : hint_range(0.0, 1.0) = 0.0;
 uniform float damage_flash : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 action_color : source_color = vec4(0.92, 0.66, 0.24, 1.0);
 uniform vec4 damage_color : source_color = vec4(1.0, 0.24, 0.16, 1.0);
+uniform float lantern_glint : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 lantern_color : source_color = vec4(0.72, 0.90, 1.0, 1.0);
 
 
 float handoff_visibility(vec2 uv, vec2 texture_pixel_size) {
@@ -176,6 +178,23 @@ void fragment() {
 	);
 	vec3 pattern_target = suit_pattern_color.rgb * (0.30 + source_luma * 0.92);
 	base.rgb = mix(base.rgb, pattern_target, construction_mix * suit_enabled);
+	// Upgraded suits need a large material mass that survives the gameplay
+	// camera, not only thin detail-edge accents. The source luminance still
+	// models the volume, so this remains a treatment of the authored raster.
+	float broad_panel_mask = fabric_mask * smoothstep(0.025, 0.22, source_luma)
+		* (1.0 - smoothstep(0.68, 0.96, source_luma));
+	float broad_panel_mix = broad_panel_mask * suit_enabled * (
+		sealed_style * suit_pattern_strength * 0.16
+		+ pressure_style * suit_plate_strength * 0.19
+		+ abyss_style * suit_emissive_strength * 0.24
+	);
+	vec3 broad_panel_tint = mix(
+		suit_fabric_color.rgb,
+		suit_pattern_color.rgb,
+		sealed_style * 0.20 + pressure_style * 0.14 + abyss_style * 0.24
+	);
+	vec3 broad_panel_target = luma_preserving_tint(broad_panel_tint, source_luma);
+	base.rgb = mix(base.rgb, broad_panel_target, clamp(broad_panel_mix, 0.0, 0.28));
 
 	vec3 lifted = mix(base.rgb, pow(max(base.rgb, vec3(0.0)), vec3(0.54)), color_lift);
 	lifted = min(lifted * exposure, vec3(1.0));
@@ -195,6 +214,9 @@ void fragment() {
 	lifted = mix(lifted, lifted + action_color.rgb * (0.18 + inner_edge * 0.28), action_glow * base.a);
 	lifted = mix(lifted, damage_color.rgb, damage_flash * base.a * (0.42 + inner_edge * 0.24));
 	float outline_alpha = outer_edge * rim_strength * outer_rim_scale;
+	float lantern_surface = max(metal_mask * 0.72, inner_edge * 0.38) * base.a;
+	lifted += lantern_color.rgb * lantern_glint * (base.a * 0.028 + lantern_surface * 0.24);
+	outline_alpha = clamp(outline_alpha + outer_edge * lantern_glint * 0.14, 0.0, 1.0);
 	vec3 final_color = mix(lifted, rim_color.rgb, outline_alpha);
 	COLOR = vec4(final_color, max(base.a, outline_alpha));
 }

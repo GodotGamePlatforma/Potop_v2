@@ -127,6 +127,9 @@ var _camera_lead_velocity_world := Vector2.ZERO
 var _camera_profile_valid := false
 var _camera_follow_smoothing_enabled := true
 var _camera_follow_smoothing_captured := false
+var _lantern_glint_enabled := false
+var _lantern_glint_color := Color.WHITE
+var _lantern_glint_strength := 0.0
 
 
 func _ready() -> void:
@@ -328,6 +331,7 @@ func set_graphics_quality(quality_id: String) -> void:
 	var effects := visual_effects if visual_effects != null else get_node_or_null("VisualEffects")
 	if effects != null and effects.has_method("set_graphics_quality"):
 		effects.set_graphics_quality(_graphics_quality)
+	_update_readability_material()
 
 
 ## Applies only the local material construction treatment. Root equipment owns
@@ -723,10 +727,24 @@ func _camera_movement_response(speed: float) -> float:
 
 
 ## Compatibility seam for the root controller. The canonical LightSystem writes
-## every emission property directly to light_source(); the avatar only guarantees
-## that this single radial source remains centered on its physical root.
-func set_lantern_presentation(_enabled: bool, _color: Color, _outer_radius: float, _energy: float) -> void:
+## every emission property directly to light_source(); the avatar only derives a
+## small material glint from the same values and keeps the single radial source
+## centered on its physical root.
+func set_lantern_presentation(enabled: bool, color: Color, outer_radius: float, energy: float) -> void:
+	_lantern_glint_enabled = enabled and is_finite(outer_radius) and is_finite(energy) and energy > 0.001
+	_lantern_glint_color = Color(
+		clampf(color.r, 0.0, 1.0) if is_finite(color.r) else 1.0,
+		clampf(color.g, 0.0, 1.0) if is_finite(color.g) else 1.0,
+		clampf(color.b, 0.0, 1.0) if is_finite(color.b) else 1.0,
+		1.0
+	)
+	if _lantern_glint_enabled:
+		var radius_weight := smoothstep(240.0, 520.0, maxf(outer_radius, 0.0))
+		_lantern_glint_strength = clampf(energy, 0.0, 1.5) * lerpf(0.30, 0.48, radius_weight)
+	else:
+		_lantern_glint_strength = 0.0
 	_update_light_mount()
+	_update_readability_material()
 
 
 ## Receives presentation-only values derived from the canonical dive session.
@@ -973,6 +991,9 @@ func presentation_state() -> Dictionary:
 		"is_towing": _is_towing,
 		"cue": _cue_kind,
 		"cue_time_left": maxf(_cue_duration - _cue_elapsed, 0.0),
+		"lantern_glint_enabled": _lantern_glint_enabled,
+		"lantern_glint_color": _lantern_glint_color,
+		"lantern_glint_strength": _lantern_glint_strength,
 		"suit_quality": _suit_quality,
 		"locomotion_state": _locomotion_state,
 		"locomotion_target": _locomotion_target,
@@ -1349,11 +1370,20 @@ func _update_readability_material() -> void:
 		action_glow = 0.18 + 0.10 * sin(_interaction_progress * PI * 5.0)
 		action_color = Color("75d7d0") if _interaction_action == &"repair" else Color("e9b958")
 	if _cue_kind in [&"knife_attack", &"harpoon_attack", &"repair", &"interaction"]:
-		action_glow = maxf(action_glow, cue_phase * (0.42 if _cue_kind == &"harpoon_attack" else 0.30))
-		action_color = Color("e8bd66") if _cue_kind == &"harpoon_attack" else Color("79ded4")
+		var cue_glow := 0.30
+		if _cue_kind == &"knife_attack":
+			cue_glow = 0.54
+		elif _cue_kind == &"harpoon_attack":
+			cue_glow = 0.42
+		action_glow = maxf(action_glow, cue_phase * cue_glow)
+		action_color = (
+			Color("e8bd66")
+			if _cue_kind == &"harpoon_attack"
+			else Color("b7f0e9") if _cue_kind == &"knife_attack" else Color("79ded4")
+		)
 	if _attack_active:
 		var attack_envelope := sin(clampf(_attack_progress, 0.0, 1.0) * PI)
-		action_glow = maxf(action_glow, 0.24 + attack_envelope * 0.24)
+		action_glow = maxf(action_glow, 0.32 + attack_envelope * 0.36)
 		var contact_reached := _attack_progress + 0.000001 >= _attack_impact_progress
 		action_color = (
 			Color("f0c56b")
@@ -1362,12 +1392,17 @@ func _update_readability_material() -> void:
 		)
 	var damage_flash := cue_phase * 0.46 if _cue_kind == &"hit" else 0.0
 	if _reduced_motion:
-		action_glow *= 0.72
+		action_glow *= 0.78
 		damage_flash *= 0.72
+	var quality_glint_scale := 0.72 if _graphics_quality == "low" else 0.86 if _graphics_quality == "medium" else 1.0
+	var motion_glint_scale := 0.88 if _reduced_motion else 1.0
+	var lantern_glint := _lantern_glint_strength * quality_glint_scale * motion_glint_scale
 	for shader_material in _readability_materials():
 		shader_material.set_shader_parameter(&"action_glow", clampf(action_glow, 0.0, 1.0))
 		shader_material.set_shader_parameter(&"damage_flash", clampf(damage_flash, 0.0, 1.0))
 		shader_material.set_shader_parameter(&"action_color", action_color)
+		shader_material.set_shader_parameter(&"lantern_glint", clampf(lantern_glint, 0.0, 1.0))
+		shader_material.set_shader_parameter(&"lantern_color", _lantern_glint_color)
 
 
 func _validate_suit_presentation_profile() -> bool:

@@ -767,13 +767,15 @@ func _capture_lantern_matrix() -> bool:
 	_diver.animated_sprite.pause()
 	_diver.animated_sprite.set_frame_and_progress(0, 0.0)
 	var cases: Array[Dictionary] = [
-		{"file": "lantern_off.png", "label": "WYŁĄCZONA", "gear": LanternMk1, "enabled": false, "flip": false},
-		{"file": "lantern_mk1_right.png", "label": "LATARNIA I — PRAWO", "gear": LanternMk1, "enabled": true, "flip": false},
-		{"file": "lantern_mk1_left.png", "label": "LATARNIA I — LEWO", "gear": LanternMk1, "enabled": true, "flip": true},
-		{"file": "lantern_mk2_right.png", "label": "LATARNIA II — PRAWO", "gear": LanternMk2, "enabled": true, "flip": false},
-		{"file": "lantern_mk2_left.png", "label": "LATARNIA II — LEWO", "gear": LanternMk2, "enabled": true, "flip": true},
+		{"file": "lantern_off.png", "label": "WYŁĄCZONA", "gear": LanternMk1, "enabled": false, "flip": false, "suit": 1},
+		{"file": "lantern_mk1_right.png", "label": "LATARNIA I — PRAWO", "gear": LanternMk1, "enabled": true, "flip": false, "suit": 1},
+		{"file": "lantern_mk1_left.png", "label": "LATARNIA I — LEWO", "gear": LanternMk1, "enabled": true, "flip": true, "suit": 1},
+		{"file": "lantern_mk2_right.png", "label": "LATARNIA II — PRAWO", "gear": LanternMk2, "enabled": true, "flip": false, "suit": 1},
+		{"file": "lantern_mk2_left.png", "label": "LATARNIA II — LEWO", "gear": LanternMk2, "enabled": true, "flip": true, "suit": 1},
+		{"file": "lantern_mk2_abyss_right.png", "label": "LATARNIA II — ABYSS", "gear": LanternMk2, "enabled": true, "flip": false, "suit": 4},
 	]
 	for capture_case: Dictionary in cases:
+		_diver.set_suit_quality_presentation(int(capture_case["suit"]))
 		_diver.animated_sprite.flip_h = bool(capture_case["flip"])
 		_diver._update_socket_markers()
 		_diver._update_light_mount()
@@ -781,6 +783,16 @@ func _capture_lantern_matrix() -> bool:
 			push_error("Could not configure radial lantern capture case %s." % capture_case["file"])
 			ambient.queue_free()
 			return false
+		var lantern_gear: Resource = capture_case["gear"]
+		var lantern_color: Color = lantern_gear.get("light_color")
+		var lantern_outer_radius := float(lantern_gear.get("light_outer_radius"))
+		var lantern_energy := float(lantern_gear.get("light_energy"))
+		_diver.set_lantern_presentation(
+			bool(capture_case["enabled"]),
+			lantern_color,
+			lantern_outer_radius,
+			lantern_energy
+		)
 		_status.text = "RADIALNE ŚWIATŁO — %s  |  ORIGIN (0, 0)" % capture_case["label"]
 		queue_redraw()
 		await get_tree().process_frame
@@ -788,6 +800,8 @@ func _capture_lantern_matrix() -> bool:
 		if not _save_viewport_png("%s/%s" % [CAPTURE_ROOT, capture_case["file"]]):
 			ambient.queue_free()
 			return false
+	_diver.set_lantern_presentation(false, Color.WHITE, 0.0, 0.0)
+	_diver.set_suit_quality_presentation(1)
 	dive_light.enabled = false
 	_show_light_overlay = false
 	_light_qa_geometry.visible = false
