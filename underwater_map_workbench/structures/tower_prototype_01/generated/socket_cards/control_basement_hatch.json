@@ -46,7 +46,7 @@
     },
     "surface_detail_mask_local": {
       "path": "structures/tower_prototype_01/generated/surface_detail_mask_local.png",
-      "sha256": "2115bbeb0fcea23f3ed21a32a98bd82dee013650564b0c08940e34ddc8a6f88c"
+      "sha256": "635de48de54746162405ab7b1b777d754f80eb13987d7b995b40bd374390c567"
     }
   },
   "native_pixel_rect": [

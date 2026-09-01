@@ -3,25 +3,201 @@
   "base": "open_water",
   "operations": [
     {
-      "id": "city_ground_band",
+      "id": "s_loop_world_mass",
       "op": "solid_rect",
       "space": "world_px",
       "rect_px": [
         0,
-        162,
+        0,
         576,
-        36
+        324
       ]
     },
     {
-      "id": "parking_descent_east",
+      "id": "s_loop_station_trench",
       "op": "open_rect",
       "space": "world_px",
       "rect_px": [
-        480,
-        162,
-        48,
-        36
+        268,
+        12,
+        40,
+        84
+      ]
+    },
+    {
+      "id": "s_loop_archive_upper",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        155,
+        54,
+        131,
+        23
+      ]
+    },
+    {
+      "id": "s_loop_archive_west",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        145,
+        54,
+        49,
+        80
+      ]
+    },
+    {
+      "id": "s_loop_archive_descent",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        150,
+        124,
+        38,
+        76
+      ]
+    },
+    {
+      "id": "s_loop_middle_trunk",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        150,
+        170,
+        252,
+        30
+      ]
+    },
+    {
+      "id": "s_loop_central_return",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        302,
+        86,
+        22,
+        84
+      ]
+    },
+    {
+      "id": "tower2_west_entry_vestibule",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        308,
+        66,
+        22,
+        16
+      ]
+    },
+    {
+      "id": "tower2_east_egress_approach",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        390,
+        155,
+        14,
+        17
+      ]
+    },
+    {
+      "id": "s_loop_r3_chamber",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        332,
+        168,
+        70,
+        44
+      ]
+    },
+    {
+      "id": "s_loop_east_knee",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        380,
+        196,
+        26,
+        58
+      ]
+    },
+    {
+      "id": "s_loop_c4_safe_route",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        400,
+        210,
+        130,
+        24
+      ]
+    },
+    {
+      "id": "s_loop_c4_risk_route",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        400,
+        250,
+        130,
+        24
+      ]
+    },
+    {
+      "id": "s_loop_c4_west_link",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        390,
+        210,
+        24,
+        64
+      ]
+    },
+    {
+      "id": "s_loop_c4_east_link",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        510,
+        210,
+        24,
+        64
+      ]
+    },
+    {
+      "id": "s_loop_c4_chamber",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        472,
+        232,
+        66,
+        44
+      ]
+    },
+    {
+      "id": "s_loop_c4_service_link",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        436,
+        234,
+        16,
+        16
+      ]
+    },
+    {
+      "id": "s_loop_salvage_basin",
+      "op": "open_rect",
+      "space": "world_px",
+      "rect_px": [
+        360,
+        268,
+        108,
+        40
       ]
     }
   ]

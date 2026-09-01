@@ -1,6 +1,7 @@
 extends SceneTree
 
 const CampaignProgressionSystemScript := preload("res://scripts/campaign/CampaignProgressionSystem.gd")
+const BuildingStateScript := preload("res://scripts/data/BuildingState.gd")
 const DiveResultScript := preload("res://scripts/data/DiveResult.gd")
 const ExpeditionPreparationSystemScript := preload("res://scripts/diving/ExpeditionPreparationSystem.gd")
 const GameDatabaseScript := preload("res://scripts/core/GameDatabase.gd")
@@ -59,6 +60,7 @@ func _initialize() -> void:
 
 
 func _test_semantic_mission_activation(database) -> void:
+	_test_manifest_placement_activation(database)
 	var state = GameStateScript.new()
 	state.setup_new_campaign(8511, database.get_standard_difficulty())
 	_remove_fixed_device_records(state.underwater_world.blueprint, CampaignProgressionSystemScript.ARCHIVE_TERMINAL_DEVICE_ID)
@@ -75,9 +77,7 @@ func _test_semantic_mission_activation(database) -> void:
 	var semantic_guidance: Dictionary = missions.expedition_guidance(state)
 	_assert(str(semantic_guidance.get("mission_id", "")) == "old_signal" and str(semantic_guidance.get("landmark_id", "")).is_empty(), "Archive guidance must remain active without claiming an unplaced landmark.")
 	_assert(str(semantic_guidance.get("guidance", "")).contains("Archiwum"), "Archive guidance must preserve the active campaign destination name.")
-	_assert(not missions._definition_targets_are_available(state, missions.mission_definition("rescue_leon")), "A rescue definition must remain dormant until its rescue record is placed by the manifest.")
 	_assert(not missions._definition_targets_are_available(state, missions.mission_definition("return_network")), "A navigation definition must remain dormant until the manifest provides its required buoy placement.")
-	_assert(not missions._definition_targets_are_available(state, missions.mission_definition("heavy_recovery")), "A heavy-recovery definition must remain dormant until the manifest contains a heavy object.")
 
 	var entry_id := str(state.underwater_world.blueprint.entry_landmark_id)
 	state.underwater_world.blueprint.fixed_device_spawns.append({
@@ -88,6 +88,84 @@ func _test_semantic_mission_activation(database) -> void:
 	missions.reconcile(state)
 	var guidance: Dictionary = missions.expedition_guidance(state)
 	_assert(str(guidance.get("landmark_id", "")) == entry_id and str(guidance.get("landmark_label", "")) == "Terminal testowy", "Once placed, Archive guidance must derive its target and display label from the current blueprint record.")
+
+
+func _test_manifest_placement_activation(database) -> void:
+	var state = GameStateScript.new()
+	state.setup_new_campaign(8512, database.get_standard_difficulty())
+	state.tutorial.complete()
+	_add_built_building(state, "diving_station", 4)
+	_add_built_building(state, "workshop", 3)
+	var contracts := [
+		{"mission_id": "rescue_leon", "blueprint_property": "rescue_spawns", "record_id": "rescue_leon"},
+		{"mission_id": "heavy_recovery", "blueprint_property": "heavy_object_spawns", "record_id": "sunken_transformer"},
+	]
+	var blueprint = state.underwater_world.blueprint
+	var saved_records_by_property := {}
+	for contract in contracts:
+		var blueprint_property := str(contract.blueprint_property)
+		var records: Array = blueprint.get(blueprint_property)
+		var saved_records := records.duplicate(true)
+		var has_expected_record := false
+		for record_value in saved_records:
+			if (
+				record_value is Dictionary
+				and str((record_value as Dictionary).get("id", "")) == str(contract.record_id)
+				and not str((record_value as Dictionary).get("landmark_id", "")).is_empty()
+			):
+				has_expected_record = true
+				break
+		_assert(
+			has_expected_record,
+			"%s must use the active manifest placement fixture %s." % [contract.mission_id, contract.record_id],
+		)
+		saved_records_by_property[blueprint_property] = saved_records
+		records.clear()
+
+	var missions = MissionSystemScript.new()
+	missions.reconcile(state)
+	for contract in contracts:
+		var mission_id := str(contract.mission_id)
+		var definition = missions.mission_definition(mission_id)
+		_assert(definition != null, "Manifest placement contract requires mission definition %s." % mission_id)
+		if definition == null:
+			continue
+		_assert(
+			not missions._definition_targets_are_available(state, definition),
+			"%s must reject an empty manifest placement fixture." % mission_id,
+		)
+		_assert(
+			not state.mission_progress.is_active(mission_id),
+			"%s must remain dormant while its manifest placement is absent." % mission_id,
+		)
+
+	for contract in contracts:
+		var blueprint_property := str(contract.blueprint_property)
+		var records: Array = blueprint.get(blueprint_property)
+		records.assign(saved_records_by_property[blueprint_property] as Array)
+	missions.reconcile(state)
+	for contract in contracts:
+		var mission_id := str(contract.mission_id)
+		var definition = missions.mission_definition(mission_id)
+		if definition == null:
+			continue
+		_assert(
+			missions._definition_targets_are_available(state, definition),
+			"%s must accept its active manifest placement fixture." % mission_id,
+		)
+		_assert(
+			state.mission_progress.is_active(mission_id),
+			"%s must activate when its manifest placement and non-placement prerequisites exist." % mission_id,
+		)
+
+
+func _add_built_building(state, definition_id: String, level: int) -> void:
+	var building = BuildingStateScript.new()
+	building.id = "mission_fixture_%s" % definition_id
+	building.definition_id = definition_id
+	building.level = level
+	building.is_built = true
+	state.buildings.append(building)
 
 
 func _apply_device(campaign, state, device_id: String) -> void:
