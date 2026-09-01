@@ -3,7 +3,7 @@
   "revision": {
     "revision_id": "center-station-right-city-two-tower-runtime-v13",
     "topology_revision": "l05-owned-two-tower-route-v5",
-    "presentation_revision": "drowned-city-visual-hierarchy-v26"
+    "presentation_revision": "drowned-world-regional-depth-v27"
   },
   "map": {
     "id": "underwater_map_clean_12x12",
@@ -28,10 +28,10 @@
   },
   "visual": {
     "water_color": "071d2a",
-    "deep_water_color": "031019",
-    "grid_color": "21485a",
-    "border_color": "62a8b8",
-    "station_color": "d7c382",
+    "deep_water_color": "020a12",
+    "grid_color": "163c4a",
+    "border_color": "4f93a0",
+    "station_color": "d69a55",
     "grid_width": 3.0,
     "border_width": 12.0,
     "diagnostic_grid_enabled": false,
@@ -60,7 +60,7 @@
           0.5,
           1.0
         ],
-        "rgb_modulate": "657786",
+        "rgb_modulate": "38535e",
         "enabled": true,
         "reserved": false,
         "affordance_policy": "nonblocking_backdrop_may_overlap_open_water",
@@ -75,7 +75,7 @@
           0.65,
           1.0
         ],
-        "rgb_modulate": "7f919d",
+        "rgb_modulate": "5d7d7b",
         "enabled": true,
         "reserved": false,
         "affordance_policy": "nonblocking_backdrop_may_overlap_open_water",
@@ -212,7 +212,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [54, 220, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -225,7 +225,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [514, 0, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -247,10 +247,10 @@
         "layer_id": "L01",
         "group_id": "Elements",
         "kind": "texture_rect",
-        "path": "assets/visual/l01_ruin_archive_spine.png",
-        "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [214, 4764, 234, 1635],
+        "path": "assets/visual/l01_ruin_approach_spire.png",
+        "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
+        "pixel_size": [341, 1696],
+        "world_rect": [214, 4764, 341, 1696],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -264,7 +264,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [2024, 5605, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -277,7 +277,7 @@
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
         "pixel_size": [437, 1371],
         "world_rect": [1552, 7056, 437, 1371],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -290,7 +290,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [1867, 6825, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -316,7 +316,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [564, 11525, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -329,7 +329,7 @@
         "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
         "pixel_size": [341, 1696],
         "world_rect": [1440, 11264, 341, 1696],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -355,7 +355,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [5413, 2490, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -368,7 +368,7 @@
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
         "pixel_size": [437, 1371],
         "world_rect": [3962, 5104, 437, 1371],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -394,7 +394,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [3913, 9250, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -407,7 +407,7 @@
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
         "pixel_size": [437, 1371],
         "world_rect": [5252, 11589, 437, 1371],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -420,7 +420,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [5920, 475, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -446,7 +446,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [5814, 4844, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -459,7 +459,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [7200, 7035, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -485,7 +485,7 @@
         "sha256": "184aa3ef577ca069f434a187578204d14a59d1f37e175abbb170c9ef09088217",
         "pixel_size": [341, 1696],
         "world_rect": [7040, 11264, 341, 1696],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -498,7 +498,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [9787, 1498, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -511,7 +511,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [11264, 3193, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -537,7 +537,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [11077, 8126, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -550,7 +550,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [9794, 9438, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -576,7 +576,7 @@
         "sha256": "c75af13674980cc47cc865a981cab73f8141ca72ebd1416b361bc18f9408882b",
         "pixel_size": [307, 705],
         "world_rect": [6420, 81, 307, 705],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -589,7 +589,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [8360, 1731, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -602,7 +602,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [3376, 3187, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -615,7 +615,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [10512, 4403, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -628,7 +628,7 @@
         "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
         "pixel_size": [234, 1635],
         "world_rect": [6176, 7395, 234, 1635],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -641,7 +641,7 @@
         "sha256": "05bd4d7dc121154662289bdd1f7ef62fa2ce97a6487814154844c75940e017e3",
         "pixel_size": [437, 1371],
         "world_rect": [1834, 8199, 437, 1371],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -654,7 +654,7 @@
         "sha256": "ac3d9fac9d27c03801320ad5cd777d220facc06377446f70ba42429d3b7d95b7",
         "pixel_size": [64, 1593],
         "world_rect": [10493, 11367, 64, 1593],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
@@ -667,19 +667,19 @@
         "sha256": "886e68f0a9c0abd0a2cd08742be87e20f0ff8771a4ea462ef10f72a37b42cf25",
         "pixel_size": [140, 867],
         "world_rect": [7823, 12093, 140, 867],
-        "enabled": true,
+        "enabled": false,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
       },
       {
-        "id": "l01_gap_accent_63",
+        "id": "l01_c4_mid_spire_d",
         "layer_id": "L01",
         "group_id": "Elements",
         "kind": "texture_rect",
-        "path": "assets/visual/l01_ruin_archive_spine.png",
-        "sha256": "85ad0fb874ce8afe2fbf7a7f09ac4cb39ce465e4ceac68a5a6d9953f5b894b6d",
-        "pixel_size": [234, 1635],
-        "world_rect": [11112, 4402, 234, 1635],
+        "path": "assets/visual/l01_ruin_c4_spire_d.png",
+        "sha256": "de9e2cdf362bfb3f532f0b706176c94dcd409716e7d659b24b33a13911ba61f5",
+        "pixel_size": [107, 609],
+        "world_rect": [11112, 4580, 107, 609],
         "enabled": true,
         "affordance": "nonblocking_backdrop",
         "topology_digest": ""
@@ -864,8 +864,8 @@
           3760
         ],
         "world_rect": [
-          17040,
-          2800,
+          13750,
+          9200,
           960,
           3760
         ],
@@ -949,8 +949,8 @@
         5760,
         12960
       ],
-      "water_color": "071d2a",
-      "accent_color": "62a8b8"
+      "water_color": "06252a",
+      "accent_color": "3fa8a2"
     },
     {
       "id": "archive_sector",
@@ -961,8 +961,8 @@
         5760,
         12960
       ],
-      "water_color": "081b29",
-      "accent_color": "7aa7b8"
+      "water_color": "071c28",
+      "accent_color": "5d8ba5"
     },
     {
       "id": "r3_sector",
@@ -973,8 +973,8 @@
         5760,
         12960
       ],
-      "water_color": "071825",
-      "accent_color": "7f9f8a"
+      "water_color": "0a211f",
+      "accent_color": "70a884"
     },
     {
       "id": "c4_sector",
@@ -985,8 +985,8 @@
         5760,
         12960
       ],
-      "water_color": "061522",
-      "accent_color": "9c866a"
+      "water_color": "171813",
+      "accent_color": "b27b4f"
     }
   ],
   "topology": {
